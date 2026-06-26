@@ -4,7 +4,7 @@ import { Home } from './pages/Home';
 
 function App() {
   return (
-    <div className="flex min-h-screen bg-[#0a1226]">
+    <div className="flex min-h-screen bg-[#080d1e]">
       <Sidebar />
       <div className="flex-1 flex flex-col">
         <TopBar />

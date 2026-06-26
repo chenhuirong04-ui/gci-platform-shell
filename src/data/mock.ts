@@ -1,35 +1,80 @@
-export interface FactReminder {
+export interface FactTile {
   id: string;
-  source: string;
-  text: string;
+  count: string;
+  label: string;
+  mod: string;
+  accent: 'gold' | 'coral' | 'neutral';
+}
+
+export interface PriorityAlert {
+  id: string;
   severity: 'high' | 'mid' | 'low';
+  text: string;
+  ref: string;
+  source: 'QUOTATION' | 'FINANCE' | 'TRADE' | 'CRM';
+  action: string;
+  mod: string;
 }
 
-export interface HighlightItem {
-  id: string;
-  title: string;
-  detail: string;
-}
-
-export interface QuickLink {
+export interface QuickAction {
   id: string;
   label: string;
-  url: string;
+  icon: string;
 }
 
-export const factReminders: FactReminder[] = [
-  { id: 'f1', source: 'DEAL', text: '5 个客户今天到跟进日期，3 个已超期未处理', severity: 'high' },
-  { id: 'f2', source: 'Trade OS', text: '2 笔 PI 报价等待客户确认，1 笔超过 48 小时未回复', severity: 'mid' },
-  { id: 'f3', source: 'Quotation', text: '昨日新增 1 份 FF&E 报价单，待转交 Trade 出单', severity: 'low' },
+export const summaryLine =
+  '今天有 2 件逾期事项、1 份报价待发送。处理完重点提醒后，按模块继续。';
+
+export const factTiles: FactTile[] = [
+  { id: 'ft1', count: '5', label: '待跟进客户', mod: 'CRM', accent: 'gold' },
+  { id: 'ft2', count: '4', label: '待完成报价', mod: 'Quotation', accent: 'neutral' },
+  { id: 'ft3', count: '2', label: '待确认订单', mod: 'Trade', accent: 'neutral' },
+  { id: 'ft4', count: '3', label: '今日到期应收', mod: 'Finance', accent: 'neutral' },
+  { id: 'ft5', count: '2', label: '库存异常', mod: 'Inventory', accent: 'coral' },
 ];
 
-export const highlights: HighlightItem[] = [
-  { id: 'h1', title: '迪拜项目 — 卫生用品批次', detail: '客户已确认样品，等待签约，建议本周跟进' },
-  { id: 'h2', title: '中国供应链 — 家居建材报价', detail: 'Quotation 已出价，Trade 尚未生成 PI' },
+export const priorityAlerts: PriorityAlert[] = [
+  {
+    id: 'a1',
+    severity: 'high',
+    text: 'Al Habtoor — The Grove 报价已等待客户确认 2 天',
+    ref: 'Q-2026-014 · AED 1.2M',
+    source: 'QUOTATION',
+    action: '跟进',
+    mod: 'Quotation',
+  },
+  {
+    id: 'a2',
+    severity: 'high',
+    text: 'Kuwait Trading — 应收款项逾期 8 天未收',
+    ref: 'SO-2026-077 · AED 147K',
+    source: 'FINANCE',
+    action: '查看',
+    mod: 'Finance',
+  },
+  {
+    id: 'a3',
+    severity: 'low',
+    text: 'Qatar Rail BOQ 已解析完成，等待发送给客户',
+    ref: 'Q-2026-021 · AED 880K',
+    source: 'QUOTATION',
+    action: '发送',
+    mod: 'Quotation',
+  },
+  {
+    id: 'a4',
+    severity: 'mid',
+    text: 'Kuwait Trading 订单交期还有 3 天，需确认备货',
+    ref: 'SO-2026-077 · 灯具 600 pcs',
+    source: 'TRADE',
+    action: '查看',
+    mod: 'Trade',
+  },
 ];
 
-export const quickLinks: QuickLink[] = [
-  { id: 'q1', label: '打开今日跟进看板', url: 'https://leads.globalcareinfo.com' },
-  { id: 'q2', label: '查看资金流水', url: 'https://trade.globalcareinfo.com' },
-  { id: 'q3', label: '新建报价单', url: 'https://living.globalcareinfo.com' },
+export const quickActions: QuickAction[] = [
+  { id: 'qa1', label: '新增客户', icon: '+' },
+  { id: 'qa2', label: '创建报价', icon: '＄' },
+  { id: 'qa3', label: '上传 BOQ', icon: '↑' },
+  { id: 'qa4', label: '创建订单', icon: '▣' },
 ];
