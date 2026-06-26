@@ -1,0 +1,54 @@
+:root {
+  /* COLORS — BACKGROUND */
+  --bg-base: #080d1e;
+  --bg-shell: #060b18;
+  --bg-surface: #0f1830;
+  --bg-raised: #162040;
+
+  /* COLORS — ACCENT + TEXT */
+  --gold-strong: #e2c988;
+  --gold-base: #cba85c;
+  --gold-muted: #a07f3c;
+  --text-primary: #f0ead2;
+  --text-secondary: #c8bda8;
+  --text-muted: #8a8070;
+
+  /* COLORS — STATUS */
+  --status-success: #6fbf8e;
+  --status-warning: #d9b45a;
+  --status-danger: #e0846a;
+  --status-info: #8fa6d4;
+  --status-purple: #b69bd0;
+
+  /* TYPOGRAPHY */
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Noto Sans SC', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  /* LAYOUT */
+  --sidebar-w: 222px;
+  --header-h: 52px;
+  --canvas-w: 1440px;
+  --content-max-w: 920px;
+  --page-padding: 48px;
+  --section-gap: 72px;
+
+  /* RADIUS */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 18px;
+
+  /* SPACING SCALE */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s8: 32px;
+  --s10: 40px;
+  --s12: 48px;
+  --s16: 64px;
+}

@@ -15,11 +15,17 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* Shared packages */
+    "paths": {
+      "@gci/design-system": ["./packages/design-system/src"],
+      "@gci/i18n": ["./packages/i18n/src"]
+    },
+
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src", "packages"]
 }

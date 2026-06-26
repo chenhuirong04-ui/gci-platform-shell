@@ -1,0 +1,8 @@
+{
+  "name": "@gci/design-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GCI Enterprise Design System V1 — shared tokens and UI primitives for CRM, Quotation Center, Trade OS and Platform Shell.",
+  "main": "src/index.ts",
+  "types": "src/index.ts"
+}

@@ -1,25 +1,14 @@
 @import "tailwindcss";
-
-:root {
-  --gci-bg: #080d1e;
-  --gci-sidebar-bg: #060b18;
-  --gci-border: rgba(255, 255, 255, 0.07);
-  --gci-gold: #cba85c;
-  --gci-gold-soft: #e2c988;
-  --gci-text: #f0ead2;
-  --gci-text-dim: #a89878;
-  --gci-text-faint: #5e677e;
-  --gci-coral: #e0846a;
-}
+@import "../packages/design-system/src/tokens.css";
 
 html,
 body,
 #root {
   margin: 0;
   min-height: 100vh;
-  background: var(--gci-bg);
-  color: var(--gci-text);
-  font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-body), var(--font-display), 'Segoe UI', system-ui, sans-serif;
 }
 
 * {
