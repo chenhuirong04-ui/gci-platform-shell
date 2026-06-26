@@ -1,103 +1,223 @@
-import { navTop, navMods, type NavItem } from '../config/navigation';
+import { navTop, navMods } from '../config/navigation';
+import { aLogoBg, aNavBg, aNavBd } from '../theme/accent';
 
-const ACCENT_TEXT: Record<string, string> = {
-  gold: 'text-[#e2c988]',
-  coral: 'text-[#d0907a]',
-  neutral: 'text-[#a89878]',
-};
+export function Sidebar({ onSoonClick }: { onSoonClick: (name: string) => void }) {
+  return (
+    <aside
+      className="shrink-0 hidden md:flex md:flex-col relative"
+      style={{
+        width: 222,
+        background: '#060B18',
+        borderRight: '1px solid rgba(255,255,255,0.055)',
+        padding: '22px 14px',
+      }}
+    >
+      <div
+        className="absolute"
+        style={{
+          top: '20%',
+          right: 0,
+          width: 1,
+          height: '60%',
+          background:
+            'linear-gradient(180deg,transparent,rgba(203,168,92,0.25),transparent)',
+        }}
+      />
 
-const ACCENT_BG: Record<string, string> = {
-  gold: 'bg-[rgba(203,168,92,0.16)]',
-  coral: 'bg-[rgba(224,132,106,0.14)]',
-  neutral: 'bg-white/[0.07]',
-};
-
-function ModRow({ item }: { item: NavItem }) {
-  const inner = (
-    <>
-      <span className="font-mono-label text-[10px] text-[#5e677e] w-5 shrink-0">
-        {item.code}
-      </span>
-      <span
-        className={`flex-1 text-sm ${
-          item.kind === 'soon' ? 'text-[#5e677e]' : 'text-[#dfe4ee]'
-        }`}
+      <div
+        className="flex items-center"
+        style={{
+          gap: 11,
+          padding: '4px 8px 22px',
+          borderBottom: '1px solid rgba(255,255,255,0.05)',
+          marginBottom: 20,
+        }}
       >
-        {item.name}
-      </span>
-      {item.count && (
-        <span
-          className={`font-mono-label text-[11px] rounded px-1.5 py-0.5 ${
-            ACCENT_BG[item.accent ?? 'neutral']
-          } ${ACCENT_TEXT[item.accent ?? 'neutral']}`}
+        <div
+          className="flex items-center justify-center shrink-0"
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 9,
+            background: aLogoBg,
+            fontFamily: "'Space Grotesk',sans-serif",
+            fontWeight: 700,
+            fontSize: 14,
+            color: '#080D1E',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+          }}
         >
-          {item.count}
-        </span>
-      )}
-      {item.kind === 'soon' && (
-        <span className="font-mono-label text-[9px] tracking-wide text-[#5e677e] border border-white/[0.08] rounded px-1.5 py-0.5">
-          即将上线
-        </span>
-      )}
-    </>
-  );
-
-  const className =
-    'flex items-center gap-2 rounded-lg px-3 py-2.5 transition-colors';
-
-  if (item.kind === 'external') {
-    return (
-      <a
-        href={item.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`${className} hover:bg-white/[0.04]`}
-      >
-        {inner}
-      </a>
-    );
-  }
-
-  return (
-    <div className={`${className} opacity-60 cursor-default`}>{inner}</div>
-  );
-}
-
-export function Sidebar() {
-  return (
-    <aside className="w-64 shrink-0 border-r border-white/[0.07] bg-[#060b18] p-5 hidden md:flex md:flex-col">
-      <div className="flex items-center gap-3 mb-8 px-1">
-        <div className="w-9 h-9 rounded-[9px] bg-[#cba85c] flex items-center justify-center text-[#080d1e] font-bold text-sm">
           G
         </div>
         <div>
-          <div className="font-mono-label text-[10px] tracking-[0.16em] text-[#cba85c]">
-            GCI UNIFIED
+          <div
+            style={{
+              fontFamily: "'Space Grotesk',sans-serif",
+              fontSize: 14.5,
+              fontWeight: 600,
+              color: '#F0EAD2',
+              lineHeight: 1.1,
+            }}
+          >
+            GCI Platform
           </div>
-          <div className="text-[#f0ead2] text-sm font-semibold">Platform</div>
+          <div
+            className="font-mono-label"
+            style={{ fontSize: 9, letterSpacing: '0.16em', color: '#505A70', marginTop: 2 }}
+          >
+            UNIFIED · v1
+          </div>
         </div>
       </div>
 
       <div
-        className="flex items-center gap-2 rounded-lg px-3 py-2.5 mb-5 bg-[rgba(203,168,92,0.10)] border border-[rgba(203,168,92,0.28)]"
+        className="font-mono-label"
+        style={{ fontSize: 8.5, letterSpacing: '0.2em', color: '#4A5268', padding: '0 8px 8px' }}
       >
-        <span className="font-mono-label text-[10px] text-[#5e677e] w-5 shrink-0">
+        WORKSPACE
+      </div>
+      <div
+        className="nv flex items-center"
+        style={{
+          gap: 11,
+          padding: '10px 11px',
+          borderRadius: 10,
+          marginBottom: 3,
+          background: aNavBg,
+          border: `1px solid ${aNavBd}`,
+        }}
+      >
+        <span
+          className="font-mono-label flex items-center justify-center shrink-0"
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: 6,
+            fontSize: 9.5,
+            fontWeight: 600,
+            color: '#080D1E',
+            background: aLogoBg,
+          }}
+        >
           {navTop.code}
         </span>
-        <span className="text-sm text-[#f0ead2] font-medium">{navTop.name}</span>
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#F0EAD2', flex: 1 }}>
+          {navTop.name}
+        </span>
       </div>
 
-      <div className="font-mono-label text-[10px] tracking-[0.16em] text-[#5e677e] mb-2 px-1">
-        模块
+      <div
+        className="font-mono-label"
+        style={{ fontSize: 8.5, letterSpacing: '0.2em', color: '#4A5268', padding: '16px 8px 8px' }}
+      >
+        MODULES
       </div>
-      <nav className="flex flex-col gap-1">
-        {navMods.map((item) => (
-          <ModRow key={item.code} item={item} />
-        ))}
+      <nav>
+        {navMods.map((n) => {
+          const inner = (
+            <>
+              <span
+                className="font-mono-label flex items-center justify-center shrink-0"
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 6,
+                  fontSize: 9.5,
+                  fontWeight: 600,
+                  color: '#9AAABA',
+                  background: 'rgba(255,255,255,0.08)',
+                }}
+              >
+                {n.code}
+              </span>
+              <span style={{ fontSize: 13, color: '#D0CBC0', flex: 1 }}>{n.name}</span>
+              {n.count && (
+                <span
+                  className="font-mono-label"
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: n.badgeColor,
+                    background: n.badgeBg,
+                    borderRadius: 8,
+                    minWidth: 20,
+                    textAlign: 'center',
+                    padding: '1px 5px',
+                  }}
+                >
+                  {n.count}
+                </span>
+              )}
+            </>
+          );
+
+          const rowStyle = {
+            gap: 11,
+            padding: '9px 11px',
+            borderRadius: 9,
+            marginBottom: 2,
+          };
+
+          if (n.url) {
+            return (
+              <a
+                key={n.code}
+                href={n.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="nv flex items-center"
+                style={rowStyle}
+              >
+                {inner}
+              </a>
+            );
+          }
+
+          return (
+            <div
+              key={n.code}
+              className="nv flex items-center"
+              style={rowStyle}
+              onClick={() => onSoonClick(n.name)}
+            >
+              {inner}
+            </div>
+          );
+        })}
       </nav>
 
-      <div className="mt-auto font-mono-label text-[9px] tracking-[0.16em] text-[#5e677e] pt-10">
-        GCI ENTERPRISE OPERATING SYSTEM
+      <div
+        className="flex items-center"
+        style={{
+          marginTop: 'auto',
+          gap: 10,
+          padding: '11px 12px',
+          background: 'rgba(255,255,255,0.025)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: 11,
+        }}
+      >
+        <div
+          className="flex items-center justify-center shrink-0"
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg,#3D5288,#2A3A60)',
+            fontWeight: 600,
+            fontSize: 12,
+            color: '#A0B0D4',
+          }}
+        >
+          C
+        </div>
+        <div className="min-w-0" style={{ flex: 1 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: '#D8D0B8', lineHeight: 1.1 }}>
+            Chris
+          </div>
+          <div style={{ fontSize: 10, color: '#505A70', marginTop: 1 }}>Owner · GCI</div>
+        </div>
+        <span style={{ color: '#4A5268', fontSize: 14 }}>⚙</span>
       </div>
     </aside>
   );

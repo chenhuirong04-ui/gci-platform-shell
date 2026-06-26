@@ -29,3 +29,76 @@ body,
 .font-mono-label {
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
 }
+
+.nv {
+  transition: all 0.14s ease;
+  cursor: pointer;
+}
+.nv:hover {
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.fact {
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.fact:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(203, 168, 92, 0.4) !important;
+}
+
+.al {
+  transition: background 0.15s;
+}
+.al:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.qa {
+  transition: all 0.18s ease;
+  cursor: pointer;
+}
+.qa:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(203, 168, 92, 0.45) !important;
+}
+
+.lk {
+  transition: color 0.14s;
+  cursor: pointer;
+}
+.lk:hover {
+  color: #e2c988 !important;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}

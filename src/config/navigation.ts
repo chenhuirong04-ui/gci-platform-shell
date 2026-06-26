@@ -1,25 +1,62 @@
-export interface NavItem {
+export interface NavTopItem {
   code: string;
   name: string;
-  kind: 'workspace' | 'external' | 'soon';
-  url?: string;
-  count?: string;
-  accent?: 'gold' | 'coral' | 'neutral';
 }
 
-export const navTop: NavItem = {
+export interface NavModItem {
+  code: string;
+  name: string;
+  count?: string;
+  badgeColor?: string;
+  badgeBg?: string;
+  url?: string;
+}
+
+export const navTop: NavTopItem = {
   code: 'WS',
   name: '每日工作台',
-  kind: 'workspace',
 };
 
-export const navMods: NavItem[] = [
-  { code: 'CR', name: 'CRM 客户', kind: 'external', url: 'https://leads.globalcareinfo.com', count: '5', accent: 'gold' },
-  { code: 'QT', name: 'Quotation', kind: 'external', url: 'https://living.globalcareinfo.com', count: '4', accent: 'neutral' },
-  { code: 'TR', name: 'Trade', kind: 'external', url: 'https://trade.globalcareinfo.com', count: '2', accent: 'neutral' },
-  { code: 'IV', name: 'Inventory', kind: 'soon', count: '2', accent: 'coral' },
-  { code: 'FN', name: 'Finance', kind: 'soon', count: '3', accent: 'neutral' },
-  { code: 'PJ', name: 'Projects', kind: 'soon' },
-  { code: 'BI', name: 'Intelligence', kind: 'soon' },
-  { code: 'ST', name: 'Settings', kind: 'soon' },
+export const navMods: NavModItem[] = [
+  {
+    code: 'CR',
+    name: 'CRM 客户',
+    count: '5',
+    badgeColor: '#E2C988',
+    badgeBg: 'rgba(203,168,92,0.16)',
+    url: 'https://leads.globalcareinfo.com',
+  },
+  {
+    code: 'QT',
+    name: 'Quotation',
+    count: '4',
+    badgeColor: '#A89878',
+    badgeBg: 'rgba(255,255,255,0.07)',
+    url: 'https://living.globalcareinfo.com',
+  },
+  {
+    code: 'TR',
+    name: 'Trade',
+    count: '2',
+    badgeColor: '#A89878',
+    badgeBg: 'rgba(255,255,255,0.07)',
+    url: 'https://trade.globalcareinfo.com',
+  },
+  {
+    code: 'IV',
+    name: 'Inventory',
+    count: '2',
+    badgeColor: '#D0907A',
+    badgeBg: 'rgba(224,132,106,0.14)',
+  },
+  {
+    code: 'FN',
+    name: 'Finance',
+    count: '3',
+    badgeColor: '#A89878',
+    badgeBg: 'rgba(255,255,255,0.07)',
+  },
+  { code: 'PJ', name: 'Projects' },
+  { code: 'BI', name: 'Intelligence' },
+  { code: 'ST', name: 'Settings' },
 ];
