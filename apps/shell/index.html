@@ -10,6 +10,15 @@
       href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
+    <!-- Trade module fonts (was loaded via its own standalone index.html) -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Trade module: HistoryDashboard's real PDF export reads window.html2pdf
+         off this global (services/pdfExport.ts's jsPDF path is unrelated/unused
+         dead code — this is the one that actually works). -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <title>GCI Platform</title>
   </head>
   <body>

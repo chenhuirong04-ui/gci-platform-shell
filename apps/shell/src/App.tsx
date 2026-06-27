@@ -5,6 +5,7 @@ import { LangContext, dictionaries, type Lang } from '@gci/i18n';
 import { modules } from './config/navigation';
 import { Home } from './pages/Home';
 import { ModulePlaceholder } from './pages/ModulePlaceholder';
+import TradeModule from '../../../modules/trade/TradeModule';
 
 function App() {
   const [lang, setLang] = useState<Lang>('zh');
@@ -70,10 +71,7 @@ function App() {
             path="/crm/*"
             element={<ModulePlaceholder title="CRM" etaLabel="DEAL CRM 正在合并中 — 预计 Day 4-5 上线（7 天合并计划）。" />}
           />
-          <Route
-            path="/trade/*"
-            element={<ModulePlaceholder title="Trade OS" etaLabel="Trade OS 正在合并中 — 预计 Day 2-3 上线（第一个迁移模块）。" />}
-          />
+          <Route path="/trade/*" element={<TradeModule />} />
           <Route
             path="/quotation/*"
             element={<ModulePlaceholder title="Quotation Center" etaLabel="Quotation Center 正在合并中 — 预计 Day 6 上线。" />}

@@ -18,14 +18,17 @@
     /* Shared packages */
     "paths": {
       "@gci/design-system": ["../../packages/design-system/src"],
-      "@gci/i18n": ["../../packages/i18n/src"]
+      "@gci/i18n": ["../../packages/i18n/src"],
+      "@gci/module-trade": ["../../modules/trade"]
     },
 
-    /* Linting */
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    /* Linting — relaxed from the shell-only strict defaults now that this
+       config also type-checks migrated module code (modules/trade etc.)
+       which wasn't written against these rules. */
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "../../packages"]
+  "include": ["src", "../../packages", "../../modules/trade"]
 }

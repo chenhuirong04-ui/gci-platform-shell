@@ -1,6 +1,22 @@
 @import "tailwindcss";
 @import "../../../packages/design-system/src/tokens.css";
 
+/* Tailwind v4 auto-detects sources from the Vite root (apps/shell) --
+   modules/* live outside that tree, so their classes need an explicit
+   @source or the utilities they use never get generated. */
+@source "../../../modules/trade/**/*.{ts,tsx}";
+
+/* Trade module used a Tailwind CDN config (now removed) that set
+   font-sans/font-mono to Inter/JetBrains Mono. Restoring the same
+   Tailwind theme vars here keeps its existing className usage
+   (font-sans, font-mono — heavily used for monetary values) unchanged.
+   Does not affect .font-mono-label, which hardcodes IBM Plex Mono
+   directly and is independent of these theme variables. */
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
 html,
 body,
 #root {
@@ -90,4 +106,49 @@ body,
   50% {
     opacity: 0.55;
   }
+}
+
+/* ── Trade module — ported from its standalone index.html ────────────── */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  body {
+    background: white;
+  }
+  #root {
+    padding: 0;
+  }
+}
+
+input#input_offer::-webkit-outer-spin-button,
+input#input_offer::-webkit-inner-spin-button,
+input#input_qty::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+
+input[type='number'],
+input[type='text'] {
+  -moz-appearance: textfield !important;
+  appearance: none !important;
+}
+
+input::-webkit-calendar-picker-indicator {
+  display: none !important;
+  -webkit-appearance: none !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
 }
