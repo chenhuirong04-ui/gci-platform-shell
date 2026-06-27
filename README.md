@@ -1,32 +1,45 @@
-# React + TypeScript + Vite
+# GCI Platform — monorepo
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Single codebase, single route table, single AppShell for CRM, Trade OS and
+Quotation Center. This repo used to be the standalone `gci-platform-shell`
+("Daily Workspace" nav shell only); it's now the monorepo root for the full
+merge.
 
-Currently, two official plugins are available:
+## Structure
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```
+apps/shell/        the host app — router, AppShell, Sidebar, Header, Daily Workspace
+modules/crm/        DEAL CRM — migrating Day 4-5
+modules/trade/      Trade OS — migrating Day 2-3 (first module)
+modules/quotation/  Quotation Center — migrating Day 6 (largest, last)
+packages/design-system/  @gci/design-system — single source of truth for all UI tokens/components
+packages/i18n/            @gci/i18n — single source of truth for EN/中文 strings
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+`packages/design-system` and `packages/i18n` are no longer vendored copies —
+this is the canonical source. Trade OS, DEAL and Quotation each still carry a
+vendored snapshot in their own (still-independent) repos until their module
+migration lands here; after that, those vendored copies get deleted.
+
+## Routes (target)
+
+```
+app.globalcareinfo.com/             Daily Workspace
+app.globalcareinfo.com/crm/*        DEAL CRM module
+app.globalcareinfo.com/trade/*      Trade OS module
+app.globalcareinfo.com/quotation/*  Quotation Center module
+```
+
+Until a module migrates, its route renders a placeholder
+(`apps/shell/src/pages/ModulePlaceholder.tsx`) — not a redirect to the legacy
+domain. Legacy domains (`leads.`/`trade.`/`living.globalcareinfo.com`) stay
+live and untouched throughout the merge; nothing is decommissioned until the
+new monorepo is verified.
+
+## Commands (run from repo root)
+
+```
+npm install     installs all workspaces
+npm run dev     starts the shell app (apps/shell)
+npm run build   builds the shell app
+```

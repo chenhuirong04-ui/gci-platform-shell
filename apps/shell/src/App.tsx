@@ -1,14 +1,18 @@
 import { useMemo, useRef, useState } from 'react';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { AppShell, Sidebar, Header, LangToggle, Toast, type NavModItem } from '@gci/design-system';
 import { LangContext, dictionaries, type Lang } from '@gci/i18n';
 import { modules } from './config/navigation';
 import { Home } from './pages/Home';
+import { ModulePlaceholder } from './pages/ModulePlaceholder';
 
 function App() {
   const [lang, setLang] = useState<Lang>('zh');
   const [toast, setToast] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const dict = dictionaries[lang];
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const flash = (msg: string) => {
     setToast(msg);
@@ -24,10 +28,12 @@ function App() {
         count: m.count,
         badgeColor: m.badgeColor,
         badgeBg: m.badgeBg,
-        href: m.url,
-        onClick: m.url ? undefined : () => flash(dict.toast.enterModule(dict.nav[m.nameKey])),
+        active: m.path ? location.pathname === m.path : undefined,
+        onClick: m.path
+          ? () => navigate(m.path!)
+          : () => flash(dict.toast.enterModule(dict.nav[m.nameKey])),
       })),
-    [dict],
+    [dict, location.pathname, navigate],
   );
 
   const dateLine = new Date()
@@ -40,7 +46,7 @@ function App() {
       <AppShell
         sidebar={
           <Sidebar
-            navTop={{ code: 'WS', name: dict.nav.workspace }}
+            navTop={{ code: 'WS', name: dict.nav.workspace, active: location.pathname === '/', onClick: () => navigate('/') }}
             navMods={navMods}
             workspaceLabel={dict.nav.workspaceSection}
             modulesLabel={dict.nav.modulesSection}
@@ -58,7 +64,21 @@ function App() {
           />
         }
       >
-        <Home onFlash={flash} />
+        <Routes>
+          <Route path="/" element={<Home onFlash={flash} />} />
+          <Route
+            path="/crm/*"
+            element={<ModulePlaceholder title="CRM" etaLabel="DEAL CRM 正在合并中 — 预计 Day 4-5 上线（7 天合并计划）。" />}
+          />
+          <Route
+            path="/trade/*"
+            element={<ModulePlaceholder title="Trade OS" etaLabel="Trade OS 正在合并中 — 预计 Day 2-3 上线（第一个迁移模块）。" />}
+          />
+          <Route
+            path="/quotation/*"
+            element={<ModulePlaceholder title="Quotation Center" etaLabel="Quotation Center 正在合并中 — 预计 Day 6 上线。" />}
+          />
+        </Routes>
       </AppShell>
       <Toast message={toast} />
     </LangContext.Provider>

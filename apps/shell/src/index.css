@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "../packages/design-system/src/tokens.css";
+@import "../../../packages/design-system/src/tokens.css";
 
 html,
 body,

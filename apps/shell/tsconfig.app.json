@@ -17,8 +17,8 @@
 
     /* Shared packages */
     "paths": {
-      "@gci/design-system": ["./packages/design-system/src"],
-      "@gci/i18n": ["./packages/i18n/src"]
+      "@gci/design-system": ["../../packages/design-system/src"],
+      "@gci/i18n": ["../../packages/i18n/src"]
     },
 
     /* Linting */
@@ -27,5 +27,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "packages"]
+  "include": ["src", "../../packages"]
 }

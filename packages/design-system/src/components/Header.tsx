@@ -7,12 +7,13 @@ interface HeaderProps {
   searchPlaceholder: string;
   syncedLabel: string;
   trailing?: ReactNode;
+  className?: string;
 }
 
-export function Header({ eyebrow, dateLine, searchPlaceholder, syncedLabel, trailing }: HeaderProps) {
+export function Header({ eyebrow, dateLine, searchPlaceholder, syncedLabel, trailing, className }: HeaderProps) {
   return (
     <div
-      className="flex items-center justify-between sticky top-0 z-10"
+      className={`flex items-center justify-between sticky top-0 z-10${className ? ` ${className}` : ''}`}
       style={{
         height: 'var(--header-h)',
         padding: '0 48px',

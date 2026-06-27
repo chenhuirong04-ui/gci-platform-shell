@@ -4,6 +4,11 @@ import { logoGradient, colors } from '../tokens';
 export interface NavTopItem {
   code: string;
   name: string;
+  /** Defaults to true — gci-platform-shell/Quotation always show navTop as the
+   * permanent highlighted anchor. Apps with internal tab-switching (e.g. Trade OS)
+   * should pass `activeTab === 'home'` here instead. */
+  active?: boolean;
+  onClick?: () => void;
 }
 
 export interface NavModItem {
@@ -14,6 +19,9 @@ export interface NavModItem {
   badgeBg?: string;
   href?: string;
   onClick?: () => void;
+  /** Highlights this row the same way navTop is highlighted — for apps where
+   * navMods are internal tabs rather than external links/disabled items. */
+  active?: boolean;
 }
 
 interface SidebarProps {
@@ -24,6 +32,7 @@ interface SidebarProps {
   userName: string;
   userRole: string;
   footer?: ReactNode;
+  className?: string;
 }
 
 function NavRow({ item }: { item: NavModItem }) {
@@ -37,13 +46,15 @@ function NavRow({ item }: { item: NavModItem }) {
           borderRadius: 6,
           fontSize: 9.5,
           fontWeight: 600,
-          color: '#9AAABA',
-          background: 'rgba(255,255,255,0.08)',
+          color: item.active ? colors.bgBase : '#9AAABA',
+          background: item.active ? logoGradient : 'rgba(255,255,255,0.08)',
         }}
       >
         {item.code}
       </span>
-      <span style={{ fontSize: 13, color: '#D0CBC0', flex: 1 }}>{item.name}</span>
+      <span style={{ fontSize: 13, color: item.active ? colors.textPrimary : '#D0CBC0', fontWeight: item.active ? 500 : 400, flex: 1 }}>
+        {item.name}
+      </span>
       {item.count && (
         <span
           className="font-mono-label"
@@ -64,7 +75,15 @@ function NavRow({ item }: { item: NavModItem }) {
     </>
   );
 
-  const rowStyle = { gap: 11, padding: '9px 11px', borderRadius: 9, marginBottom: 2 };
+  const rowStyle: React.CSSProperties = {
+    gap: 11,
+    padding: '9px 11px',
+    borderRadius: 9,
+    marginBottom: 2,
+    ...(item.active
+      ? { background: 'rgba(203,168,92,0.10)', border: '1px solid rgba(203,168,92,0.28)' }
+      : {}),
+  };
 
   if (item.href) {
     return (
@@ -80,12 +99,13 @@ function NavRow({ item }: { item: NavModItem }) {
   );
 }
 
-export function Sidebar({ navTop, navMods, workspaceLabel, modulesLabel, userName, userRole, footer }: SidebarProps) {
+export function Sidebar({ navTop, navMods, workspaceLabel, modulesLabel, userName, userRole, footer, className }: SidebarProps) {
   return (
     <aside
-      className="shrink-0 hidden md:flex md:flex-col relative"
+      className={`shrink-0 hidden md:flex md:flex-col relative sticky top-0 overflow-y-auto${className ? ` ${className}` : ''}`}
       style={{
         width: 'var(--sidebar-w)',
+        height: '100vh',
         background: 'var(--bg-shell)',
         borderRight: '1px solid rgba(255,255,255,0.055)',
         padding: '22px 14px',
@@ -137,22 +157,34 @@ export function Sidebar({ navTop, navMods, workspaceLabel, modulesLabel, userNam
       </div>
       <div
         className="nv flex items-center"
+        onClick={navTop.onClick}
         style={{
           gap: 11,
           padding: '10px 11px',
           borderRadius: 10,
           marginBottom: 3,
-          background: 'rgba(203,168,92,0.10)',
-          border: '1px solid rgba(203,168,92,0.28)',
+          ...(navTop.active !== false
+            ? { background: 'rgba(203,168,92,0.10)', border: '1px solid rgba(203,168,92,0.28)' }
+            : { border: '1px solid transparent' }),
         }}
       >
         <span
           className="font-mono-label flex items-center justify-center shrink-0"
-          style={{ width: 24, height: 24, borderRadius: 6, fontSize: 9.5, fontWeight: 600, color: colors.bgBase, background: logoGradient }}
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: 6,
+            fontSize: 9.5,
+            fontWeight: 600,
+            color: navTop.active !== false ? colors.bgBase : '#9AAABA',
+            background: navTop.active !== false ? logoGradient : 'rgba(255,255,255,0.08)',
+          }}
         >
           {navTop.code}
         </span>
-        <span style={{ fontSize: 13, fontWeight: 500, color: colors.textPrimary, flex: 1 }}>{navTop.name}</span>
+        <span style={{ fontSize: 13, fontWeight: 500, color: navTop.active !== false ? colors.textPrimary : '#D0CBC0', flex: 1 }}>
+          {navTop.name}
+        </span>
       </div>
 
       <div className="font-mono-label" style={{ fontSize: 8.5, letterSpacing: '0.2em', color: '#4A5268', padding: '16px 8px 8px' }}>

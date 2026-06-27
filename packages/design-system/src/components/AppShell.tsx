@@ -13,7 +13,11 @@ export function AppShell({ sidebar, header, children }: AppShellProps) {
       {sidebar}
       <div className="flex-1 flex flex-col min-w-0">
         {header}
-        <main className="flex-1 min-w-0 overflow-y-auto relative" style={{ animation: 'fadeUp .4s ease both' }}>
+        {/* No `relative`/`overflow` here: Trade OS captures specific DOM nodes via
+            html2canvas (services/pdfExport.ts) for PI export — an ancestor with
+            overflow/positioning can clip or mis-render that capture. Whole-page
+            scroll instead of main-only scroll is functionally equivalent. */}
+        <main className="flex-1 min-w-0" style={{ animation: 'fadeUp .4s ease both' }}>
           {children}
         </main>
       </div>

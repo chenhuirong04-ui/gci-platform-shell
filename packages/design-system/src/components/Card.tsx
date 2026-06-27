@@ -1,13 +1,39 @@
 import type { ReactNode } from 'react';
 import { colors } from '../tokens';
 
-export function Card({ children, style }: { children: ReactNode; style?: React.CSSProperties }) {
+export type CardTone = 'dark' | 'light';
+
+const TONE_STYLE: Record<CardTone, React.CSSProperties> = {
+  dark: {
+    background: colors.bgSurface,
+    border: '1px solid rgba(255,255,255,0.07)',
+  },
+  // 'light' matches the existing white-card-on-light-bg pattern already used
+  // across Trade OS / DEAL business pages (bg-white + border-gray-100 + shadow-sm).
+  light: {
+    background: '#ffffff',
+    border: '1px solid #f3f4f6',
+    boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)',
+  },
+};
+
+export function Card({
+  children,
+  tone = 'dark',
+  className,
+  style,
+}: {
+  children: ReactNode;
+  tone?: CardTone;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
   return (
     <div
+      className={className}
       style={{
-        background: colors.bgSurface,
-        border: '1px solid rgba(255,255,255,0.07)',
         borderRadius: 14,
+        ...TONE_STYLE[tone],
         ...style,
       }}
     >
