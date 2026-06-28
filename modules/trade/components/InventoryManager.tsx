@@ -313,6 +313,12 @@ const InventoryManager: React.FC = () => {
         </button>
       </div>
 
+      {/* OPERATIONS 分区"库存流水"入口暂时指向这个页面，直到独立的明细查看
+          页面做出来——只是一个轻提示，不涉及任何数据/逻辑改动。 */}
+      <div className="px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-100 text-[11px] font-bold text-amber-700">
+        库存流水明细页面正在完善中。当前页面显示库存总览与库存调整功能。
+      </div>
+
       {/* KPI Strip */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <StatCard label="库存总金额" value={`AED ${Number(stats.totalValue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} color="indigo" icon={<Package className="w-4 h-4" />} />
