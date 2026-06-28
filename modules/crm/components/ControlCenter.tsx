@@ -3,6 +3,7 @@ import {
   Calendar, AlertTriangle, Briefcase,
   ChevronRight, TrendingUp, Activity
 } from 'lucide-react';
+import { PageHeader, StatCard } from '@gci/design-system';
 import { FollowUpTask, Project } from '../types';
 import ActionCenter from './ActionCenter';
 
@@ -21,26 +22,6 @@ interface Props {
 
 const GOLD = '#B8960C';
 const NAVY = '#0F172A';
-
-function StatCard({ icon, label, count, color }: {
-  icon: React.ReactNode; label: string; count: number | null; color: string; bg?: string;
-}) {
-  return (
-    <div className="bg-white rounded-[18px] border p-5 flex items-center gap-4 shadow-sm relative overflow-hidden" style={{ borderColor: NAVY + '14' }}>
-      {/* Left accent bar */}
-      <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-[18px]" style={{ backgroundColor: color }} />
-      <div className="p-2.5 rounded-xl bg-slate-50 ml-1">
-        <div style={{ color }}>{icon}</div>
-      </div>
-      <div>
-        <div className="text-2xl font-black" style={{ color: NAVY, fontFamily: "'Space Grotesk',sans-serif" }}>
-          {count === null ? <span className="text-slate-300">-</span> : count}
-        </div>
-        <div className="text-xs font-bold mt-0.5 text-slate-500">{label}</div>
-      </div>
-    </div>
-  );
-}
 
 function SectionHeader({ icon, title, color = NAVY }: {
   icon: React.ReactNode; title: string; color?: string;
@@ -141,18 +122,15 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
   return (
     <div className="space-y-8">
 
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold" style={{ color: NAVY, fontFamily: "'Space Grotesk',sans-serif" }}>控制中心</h1>
-        <p className="font-mono-label text-xs font-bold mt-1" style={{ color: GOLD }}>{nowLabel}</p>
-      </div>
+      {/* Header — shared PageHeader (GCI Design System V1 pilot) */}
+      <PageHeader title="控制中心" eyebrow={nowLabel} />
 
-      {/* Stats row */}
+      {/* Stats row — shared StatCard (GCI Design System V1 pilot) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={<Calendar className="w-5 h-5" />}      label="今日待跟进"           count={todayFollowupCount === null ? null : dashboardStats.todayFollowupCount} color="#8FA6D4" bg="#F8FAFC" />
-        <StatCard icon={<TrendingUp className="w-5 h-5" />}    label="高优先客户 (A)"        count={dashboardStats.highPriorityCount}       color={GOLD}    bg="#FFFBEB" />
-        <StatCard icon={<Briefcase className="w-5 h-5" />}     label="执行中项目"            count={dashboardStats.executingProjectsCount}  color="#6FBF8E" bg="#F8FAFC" />
-        <StatCard icon={<AlertTriangle className="w-5 h-5" />} label="逾期风险 (>3天)"       count={dashboardStats.overdueCount}            color="#E0846A" bg="#F8FAFC" />
+        <StatCard icon={<Calendar className="w-5 h-5" />}      label="今日待跟进"     value={todayFollowupCount === null ? null : dashboardStats.todayFollowupCount} color="#8FA6D4" />
+        <StatCard icon={<TrendingUp className="w-5 h-5" />}    label="高优先客户 (A)" value={dashboardStats.highPriorityCount}       color={GOLD} />
+        <StatCard icon={<Briefcase className="w-5 h-5" />}     label="执行中项目"     value={dashboardStats.executingProjectsCount}  color="#6FBF8E" />
+        <StatCard icon={<AlertTriangle className="w-5 h-5" />} label="逾期风险 (>3天)" value={dashboardStats.overdueCount}            color="#E0846A" />
       </div>
 
       {/* 数据概览 */}

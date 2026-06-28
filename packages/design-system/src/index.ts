@@ -4,6 +4,7 @@ export * from './components/Sidebar';
 export * from './components/Header';
 export * from './components/Button';
 export * from './components/Card';
+export * from './components/PageHeader';
 export * from './components/StatusBadge';
 export * from './components/DataTable';
 export * from './components/LangToggle';
