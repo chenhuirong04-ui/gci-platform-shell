@@ -20,7 +20,8 @@
       "@gci/design-system": ["../../packages/design-system/src"],
       "@gci/i18n": ["../../packages/i18n/src"],
       "@gci/module-trade": ["../../modules/trade"],
-      "@gci/module-crm": ["../../modules/crm"]
+      "@gci/module-crm": ["../../modules/crm"],
+      "@gci/module-quotation": ["../../modules/quotation"]
     },
 
     /* Linting — relaxed from the shell-only strict defaults now that this
@@ -31,5 +32,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "../../packages", "../../modules/trade", "../../modules/crm"]
+  "include": ["src", "../../packages", "../../modules/trade", "../../modules/crm", "../../modules/quotation"]
 }

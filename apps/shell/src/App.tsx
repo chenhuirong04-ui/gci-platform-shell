@@ -4,9 +4,9 @@ import { AppShell, Sidebar, Header, LangToggle, Toast, type NavModItem } from '@
 import { LangContext, dictionaries, type Lang } from '@gci/i18n';
 import { modules } from './config/navigation';
 import { Home } from './pages/Home';
-import { ModulePlaceholder } from './pages/ModulePlaceholder';
 import TradeModule from '../../../modules/trade/TradeModule';
 import CrmModule from '../../../modules/crm/CrmModule';
+import QuotationModule from '../../../modules/quotation/QuotationModule';
 
 function App() {
   const [lang, setLang] = useState<Lang>('zh');
@@ -70,10 +70,7 @@ function App() {
           <Route path="/" element={<Home onFlash={flash} />} />
           <Route path="/crm/*" element={<CrmModule />} />
           <Route path="/trade/*" element={<TradeModule />} />
-          <Route
-            path="/quotation/*"
-            element={<ModulePlaceholder title="Quotation Center" etaLabel="Quotation Center 正在合并中 — 预计 Day 6 上线。" />}
-          />
+          <Route path="/quotation/*" element={<QuotationModule />} />
         </Routes>
       </AppShell>
       <Toast message={toast} />

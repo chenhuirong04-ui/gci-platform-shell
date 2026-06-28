@@ -6,6 +6,7 @@
    @source or the utilities they use never get generated. */
 @source "../../../modules/trade/**/*.{ts,tsx}";
 @source "../../../modules/crm/**/*.{ts,tsx}";
+@source "../../../modules/quotation/**/*.{ts,tsx}";
 
 /* Trade module used a Tailwind CDN config (now removed) that set
    font-sans/font-mono to Inter/JetBrains Mono. Restoring the same
@@ -16,6 +17,17 @@
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Quotation module's own configurator/PDF brand palette (brown/gold) —
+     kept distinct from the shell's navy/gold theme on purpose, ported
+     verbatim from its standalone index.css. */
+  --font-serif: 'Cormorant Garamond', serif;
+  --color-brand-ivory: #FDFBF7;
+  --color-brand-beige: #F7F3EE;
+  --color-brand-brown: #3E2723;
+  --color-brand-brown-muted: #5D4037;
+  --color-brand-gold: #C5A059;
+  --color-brand-gold-muted: #D4C4A8;
 }
 
 html,
@@ -122,6 +134,33 @@ body,
   }
   #root {
     padding: 0;
+  }
+}
+
+/* ── Quotation module — ported from its standalone index.css, scoped with
+   :has() so printing from Trade/CRM/Home doesn't get blanked out by this
+   rule (its original `body * { visibility: hidden }` was unscoped, which
+   is fine standalone but would hide every other module's print output
+   here since all modules share one document). Only takes effect when
+   #quotation-print actually exists in the DOM, i.e. while QuotationModule
+   is mounted. ──────────────────────────────────────────────────────── */
+@media print {
+  body:has(#quotation-print) * {
+    visibility: hidden;
+  }
+  body:has(#quotation-print) #quotation-print,
+  body:has(#quotation-print) #quotation-print * {
+    visibility: visible;
+  }
+  body:has(#quotation-print) #quotation-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
   }
 }
 

@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => {
         '@gci/i18n': path.resolve(__dirname, '../../packages/i18n/src'),
         '@gci/module-trade': path.resolve(__dirname, '../../modules/trade'),
         '@gci/module-crm': path.resolve(__dirname, '../../modules/crm'),
+        '@gci/module-quotation': path.resolve(__dirname, '../../modules/quotation'),
       },
     },
     // Trade/CRM modules' services read these process.env vars as fallbacks
