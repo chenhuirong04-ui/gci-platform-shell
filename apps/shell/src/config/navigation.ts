@@ -40,10 +40,9 @@ export interface SectionDef {
  * params the modules already read for deep-linking; this is a navigation
  * and grouping change only.
  *
- * Known overlap (intentional, to be revisited when page-internal content
- * is reorganized): "Quote History" and "Stock Ledger" both currently point
- * at Trade's combined HistoryDashboard (?tab=history), since that view
- * isn't yet split into separate quote-history vs stock-ledger pages. */
+ * Known product gap (not a nav bug — see SL comment below): "Stock Ledger"
+ * has no real list view anywhere in Trade yet, so it points at the closest
+ * existing screen (Inventory) rather than a dedicated ledger page. */
 export const sections: SectionDef[] = [
   {
     labelKey: 'salesSection',
@@ -70,7 +69,14 @@ export const sections: SectionDef[] = [
     items: [
       { code: 'IV', nameKey: 'inventory', count: '2', badgeColor: '#D0906A', badgeBg: 'rgba(224,132,106,0.14)', path: '/trade?tab=inventory' },
       { code: 'CS', nameKey: 'consignment', path: '/trade?tab=consignment' },
-      { code: 'SL', nameKey: 'stockLedger', path: '/trade?tab=history' },
+      // Was '/trade?tab=history' (Step 1 guess) -- confirmed wrong on review:
+      // HistoryDashboard's tabs are 报价历史/订单中心/应收核销, no stock-ledger
+      // view exists there. InventoryManager (库存 tab) is the closest real
+      // destination -- it's the only place that writes to STOCK_LEDGER (an
+      // adjustment form), even though there's no ledger list view yet. A
+      // real "view stock ledger history" page doesn't exist in the product
+      // yet; flagged separately as a feature gap, not a nav fix.
+      { code: 'SL', nameKey: 'stockLedger', path: '/trade?tab=inventory' },
       { code: 'IT', nameKey: 'internalTasks', path: '/crm?tab=internal' },
     ],
   },

@@ -1641,6 +1641,9 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
     // Breadcrumb — same structure/style as Package Quote's "Workflow Home › Package Quote › ..."
     const SvcBreadcrumb = ({ trail }: { trail?: string }) => (
+      <>
+      {/* SUPPLY CHAIN 分区页面标题 */}
+      <h1 className="text-2xl font-semibold mb-2" style={{ fontFamily: "'Space Grotesk',sans-serif", color: '#0C1B3A' }}>服务报价</h1>
       <div className="flex items-center gap-2 text-[12px] font-black uppercase tracking-widest flex-wrap">
         <button onClick={() => setAppMode('landing')} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">
           Workflow Home
@@ -1658,6 +1661,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           </>
         )}
       </div>
+      </>
     );
 
     // ── List view: saved Service Quotes ───────────────────────────────────────
@@ -2143,6 +2147,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
       return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
+          {/* SUPPLY CHAIN 分区页面标题 */}
+          <h1 className="text-2xl font-semibold" style={{ fontFamily: "'Space Grotesk',sans-serif", color: '#0C1B3A' }}>套餐报价</h1>
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-[12px] font-black uppercase tracking-widest flex-wrap">
             <button onClick={() => { setAppMode('landing'); setPqProject(null); setPqParseStatus('idle'); setPqPhase('upload'); }}
@@ -2440,6 +2446,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     // ── Phase 1: Upload + Package Review ─────────────────────────────────
     return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
+      {/* SUPPLY CHAIN 分区页面标题 */}
+      <h1 className="text-2xl font-semibold" style={{ fontFamily: "'Space Grotesk',sans-serif", color: '#0C1B3A' }}>套餐报价</h1>
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-[12px] font-black uppercase tracking-widest">
         <button onClick={() => { setAppMode('landing'); setPqProject(null); setPqParseStatus('idle'); setPqParseError(''); setPqPhase('upload'); }}
@@ -2714,6 +2722,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   // ── Supplier Quote Upload flow ───────────────────────────────────────────
   const renderSupplierQuoteUpload = () => (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
+      {/* SUPPLY CHAIN 分区页面标题 */}
+      <h1 className="text-2xl font-semibold" style={{ fontFamily: "'Space Grotesk',sans-serif", color: '#0C1B3A' }}>供应商报价</h1>
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-[12px] font-black uppercase tracking-widest flex-wrap">
         <button onClick={() => { setAppMode('landing'); setDraftItems([]); setTradeTerms(''); }} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">

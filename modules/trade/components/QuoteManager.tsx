@@ -749,7 +749,11 @@ const QuoteManager: React.FC = () => {
   }, [reviewItems]);
 
   return (
-    <div className="flex flex-row w-full h-[calc(100vh-160px)] gap-8 overflow-hidden relative">
+    <>
+      {/* SUPPLY CHAIN 分区页面标题，跟其他分区保持一致的标题样式 — 独立于下面
+          的双栏布局，不改它的高度计算，不影响打印逻辑 */}
+      <h1 className="no-print text-2xl font-semibold mb-4" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>PI 报价</h1>
+      <div className="flex flex-row w-full h-[calc(100vh-160px)] gap-8 overflow-hidden relative">
       {/* 左侧控制区 */}
       <section className="w-[40%] h-full flex flex-col gap-6 no-print overflow-y-auto custom-scrollbar pr-2 pb-10">
 
@@ -1256,6 +1260,7 @@ const QuoteManager: React.FC = () => {
         </div>
       )}
     </div>
+    </>
   );
 };
 export default QuoteManager;
