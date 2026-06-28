@@ -1,0 +1,961 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { generateTaskContent } from './services/geminiService';
+import { FollowUpTask, CMOResponse, Project, ProjectType, ProjectStatus, ProjectLogEntry } from './types';
+import { PersistenceService } from './services/persistenceService';
+import { notionSyncService } from './services/notionSync';
+
+import { ADMIN_IMPORT_TASKS, ADMIN_IMPORT_PROJECTS } from './adminImportData';
+import LeadMasterDetail from './components/LeadMasterDetail';
+import QuickFollowUpPanel from './components/QuickFollowUpPanel';
+import ManualRecordForm from './components/ManualRecordForm';
+import FollowUpQueue from './components/FollowUpQueue';
+import HistoryView from './components/HistoryView';
+import ProjectProgress from './components/ProjectProgress';
+import InternalTasksView from './components/InternalTasksView';
+import ControlCenter from './components/ControlCenter';
+
+import {
+  CheckCircle2,
+  AlertCircle,
+  Lock,
+  RefreshCw,
+} from 'lucide-react';
+
+/* =========================
+   Keys
+   ========================= */
+const ICARE_HISTORY_V1 = 'ICARE_HISTORY_V1';
+const ICARE_PROJECTS_V1 = 'ICARE_PROJECTS_V1';
+const ICARE_INTERNAL_TASKS_V1 = 'ICARE_INTERNAL_TASKS_V1';
+
+/* =========================
+   ErrorBoundary（避免白屏）
+   ========================= */
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: any }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: any) {
+    console.error('🔥 ErrorBoundary caught:', error);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#F8FAFC] p-6">
+          <div className="max-w-3xl mx-auto bg-white border border-red-200 rounded-2xl p-6">
+            <div className="text-xl font-black text-red-600">页面出错（已拦截，避免白屏）</div>
+            <div className="mt-2 text-sm text-slate-600">
+              把下面这段错误截图发我，我可以直接定位是哪一行。
+            </div>
+            <pre className="mt-4 text-xs bg-slate-900 text-slate-100 p-4 rounded-xl overflow-auto">
+{String(this.state.error?.stack || this.state.error || 'Unknown error')}
+            </pre>
+            <button
+              className="mt-4 px-4 py-2 rounded-xl text-white font-black"
+              style={{ backgroundColor: '#0F172A' }}
+              onClick={() => location.reload()}
+            >
+              刷新
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+/* =========================
+   Password Gate（最终可用：用 pull_snapshot 做验证）
+   ========================= */
+async function verifyPagePassword(password: string) {
+  localStorage.setItem('ICARE_GATE_PASSWORD', password || 'bypass');
+  return true;
+}
+function PasswordGate({ onPass }: { onPass: () => void }) {
+  const [pwd, setPwd] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  const submit = async () => {
+  setErr('');
+  setLoading(true);
+  try {
+    await verifyPagePassword(pwd);  // 把密码存入 localStorage，激活云同步
+    onPass();
+  } catch (e: any) {
+    console.error('[Gate] bypass failed:', e);
+    setErr('进入失败，请重试');
+  } finally {
+    setLoading(false);
+  }
+};
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-6 relative overflow-hidden"
+      style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%)' }}>
+
+      {/* Decorative gold rings */}
+      <div className="absolute top-[-80px] right-[-80px] w-[360px] h-[360px] rounded-full opacity-[0.06]"
+        style={{ border: '60px solid #B8960C' }} />
+      <div className="absolute bottom-[-120px] left-[-60px] w-[280px] h-[280px] rounded-full opacity-[0.04]"
+        style={{ border: '50px solid #B8960C' }} />
+      <div className="absolute top-[40%] left-[-30px] w-[120px] h-[120px] rounded-full opacity-[0.05]"
+        style={{ border: '24px solid #B8960C' }} />
+
+      {/* Card */}
+      <div className="relative z-10 w-full max-w-sm">
+
+        {/* Brand header — above card */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4 shadow-lg"
+            style={{ background: 'linear-gradient(135deg, #B8960C, #D4AF37)' }}>
+            <span className="text-xl font-black text-white tracking-tight">GCI</span>
+          </div>
+          <div className="text-white text-xl font-black tracking-wide">业务控制中心</div>
+          <div className="text-xs font-bold mt-1" style={{ color: '#B8960C' }}>
+            Global Care Info · Middle East Platform
+          </div>
+        </div>
+
+        {/* Login card */}
+        <div className="bg-white/[0.06] backdrop-blur-sm rounded-3xl border border-white/10 p-8 shadow-2xl">
+          <div className="text-xs font-black uppercase tracking-widest text-white/40 mb-5 flex items-center gap-2">
+            <Lock className="w-3 h-3" />
+            访问验证
+          </div>
+
+          <input
+            type="password"
+            value={pwd}
+            onChange={e => setPwd(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && submit()}
+            placeholder="输入访问密码"
+            className="w-full px-4 py-3.5 rounded-2xl text-sm font-bold text-white placeholder-white/30 outline-none focus:ring-2 transition-all"
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.12)',
+            }}
+            onFocus={e => (e.target.style.borderColor = '#B8960C')}
+            onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.12)')}
+          />
+
+          <button
+            onClick={submit}
+            disabled={!pwd || loading}
+            className="w-full mt-4 py-3.5 rounded-2xl text-sm font-black tracking-wide shadow-lg transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-30"
+            style={{ background: 'linear-gradient(135deg, #B8960C, #D4AF37)', color: '#0F172A' }}
+          >
+            {loading ? '验证中…' : '进入系统 →'}
+          </button>
+
+          {err && (
+            <div className="mt-3 text-xs font-bold text-red-400 text-center">{err}</div>
+          )}
+        </div>
+
+        <div className="text-center mt-6 text-[10px] font-bold text-white/20">
+          每次刷新 / 关闭后需重新验证
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================
+   CRM Module — 迁移自 AppInner（不再渲染 AppShell/Sidebar/Header，
+   GCI Platform 壳全局提供）。Day 4-5 monorepo 合并计划。
+   ========================= */
+function CrmInner() {
+  const isAdminMode = new URLSearchParams(window.location.search).get('admin') === '1';
+  const [tasks, setTasks] = useState<FollowUpTask[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [activeTab, setActiveTab] =
+    useState<'control' | 'dashboard' | 'history' | 'project' | 'internal'>('control');
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error'>('idle');
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(notionSyncService.getLastSyncAt());
+  // Authoritative today-follow-up count from API (Follow-up Log only, before orphan merge)
+  const [todayFollowupCount, setTodayFollowupCount] = useState<number | null>(null);
+  const [intakeOpen, setIntakeOpen] = useState(true); // default open — 客户跟进 is quick entry point
+  const [selectedTask, setSelectedTask] = useState<FollowUpTask | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const [hydrated, setHydrated] = useState(false);
+  const firstHydrateRef = useRef(true);
+  // When Notion overwrite is running, block the ordinary save effect from
+  // firing a merge-push that would re-inflate ICARE_HISTORY_V1 back to 68.
+  const notionOverwriteInProgressRef = useRef(false);
+
+  // 明确排除名单（不进入业务跟进中心）
+  const BIZ_EXCLUDE = new Set([
+    'log_only', '仅记录', '内部事项', 'internal', 'note', 'log',
+  ]);
+
+  // 项目型关键词（The Grove、villa、fitout 等优先判 PROJECT）
+  const PROJECT_KW = [
+    'project', '项目', 'the grove', '工程', '施工', 'ff&e', 'villa',
+    'apartment', 'fitout', 'fit-out', 'fit out', 'interior', 'renovation',
+    'hotel', 'office', 'resort', 'building', 'construction', 'design',
+    '设计', '装修', '室内', '家具', 'furniture', '酒店', '公寓', '办公',
+  ];
+
+  // 贸易型关键词
+  const TRADE_KW = [
+    'trade', '贸易', 'quotation', 'quote', 'sample', 'order', 'moq',
+    'fob', 'cif', 'supplier', 'product', '采购', '报价', '样品', '询盘',
+    'catalog', 'price list', 'pricelist', 'shipment', 'delivery',
+    '发货', '出货', '下单', '验货',
+  ];
+
+  /**
+   * 判断 task 属于项目型还是贸易型。
+   * 优先级：显式 businessType → recordType → 关键词搜索 → 默认贸易
+   */
+  const classifyTaskType = (task: FollowUpTask): ProjectType => {
+    const bt = (task.businessType || '').toLowerCase().trim();
+    const rt = ((task as any).recordType || '').toLowerCase().trim();
+
+    if (['project', '项目推进', '项目'].includes(bt)) return '项目型';
+    if (['trade', '贸易询盘', '贸易'].includes(bt)) return '贸易型';
+    if (['project', '项目推进'].includes(rt)) return '项目型';
+    if (['trade', '贸易询盘'].includes(rt)) return '贸易型';
+
+    // 关键词搜索（拼接所有文本字段）
+    const text = [
+      task.clientName, task.goal, task.lastContext,
+      (task as any).inquirySummary, (task as any).lastNote,
+      (task as any).summary, (task as any).relatedProject,
+    ].filter(Boolean).join(' ').toLowerCase();
+
+    // PROJECT 优先（工程类项目价值高，宁可误判为项目也不漏）
+    for (const kw of PROJECT_KW) {
+      if (text.includes(kw)) return '项目型';
+    }
+    for (const kw of TRADE_KW) {
+      if (text.includes(kw)) return '贸易型';
+    }
+
+    return '贸易型'; // 默认贸易
+  };
+
+  // 排除法：只有明确 LOG_ONLY / 内部事项才不进入业务跟进中心
+  const bizQualifiesForView = (task: FollowUpTask): boolean => {
+    const bt = (task.businessType || '').toLowerCase().trim();
+    const rt = ((task as any).recordType || '').toLowerCase().trim();
+    if (BIZ_EXCLUDE.has(bt) || BIZ_EXCLUDE.has(rt)) return false;
+    return true;
+  };
+
+  /**
+   * SINGLE SOURCE OF TRUTH — used by ALL views.
+   *
+   * normalizedTasks:
+   *   1. Remove status='deleted' records
+   *   2. Dedup by businessId — same client multiple times → keep latest nextFollowUpAt
+   *
+   * This ensures Control Center, Customer Follow-up Kanban, and Business Center
+   * always see the SAME set of records. No more per-view raw filter divergence.
+   */
+  const normalizedTasks = useMemo((): FollowUpTask[] => {
+    const nonDeleted = tasks.filter(t => t.status !== 'deleted');
+    // Dedup by businessId, keeping the record with the latest nextFollowUpAt
+    const map = new Map<string, FollowUpTask>();
+    for (const t of nonDeleted) {
+      const key = (t as any).businessId || t.leadId || t.id;
+      if (!map.has(key)) {
+        map.set(key, t);
+      } else {
+        const existing = map.get(key)!;
+        if ((t.nextFollowUpAt || '') > (existing.nextFollowUpAt || '')) {
+          map.set(key, t);
+        }
+      }
+    }
+    return Array.from(map.values());
+  }, [tasks]);
+
+  const combinedProjectsForView = useMemo((): Project[] => {
+    /**
+     * PLAN A — Notion businessType is authoritative.
+     *
+     * All qualifying normalizedTasks are synthesized to Project format.
+     * type = task.businessType directly (no keyword override, no orphan detection).
+     * This ensures business center counts match Follow-up Log exactly.
+     */
+    const allQualifying = normalizedTasks.filter(t =>
+      bizQualifiesForView(t) &&
+      t.status !== 'archived'
+    );
+
+    const synthetic: Project[] = allQualifying.map(task => ({
+      id:             `SYNTH_${task.id}`,
+      businessId:     (task as any).businessId || '',
+      name:           task.inquirySummary || task.goal || task.clientName,
+      clientName:     task.clientName,
+      countryCity:    task.countryCity || '',
+      contactKey:     task.contactKey,
+      phoneE164:      task.phoneE164,
+      whatsapp:       task.whatsapp,
+      email:          task.email,
+      // ← Notion businessType is the authority — no keyword fallback
+      type:           (task.businessType === 'PROJECT' ? '项目型' : '贸易型') as ProjectType,
+      owner:          task.owner || '',
+      status:         (task.status === 'completed' ? '已完成' : '进行中') as ProjectStatus,
+      tradeStatus:    task.tradeStatus || '新询盘',
+      initialContext: task.lastContext || task.inquirySummary || task.goal || '',
+      projectFollowUps: (task.history || [])
+        .filter(h => h.message || (h as any).summary)
+        .slice(0, 20)
+        .map(h => ({
+          content: (h as any).summary || h.message || '',
+          time:    new Date(h.timestamp).toLocaleString('zh-CN'),
+          author:  (h as any).by || task.owner || 'system',
+        })),
+      attachments:    task.attachments || [],
+      createdAt:      task.createdAt,
+      nextActionAt:   task.nextFollowUpAt,
+    }));
+
+    // Notion is the single source of truth — no legacy local projects.
+    return synthetic;
+  }, [normalizedTasks]);
+
+  const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 2500);
+  };
+
+  const syncFromNotion = async () => {
+    setSyncStatus('syncing');
+    try {
+      const result = await notionSyncService.sync();
+
+      // ── result.notionTasks is the ONLY source of truth ─────────────────────
+      // result.tasks  = stale localStorage merge (42 NOTION + 26 HIST = 68) — NEVER use
+      // result.notionTasks = pure /api/crm/notion-sync output, exactly Follow-up Log count (~20)
+      notionOverwriteInProgressRef.current = true;
+      setTasks(result.notionTasks);       // exactly ~20 — no merge, no filter, no old data
+      setLastSyncAt(result.syncedAt);
+      setTodayFollowupCount(result.todayFollowupCount);
+
+      // Write the same 20 records to localStorage and cloud (no local-only preserved).
+      await PersistenceService.overwriteFromNotion(ICARE_HISTORY_V1, result.notionTasks);
+
+      // Flag cleared only after cloud push completes — future user edits save ~20.
+      notionOverwriteInProgressRef.current = false;
+
+      showToast(`已同步 ${result.newCount} 新 / ${result.updatedCount} 更新`, 'success');
+      setSyncStatus('idle');
+    } catch (e: any) {
+      notionOverwriteInProgressRef.current = false;
+      console.warn('[App] Notion sync failed:', e);
+      setSyncStatus('error');
+      showToast('Notion 同步失败，使用本地数据', 'error');
+    }
+  };
+
+  useEffect(() => {
+    let alive = true;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    (async () => {
+      // Sync from Notion first (before loading localStorage fallback)
+      syncFromNotion().catch(() => {});
+
+      try {
+        const [t, p] = await Promise.all([
+          PersistenceService.load(ICARE_HISTORY_V1),
+          PersistenceService.load(ICARE_PROJECTS_V1),
+          PersistenceService.load(ICARE_INTERNAL_TASKS_V1)
+        ]);
+
+        if (!alive) return;
+        setTasks(Array.isArray(t) ? (t as any) : []);
+        setProjects(Array.isArray(p) ? (p as any) : []);
+      } catch (e) {
+        console.warn('Init load failed', e);
+      } finally {
+        if (!alive) return;
+        setHydrated(true);
+        firstHydrateRef.current = false;
+      }
+
+      // Auto-sync every 10 minutes
+      intervalId = setInterval(() => {
+        if (alive) syncFromNotion().catch(() => {});
+      }, 10 * 60 * 1000);
+    })();
+    return () => {
+      alive = false;
+      if (intervalId) clearInterval(intervalId);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (firstHydrateRef.current) return;
+    // Skip when Notion overwrite is in progress — overwriteFromNotion handles
+    // the cloud write directly; a merge-push here would re-inflate to 68.
+    if (notionOverwriteInProgressRef.current) return;
+    PersistenceService.save(ICARE_HISTORY_V1, tasks);
+  }, [tasks, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (firstHydrateRef.current) return;
+    PersistenceService.save(ICARE_PROJECTS_V1, projects);
+  }, [projects, hydrated]);
+
+  const handleAddTask = async (formData: Partial<FollowUpTask>) => {
+    setIsGenerating(true);
+    showToast('正在分析并分流...', 'info');
+
+    const now = Date.now();
+    const nowISO = new Date().toISOString();
+    const localNow = new Date().toLocaleString('zh-CN');
+
+    const clientName = (formData.clientName || '').trim() || '未命名客户';
+    const goal = (formData.goal || '').trim() || '未填写目标';
+    const lastContext = (formData.lastContext || '').trim() || '';
+    const businessType = (formData.businessType as any) || 'TRADE';
+
+    const contactKey = String(
+      (formData.whatsapp || formData.phoneE164 || formData.email || '')
+    )
+      .replace(/[\s+]/g, '')
+      .toLowerCase();
+
+    const baseTask: FollowUpTask = {
+      id: `HIST_${now}`,
+      leadId: `LEAD_${now}`,
+      clientName,
+      phoneE164: formData.phoneE164 || '',
+      whatsapp: formData.whatsapp || '',
+      email: formData.email,
+      contactKey,
+      countryCity: formData.countryCity || '',
+      owner: '本人',
+      myRole: formData.myRole || '本人',
+      goal,
+      lastContext,
+      businessType,
+      status: 'todo',
+      tradeStatus: businessType === 'TRADE' ? '新询盘' : '新建',
+      priority: 'B',
+      nextFollowUpAt: formData.nextFollowUpAt || nowISO,
+      createdAt: nowISO,
+      updatedAt: nowISO,
+      draftZH: '',
+      finalBilingual: '',
+      suggestedAction: '',
+      riskNotice: '',
+      attachments: formData.attachments || [],
+      aiInsights: undefined as any,
+      history: [
+        {
+          id: `L_${now}`,
+          timestamp: nowISO,
+          type: 'CREATED',
+          message: `已记录（AI分析中）`
+        }
+      ],
+      inquirySummary: goal,
+      categories: '',
+      lastNote: lastContext
+    };
+
+    setTasks(prev => [baseTask, ...prev]);
+    setSelectedTask(baseTask);
+
+    // ── Write to Notion Follow-up Log ──────────────────────────────────────
+    // Fire-and-forget: don't block UI, don't show error to user if it fails
+    ;(async () => {
+      try {
+        const followUpMethod = formData.whatsapp ? 'WhatsApp'
+          : formData.phoneE164 ? '电话'
+          : formData.email ? '邮件'
+          : 'WhatsApp';
+
+        const notionPayload = {
+          clientName,
+          phone:        formData.phoneE164 || '',
+          whatsapp:     formData.whatsapp  || '',
+          email:        formData.email     || '',
+          countryCity:  formData.countryCity || '',
+          lastContext,
+          goal,
+          nextFollowUpAt: (formData.nextFollowUpAt || nowISO).slice(0, 10),
+          followUpMethod,
+          owner: 'Chris',
+          source: followUpMethod,
+        };
+
+        const base = typeof window !== 'undefined' ? window.location.origin : '';
+        // TRADE → notion-write-lead (SB Pool first, then Follow-up Log)
+        // Others → notion-create (Follow-up Log only)
+        const endpoint = businessType === 'TRADE' ? '/api/crm/notion-write-lead' : '/api/crm/notion-create';
+        const res = await fetch(`${base}${endpoint}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(notionPayload),
+        });
+        const result = await res.json();
+
+        if (res.ok) {
+          syncFromNotion().catch((e: any) => console.warn('[LeadSubmit] sync after write failed', e));
+        } else {
+          console.error('[LeadSubmit] Notion write failed', result);
+        }
+      } catch (e: any) {
+        console.error('[LeadSubmit] error writing to Notion', e?.message);
+      }
+    })();
+    // ──────────────────────────────────────────────────────────────────────
+
+    if (businessType === 'TRADE' || businessType === 'PROJECT') {
+      const log: ProjectLogEntry = {
+        content: `[实时指挥] 目标: ${goal}\n详情: ${lastContext}`,
+        time: localNow,
+        author: '本人'
+      };
+
+      setProjects(prev => {
+        const idx = prev.findIndex(p => p.contactKey && contactKey && p.contactKey === contactKey);
+        if (idx >= 0) {
+          const copy = [...prev];
+          const old = copy[idx];
+          copy[idx] = {
+            ...old,
+            projectFollowUps: [log, ...(old.projectFollowUps || [])],
+            attachments: [...(formData.attachments || []), ...(old.attachments || [])],
+            nextActionAt: formData.nextFollowUpAt || old.nextActionAt
+          };
+          return copy;
+        }
+
+        const pType: ProjectType = businessType === 'TRADE' ? '贸易型' : '项目型';
+        const pName =
+          businessType === 'TRADE'
+            ? `[询盘] ${goal || clientName}`
+            : `[项目] ${clientName}`;
+
+        const newProj: Project = {
+          id: `P_${now}`,
+          name: pName,
+          clientName,
+          countryCity: formData.countryCity || '',
+          contactKey,
+          phoneE164: formData.phoneE164,
+          whatsapp: formData.whatsapp,
+          email: formData.email,
+          type: pType,
+          owner: '本人',
+          status: '进行中',
+          tradeStatus: businessType === 'TRADE' ? '新询盘' : '新建',
+          initialContext: lastContext,
+          projectFollowUps: [log],
+          attachments: formData.attachments || [],
+          createdAt: nowISO,
+          nextActionAt: formData.nextFollowUpAt || nowISO
+        };
+
+        return [newProj, ...prev];
+      });
+    }
+
+    try {
+      const ai: CMOResponse = await generateTaskContent(baseTask as any);
+
+      setTasks(prev =>
+        prev.map(t =>
+          t.id === baseTask.id
+            ? {
+                ...t,
+                draftZH: ai?.draftZH || t.draftZH,
+                finalBilingual: ai?.finalBilingual || t.finalBilingual,
+                suggestedAction: ai?.suggestedAction || t.suggestedAction,
+                riskNotice: ai?.riskNotice || t.riskNotice,
+                aiInsights: ai?.aiInsights,
+                updatedAt: new Date().toISOString(),
+                history: [
+                  ...(t.history || []),
+                  {
+                    id: `L_${Date.now()}`,
+                    timestamp: new Date().toISOString(),
+                    type: 'AI_DONE',
+                    message: 'AI 分析完成'
+                  }
+                ]
+              }
+            : t
+        )
+      );
+
+      setSelectedTask(prev => {
+        if (!prev || prev.id !== baseTask.id) return prev;
+        return {
+          ...prev,
+          draftZH: ai?.draftZH || prev.draftZH,
+          finalBilingual: ai?.finalBilingual || prev.finalBilingual,
+          suggestedAction: ai?.suggestedAction || prev.suggestedAction,
+          riskNotice: ai?.riskNotice || prev.riskNotice,
+          aiInsights: ai?.aiInsights
+        };
+      });
+
+      showToast('分析完成，记录已生成', 'success');
+    } catch (e: any) {
+      console.warn('AI failed', e);
+      showToast('AI 分析失败，但记录已保存', 'error');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const updateTaskStatus = (id: string, s: FollowUpTask['status']) => {
+    setTasks(prev =>
+      prev.map(t =>
+        t.id === id
+          ? {
+              ...t,
+              status: s,
+              completedAt: s === 'completed' ? new Date().toISOString() : t.completedAt,
+              updatedAt: new Date().toISOString()
+            }
+          : t
+      )
+    );
+  };
+
+  const updateTradeStatus = (id: string, tradeStatus: any) => {
+    setTasks(prev => prev.map(t => (t.id === id ? { ...t, tradeStatus } : t)));
+  };
+
+  // ── 帮助函数：判断 task 与 project 是否匹配同一客户 ──────────────
+  const taskMatchesProject = (task: FollowUpTask, p: Project): boolean => {
+    if (task.contactKey && p.contactKey && task.contactKey === p.contactKey) return true;
+    if (task.clientName && p.clientName &&
+        task.clientName.trim().toLowerCase() === p.clientName.trim().toLowerCase()) return true;
+    if (task.whatsapp && p.whatsapp && task.whatsapp === p.whatsapp) return true;
+    if (task.phoneE164 && p.phoneE164 && task.phoneE164 === p.phoneE164) return true;
+    return false;
+  };
+
+  // ── 归档 / 软删除（task）— 同步到对应 project ──────────────────
+  const archiveTask = (id: string) => {
+    const now = new Date().toISOString();
+    const task = tasks.find(t => t.id === id);
+    setTasks(prev => prev.map(t =>
+      t.id === id ? { ...t, status: 'archived', updatedAt: now } : t
+    ));
+    if (task) {
+      setProjects(prev => prev.map(p =>
+        taskMatchesProject(task, p) ? { ...p, archivedAt: now } : p
+      ));
+    }
+  };
+
+  const deleteTask = (id: string) => {
+    const now = new Date().toISOString();
+    const task = tasks.find(t => t.id === id);
+    setTasks(prev => prev.map(t =>
+      t.id === id ? { ...t, status: 'deleted', updatedAt: now } : t
+    ));
+    if (task) {
+      setProjects(prev => prev.map(p =>
+        taskMatchesProject(task, p) ? { ...p, deleted: true } : p
+      ));
+    }
+  };
+
+  // ── 归档 / 软删除（project）— 同步到对应 task ────────────────────
+  const archiveProject = (id: string) => {
+    const now = new Date().toISOString();
+    setProjects(prev => prev.map(p =>
+      p.id === id ? { ...p, archivedAt: now } : p
+    ));
+    const proj = projects.find(p => p.id === id);
+    if (proj) {
+      setTasks(prev => prev.map(t =>
+        taskMatchesProject(t, proj) ? { ...t, status: 'archived', updatedAt: now } : t
+      ));
+    }
+  };
+
+  const deleteProject = (id: string) => {
+    const now = new Date().toISOString();
+    if (id.startsWith('SYNTH_')) {
+      deleteTask(id.replace('SYNTH_', ''));
+    } else {
+      setProjects(prev => prev.map(p =>
+        p.id === id ? { ...p, deleted: true } : p
+      ));
+      const proj = projects.find(p => p.id === id);
+      if (proj) {
+        setTasks(prev => prev.map(t =>
+          taskMatchesProject(t, proj) ? { ...t, status: 'deleted', updatedAt: now } : t
+        ));
+      }
+    }
+  };
+
+  const handleAdminImport = () => {
+    const existingTaskIds = new Set(tasks.map(t => t.id));
+    const existingProjectIds = new Set(projects.map(p => p.id));
+    const newTasks = ADMIN_IMPORT_TASKS
+      .filter(t => !existingTaskIds.has(t.id))
+      .map(t => ({ ...t, importedHistorical: true as const }));
+    const newProjects = ADMIN_IMPORT_PROJECTS
+      .filter(p => !existingProjectIds.has(p.id))
+      .map(p => ({ ...p, importedHistorical: true as const }));
+    if (newTasks.length === 0 && newProjects.length === 0) {
+      showToast('所有记录已存在，无需导入', 'info');
+      return;
+    }
+    setTasks(prev => [...prev, ...newTasks]);
+    setProjects(prev => [...prev, ...newProjects]);
+    showToast(`已导入 ${newTasks.length} 条 Task、${newProjects.length} 个 Project，正在同步云端…`, 'success');
+  };
+
+  const toastClass =
+    toast?.type === 'success'
+      ? 'bg-emerald-600 border-emerald-500'
+      : toast?.type === 'error'
+      ? 'bg-rose-600 border-rose-500'
+      : 'bg-slate-900 border-slate-700';
+
+  const navTabs = [
+    { id: 'control' as const,    label: '控制中心' },
+    { id: 'dashboard' as const,  label: '客户跟进' },
+    { id: 'project' as const,    label: '业务中心' },
+    { id: 'internal' as const,   label: '内部事项' },
+    { id: 'history' as const,    label: '历史归档' },
+  ];
+
+  return (
+    <div className="min-h-screen bg-[#F8FAFC] font-sans text-slate-900 pb-36">
+      {/* In-module sub-nav: was the global Sidebar's CRM tab list; now the
+          only nav for these 5 tabs since the global Sidebar carries just one
+          "CRM" entry. Header's sync/import actions moved up next to it. */}
+      <nav className="no-print bg-white border-b border-slate-100 sticky top-0 z-[90] px-3 shadow-sm">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 py-2">
+          <div className="flex overflow-x-auto gap-1.5">
+            {navTabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                  activeTab === tab.id ? 'text-white' : 'text-slate-500 bg-slate-100'
+                }`}
+                style={activeTab === tab.id ? { backgroundColor: '#B8960C' } : {}}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            {lastSyncAt && (
+              <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap hidden md:inline">
+                最后同步: {(() => {
+                  const diff = Math.floor((Date.now() - new Date(lastSyncAt).getTime()) / 60000);
+                  return diff < 1 ? '刚刚' : `${diff}分钟前`;
+                })()}
+              </span>
+            )}
+            <button
+              onClick={() => syncFromNotion()}
+              disabled={syncStatus === 'syncing'}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black text-white transition-all disabled:opacity-50"
+              style={{ backgroundColor: '#B8960C' }}
+              title="从 Notion 同步数据"
+            >
+              <RefreshCw className={`w-3 h-3 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+              {syncStatus === 'syncing' ? '同步中…' : '↻ 同步'}
+            </button>
+            {isAdminMode && (
+              <button
+                onClick={handleAdminImport}
+                className="px-3 py-1.5 rounded-xl text-[10px] font-black text-white"
+                style={{ backgroundColor: '#334155' }}
+              >
+                ⬆ 导入
+              </button>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      <main className="max-w-7xl mx-auto px-6 py-10">
+
+        {activeTab === 'control' && (
+          <ControlCenter
+            tasks={normalizedTasks}
+            projects={combinedProjectsForView.filter(p => !p.deleted && !p.archivedAt)}
+            todayFollowupCount={todayFollowupCount}
+            onTabSwitch={(tab) => setActiveTab(tab)}
+            onSelectTask={setSelectedTask}
+          />
+        )}
+
+        {activeTab === 'dashboard' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-black" style={{ color: '#0F172A' }}>客户跟进队列</h2>
+                <p className="text-xs font-bold text-slate-400 mt-0.5">所有待跟进记录</p>
+              </div>
+              <button
+                onClick={() => setIntakeOpen(v => !v)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black border border-slate-200 hover:bg-slate-50 transition-all"
+              >
+                {intakeOpen ? '收起录入' : '展开录入'}
+              </button>
+            </div>
+
+            {intakeOpen && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                <ManualRecordForm
+                  onAdd={async (data) => {
+                    await handleAddTask(data);
+                    showToast('记录已创建', 'success');
+                  }}
+                  isLoading={isGenerating}
+                  lang={'zh'}
+                  projects={projects}
+                />
+              </div>
+            )}
+
+            <FollowUpQueue
+              tasks={normalizedTasks}
+              onAction={setSelectedTask}
+              onUpdateStatus={updateTaskStatus}
+              onUpdateTradeStatus={updateTradeStatus}
+              lang={'zh'}
+            />
+          </div>
+        )}
+
+        {activeTab === 'internal' && (
+          <InternalTasksView lang={'zh'} onShowToast={showToast as any} />
+        )}
+
+        {activeTab === 'project' && (
+          <ProjectProgress
+            projects={combinedProjectsForView.filter(p => !p.deleted && !p.archivedAt)}
+            onAddProject={(p: any) => setProjects(v => [p, ...v])}
+            onUpdateProject={(p: any) => {
+              if (typeof p.id === 'string' && p.id.startsWith('SYNTH_')) {
+                const taskId = p.id.replace('SYNTH_', '');
+                setTasks(v => v.map(t =>
+                  t.id === taskId
+                    ? { ...t, tradeStatus: p.tradeStatus, updatedAt: new Date().toISOString() }
+                    : t
+                ));
+              } else {
+                setProjects(v => v.map(o => (o.id === p.id ? p : o)));
+              }
+            }}
+            onArchiveProject={(id: string) => {
+              if (id.startsWith('SYNTH_')) archiveTask(id.replace('SYNTH_', ''));
+              else archiveProject(id);
+            }}
+            onDeleteProject={(id: string) => deleteProject(id)}
+            lang={'zh'}
+            tradeItems={[] as any}
+            onAddTrade={() => {}}
+            onUpdateTrade={() => {}}
+          />
+        )}
+
+        {activeTab === 'history' && (
+          <HistoryView
+            tasks={normalizedTasks}
+            projects={projects}
+            lang={'zh'}
+            onUpdateTask={(u: any) => setTasks(v => v.map(t => t.id === u.id ? u : t))}
+            onArchiveTask={archiveTask}
+            onDeleteTask={deleteTask}
+          />
+        )}
+      </main>
+
+      {selectedTask && activeTab === 'dashboard' && (
+        <QuickFollowUpPanel
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          onSave={(taskId, log) => {
+            const now = new Date().toISOString();
+            setTasks(prev => prev.map(t => {
+              if (t.id !== taskId) return t;
+              return {
+                ...t,
+                nextFollowUpAt: log.nextDate,
+                history: [
+                  {
+                    id: `quick-${Date.now()}`,
+                    timestamp: now,
+                    message: `[${log.method}] ${log.content}`,
+                    type: 'follow_up' as const,
+                    by: 'Admin',
+                  },
+                  ...(t.history || []),
+                ],
+              };
+            }));
+            showToast('跟进记录已保存', 'success');
+          }}
+          onViewFull={() => setActiveTab('project')}
+        />
+      )}
+
+      {selectedTask && activeTab !== 'dashboard' && (
+        <LeadMasterDetail
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          onUpdateTask={(u: any) => setTasks(v => v.map(t => (t.id === u.id ? u : t)))}
+          onArchiveTask={archiveTask}
+          onDeleteTask={deleteTask}
+          lang={'zh'}
+        />
+      )}
+
+      {toast && (
+        <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[3000] animate-fadeIn">
+          <div className={`px-8 py-4 rounded-3xl shadow-2xl flex items-center gap-3 border text-white ${toastClass}`}>
+            {toast.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5" />
+            ) : (
+              <AlertCircle className="w-5 h-5" />
+            )}
+            <span className="text-sm font-black">{toast.msg}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =========================
+   Root — Gate + ErrorBoundary，与原 App() 完全一致，
+   只是 AppInner 改名 CrmInner 且不再渲染 AppShell。
+   ========================= */
+export default function CrmModule() {
+  const [passed, setPassed] = useState(false);
+
+  if (!passed) return <PasswordGate onPass={() => setPassed(true)} />;
+
+  return (
+    <ErrorBoundary>
+      <CrmInner />
+    </ErrorBoundary>
+  );
+}

@@ -6,6 +6,7 @@ import { modules } from './config/navigation';
 import { Home } from './pages/Home';
 import { ModulePlaceholder } from './pages/ModulePlaceholder';
 import TradeModule from '../../../modules/trade/TradeModule';
+import CrmModule from '../../../modules/crm/CrmModule';
 
 function App() {
   const [lang, setLang] = useState<Lang>('zh');
@@ -67,10 +68,7 @@ function App() {
       >
         <Routes>
           <Route path="/" element={<Home onFlash={flash} />} />
-          <Route
-            path="/crm/*"
-            element={<ModulePlaceholder title="CRM" etaLabel="DEAL CRM 正在合并中 — 预计 Day 4-5 上线（7 天合并计划）。" />}
-          />
+          <Route path="/crm/*" element={<CrmModule />} />
           <Route path="/trade/*" element={<TradeModule />} />
           <Route
             path="/quotation/*"

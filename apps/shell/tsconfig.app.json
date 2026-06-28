@@ -19,7 +19,8 @@
     "paths": {
       "@gci/design-system": ["../../packages/design-system/src"],
       "@gci/i18n": ["../../packages/i18n/src"],
-      "@gci/module-trade": ["../../modules/trade"]
+      "@gci/module-trade": ["../../modules/trade"],
+      "@gci/module-crm": ["../../modules/crm"]
     },
 
     /* Linting — relaxed from the shell-only strict defaults now that this
@@ -30,5 +31,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "../../packages", "../../modules/trade"]
+  "include": ["src", "../../packages", "../../modules/trade", "../../modules/crm"]
 }

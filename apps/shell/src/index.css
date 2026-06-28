@@ -5,6 +5,7 @@
    modules/* live outside that tree, so their classes need an explicit
    @source or the utilities they use never get generated. */
 @source "../../../modules/trade/**/*.{ts,tsx}";
+@source "../../../modules/crm/**/*.{ts,tsx}";
 
 /* Trade module used a Tailwind CDN config (now removed) that set
    font-sans/font-mono to Inter/JetBrains Mono. Restoring the same
@@ -151,4 +152,22 @@ input::-webkit-calendar-picker-indicator {
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: #e2e8f0;
   border-radius: 10px;
+}
+
+/* ── CRM module — ported from its standalone index.html (global scrollbar
+   styling, doesn't conflict with .custom-scrollbar above: class selector
+   takes precedence for elements that have it). ──────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
