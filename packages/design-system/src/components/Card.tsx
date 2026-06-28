@@ -142,7 +142,7 @@ export function StatCard(props: { data: StatCardData; onClick?: () => void } | S
         <div style={{ fontFamily: fonts.display, fontSize: 24, fontWeight: 800, color: colors.bgBase, lineHeight: 1 }}>
           {value === null ? <span style={{ color: '#CBD5E1' }}>-</span> : value}
         </div>
-        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 2, color: '#64748B' }}>{label}</div>
+        <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2, color: '#64748B' }}>{label}</div>
       </div>
     </div>
   );

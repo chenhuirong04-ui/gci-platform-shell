@@ -13,6 +13,9 @@ export const colors = {
   statusWarning: '#D9B45A',
   statusDanger: '#E0846A',
   statusInfo: '#8FA6D4',
+  /** @deprecated retired per the V2 UI baseline — only danger/warning/
+   * success/info/neutral are allowed as status colors now. Kept here only
+   * so nothing throws if an old reference lingers; do not use in new code. */
   statusPurple: '#B69BD0',
   /** Neutral/paused state — not a brand color, just the same gray every
    * business page already uses for "inactive" (was hardcoded as #94A3B8
@@ -47,13 +50,14 @@ export const spacing = [4, 8, 12, 16, 20, 24, 32, 40, 48, 64];
 
 export const logoGradient = `linear-gradient(135deg,${colors.goldStrong},${colors.goldMuted})`;
 
-/** Business statuses mapped onto the 5 status colors — per V1 "Notes for
- * Claude Code": map centrally, never inline in pages. Extended for
- * ActionCenter's 5 action-priority categories (urgent/waitingSupplier/
- * waitingClient/paused/otherInquiry) — each aliases an existing status
- * color rather than introducing a new one (paused aliases the neutral gray
- * every business page already used, just centralized here instead of
- * re-hardcoded per file). */
+/** Business statuses mapped onto exactly 5 allowed status colors — danger/
+ * warning/success/info/neutral. Per V2 UI baseline (Home/Daily Workspace):
+ * status color is for a dot, a thin left border, or a small badge only —
+ * NEVER a whole card background. There is no `cardBg` field anymore on
+ * purpose; if you find yourself wanting one, the card should stay neutral
+ * (Card tone="light"/"dark") and the status should show up as a smaller
+ * accent instead. Purple/indigo/orange-as-distinct-from-warning are
+ * retired — every status maps onto one of the 5 allowed colors below. */
 export type StatusKey =
   | 'newInquiry'
   | 'inProgress'
@@ -71,19 +75,19 @@ export type StatusKey =
   /** Gold/brand highlight — used for AI-assist sections, not a business state. */
   | 'ai';
 
-export const statusMap: Record<StatusKey, { color: string; bg: string; cardBg: string }> = {
-  newInquiry: { color: colors.statusInfo, bg: 'rgba(143,166,212,0.16)', cardBg: 'rgba(143,166,212,0.05)' },
-  inProgress: { color: colors.statusWarning, bg: 'rgba(217,180,90,0.16)', cardBg: 'rgba(217,180,90,0.05)' },
-  quoted: { color: colors.statusPurple, bg: 'rgba(182,155,208,0.16)', cardBg: 'rgba(182,155,208,0.05)' },
-  confirmed: { color: colors.statusSuccess, bg: 'rgba(111,191,142,0.16)', cardBg: 'rgba(111,191,142,0.05)' },
-  overdue: { color: colors.statusDanger, bg: 'rgba(224,132,106,0.16)', cardBg: 'rgba(224,132,106,0.05)' },
-  inProduction: { color: colors.statusWarning, bg: 'rgba(217,180,90,0.16)', cardBg: 'rgba(217,180,90,0.05)' },
-  shipped: { color: colors.statusInfo, bg: 'rgba(143,166,212,0.16)', cardBg: 'rgba(143,166,212,0.05)' },
-  paid: { color: colors.statusSuccess, bg: 'rgba(111,191,142,0.16)', cardBg: 'rgba(111,191,142,0.05)' },
-  urgent: { color: colors.statusDanger, bg: 'rgba(224,132,106,0.16)', cardBg: 'rgba(224,132,106,0.05)' },
-  waitingSupplier: { color: colors.statusWarning, bg: 'rgba(217,180,90,0.16)', cardBg: 'rgba(217,180,90,0.05)' },
-  waitingClient: { color: colors.statusInfo, bg: 'rgba(143,166,212,0.16)', cardBg: 'rgba(143,166,212,0.05)' },
-  paused: { color: colors.statusNeutral, bg: 'rgba(148,163,184,0.16)', cardBg: 'rgba(148,163,184,0.05)' },
-  otherInquiry: { color: colors.statusPurple, bg: 'rgba(182,155,208,0.16)', cardBg: 'rgba(182,155,208,0.05)' },
-  ai: { color: colors.goldBase, bg: 'rgba(203,168,92,0.16)', cardBg: 'rgba(203,168,92,0.08)' },
+export const statusMap: Record<StatusKey, { color: string; bg: string }> = {
+  newInquiry: { color: colors.statusInfo, bg: 'rgba(143,166,212,0.16)' },
+  inProgress: { color: colors.statusWarning, bg: 'rgba(217,180,90,0.16)' },
+  quoted: { color: colors.statusNeutral, bg: 'rgba(148,163,184,0.16)' },
+  confirmed: { color: colors.statusSuccess, bg: 'rgba(111,191,142,0.16)' },
+  overdue: { color: colors.statusDanger, bg: 'rgba(224,132,106,0.16)' },
+  inProduction: { color: colors.statusWarning, bg: 'rgba(217,180,90,0.16)' },
+  shipped: { color: colors.statusInfo, bg: 'rgba(143,166,212,0.16)' },
+  paid: { color: colors.statusSuccess, bg: 'rgba(111,191,142,0.16)' },
+  urgent: { color: colors.statusDanger, bg: 'rgba(224,132,106,0.16)' },
+  waitingSupplier: { color: colors.statusWarning, bg: 'rgba(217,180,90,0.16)' },
+  waitingClient: { color: colors.statusInfo, bg: 'rgba(143,166,212,0.16)' },
+  paused: { color: colors.statusNeutral, bg: 'rgba(148,163,184,0.16)' },
+  otherInquiry: { color: colors.statusNeutral, bg: 'rgba(148,163,184,0.16)' },
+  ai: { color: colors.goldBase, bg: 'rgba(203,168,92,0.16)' },
 };

@@ -340,14 +340,14 @@ function WAModal({ item, onClose }: { item: ActionItem; onClose: () => void }) {
             </div>
             <div>
               <div className="text-sm font-black" style={{ color: NAVY }}>WhatsApp 草稿</div>
-              <div className="text-[10px] text-slate-400">{item.clientName} · {item.tradeStatus}</div>
+              <div className="text-[13px] text-slate-400">{item.clientName} · {item.tradeStatus}</div>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100">
             <X className="w-4 h-4 text-slate-400" />
           </button>
         </div>
-        <div className="rounded-xl p-3 bg-slate-50 text-xs font-bold text-slate-500 space-y-0.5">
+        <div className="rounded-xl p-3 bg-slate-50 text-[13px] font-bold text-slate-500 space-y-0.5">
           <div>问题：<span className="text-slate-700">{item.problem}</span></div>
           <div>建议：<span className="text-slate-700">{item.suggestion}</span></div>
         </div>
@@ -358,18 +358,18 @@ function WAModal({ item, onClose }: { item: ActionItem; onClose: () => void }) {
             value={draft} onChange={e => setDraft(e.target.value)}
           />
         ) : (
-          <div className="rounded-xl border-2 border-dashed border-slate-200 p-5 text-center text-xs font-bold text-slate-400">
+          <div className="rounded-xl border-2 border-dashed border-slate-200 p-5 text-center text-[13px] font-bold text-slate-400">
             点击生成，AI 将根据当前卡点和阶段起草消息
           </div>
         )}
         {error && (
-          <div className="rounded-lg p-2.5 text-xs font-bold" style={{ backgroundColor: statusMap.urgent.bg, color: statusMap.urgent.color }}>
+          <div className="rounded-lg p-2.5 text-[13px] font-bold" style={{ backgroundColor: statusMap.urgent.bg, color: statusMap.urgent.color }}>
             {error}
           </div>
         )}
         <div className="flex gap-2">
           <button onClick={generate} disabled={loading}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-black text-white hover:opacity-90 disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[13px] font-black text-white hover:opacity-90 disabled:opacity-50"
             style={{ backgroundColor: NAVY }}>
             {loading
               ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> 生成中...</>
@@ -377,7 +377,7 @@ function WAModal({ item, onClose }: { item: ActionItem; onClose: () => void }) {
           </button>
           {draft && (
             <button onClick={copy}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black border-2 hover:bg-amber-50"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[13px] font-black border-2 hover:bg-amber-50"
               style={{ borderColor: GOLD, color: GOLD }}>
               {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
               {copied ? '已复制' : '复制'}
@@ -389,15 +389,15 @@ function WAModal({ item, onClose }: { item: ActionItem; onClose: () => void }) {
   );
 }
 
-// ── Rule Engine Badge — now a thin wrapper around the shared Badge,
-//    using statusPurple (closest existing token to the old ad-hoc indigo)
+// ── Rule Engine Badge — now a thin wrapper around the shared Badge, using
+//    the neutral status color (purple is retired per the V2 UI baseline)
 //    instead of a hardcoded #6366F1. ───────────────────────────────────────────
 
 function RuleEngineBadge() {
   return (
     <Badge
-      color={colors.statusPurple}
-      bg="rgba(182,155,208,0.16)"
+      color={colors.statusNeutral}
+      bg="rgba(148,163,184,0.16)"
       icon={<Cpu className="w-2.5 h-2.5" />}
       label="规则引擎"
       className="rounded-lg"
@@ -427,27 +427,27 @@ function ActionCard({ item, status, onWA, onOpen }: {
             <Badge color={accentColor} bg={statusMap[status].bg} label={`已等 ${item.daysOverdue} 天`} className="rounded-full flex-shrink-0" />
           )}
         </div>
-        <p className="text-[11px] text-slate-500 leading-relaxed">{item.problem}</p>
-        <p className="text-[11px] font-bold mt-1 flex items-start gap-1" style={{ color: NAVY }}>
+        <p className="text-[13px] text-slate-500 leading-relaxed">{item.problem}</p>
+        <p className="text-[13px] font-bold mt-1 flex items-start gap-1" style={{ color: NAVY }}>
           <Zap className="w-2.5 h-2.5 flex-shrink-0 mt-0.5" style={{ color: GOLD }} />
           {item.suggestion}
         </p>
         <div className="flex items-center gap-1 mt-1.5">
           <Tag className="w-2.5 h-2.5 flex-shrink-0 text-slate-300" />
-          <span className="text-[9px] font-bold text-slate-400">{item.matchReason}</span>
+          <span className="text-[12px] font-bold text-slate-400">{item.matchReason}</span>
         </div>
         {(onWA || onOpen) && (
           <div className="flex gap-1.5 mt-2">
             {onWA && item.source === 'task' && item.task && (
               <button onClick={() => onWA(item)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black text-white"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[13px] font-black text-white"
                 style={{ backgroundColor: NAVY }}>
                 <MessageSquare className="w-2.5 h-2.5" /> 生成 WA 消息
               </button>
             )}
             {onOpen && (
               <button onClick={() => onOpen(item)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black border"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[13px] font-black border"
                 style={{ borderColor: NAVY + '30', color: NAVY }}>
                 打开详情 <ChevronRight className="w-2.5 h-2.5" />
               </button>
@@ -462,7 +462,7 @@ function ActionCard({ item, status, onWA, onOpen }: {
 // ── Opportunity Card ──────────────────────────────────────────────────────────
 
 function OpportunityCard({ opp, onOpen }: { opp: NewOpportunity; onOpen: (t: FollowUpTask) => void }) {
-  const typeColor = opp.suggestedType === '项目型' ? colors.statusPurple : opp.suggestedType === '贸易型' ? GOLD : colors.statusSuccess;
+  const typeColor = opp.suggestedType === '项目型' ? colors.statusInfo : opp.suggestedType === '贸易型' ? GOLD : colors.statusSuccess;
   const bizId = getTaskBusinessId(opp.task.id);
   return (
     <Card tone="light" className="flex gap-3 p-3.5">
@@ -475,14 +475,14 @@ function OpportunityCard({ opp, onOpen }: { opp: NewOpportunity; onOpen: (t: Fol
           </div>
           <Badge color={typeColor} bg={typeColor + '18'} label={`建议: ${opp.suggestedType}`} className="rounded-full flex-shrink-0" />
         </div>
-        <p className="text-[11px] text-slate-500">状态: {opp.tradeStatus}  ·  今日录入</p>
+        <p className="text-[13px] text-slate-500">状态: {opp.tradeStatus}  ·  今日录入</p>
         <div className="flex items-center gap-1 mt-1.5">
           <Tag className="w-2.5 h-2.5 flex-shrink-0 text-slate-300" />
-          <span className="text-[9px] font-bold text-slate-400">{opp.matchReason}</span>
+          <span className="text-[12px] font-bold text-slate-400">{opp.matchReason}</span>
         </div>
         <div className="flex gap-1.5 mt-2">
           <button onClick={() => onOpen(opp.task)}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black border"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[13px] font-black border"
             style={{ borderColor: NAVY + '30', color: NAVY }}>
             打开详情 <ChevronRight className="w-2.5 h-2.5" />
           </button>
@@ -523,19 +523,19 @@ function GPTActionCard({ action, index }: { action: GPTAction; index: number }) 
       <div className="px-4 py-3 space-y-2.5">
         <div>
           <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">客户 · </span>
-          <span className="text-[11px] font-black" style={{ color: NAVY }}>{action.clientName}</span>
+          <span className="text-[13px] font-black" style={{ color: NAVY }}>{action.clientName}</span>
         </div>
         <div>
           <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">原因分析</div>
-          <p className="text-[11px] text-slate-600 leading-relaxed">{action.reason}</p>
+          <p className="text-[13px] text-slate-600 leading-relaxed">{action.reason}</p>
         </div>
         <div className="flex items-start gap-1.5 rounded-lg p-2.5" style={{ backgroundColor: statusMap.urgent.bg }}>
           <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" style={{ color: statusMap.urgent.color }} />
-          <p className="text-[11px] font-bold leading-relaxed" style={{ color: statusMap.urgent.color }}>{action.risk}</p>
+          <p className="text-[13px] font-bold leading-relaxed" style={{ color: statusMap.urgent.color }}>{action.risk}</p>
         </div>
         <div className="flex items-start gap-1.5">
           <Zap className="w-3 h-3 flex-shrink-0 mt-0.5" style={{ color: GOLD }} />
-          <p className="text-[11px] font-bold leading-relaxed" style={{ color: NAVY }}>{action.commStyle}</p>
+          <p className="text-[13px] font-bold leading-relaxed" style={{ color: NAVY }}>{action.commStyle}</p>
         </div>
         {/* WA Template */}
         {action.waTemplate && (
@@ -546,17 +546,17 @@ function GPTActionCard({ action, index }: { action: GPTAction; index: number }) 
                 <span className="text-[9px] font-black text-slate-400 uppercase">WhatsApp 文案</span>
               </div>
               <button onClick={() => setShowWA(v => !v)}
-                className="text-[9px] font-black" style={{ color: colors.statusPurple }}>
+                className="text-[13px] font-black" style={{ color: GOLD }}>
                 {showWA ? '收起' : '展开'}
               </button>
             </div>
             {showWA && (
               <div className="px-3 py-2.5">
-                <p className="text-[11px] text-slate-600 leading-relaxed whitespace-pre-line font-medium">
+                <p className="text-[13px] text-slate-600 leading-relaxed whitespace-pre-line font-medium">
                   {action.waTemplate}
                 </p>
                 <button onClick={copyWA}
-                  className="mt-2 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black border"
+                  className="mt-2 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[13px] font-black border"
                   style={{ borderColor: GOLD + '60', color: GOLD }}>
                   {copied ? <Check className="w-2.5 h-2.5" /> : <Copy className="w-2.5 h-2.5" />}
                   {copied ? '已复制' : '复制文案'}
@@ -661,23 +661,25 @@ function SummaryCard({
   onExpand: () => void;
 }) {
   const s = statusMap[status];
-  const cardBg = count > 0 ? s.cardBg : '#FAFAFA';
 
   return (
     <Card
       tone="light"
       hoverable
-      className="p-5 flex flex-col gap-3"
-      style={{ backgroundColor: cardBg, cursor: count > 0 ? 'pointer' : 'default' }}
+      className="p-5 flex flex-col gap-3 relative overflow-hidden"
+      style={{ cursor: count > 0 ? 'pointer' : 'default' }}
       onClick={count > 0 ? onExpand : undefined}
     >
+      {/* Status shows up as a thin left bar only — card itself stays neutral white. */}
+      <div className="absolute left-0 top-0 bottom-0" style={{ width: 3, background: count > 0 ? s.color : '#E2E8F0' }} />
+
       {/* Header row */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg" style={{ backgroundColor: s.bg }}>
             <div style={{ color: s.color }}>{icon}</div>
           </div>
-          <span className="text-xs font-black" style={{ color: NAVY }}>{title}</span>
+          <span className="text-[13px] font-black" style={{ color: NAVY }}>{title}</span>
           {badge}
         </div>
         <Badge
@@ -691,13 +693,13 @@ function SummaryCard({
       {/* Preview lines */}
       <div className="space-y-2 min-h-[44px]">
         {count === 0 ? (
-          <p className="text-[11px] text-slate-300 italic">{emptyText}</p>
+          <p className="text-[13px] text-slate-300 italic">{emptyText}</p>
         ) : (
           previewLines.slice(0, 2).map(line => (
             <div key={line.id} className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
-              <span className="text-[12px] font-bold truncate flex-1" style={{ color: NAVY }}>{line.label}</span>
-              <span className="text-[10px] font-bold flex-shrink-0"
+              <span className="text-[13px] font-bold truncate flex-1" style={{ color: NAVY }}>{line.label}</span>
+              <span className="text-[12px] font-bold flex-shrink-0"
                 style={{ color: line.urgent ? statusMap.urgent.color : colors.statusNeutral }}>
                 {line.meta}
               </span>
@@ -710,7 +712,7 @@ function SummaryCard({
       {count > 0 && (
         <button
           onClick={e => { e.stopPropagation(); onExpand(); }}
-          className="flex items-center gap-1 text-[11px] font-bold transition-colors hover:opacity-70"
+          className="flex items-center gap-1 text-[13px] font-bold transition-colors hover:opacity-70"
           style={{ color: s.color }}>
           查看全部 {count} 条
           <ChevronRight className="w-3 h-3" />
@@ -737,14 +739,16 @@ function AISummaryCard({
     : aiResult?.overallInsight || (aiError ? ruleSuggestions[0] : null);
 
   return (
-    <Card tone="light" hoverable className="p-5" style={{ backgroundColor: statusMap.ai.cardBg, border: `1px solid ${GOLD}30` }}>
+    <Card tone="light" hoverable className="p-5 relative overflow-hidden">
+      {/* Status (gold = AI/brand highlight) shows up as a thin left bar only. */}
+      <div className="absolute left-0 top-0 bottom-0" style={{ width: 3, background: GOLD }} />
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg" style={{ backgroundColor: statusMap.ai.bg }}>
             <Bot className="w-3.5 h-3.5" style={{ color: GOLD }} />
           </div>
-          <span className="text-xs font-black" style={{ color: NAVY }}>OpenAI 智能建议</span>
+          <span className="text-[13px] font-black" style={{ color: NAVY }}>OpenAI 智能建议</span>
           {!aiLoading && !aiError && aiResult && (
             <Badge color={colors.statusSuccess} bg="rgba(111,191,142,0.16)" label="GPT-4o" className="rounded-lg" />
           )}
@@ -753,7 +757,7 @@ function AISummaryCard({
           )}
         </div>
         <button onClick={e => { e.stopPropagation(); onRefresh(); }} disabled={aiLoading}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[13px] font-bold border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 transition-colors">
           <RefreshCw className={`w-3 h-3 ${aiLoading ? 'animate-spin' : ''}`} />
           {aiLoading ? '分析中' : '刷新'}
         </button>
@@ -764,16 +768,16 @@ function AISummaryCard({
         {aiLoading && (
           <div className="flex items-center gap-2 text-slate-400">
             <RefreshCw className="w-3.5 h-3.5 animate-spin flex-shrink-0" style={{ color: GOLD }} />
-            <span className="text-[12px] font-bold">GPT-4o 正在分析业务数据…</span>
+            <span className="text-[13px] font-bold">GPT-4o 正在分析业务数据…</span>
           </div>
         )}
         {!aiLoading && previewText && (
-          <p className="text-[12px] font-bold leading-relaxed line-clamp-2" style={{ color: NAVY }}>
+          <p className="text-[13px] font-bold leading-relaxed line-clamp-2" style={{ color: NAVY }}>
             {previewText}
           </p>
         )}
         {!aiLoading && !previewText && (
-          <p className="text-[12px] text-slate-300 italic">等待数据加载后自动分析…</p>
+          <p className="text-[13px] text-slate-300 italic">等待数据加载后自动分析…</p>
         )}
       </div>
 
@@ -781,13 +785,13 @@ function AISummaryCard({
       <div className="flex items-center justify-between">
         {(aiResult || aiError) && !aiLoading ? (
           <button onClick={onExpand}
-            className="flex items-center gap-1 text-[11px] font-bold hover:opacity-70 transition-opacity"
+            className="flex items-center gap-1 text-[13px] font-bold hover:opacity-70 transition-opacity"
             style={{ color: GOLD }}>
             {aiResult ? `查看全部 ${(aiResult.actions || []).length} 条建议` : '查看规则分析'}
             <ChevronRight className="w-3 h-3" />
           </button>
         ) : <div />}
-        <div className="text-[9px] font-bold text-slate-300 flex items-center gap-1">
+        <div className="text-[13px] font-bold text-slate-300 flex items-center gap-1">
           <Shield className="w-2.5 h-2.5" />
           AI辅助建议，请以实际业务判断为准
         </div>
@@ -969,8 +973,8 @@ export default function ActionCenter({ tasks, projects, followupTasks, pausedTas
                 <div className="flex items-center gap-2 p-3 rounded-xl" style={{ backgroundColor: statusMap.urgent.bg, border: `1px solid ${statusMap.urgent.color}30` }}>
                   <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: statusMap.urgent.color }} />
                   <div>
-                    <p className="text-xs font-black" style={{ color: statusMap.urgent.color }}>GPT-4o 连接失败，显示规则引擎分析</p>
-                    <p className="text-[10px] mt-0.5" style={{ color: statusMap.urgent.color }}>{aiError}</p>
+                    <p className="text-[13px] font-black" style={{ color: statusMap.urgent.color }}>GPT-4o 连接失败，显示规则引擎分析</p>
+                    <p className="text-[13px] mt-0.5" style={{ color: statusMap.urgent.color }}>{aiError}</p>
                   </div>
                 </div>
                 {ruleSuggestions.map((s, i) => (
