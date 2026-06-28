@@ -62,11 +62,6 @@ export const sections: SectionDef[] = [
       { code: 'PK', nameKey: 'packageQuote', path: '/quotation?mode=package-quote' },
       { code: 'SV', nameKey: 'serviceQuote', path: '/quotation?mode=service-quote' },
       { code: 'QH', nameKey: 'quoteHistory', path: '/trade?tab=history' },
-    ],
-  },
-  {
-    labelKey: 'operationsSection',
-    items: [
       { code: 'IV', nameKey: 'inventory', count: '2', badgeColor: '#D0906A', badgeBg: 'rgba(224,132,106,0.14)', path: '/trade?tab=inventory' },
       { code: 'CS', nameKey: 'consignment', path: '/trade?tab=consignment' },
       // Was '/trade?tab=history' (Step 1 guess) -- confirmed wrong on review:
@@ -77,6 +72,15 @@ export const sections: SectionDef[] = [
       // real "view stock ledger history" page doesn't exist in the product
       // yet; flagged separately as a feature gap, not a nav fix.
       { code: 'SL', nameKey: 'stockLedger', path: '/trade?tab=inventory' },
+    ],
+  },
+  {
+    // Inventory/Consignment/Stock Ledger moved here from OPERATIONS (Chris's
+    // call: they're one supply-chain flow, not internal execution). OPERATIONS
+    // now holds only internally-executed work -- Internal Tasks today,
+    // Delivery/Installation/Execution-type items later.
+    labelKey: 'operationsSection',
+    items: [
       { code: 'IT', nameKey: 'internalTasks', path: '/crm?tab=internal' },
     ],
   },
