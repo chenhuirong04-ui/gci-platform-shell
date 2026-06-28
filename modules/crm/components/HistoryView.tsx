@@ -10,6 +10,21 @@ import {
 } from 'lucide-react';
 import { exportToCSV } from '../services/exportService';
 import { getTaskBusinessId, getProjectBusinessId, compareByBusinessId } from '../utils/businessId';
+import { colors, statusMap, type StatusKey, Badge as DSBadge } from '@gci/design-system';
+
+const GOLD = colors.goldBase;
+const NAVY = colors.bgBase;
+
+// Task/record lifecycle status -> centralized StatusKey (5 allowed colors).
+const RECORD_STATUS_KEY: Record<string, StatusKey> = {
+  todo: 'newInquiry',
+  completed: 'confirmed',
+  archived: 'paused',
+  deleted: 'urgent',
+  '进行中': 'newInquiry',
+  '已完成': 'confirmed',
+  '暂停': 'urgent',
+};
 
 interface HistoryViewProps {
   tasks: FollowUpTask[];
@@ -174,7 +189,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({
             <h2 className="text-lg font-black text-slate-800 truncate">{project.clientName}</h2>
             <p className="text-xs text-slate-400 font-bold mt-0.5 flex items-center gap-2 flex-wrap">
               <Globe className="w-3 h-3 shrink-0" />{project.countryCity || '—'}
-              <span className={`ml-2 px-2 py-0.5 rounded text-[9px] font-black uppercase border ${project.type === '项目型' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>{project.type}</span>
+              <DSBadge color={project.type === '项目型' ? colors.statusInfo : GOLD} bg={project.type === '项目型' ? 'rgba(143,166,212,0.16)' : `${GOLD}18`} label={project.type} className="ml-2 uppercase" />
             </p>
           </div>
           <button onClick={() => setSelectedProject(null)} className="p-2 rounded-full hover:bg-slate-200 transition-colors text-slate-400 shrink-0">
@@ -190,13 +205,13 @@ const HistoryView: React.FC<HistoryViewProps> = ({
           </div>
 
           <div className="flex gap-6 flex-wrap">
-            <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">阶段</p><p className="text-sm font-black text-indigo-600">{project.tradeStatus}</p></div>
+            <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">阶段</p><p className="text-sm font-black" style={{ color: GOLD }}>{project.tradeStatus}</p></div>
             <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">状态</p><p className="text-sm font-black text-slate-700">{project.status}</p></div>
             <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">负责人</p><p className="text-sm font-black text-slate-700">{project.owner || '—'}</p></div>
             {project.nextActionAt && (
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" />下次跟进</p>
-                <p className="text-sm font-black text-indigo-600">{new Date(project.nextActionAt).toLocaleDateString()}</p>
+                <p className="text-sm font-black" style={{ color: GOLD }}>{new Date(project.nextActionAt).toLocaleDateString()}</p>
               </div>
             )}
           </div>
@@ -308,7 +323,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({
       setAppend({ method: 'WhatsApp', content: '', nextAction: '', nextFollowUpAt: '' });
     };
 
-    const inputCls = 'w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-400 bg-slate-50';
+    const inputCls = 'w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-slate-300 bg-slate-50';
     const labelCls = 'text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1';
 
     return (
@@ -338,27 +353,28 @@ const HistoryView: React.FC<HistoryViewProps> = ({
               {mode === 'view' && (
                 <button
                   onClick={() => setMode('edit')}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-[11px] font-black transition-colors"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[13px] font-black transition-colors"
+                  style={{ backgroundColor: `${GOLD}18`, color: GOLD }}
                 >
                   <Edit2 className="w-3 h-3" /> 编辑
                 </button>
               )}
               {mode === 'edit' && (
                 <>
-                  <button onClick={handleSaveEdit} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-black transition-colors">
+                  <button onClick={handleSaveEdit} className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-white text-[13px] font-black transition-colors hover:opacity-90" style={{ backgroundColor: colors.statusSuccess }}>
                     <Save className="w-3 h-3" /> 保存
                   </button>
-                  <button onClick={() => setMode('view')} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-600 text-[11px] font-black transition-colors">
+                  <button onClick={() => setMode('view')} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-600 text-[13px] font-black transition-colors">
                     <XCircle className="w-3 h-3" /> 取消
                   </button>
                 </>
               )}
               {mode === 'append' && (
                 <>
-                  <button onClick={handleSaveAppend} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-black transition-colors">
+                  <button onClick={handleSaveAppend} className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-white text-[13px] font-black transition-colors hover:opacity-90" style={{ backgroundColor: colors.statusSuccess }}>
                     <Save className="w-3 h-3" /> 确认追加
                   </button>
-                  <button onClick={() => setMode('view')} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-600 text-[11px] font-black transition-colors">
+                  <button onClick={() => setMode('view')} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-600 text-[13px] font-black transition-colors">
                     <XCircle className="w-3 h-3" /> 取消
                   </button>
                 </>
@@ -426,8 +442,8 @@ const HistoryView: React.FC<HistoryViewProps> = ({
 
             {/* ── 追加跟进模式 ── */}
             {mode === 'append' && (
-              <div className="space-y-4 bg-indigo-50/60 rounded-2xl p-5 border border-indigo-100">
-                <p className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1">
+              <div className="space-y-4 rounded-2xl p-5 border" style={{ backgroundColor: `${GOLD}0F`, borderColor: `${GOLD}30` }}>
+                <p className="text-xs font-black uppercase tracking-widest flex items-center gap-1" style={{ color: GOLD }}>
                   <PlusCircle className="w-3.5 h-3.5" /> 追加跟进记录
                 </p>
                 <div className="grid grid-cols-2 gap-4">
@@ -492,7 +508,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
                         <Calendar className="w-3 h-3" /> 下次跟进
                       </p>
-                      <p className="text-sm font-black text-indigo-600">
+                      <p className="text-sm font-black" style={{ color: GOLD }}>
                         {new Date(task.nextFollowUpAt).toLocaleDateString()}
                       </p>
                     </div>
@@ -537,14 +553,16 @@ const HistoryView: React.FC<HistoryViewProps> = ({
             <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center gap-2 shrink-0 flex-wrap">
               <button
                 onClick={() => setMode('append')}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-black transition-colors shadow-md"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-[13px] font-black transition-colors shadow-md hover:opacity-90"
+                style={{ backgroundColor: NAVY }}
               >
                 <PlusCircle className="w-3.5 h-3.5" /> 追加跟进
               </button>
               {task.status !== 'archived' && task.status !== 'deleted' && (
                 <button
                   onClick={() => { onArchiveTask(task.id); setSelectedTask(null); }}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-[11px] font-black transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-black transition-colors"
+                  style={{ backgroundColor: statusMap.inProgress.bg, color: statusMap.inProgress.color, border: `1px solid ${statusMap.inProgress.color}40` }}
                 >
                   <Archive className="w-3.5 h-3.5" /> 归档
                 </button>
@@ -556,18 +574,16 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                     setSelectedTask(null);
                   }
                 }}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-[11px] font-black transition-colors"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-black transition-colors"
+                style={{ backgroundColor: statusMap.urgent.bg, color: statusMap.urgent.color, border: `1px solid ${statusMap.urgent.color}40` }}
               >
                 <Trash2 className="w-3.5 h-3.5" /> 删除
               </button>
-              <span className={`ml-auto inline-flex px-2 py-0.5 rounded-lg text-[10px] font-black uppercase border ${
-                task.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                : task.status === 'deleted' ? 'bg-rose-50 text-rose-600 border-rose-200'
-                : task.status === 'archived' ? 'bg-amber-50 text-amber-600 border-amber-100'
-                : 'bg-slate-100 text-slate-600 border-slate-200'
-              }`}>
-                {getStatusLabel(task.status)}
-              </span>
+              <DSBadge
+                status={RECORD_STATUS_KEY[task.status] || 'newInquiry'}
+                label={getStatusLabel(task.status)}
+                className="ml-auto rounded-lg uppercase"
+              />
             </div>
           )}
         </div>
@@ -576,34 +592,26 @@ const HistoryView: React.FC<HistoryViewProps> = ({
   };
 
   /* ─── 渲染状态徽章 ──────────────────────────────────────────── */
-  const StatusBadge = ({ status }: { status: string }) => {
-    const cfg: Record<string, string> = {
-      completed: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-      todo:      'bg-sky-50 text-sky-600 border-sky-100',
-      archived:  'bg-slate-100 text-slate-600 border-slate-200',
-      '进行中':  'bg-sky-50 text-sky-600 border-sky-100',
-      '已完成':  'bg-emerald-50 text-emerald-700 border-emerald-100',
-      '暂停':    'bg-rose-50 text-rose-600 border-rose-100',
-    };
-    return (
-      <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase border ${cfg[status] ?? 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-        {STATUS_LABELS[status] ?? status}
-      </span>
-    );
-  };
+  const StatusBadge = ({ status }: { status: string }) => (
+    <DSBadge
+      status={RECORD_STATUS_KEY[status] || 'otherInquiry'}
+      label={STATUS_LABELS[status] ?? status}
+      className="rounded-lg uppercase"
+    />
+  );
 
   /* ─── 渲染业务类型图标 ──────────────────────────────────────── */
   const BizTypeCell = ({ record }: { record: URecord }) => (
     <div className="flex items-center gap-1.5">
-      {record.bizType === 'TRADE'    ? <ShoppingBag className="w-3 h-3 text-amber-500" />
-       : record.bizType === 'PROJECT' ? <Briefcase   className="w-3 h-3 text-indigo-500" />
+      {record.bizType === 'TRADE'    ? <ShoppingBag className="w-3 h-3" style={{ color: GOLD }} />
+       : record.bizType === 'PROJECT' ? <Briefcase   className="w-3 h-3" style={{ color: colors.statusInfo }} />
        : <FileSearch className="w-3 h-3 text-slate-400" />}
       <span className="text-[10px] font-black text-slate-600 uppercase">{record.bizTypeLabel}</span>
       {record.source === 'merged' && (
-        <span className="text-[8px] font-black text-indigo-400 bg-indigo-50 border border-indigo-100 px-1 rounded">关联</span>
+        <DSBadge color={colors.statusInfo} bg="rgba(143,166,212,0.16)" label="关联" size="sm" />
       )}
       {record.source === 'project' && (
-        <span className="text-[8px] font-black text-amber-500 bg-amber-50 border border-amber-100 px-1 rounded">项目</span>
+        <DSBadge color={GOLD} bg={`${GOLD}18`} label="项目" size="sm" />
       )}
     </div>
   );
@@ -627,13 +635,13 @@ const HistoryView: React.FC<HistoryViewProps> = ({
               placeholder="搜索客户、电话、产品、摘要或跟进备注..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-6 py-5 bg-slate-50 border border-slate-200 rounded-[24px] outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-sm transition-all shadow-inner"
+              className="w-full pl-12 pr-6 py-5 bg-slate-50 border border-slate-200 rounded-[24px] outline-none focus:ring-2 focus:ring-slate-300 font-bold text-[13px] transition-all shadow-inner"
             />
           </div>
           <div className="flex gap-3 shrink-0">
             <div className="flex flex-col gap-1">
               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">业务类型</label>
-              <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} className="bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-xs font-black text-slate-600 outline-none">
+              <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} className="bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-[13px] font-black text-slate-600 outline-none">
                 <option value="all">全部类型</option>
                 <option value="TRADE">贸易询盘</option>
                 <option value="PROJECT">项目推进</option>
@@ -642,7 +650,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">状态筛选</label>
-              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-xs font-black text-slate-600 outline-none">
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-[13px] font-black text-slate-600 outline-none">
                 <option value="all">全部（不含已删除）</option>
                 <option value="todo">跟进中</option>
                 <option value="completed">已完成</option>
@@ -653,7 +661,8 @@ const HistoryView: React.FC<HistoryViewProps> = ({
             <div className="flex items-end">
               <button
                 onClick={() => exportToCSV(taskRecordsForExport)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3.5 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg transition-all active:scale-95"
+                className="text-white px-6 py-3.5 rounded-2xl text-[13px] font-black uppercase flex items-center gap-2 shadow-lg transition-all active:scale-95 hover:opacity-90"
+                style={{ backgroundColor: NAVY }}
               >
                 <Download className="w-3 h-3" /> 导出 CSV
               </button>
@@ -692,7 +701,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({
               {unifiedRecords.map(record => (
                 <tr
                   key={record.key}
-                  className="hover:bg-indigo-50/40 transition-colors group cursor-pointer"
+                  className="hover:bg-slate-50 transition-colors group cursor-pointer"
                   onClick={() => {
                     if (record.task)         setSelectedTask(record.task);
                     else if (record.project) setSelectedProject(record.project);
@@ -706,7 +715,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                           {record.bizId}
                         </span>
                       )}
-                      <span className="font-black text-slate-800 text-sm group-hover:text-indigo-600 transition-colors">{record.clientName}</span>
+                      <span className="font-black text-slate-800 text-sm transition-colors">{record.clientName}</span>
                       <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1 mt-1">
                         <Globe className="w-3 h-3" /> {record.countryCity || '—'}
                       </p>
@@ -719,8 +728,8 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                   </td>
                   <td className="px-6 py-6">
                     <div className="flex items-start gap-2">
-                      <MessageSquare className="w-3.5 h-3.5 text-indigo-400 mt-0.5 shrink-0" />
-                      <p className="text-xs font-bold text-slate-700 leading-relaxed line-clamp-2 max-w-[250px]">
+                      <MessageSquare className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: GOLD }} />
+                      <p className="text-[13px] font-bold text-slate-700 leading-relaxed line-clamp-2 max-w-[250px]">
                         {record.inquirySummary || '—'}
                       </p>
                     </div>
@@ -734,23 +743,23 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                             </span>
                           ))
                         : record.tradeStatus
-                          ? <span className="px-2 py-0.5 bg-indigo-50 text-indigo-500 rounded text-[9px] font-black border border-indigo-100">{record.tradeStatus}</span>
+                          ? <DSBadge color={GOLD} bg={`${GOLD}18`} label={record.tradeStatus} size="sm" />
                           : <span className="text-slate-300 italic text-[10px] font-bold">—</span>}
                     </div>
                   </td>
                   <td className="px-6 py-6">
                     <div className="flex flex-col gap-1">
-                      <p className="text-xs font-bold text-slate-500 line-clamp-2 max-w-[250px] italic">
+                      <p className="text-[13px] font-bold text-slate-500 line-clamp-2 max-w-[250px] italic">
                         {record.lastContent || '—'}
                       </p>
-                      <span className="text-[9px] text-indigo-400 font-black flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-[12px] font-black flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: GOLD }}>
                         查看详情 <ChevronRight className="w-2.5 h-2.5" />
                       </span>
                     </div>
                   </td>
                   <td className="px-6 py-6">
                     {record.nextFollowUpAt
-                      ? <div className="flex items-center gap-1.5 text-[10px] font-black text-indigo-500 uppercase">
+                      ? <div className="flex items-center gap-1.5 text-[10px] font-black uppercase" style={{ color: GOLD }}>
                           <Calendar className="w-3 h-3" /> {new Date(record.nextFollowUpAt).toLocaleDateString()}
                         </div>
                       : <span className="text-slate-300 text-[10px] font-bold">—</span>}
