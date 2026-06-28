@@ -614,6 +614,9 @@ const HistoryView: React.FC<HistoryViewProps> = ({
       {selectedTask    && <DetailDrawer task={selectedTask} />}
       {selectedProject && <ProjectDrawer project={selectedProject} />}
 
+      {/* SALES 分区页面标题，跟控制中心/客户跟进保持一致的标题样式 */}
+      <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>历史归档</h1>
+
       {/* 搜索与筛选 */}
       <div className="bg-white rounded-[40px] p-8 shadow-2xl border border-slate-200 flex flex-col gap-6">
         <div className="flex flex-col md:flex-row gap-4">

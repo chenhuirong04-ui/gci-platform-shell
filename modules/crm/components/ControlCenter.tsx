@@ -143,7 +143,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold" style={{ color: NAVY, fontFamily: "'Space Grotesk',sans-serif" }}>业务控制中心</h1>
+        <h1 className="text-2xl font-semibold" style={{ color: NAVY, fontFamily: "'Space Grotesk',sans-serif" }}>控制中心</h1>
         <p className="font-mono-label text-xs font-bold mt-1" style={{ color: GOLD }}>{nowLabel}</p>
       </div>
 

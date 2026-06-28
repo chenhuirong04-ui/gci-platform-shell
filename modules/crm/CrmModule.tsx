@@ -746,12 +746,15 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
       ? 'bg-rose-600 border-rose-500'
       : 'bg-slate-900 border-slate-700';
 
+  // SALES 分区的 4 个 Tab 在前；内部事项排最后并在渲染时用分隔线隔开——
+  // 全局 Sidebar 已经把"内部事项"归到 OPERATIONS，这里只是让本模块内部
+  // 的横条顺序和分组跟全局导航保持一致，不影响 activeTab 的任何逻辑。
   const navTabs = [
     { id: 'control' as const,    label: '控制中心' },
     { id: 'dashboard' as const,  label: '客户跟进' },
     { id: 'project' as const,    label: '业务中心' },
-    { id: 'internal' as const,   label: '内部事项' },
     { id: 'history' as const,    label: '历史归档' },
+    { id: 'internal' as const,   label: '内部事项' },
   ];
 
   return (
@@ -761,18 +764,22 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
           "CRM" entry. Header's sync/import actions moved up next to it. */}
       <nav className="no-print bg-white border-b border-slate-100 sticky top-0 z-[90] px-3 shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 py-2">
-          <div className="flex overflow-x-auto gap-1.5">
+          <div className="flex items-center overflow-x-auto gap-1.5">
             {navTabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                  activeTab === tab.id ? 'text-white' : 'text-slate-500 bg-slate-100'
-                }`}
-                style={activeTab === tab.id ? { backgroundColor: '#B8960C' } : {}}
-              >
-                {tab.label}
-              </button>
+              <React.Fragment key={tab.id}>
+                {tab.id === 'internal' && (
+                  <div className="w-px h-5 bg-slate-200 mx-1.5 shrink-0" title="OPERATIONS" />
+                )}
+                <button
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                    activeTab === tab.id ? 'text-white' : 'text-slate-500 bg-slate-100'
+                  }`}
+                  style={activeTab === tab.id ? { backgroundColor: '#B8960C' } : {}}
+                >
+                  {tab.label}
+                </button>
+              </React.Fragment>
             ))}
           </div>
           <div className="flex items-center gap-3 shrink-0">

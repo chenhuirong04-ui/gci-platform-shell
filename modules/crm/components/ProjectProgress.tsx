@@ -198,6 +198,9 @@ const ProjectProgress: React.FC<ProjectProgressProps> = ({
 
   return (
     <div className="flex flex-col gap-6 h-[calc(100vh-180px)]">
+      {/* SALES 分区页面标题，跟控制中心/客户跟进保持一致的标题样式 */}
+      <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>业务中心</h1>
+
       {/* 顶部控制栏：业务分流器 + 视图切换 */}
       <div className="bg-white p-5 rounded-[32px] border border-slate-200 shadow-sm flex flex-col gap-6 shrink-0">
          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
