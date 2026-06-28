@@ -180,6 +180,8 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
 
   return (
     <div className="h-full flex flex-col gap-6 animate-in fade-in duration-500">
+      {/* FINANCE 分区页面标题 */}
+      <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>财务账</h1>
       <div className="bg-white p-2 rounded-2xl border border-gray-200 shadow-md flex flex-col sm:flex-row gap-2">
         {accounts.map((acc) => (
           <button

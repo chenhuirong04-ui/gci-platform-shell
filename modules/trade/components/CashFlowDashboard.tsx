@@ -190,6 +190,8 @@ const CashFlowDashboard: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-8 animate-in fade-in duration-500 pb-20">
+      {/* FINANCE 分区页面标题 */}
+      <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>资金流水</h1>
       {/* Header Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm relative overflow-hidden group">
