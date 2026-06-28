@@ -173,12 +173,26 @@ function PasswordGate({ onPass }: { onPass: () => void }) {
    CRM Module — 迁移自 AppInner（不再渲染 AppShell/Sidebar/Header，
    GCI Platform 壳全局提供）。Day 4-5 monorepo 合并计划。
    ========================= */
-function CrmInner() {
+type CrmTab = 'control' | 'dashboard' | 'history' | 'project' | 'internal';
+const _crmValidTabs = ['control', 'dashboard', 'history', 'project', 'internal'] as const;
+
+function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
   const isAdminMode = new URLSearchParams(window.location.search).get('admin') === '1';
   const [tasks, setTasks] = useState<FollowUpTask[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [activeTab, setActiveTab] =
-    useState<'control' | 'dashboard' | 'history' | 'project' | 'internal'>('control');
+  // Sidebar deep-links into a specific tab via ?tab=. Falls back to reading
+  // the URL once on mount when no host shell prop is provided.
+  const _initTab = initialTab || new URLSearchParams(window.location.search).get('tab');
+  const _startTab = (_crmValidTabs as readonly string[]).includes(_initTab || '')
+    ? (_initTab as CrmTab)
+    : 'control';
+  const [activeTab, setActiveTab] = useState<CrmTab>(_startTab);
+  // Sidebar can navigate to a different ?tab= without unmounting this module
+  // (avoids re-triggering the password gate on every click) — sync when the
+  // host shell passes a new initialTab. No-op when used standalone.
+  useEffect(() => {
+    if (initialTab && _crmValidTabs.includes(initialTab)) setActiveTab(initialTab);
+  }, [initialTab]);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error'>('idle');
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(notionSyncService.getLastSyncAt());
   // Authoritative today-follow-up count from API (Follow-up Log only, before orphan merge)
@@ -948,14 +962,14 @@ function CrmInner() {
    Root — Gate + ErrorBoundary，与原 App() 完全一致，
    只是 AppInner 改名 CrmInner 且不再渲染 AppShell。
    ========================= */
-export default function CrmModule() {
+export default function CrmModule({ initialTab }: { initialTab?: CrmTab } = {}) {
   const [passed, setPassed] = useState(false);
 
   if (!passed) return <PasswordGate onPass={() => setPassed(true)} />;
 
   return (
     <ErrorBoundary>
-      <CrmInner />
+      <CrmInner initialTab={initialTab} />
     </ErrorBoundary>
   );
 }

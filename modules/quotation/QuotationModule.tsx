@@ -275,15 +275,43 @@ const SOFA_TYPES = [
   'Other'
 ];
 
-export default function QuotationModule() {
+type QuoteAppMode = 'landing' | 'customer-quote' | 'supplier-quote' | 'package-quote' | 'service-quote';
+const _validModes = ['landing', 'customer-quote', 'supplier-quote', 'package-quote', 'service-quote'];
+
+interface QuotationModuleProps {
+  /** Sidebar deep-link target (?mode=). Optional — falls back to reading the
+   * URL once on mount, same as before, when rendered without a host shell. */
+  initialMode?: QuoteAppMode;
+  /** Sidebar deep-link target (?view=history). */
+  initialView?: 'configurator' | 'history';
+}
+
+export default function QuotationModule({ initialMode, initialView }: QuotationModuleProps = {}) {
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<FurnitureCategory | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [prices, setPrices] = useState<MaterialPrices>(DEFAULT_PRICES);
   const [showSettings, setShowSettings] = useState(false);
-  const [view, setView] = useState<'configurator' | 'history'>('configurator');
+  // Sidebar deep-links into a specific card/view via ?mode=/?view=, same
+  // pattern TradeModule's ?tab= already uses — initial render only, doesn't
+  // change any business logic.
+  const _sidebarParams = new URLSearchParams(window.location.search);
+  const _modeParam = (initialMode || _sidebarParams.get('mode')) as QuoteAppMode | null;
+  const _startMode = _modeParam && _validModes.includes(_modeParam) ? _modeParam : 'landing';
+  const _startView = initialView || (_sidebarParams.get('view') === 'history' ? 'history' : 'configurator');
+  const [view, setView] = useState<'configurator' | 'history'>(_startView);
   // Top-level app mode — controls homepage entry point
-  const [appMode, setAppMode] = useState<'landing' | 'customer-quote' | 'supplier-quote' | 'package-quote' | 'service-quote'>('landing');
+  const [appMode, setAppMode] = useState<QuoteAppMode>(_startMode);
+
+  // Sidebar can navigate to a different ?mode=/?view= without unmounting
+  // this module (avoids losing in-progress configurator state on every
+  // click) — sync when the host shell passes new props. No-op standalone.
+  useEffect(() => {
+    if (initialMode && _validModes.includes(initialMode)) setAppMode(initialMode);
+  }, [initialMode]);
+  useEffect(() => {
+    if (initialView) setView(initialView);
+  }, [initialView]);
   // Supplier Quote metadata form
   const [supplierMeta, setSupplierMeta] = useState({
     supplierName: '', supplierContact: '', category: '', currency: 'AED',

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import QuoteManager from './components/QuoteManager';
 import FinanceTracker from './components/FinanceTracker';
 import OrderConverter from './components/OrderConverter';
@@ -29,11 +29,26 @@ const ENABLE_ORDER_CONVERSION_AI = false;
  * sub-navigation, shown at all sizes, since the global Sidebar just has one
  * "Trade" entry.
  */
-export default function TradeModule() {
-  const _initTab = new URLSearchParams(window.location.search).get('tab');
-  const _validTabs = ['home','quote','finance','convert','history','cashflow','dashboard','inventory','consignment'];
+type TradeTab = 'home' | 'quote' | 'finance' | 'convert' | 'history' | 'cashflow' | 'dashboard' | 'inventory' | 'consignment';
+const _validTabs = ['home', 'quote', 'finance', 'convert', 'history', 'cashflow', 'dashboard', 'inventory', 'consignment'];
+
+interface TradeModuleProps {
+  /** Sidebar deep-link target (?tab=). Optional — falls back to reading the
+   * URL once on mount, same as before, when rendered without a host shell. */
+  initialTab?: TradeTab;
+}
+
+export default function TradeModule({ initialTab }: TradeModuleProps = {}) {
+  const _initTab = initialTab || new URLSearchParams(window.location.search).get('tab');
   const _startTab = (_validTabs.includes(_initTab || '') ? _initTab : 'home') as any;
-  const [activeTab, setActiveTab] = useState<'home' | 'quote' | 'finance' | 'convert' | 'history' | 'cashflow' | 'dashboard' | 'inventory' | 'consignment'>(_startTab);
+  const [activeTab, setActiveTab] = useState<TradeTab>(_startTab);
+
+  // Sidebar can navigate to a different ?tab= without unmounting this module
+  // (avoids losing in-progress form state on every click) — sync activeTab
+  // when the host shell passes a new initialTab. No-op when used standalone.
+  useEffect(() => {
+    if (initialTab && _validTabs.includes(initialTab)) setActiveTab(initialTab);
+  }, [initialTab]);
   const [currency, setCurrency] = useState<Currency>('AED');
   const [currentUserId] = useState('Admin'); // 物理隔离：默认 Admin
 

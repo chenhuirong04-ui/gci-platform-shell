@@ -24,11 +24,20 @@ export interface NavModItem {
   active?: boolean;
 }
 
+export interface NavSection {
+  /** Section header label, e.g. "SALES", "SUPPLY CHAIN". */
+  label: string;
+  items: NavModItem[];
+}
+
 interface SidebarProps {
+  /** WORKSPACE is always rendered as the first section, with its single
+   * item styled as the permanent highlighted anchor (legacy navTop look). */
   navTop: NavTopItem;
-  navMods: NavModItem[];
   workspaceLabel: string;
-  modulesLabel: string;
+  /** Remaining sections, rendered in order below WORKSPACE — SALES, SUPPLY
+   * CHAIN, OPERATIONS, FINANCE, PLATFORM, etc. */
+  sections: NavSection[];
   userName: string;
   userRole: string;
   footer?: ReactNode;
@@ -99,7 +108,7 @@ function NavRow({ item }: { item: NavModItem }) {
   );
 }
 
-export function Sidebar({ navTop, navMods, workspaceLabel, modulesLabel, userName, userRole, footer, className }: SidebarProps) {
+export function Sidebar({ navTop, workspaceLabel, sections, userName, userRole, footer, className }: SidebarProps) {
   return (
     <aside
       className={`shrink-0 hidden md:flex md:flex-col relative sticky top-0 overflow-y-auto${className ? ` ${className}` : ''}`}
@@ -187,14 +196,18 @@ export function Sidebar({ navTop, navMods, workspaceLabel, modulesLabel, userNam
         </span>
       </div>
 
-      <div className="font-mono-label" style={{ fontSize: 8.5, letterSpacing: '0.2em', color: '#4A5268', padding: '16px 8px 8px' }}>
-        {modulesLabel}
-      </div>
-      <nav>
-        {navMods.map((n) => (
-          <NavRow key={n.code} item={n} />
-        ))}
-      </nav>
+      {sections.map((section) => (
+        <div key={section.label}>
+          <div className="font-mono-label" style={{ fontSize: 8.5, letterSpacing: '0.2em', color: '#4A5268', padding: '16px 8px 8px' }}>
+            {section.label}
+          </div>
+          <nav>
+            {section.items.map((n) => (
+              <NavRow key={n.code} item={n} />
+            ))}
+          </nav>
+        </div>
+      ))}
 
       <div
         className="flex items-center"
