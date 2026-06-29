@@ -14,6 +14,14 @@ import { QuoteRecord, QuoteItemRecord } from '../types';
 import { roundTo2, calculateTradeTotals } from '../services/currencyUtils';
 import { persistence } from '../services/persistenceService';
 import { exportElementToPdf } from '../services/pdfExport';
+import { colors } from '@gci/design-system';
+
+// V2 baseline colors — used only in the editable workbench (dropdowns,
+// left input panel, Review & Edit Line Items modal). The live invoice
+// preview / UNIVERSAL DOC CENTER / print HTML template further down are
+// the customer-facing document and are intentionally left untouched.
+const GOLD = colors.goldBase;
+const NAVY = colors.bgBase;
 
 const CONFIG = {
   TOKEN: '', // removed hardcoded secret during monorepo migration -- this field is unused dead config here
@@ -83,7 +91,7 @@ const CustomerDropdown: React.FC<{
     <div ref={wrapRef} className="relative">
       <input
         type="text"
-        className="w-full p-4 border-2 border-emerald-50 rounded-2xl outline-none focus:border-emerald-500 font-bold bg-emerald-50/10 text-emerald-900 uppercase"
+        className="w-full p-4 border-2 border-[#CBA85C]/20 rounded-2xl outline-none focus:border-[#CBA85C] font-bold bg-[#CBA85C]/5 text-[#0F1E45] uppercase"
         placeholder="选择客户..."
         value={q}
         onFocus={() => { setOpen(true); setQ(''); }}
@@ -95,7 +103,7 @@ const CustomerDropdown: React.FC<{
           {filtered.map((o, i) => (
             <li
               key={o.id}
-              className={`px-4 py-3 cursor-pointer text-sm font-bold uppercase ${i === hi ? 'bg-emerald-50 text-emerald-700' : 'text-gray-700 hover:bg-gray-50'}`}
+              className={`px-4 py-3 cursor-pointer text-sm font-bold uppercase ${i === hi ? 'bg-[#CBA85C]/15 text-[#8A6D2F]' : 'text-gray-700 hover:bg-gray-50'}`}
               onMouseDown={() => select(o.name)}
               onMouseEnter={() => setHi(i)}
             >{o.name}</li>
@@ -151,7 +159,7 @@ const ProductDropdown: React.FC<{
     <div ref={wrapRef} className="relative">
       <input
         type="text"
-        className="w-full p-4 border-2 border-emerald-50 rounded-2xl outline-none focus:border-emerald-500 font-bold bg-emerald-50/10 text-emerald-900"
+        className="w-full p-4 border-2 border-[#CBA85C]/20 rounded-2xl outline-none focus:border-[#CBA85C] font-bold bg-[#CBA85C]/5 text-[#0F1E45]"
         placeholder={placeholder || "搜索产品..."}
         value={q}
         onFocus={() => { setOpen(true); setQ(''); }}
@@ -163,13 +171,17 @@ const ProductDropdown: React.FC<{
           {filtered.map((o, i) => (
             <li
               key={o.productId || o.name}
-              className={`px-4 py-3 cursor-pointer border-b border-gray-50 last:border-0 ${i === hi ? 'bg-emerald-50' : 'hover:bg-gray-50'}`}
+              className={`px-4 py-3 cursor-pointer border-b border-gray-50 last:border-0 ${i === hi ? 'bg-[#CBA85C]/15' : 'hover:bg-gray-50'}`}
               onMouseDown={() => select(o)}
               onMouseEnter={() => setHi(i)}
             >
               <div className="flex items-center justify-between">
-                <span className={`text-sm font-bold ${i === hi ? 'text-emerald-700' : 'text-gray-800'}`}>{o.name}</span>
-                <span className={`text-xs font-black px-2 py-0.5 rounded-full ${o.stock <= 0 ? 'bg-red-50 text-red-500' : o.stock <= 10 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                <span className="text-sm font-bold" style={{ color: i === hi ? '#8A6D2F' : '#1f2937' }}>{o.name}</span>
+                <span className="text-xs font-black px-2 py-0.5 rounded-full" style={
+                  o.stock <= 0 ? { backgroundColor: 'rgba(224,132,106,0.16)', color: colors.statusDanger }
+                  : o.stock <= 10 ? { backgroundColor: 'rgba(217,180,90,0.16)', color: colors.statusWarning }
+                  : { backgroundColor: 'rgba(111,191,142,0.16)', color: colors.statusSuccess }
+                }>
                   {o.stock} {o.unit}
                 </span>
               </div>
@@ -788,20 +800,20 @@ const QuoteManager: React.FC = () => {
           </div>
         )}
 
-        <div className="bg-white p-8 rounded-[32px] shadow-sm border border-emerald-50">
-          <label className="text-[10px] font-black text-emerald-700 uppercase tracking-widest block mb-4">1. Customer Selection</label>
+        <div className="bg-white p-8 rounded-[32px] shadow-sm" style={{ border: `1px solid ${GOLD}30` }}>
+          <label className="text-[10px] font-black uppercase tracking-widest block mb-4" style={{ color: GOLD }}>1. Customer Selection</label>
           <CustomerDropdown
             options={customerOptions}
             value={customerName}
             onChange={setCustomerName}
           />
           {custError && (
-            <p className="mt-2 text-xs font-bold text-red-500">{custError}</p>
+            <p className="mt-2 text-[13px] font-bold" style={{ color: colors.statusDanger }}>{custError}</p>
           )}
         </div>
 
-        <div className="bg-white p-8 rounded-[32px] shadow-sm border border-emerald-50">
-          <label className="text-[10px] font-black text-emerald-700 uppercase tracking-widest block mb-4">2. Inventory Lookup</label>
+        <div className="bg-white p-8 rounded-[32px] shadow-sm" style={{ border: `1px solid ${GOLD}30` }}>
+          <label className="text-[10px] font-black uppercase tracking-widest block mb-4" style={{ color: GOLD }}>2. Inventory Lookup</label>
           <ProductDropdown
             items={inventoryData}
             value={searchProduct}
@@ -828,15 +840,15 @@ const QuoteManager: React.FC = () => {
               <span className="text-[8px] font-black text-gray-400 block uppercase mb-1">单位</span>
               <span className="text-lg font-black text-gray-700">{tempUnit}</span>
             </div>
-            <div className="bg-indigo-50 p-4 rounded-xl text-center border border-indigo-100">
-              <span className="text-[8px] font-black text-indigo-400 block uppercase mb-1">底价</span>
-              <span className="text-lg font-black text-indigo-700 font-mono">{tempTargetPrice.toFixed(2)}</span>
+            <div className="p-4 rounded-xl text-center" style={{ backgroundColor: `${GOLD}15`, border: `1px solid ${GOLD}30` }}>
+              <span className="text-[8px] font-black block uppercase mb-1" style={{ color: GOLD }}>底价</span>
+              <span className="text-lg font-black font-mono" style={{ color: '#6B4E15' }}>{tempTargetPrice.toFixed(2)}</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-8 rounded-[32px] shadow-sm border-2 border-orange-100">
-          <label className="text-[10px] font-black text-orange-600 uppercase tracking-widest block mb-4">3. Commercial Control</label>
+        <div className="bg-white p-8 rounded-[32px] shadow-sm border-2 border-[#CBA85C]/30">
+          <label className="text-[10px] font-black text-[#0F1E45] uppercase tracking-widest block mb-4">3. Commercial Control</label>
 
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div className="flex flex-col gap-1">
@@ -845,16 +857,16 @@ const QuoteManager: React.FC = () => {
                 type="text"
                 value={livePrice}
                 onChange={e => setLivePrice(e.target.value.replace(/[^0-9.]/g, ''))}
-                className="w-full p-4 border-2 border-orange-500 rounded-xl font-black text-right outline-none text-orange-600"
+                className="w-full p-4 border-2 border-[#CBA85C] rounded-xl font-black text-right outline-none text-[#0F1E45]"
               />
             </div>
 
             <div className="flex flex-col gap-1">
               <span className="text-[9px] font-black text-gray-400 uppercase">Quantity</span>
-              <div className="flex items-center border-2 border-orange-200 rounded-xl overflow-hidden h-[56px]">
+              <div className="flex items-center border-2 border-[#CBA85C]/40 rounded-xl overflow-hidden h-[56px]">
                 <button
                   onClick={() => setLiveQty(q => Math.max(1, parseInt(q || "0") - 1).toString())}
-                  className="w-10 h-full bg-orange-50 text-orange-500 hover:bg-orange-100 font-black"
+                  className="w-10 h-full bg-[#CBA85C]/15 text-[#CBA85C] hover:bg-[#CBA85C]/25 font-black"
                 >
                   -
                 </button>
@@ -862,11 +874,11 @@ const QuoteManager: React.FC = () => {
                   type="number"
                   value={liveQty}
                   onChange={e => setLiveQty(e.target.value.replace(/[^0-9]/g, ''))}
-                  className="flex-1 text-center font-black text-orange-600 outline-none bg-transparent"
+                  className="flex-1 text-center font-black text-[#0F1E45] outline-none bg-transparent"
                 />
                 <button
                   onClick={() => setLiveQty(q => (parseInt(q || "0") + 1).toString())}
-                  className="w-10 h-full bg-orange-50 text-orange-500 hover:bg-orange-100 font-black"
+                  className="w-10 h-full bg-[#CBA85C]/15 text-[#CBA85C] hover:bg-[#CBA85C]/25 font-black"
                 >
                   +
                 </button>
@@ -878,14 +890,14 @@ const QuoteManager: React.FC = () => {
           <div className="mb-6 space-y-4 pt-4 border-t border-gray-100">
             <div className="flex flex-col gap-2">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                <CreditCard className="w-3 h-3 text-indigo-500" /> Payment Terms (Manual Input)
+                <CreditCard className="w-3 h-3 text-[#CBA85C]" /> Payment Terms (Manual Input)
               </label>
               <input
                 type="text"
                 value={paymentTerms}
                 onChange={e => setPaymentTerms(e.target.value)}
                 placeholder="例如: 30% Deposit, 70% Balanced"
-                className="w-full p-4 border-2 border-indigo-50 rounded-xl font-bold text-gray-700 outline-none focus:border-indigo-500"
+                className="w-full p-4 border-2 border-[#CBA85C]/20 rounded-xl font-bold text-gray-700 outline-none focus:border-[#CBA85C]"
               />
             </div>
 
@@ -895,13 +907,13 @@ const QuoteManager: React.FC = () => {
                 <div className="flex gap-2">
                   <button
                     onClick={() => setTermMode('DAYS')}
-                    className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${termMode === 'DAYS' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-gray-100 text-gray-400'}`}
+                    className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${termMode === 'DAYS' ? 'bg-[#0F1E45] text-white shadow-sm' : 'bg-gray-100 text-gray-400'}`}
                   >
                     By Days
                   </button>
                   <button
                     onClick={() => setTermMode('DATE')}
-                    className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${termMode === 'DATE' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-gray-100 text-gray-400'}`}
+                    className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${termMode === 'DATE' ? 'bg-[#0F1E45] text-white shadow-sm' : 'bg-gray-100 text-gray-400'}`}
                   >
                     Manual Date
                   </button>
@@ -926,7 +938,7 @@ const QuoteManager: React.FC = () => {
                       type="number"
                       value={termDays}
                       onChange={e => setTermDays(e.target.value)}
-                      className="w-full p-3 border-2 border-indigo-100 rounded-xl font-mono font-black text-indigo-600 outline-none"
+                      className="w-full p-3 border-2 border-[#CBA85C]/30 rounded-xl font-mono font-black text-[#0F1E45] outline-none"
                     />
                   </div>
                 ) : (
@@ -936,15 +948,15 @@ const QuoteManager: React.FC = () => {
                       type="date"
                       value={manualDueDate}
                       onChange={e => setManualDueDate(e.target.value)}
-                      className="w-full p-3 border-2 border-indigo-100 rounded-xl font-mono font-black text-indigo-600 outline-none"
+                      className="w-full p-3 border-2 border-[#CBA85C]/30 rounded-xl font-mono font-black text-[#0F1E45] outline-none"
                     />
                   </div>
                 )}
               </div>
 
-              <div className="mt-2 p-3 bg-indigo-50 rounded-xl border border-indigo-100 flex items-center justify-between">
-                <span className="text-[9px] font-black text-indigo-400 uppercase">Calculated Due:</span>
-                <span className="text-xs font-black text-indigo-900 font-mono tracking-widest">{calculatedDueDate}</span>
+              <div className="mt-2 p-3 rounded-xl flex items-center justify-between" style={{ backgroundColor: `${GOLD}15`, border: `1px solid ${GOLD}30` }}>
+                <span className="text-[9px] font-black uppercase" style={{ color: GOLD }}>Calculated Due:</span>
+                <span className="text-xs font-black font-mono tracking-widest" style={{ color: NAVY }}>{calculatedDueDate}</span>
               </div>
             </div>
           </div>
@@ -952,7 +964,8 @@ const QuoteManager: React.FC = () => {
           <button
             disabled={!searchProduct.trim() || isSyncing}
             onClick={handleAddItem}
-            className="w-full bg-orange-500 text-white rounded-2xl font-black uppercase text-xs py-5 shadow-xl hover:bg-orange-600 mb-4 transition-all active:scale-[0.98]"
+            className="w-full text-white rounded-2xl font-black uppercase text-xs py-5 shadow-xl hover:opacity-90 mb-4 transition-all active:scale-[0.98]"
+            style={{ backgroundColor: GOLD }}
           >
             加入清单 / ADD ITEM
           </button>
@@ -960,7 +973,8 @@ const QuoteManager: React.FC = () => {
           <button
             onClick={() => items.length > 0 && setIsDocModalOpen(true)}
             disabled={items.length === 0}
-            className="w-full py-6 bg-[#1a237e] text-white rounded-2xl font-black text-[11px] uppercase tracking-[0.3em] hover:bg-black transition-all shadow-xl active:scale-[0.98]"
+            className="w-full py-6 text-white rounded-2xl font-black text-[11px] uppercase tracking-[0.3em] hover:bg-black transition-all shadow-xl active:scale-[0.98]"
+            style={{ backgroundColor: NAVY }}
           >
             🚀 进入单据中心 (CENTER)
           </button>
@@ -1185,7 +1199,7 @@ const QuoteManager: React.FC = () => {
           <div className="bg-white w-full max-w-4xl rounded-[50px] overflow-hidden shadow-2xl flex flex-col border-4 border-white/20">
             <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-orange-100 rounded-2xl text-orange-600">
+                <div className="p-3 rounded-2xl" style={{ backgroundColor: `${GOLD}18`, color: GOLD }}>
                   <Edit3 className="w-6 h-6" />
                 </div>
                 <div>
@@ -1193,7 +1207,7 @@ const QuoteManager: React.FC = () => {
                   <p className="text-[9px] font-bold text-gray-400 uppercase mt-0.5">Edit quantity or unit price before final submission</p>
                 </div>
               </div>
-              <button onClick={() => setIsReviewOpen(false)} className="p-2 text-gray-400 hover:text-red-500 transition-all">
+              <button onClick={() => setIsReviewOpen(false)} className="p-2 text-gray-400 hover:text-gray-600 transition-all">
                 <X className="w-6 h-6" />
               </button>
             </div>
@@ -1219,7 +1233,7 @@ const QuoteManager: React.FC = () => {
                           onChange={(e) => handleUpdateReviewItem(idx, { qty: Math.max(1, parseInt(e.target.value) || 0) })}
                           onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
                           onKeyDown={(e) => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault(); }}
-                          className="w-20 p-2 border-2 border-gray-100 rounded-xl font-black text-center text-xs outline-none focus:border-orange-500 transition-all"
+                          className="w-20 p-2 border-2 border-gray-100 rounded-xl font-black text-center text-xs outline-none focus:border-[#CBA85C] transition-all"
                         />
                       </td>
                       <td className="py-6 text-center">
@@ -1229,7 +1243,7 @@ const QuoteManager: React.FC = () => {
                             step="0.01"
                             value={it.unit_price}
                             onChange={(e) => handleUpdateReviewItem(idx, { unit_price: parseFloat(e.target.value) || 0 })}
-                            className="w-full p-2 border-2 border-gray-100 rounded-xl font-black text-center text-xs outline-none focus:border-orange-500 transition-all pr-4"
+                            className="w-full p-2 border-2 border-gray-100 rounded-xl font-black text-center text-xs outline-none focus:border-[#CBA85C] transition-all pr-4"
                           />
                         </div>
                       </td>
@@ -1251,7 +1265,7 @@ const QuoteManager: React.FC = () => {
               </button>
               <button
                 onClick={handleApplyReviewChanges}
-                className="px-10 py-4 bg-orange-600 text-white rounded-[20px] font-black uppercase text-[10px] tracking-widest shadow-xl shadow-orange-100 hover:bg-black transition-all flex items-center gap-2"
+                className="px-10 py-4 bg-[#080D1E] text-white rounded-[20px] font-black uppercase text-[10px] tracking-widest shadow-xl shadow-slate-200 hover:bg-black transition-all flex items-center gap-2"
               >
                 <SaveIcon className="w-4 h-4" /> Apply Changes
               </button>
