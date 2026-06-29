@@ -8,6 +8,10 @@ import { OrderRecord, PaymentRecord } from '../types';
 import { roundTo2 } from '../services/currencyUtils';
 import { persistence } from '../services/persistenceService';
 import { cloudDb } from '../services/cloudDb'; // ✅ NEW: Supabase
+import { colors } from '@gci/design-system';
+
+const GOLD = colors.goldBase;
+const NAVY = colors.bgBase;
 
 type FlowType = 'SALE' | 'CONSIGNMENT' | 'ADJUSTMENT';
 
@@ -195,18 +199,18 @@ const CashFlowDashboard: React.FC = () => {
       {/* Header Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-all"><TrendingUp className="w-16 h-16 text-emerald-600" /></div>
+          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-all"><TrendingUp className="w-16 h-16" style={{ color: colors.statusSuccess }} /></div>
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Total Sale Inflow (AED)</p>
-          <p className="text-4xl font-black text-emerald-600 font-mono tracking-tighter leading-none">{stats.totalInflow.toFixed(2)}</p>
+          <p className="text-4xl font-black font-mono tracking-tighter leading-none" style={{ color: '#3F7D58' }}>{stats.totalInflow.toFixed(2)}</p>
         </div>
         <div className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-all"><Activity className="w-16 h-16 text-orange-600" /></div>
+          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-all"><Activity className="w-16 h-16" style={{ color: colors.statusWarning }} /></div>
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Total Adjustments (AED)</p>
-          <p className="text-4xl font-black text-orange-600 font-mono tracking-tighter leading-none">{stats.totalAdj.toFixed(2)}</p>
+          <p className="text-4xl font-black font-mono tracking-tighter leading-none" style={{ color: '#8A6D2F' }}>{stats.totalAdj.toFixed(2)}</p>
         </div>
-        <div className="bg-[#1a237e] p-10 rounded-[40px] shadow-2xl text-white relative overflow-hidden group">
+        <div className="bg-[#080D1E] p-10 rounded-[40px] shadow-2xl text-white relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-all"><Wallet className="w-16 h-16" /></div>
-          <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-2">Net Business Flow (AED)</p>
+          <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: GOLD }}>Net Business Flow (AED)</p>
           <p className="text-4xl font-black font-mono tracking-tighter leading-none">{stats.net.toFixed(2)}</p>
         </div>
       </div>
@@ -215,13 +219,15 @@ const CashFlowDashboard: React.FC = () => {
       <div className="flex bg-white p-2 rounded-[30px] shadow-sm border border-gray-100 w-fit self-center no-print">
         <button
           onClick={() => setActiveView('daily')}
-          className={`px-8 py-4 rounded-[22px] text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-3 ${activeView === 'daily' ? 'bg-indigo-600 text-white shadow-xl' : 'text-gray-400 hover:bg-gray-50'}`}
+          className="px-8 py-4 rounded-[22px] text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-3"
+          style={activeView === 'daily' ? { backgroundColor: NAVY, color: '#fff', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' } : { color: '#9CA3AF' }}
         >
           <Calendar className="w-4 h-4" /> Daily Flow
         </button>
         <button
           onClick={() => setActiveView('monthly')}
-          className={`px-8 py-4 rounded-[22px] text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-3 ${activeView === 'monthly' ? 'bg-indigo-600 text-white shadow-xl' : 'text-gray-400 hover:bg-gray-50'}`}
+          className="px-8 py-4 rounded-[22px] text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-3"
+          style={activeView === 'monthly' ? { backgroundColor: NAVY, color: '#fff', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' } : { color: '#9CA3AF' }}
         >
           <BarChart3 className="w-4 h-4" /> Monthly Review
         </button>
@@ -246,7 +252,7 @@ const CashFlowDashboard: React.FC = () => {
             <div key={day.date} className="bg-white rounded-[50px] border border-gray-100 shadow-sm overflow-hidden animate-in slide-in-from-bottom-4">
               <div className="p-8 bg-gray-50/50 border-b flex flex-col md:flex-row justify-between items-center gap-6">
                 <div className="flex items-center gap-4">
-                  <div className="p-4 bg-white rounded-2xl shadow-sm border border-gray-100 text-[#1a237e]">
+                  <div className="p-4 bg-white rounded-2xl shadow-sm border border-gray-100 text-[#080D1E]">
                     <Calendar className="w-6 h-6" />
                   </div>
                   <div>
@@ -256,16 +262,16 @@ const CashFlowDashboard: React.FC = () => {
                 </div>
                 <div className="flex gap-8">
                   <div className="text-center">
-                    <p className="text-[8px] font-black text-emerald-400 uppercase mb-1">Inflow</p>
-                    <p className="text-lg font-black text-emerald-600 font-mono">+{day.inflow.toFixed(2)}</p>
+                    <p className="text-[8px] font-black uppercase mb-1" style={{ color: colors.statusSuccess }}>Inflow</p>
+                    <p className="text-lg font-black font-mono" style={{ color: '#3F7D58' }}>+{day.inflow.toFixed(2)}</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-[8px] font-black text-orange-400 uppercase mb-1">Adj</p>
-                    <p className="text-lg font-black text-orange-600 font-mono">{day.adjustment.toFixed(2)}</p>
+                    <p className="text-[8px] font-black uppercase mb-1" style={{ color: colors.statusWarning }}>Adj</p>
+                    <p className="text-lg font-black font-mono" style={{ color: '#8A6D2F' }}>{day.adjustment.toFixed(2)}</p>
                   </div>
                   <div className="text-center border-l border-gray-200 pl-8">
-                    <p className="text-[8px] font-black text-indigo-400 uppercase mb-1">Net Flow</p>
-                    <p className="text-lg font-black text-[#1a237e] font-mono">{day.net.toFixed(2)}</p>
+                    <p className="text-[8px] font-black uppercase mb-1" style={{ color: GOLD }}>Net Flow</p>
+                    <p className="text-lg font-black text-[#080D1E] font-mono">{day.net.toFixed(2)}</p>
                   </div>
                 </div>
               </div>
@@ -285,17 +291,17 @@ const CashFlowDashboard: React.FC = () => {
                       <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-8 py-4">
                           <span className={`px-3 py-1 rounded-full text-[7px] font-black uppercase border ${
-                            item.type === 'SALE' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                            item.type === 'CONSIGNMENT' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
-                            'bg-orange-50 text-orange-600 border-orange-100'
+                            item.type === 'SALE' ? 'bg-[#6FBF8E]/15 text-[#3F7D58] border-[#6FBF8E]/30' :
+                            item.type === 'CONSIGNMENT' ? 'bg-[#8FA6D4]/15 text-[#4A6090] border-[#8FA6D4]/30' :
+                            'bg-[#D9B45A]/15 text-[#8A6D2F] border-[#D9B45A]/30'
                           }`}>
                             {item.type}
                           </span>
                         </td>
-                        <td className="px-8 py-4 font-mono text-[10px] text-indigo-600 font-bold">{item.reference_no}</td>
+                        <td className="px-8 py-4 font-mono text-[10px] font-bold" style={{ color: GOLD }}>{item.reference_no}</td>
                         <td className="px-8 py-4 text-[10px] font-black text-gray-700 uppercase">{item.customer}</td>
                         <td className="px-8 py-4 text-[10px] font-bold text-gray-400 uppercase truncate max-w-[200px]">{item.note}</td>
-                        <td className={`px-8 py-4 text-right font-mono font-black text-xs ${item.amount < 0 ? 'text-red-500' : 'text-gray-800'}`}>
+                        <td className={`px-8 py-4 text-right font-mono font-black text-xs ${item.amount < 0 ? 'text-[#A85D45]' : 'text-gray-800'}`}>
                           {item.amount.toFixed(2)}
                         </td>
                       </tr>
@@ -313,33 +319,33 @@ const CashFlowDashboard: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {monthlyAggregates.map(month => (
             <div key={month.month} className="bg-white p-10 rounded-[50px] border border-gray-100 shadow-sm relative overflow-hidden group hover:shadow-2xl transition-all">
-              <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-50 rounded-full opacity-0 group-hover:opacity-100 transition-all -z-0"></div>
+              <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full opacity-0 group-hover:opacity-100 transition-all -z-0" style={{ backgroundColor: `${GOLD}15` }}></div>
               <div className="relative z-10">
                 <div className="flex justify-between items-start mb-10">
                   <div>
-                    <h3 className="text-2xl font-black text-[#1a237e] tracking-tighter uppercase">{month.month}</h3>
+                    <h3 className="text-2xl font-black text-[#080D1E] tracking-tighter uppercase">{month.month}</h3>
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Monthly Performance Review</p>
                   </div>
-                  <div className="p-4 bg-indigo-50 text-indigo-600 rounded-3xl">
+                  <div className="p-4 rounded-3xl" style={{ backgroundColor: `${GOLD}15`, color: GOLD }}>
                     <BarChart3 className="w-6 h-6" />
                   </div>
                 </div>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center py-3 border-b border-gray-50">
                     <span className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-2"><ArrowUpRight className="w-3 h-3" /> Total Inflow</span>
-                    <span className="font-mono font-black text-emerald-600">AED {month.inflow.toFixed(2)}</span>
+                    <span className="font-mono font-black" style={{ color: '#3F7D58' }}>AED {month.inflow.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center py-3 border-b border-gray-50">
                     <span className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-2"><PackageCheck className="w-3 h-3" /> Consignment Portion</span>
-                    <span className="font-mono font-bold text-indigo-400">AED {month.consignment.toFixed(2)}</span>
+                    <span className="font-mono font-bold" style={{ color: '#4A6090' }}>AED {month.consignment.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center py-3 border-b border-gray-50">
                     <span className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-2"><History className="w-3 h-3" /> Adjustments</span>
-                    <span className={`font-mono font-black ${month.adjustment < 0 ? 'text-red-500' : 'text-orange-600'}`}>AED {month.adjustment.toFixed(2)}</span>
+                    <span className="font-mono font-black" style={{ color: month.adjustment < 0 ? '#A85D45' : '#8A6D2F' }}>AED {month.adjustment.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center pt-6">
-                    <span className="text-xs font-black text-[#1a237e] uppercase tracking-widest">Monthly Net Flow</span>
-                    <span className="text-3xl font-black text-[#1a237e] font-mono tracking-tighter leading-none">AED {month.net.toFixed(2)}</span>
+                    <span className="text-xs font-black text-[#080D1E] uppercase tracking-widest">Monthly Net Flow</span>
+                    <span className="text-3xl font-black text-[#080D1E] font-mono tracking-tighter leading-none">AED {month.net.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
