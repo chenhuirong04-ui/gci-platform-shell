@@ -9,6 +9,10 @@ import {
   RefreshCw, Search, Package, AlertCircle, Clock,
   CheckCircle, Filter, Edit3, X, Save, ChevronDown
 } from 'lucide-react';
+import { colors } from '@gci/design-system';
+
+const GOLD = colors.goldBase;
+const NAVY = colors.bgBase;
 
 console.log('[TRADE OPS BUILD]', 'inventory-notion-v2');
 
@@ -122,9 +126,9 @@ function syncToLocalCache(rows: InventoryRow[]) {
 // ── Stock status badge ──────────────────────────────────────────────────────
 type Badge = { label: string; cls: string };
 function getBadge(row: InventoryRow): Badge {
-  if (row.currentQty <= 0)  return { label: '零库存', cls: 'bg-red-50 text-red-600 border border-red-100' };
-  if (row.currentQty <= 10) return { label: '低库存', cls: 'bg-amber-50 text-amber-600 border border-amber-100' };
-  return { label: '正常',   cls: 'bg-emerald-50 text-emerald-600 border border-emerald-100' };
+  if (row.currentQty <= 0)  return { label: '零库存', cls: 'bg-[#E0846A]/15 text-[#A85D45] border border-[#E0846A]/30' };
+  if (row.currentQty <= 10) return { label: '低库存', cls: 'bg-[#D9B45A]/15 text-[#8A6D2F] border border-[#D9B45A]/30' };
+  return { label: '正常',   cls: 'bg-[#6FBF8E]/15 text-[#3F7D58] border border-[#6FBF8E]/30' };
 }
 
 const fmt2 = (n: number) => Number(n || 0).toFixed(2);
@@ -277,7 +281,7 @@ const InventoryManager: React.FC = () => {
 
   // ── Render ───────────────────────────────────────────────────────────────
   if (loading) return (
-    <div className="flex items-center justify-center h-[60vh] gap-3 text-indigo-400">
+    <div className="flex items-center justify-center h-[60vh] gap-3" style={{ color: GOLD }}>
       <RefreshCw className="w-6 h-6 animate-spin" />
       <span className="text-sm font-black uppercase tracking-widest">Loading from Notion...</span>
     </div>
@@ -285,12 +289,12 @@ const InventoryManager: React.FC = () => {
 
   if (error) return (
     <div className="flex flex-col items-center justify-center h-[60vh] gap-4 text-center">
-      <AlertCircle className="w-10 h-10 text-red-400" />
-      <p className="text-sm font-black text-red-500">{error}</p>
+      <AlertCircle className="w-10 h-10" style={{ color: colors.statusDanger }} />
+      <p className="text-sm font-black" style={{ color: colors.statusDanger }}>{error}</p>
       <p className="text-[10px] text-gray-400 max-w-sm">
         Notion 数据读取失败。请检查网络连接，或联系系统管理员确认 API 配置。
       </p>
-      <button onClick={load} className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black">重试</button>
+      <button onClick={load} className="px-6 py-2 text-white rounded-xl text-xs font-black" style={{ backgroundColor: NAVY }}>重试</button>
     </div>
   );
 
@@ -300,14 +304,14 @@ const InventoryManager: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h2 className="text-lg font-black uppercase tracking-widest text-[#1a237e]">库存管理</h2>
+          <h2 className="text-lg font-black uppercase tracking-widest text-[#080D1E]">库存管理</h2>
           <p className="text-xs text-gray-500 font-bold mt-0.5 uppercase tracking-wide">
             Notion INVENTORY · {rows.length} 行 · 刷新 {refreshed.toLocaleTimeString()}
           </p>
         </div>
         <button
           onClick={load}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-[#1a237e] transition-all shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-[#080D1E] transition-all shadow-sm"
         >
           <RefreshCw className="w-3 h-3" />从 Notion 刷新
         </button>
@@ -315,7 +319,7 @@ const InventoryManager: React.FC = () => {
 
       {/* OPERATIONS 分区"库存流水"入口暂时指向这个页面，直到独立的明细查看
           页面做出来——只是一个轻提示，不涉及任何数据/逻辑改动。 */}
-      <div className="px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-100 text-[11px] font-bold text-amber-700">
+      <div className="px-4 py-2.5 rounded-xl text-[11px] font-bold" style={{ backgroundColor: `${colors.statusWarning}1F`, border: `1px solid ${colors.statusWarning}40`, color: '#8A6D2F' }}>
         库存流水明细页面正在完善中。当前页面显示库存总览与库存调整功能。
       </div>
 
@@ -358,7 +362,7 @@ const InventoryManager: React.FC = () => {
         <label className="flex items-center gap-2 text-xs font-black text-gray-600 uppercase cursor-pointer select-none">
           <input
             type="checkbox" checked={showZero} onChange={e => setShowZero(e.target.checked)}
-            className="accent-indigo-600"
+            className="accent-[#080D1E]"
           />
           显示零库存
         </label>
@@ -386,7 +390,7 @@ const InventoryManager: React.FC = () => {
               {filtered.map(row => {
                 const badge = getBadge(row);
                 return (
-                  <tr key={row.invPageId} className="border-b border-gray-50 hover:bg-indigo-50/30 transition-colors">
+                  <tr key={row.invPageId} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 font-medium text-gray-800 max-w-[220px]">
                       <div className="font-black text-gray-800 truncate" title={row.name}>{row.name || '—'}</div>
                       {row.nameEN && row.nameEN !== row.name && (
@@ -394,7 +398,7 @@ const InventoryManager: React.FC = () => {
                       )}
                     </td>
                     <td className="px-4 py-3 font-mono text-gray-600 whitespace-nowrap">{row.sku || '—'}</td>
-                    <td className="px-4 py-3 font-black font-mono text-[#1a237e] whitespace-nowrap text-right text-base">
+                    <td className="px-4 py-3 font-black font-mono text-[#080D1E] whitespace-nowrap text-right text-base">
                       {fmtQty(row.currentQty)}
                     </td>
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{row.unit}</td>
@@ -406,7 +410,7 @@ const InventoryManager: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 font-mono whitespace-nowrap text-right text-base">
                       {row.currentQty > 0 && row.costPrice > 0
-                        ? <span className="text-[#1a237e] font-black">{fmt2(row.currentQty * row.costPrice)}</span>
+                        ? <span className="text-[#080D1E] font-black">{fmt2(row.currentQty * row.costPrice)}</span>
                         : <span className="text-gray-300">—</span>
                       }
                     </td>
@@ -420,7 +424,7 @@ const InventoryManager: React.FC = () => {
                     <td className="px-4 py-3 whitespace-nowrap">
                       <button
                         onClick={() => { setAdjRow(row); setAdjDelta(''); setAdjNote(''); setAdjMsg(''); setAdjType('入库'); }}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-black hover:bg-indigo-100 transition-all"
+                        className="flex items-center gap-1 px-3 py-1.5 bg-[#CBA85C]/15 text-[#8A6D2F] rounded-lg text-xs font-black hover:bg-[#CBA85C]/25 transition-all"
                       >
                         <Edit3 className="w-3 h-3" />库存调整
                       </button>
@@ -439,7 +443,7 @@ const InventoryManager: React.FC = () => {
           <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-md space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-black text-[#1a237e] text-sm">库存调整</h3>
+                <h3 className="font-black text-[#080D1E] text-sm">库存调整</h3>
                 <p className="text-[10px] text-gray-400 mt-0.5 font-bold uppercase tracking-widest">写入 Notion STOCK_LEDGER</p>
               </div>
               <button onClick={() => setAdjRow(null)} className="text-gray-400 hover:text-gray-600">
@@ -450,7 +454,7 @@ const InventoryManager: React.FC = () => {
             <div className="bg-gray-50 rounded-2xl p-4 space-y-1">
               <p className="font-black text-gray-800 text-sm truncate">{adjRow.name}</p>
               <p className="text-[10px] text-gray-400 font-mono">{adjRow.sku}</p>
-              <p className="text-xs font-bold text-indigo-600 mt-1">
+              <p className="text-xs font-bold text-[#8A6D2F] mt-1">
                 当前库存：<span className="font-black font-mono">{fmtQty(adjRow.currentQty)}</span> {adjRow.unit}
               </p>
             </div>
@@ -465,8 +469,8 @@ const InventoryManager: React.FC = () => {
                       onClick={() => setAdjType(t)}
                       className={`flex-1 py-2 rounded-xl text-[10px] font-black border transition-all ${
                         adjType === t
-                          ? 'bg-[#1a237e] text-white border-[#1a237e]'
-                          : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'
+                          ? 'bg-[#080D1E] text-white border-[#080D1E]'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
                       }`}
                     >
                       {t}
@@ -484,10 +488,10 @@ const InventoryManager: React.FC = () => {
                   value={adjDelta}
                   onChange={e => setAdjDelta(e.target.value)}
                   placeholder="如：+50 或 -12"
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono outline-none focus:border-indigo-400 bg-gray-50"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono outline-none focus:border-[#CBA85C] bg-gray-50"
                 />
                 {adjDelta && !isNaN(parseFloat(adjDelta)) && (
-                  <p className="text-[10px] text-indigo-500 font-bold mt-1 pl-1">
+                  <p className="text-[10px] text-[#8A6D2F] font-bold mt-1 pl-1">
                     预计调整后库存：{fmtQty(adjRow.currentQty + parseFloat(adjDelta))} {adjRow.unit}
                   </p>
                 )}
@@ -500,14 +504,14 @@ const InventoryManager: React.FC = () => {
                   value={adjNote}
                   onChange={e => setAdjNote(e.target.value)}
                   placeholder="如：新到货/盘点误差"
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-indigo-400 bg-gray-50"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#CBA85C] bg-gray-50"
                 />
               </div>
             </div>
 
             {adjMsg && (
               <div className={`text-[10px] font-bold rounded-xl p-3 ${
-                adjMsg.startsWith('✅') ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
+                adjMsg.startsWith('✅') ? 'bg-[#6FBF8E]/15 text-[#3F7D58]' : 'bg-[#E0846A]/15 text-[#A85D45]'
               }`}>
                 {adjMsg}
               </div>
@@ -523,7 +527,7 @@ const InventoryManager: React.FC = () => {
               <button
                 onClick={handleAdjSubmit}
                 disabled={adjSaving || !adjDelta}
-                className="flex-1 py-3 bg-[#1a237e] text-white rounded-2xl text-xs font-black flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-indigo-900 transition-all"
+                className="flex-1 py-3 bg-[#080D1E] text-white rounded-2xl text-xs font-black flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-black transition-all"
               >
                 {adjSaving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                 {adjSaving ? '写入中...' : '确认写入'}
@@ -537,13 +541,18 @@ const InventoryManager: React.FC = () => {
   );
 };
 
-// ── Stat card ────────────────────────────────────────────────────────────────
+// ── Stat card — key names kept (call sites use color="indigo"/"orange" etc)
+// -- only the literal colors changed, mapped onto the 5 allowed status
+// colors. 'indigo' (库存总金额, the primary KPI) -> gold; 'orange' (缺少
+//成本价, a data-quality warning like 低库存) -> the same warning color as
+// 'amber', reusing one color across two warning-type stats rather than
+// inventing a 6th hue. ──────────────────────────────────────────────────
 const C = {
-  indigo:  { border: 'border-indigo-100',  bg: 'bg-indigo-50',  icon: 'text-indigo-500',  val: 'text-[#1a237e]' },
-  emerald: { border: 'border-emerald-100', bg: 'bg-emerald-50', icon: 'text-emerald-500', val: 'text-emerald-700' },
-  amber:   { border: 'border-amber-100',   bg: 'bg-amber-50',   icon: 'text-amber-500',   val: 'text-amber-700' },
-  red:     { border: 'border-red-100',     bg: 'bg-red-50',     icon: 'text-red-400',     val: 'text-red-600' },
-  orange:  { border: 'border-orange-100',  bg: 'bg-orange-50',  icon: 'text-orange-500',  val: 'text-orange-700' },
+  indigo:  { border: 'border-[#CBA85C]/30',  bg: 'bg-[#CBA85C]/15',  icon: 'text-[#CBA85C]',  val: 'text-[#080D1E]' },
+  emerald: { border: 'border-[#6FBF8E]/30', bg: 'bg-[#6FBF8E]/15', icon: 'text-[#3F7D58]', val: 'text-[#3F7D58]' },
+  amber:   { border: 'border-[#D9B45A]/30',   bg: 'bg-[#D9B45A]/15',   icon: 'text-[#8A6D2F]',   val: 'text-[#8A6D2F]' },
+  red:     { border: 'border-[#E0846A]/30',     bg: 'bg-[#E0846A]/15',     icon: 'text-[#A85D45]',     val: 'text-[#A85D45]' },
+  orange:  { border: 'border-[#D9B45A]/30',  bg: 'bg-[#D9B45A]/15',  icon: 'text-[#8A6D2F]',  val: 'text-[#8A6D2F]' },
 } as const;
 
 const StatCard: React.FC<{
