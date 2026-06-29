@@ -7,6 +7,10 @@ import {
 import { OrderRecord, OrderItemRecord } from '../types';
 import { roundTo2 } from '../services/currencyUtils';
 import { persistence } from '../services/persistenceService';
+import { colors } from '@gci/design-system';
+
+const GOLD = colors.goldBase;
+const NAVY = colors.bgBase;
 
 console.log('[TRADE DASHBOARD BUILD]', 'sales-dashboard-v2');
 
@@ -197,7 +201,7 @@ const SalesDashboard: React.FC = () => {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="text-center space-y-4">
-          <RefreshCw className="w-8 h-8 text-indigo-300 animate-spin mx-auto" />
+          <RefreshCw className="w-8 h-8 animate-spin mx-auto" style={{ color: GOLD }} />
           <p className="text-xs font-black uppercase tracking-widest text-gray-400">Loading Dashboard...</p>
         </div>
       </div>
@@ -210,14 +214,14 @@ const SalesDashboard: React.FC = () => {
       {/* ── Page Header ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-2xl font-black uppercase tracking-widest text-[#1a237e]">经营看板</h2>
+          <h2 className="text-2xl font-black uppercase tracking-widest" style={{ color: NAVY }}>经营看板</h2>
           <p className="text-xs text-gray-400 font-bold mt-0.5 uppercase tracking-widest">
             Business Analytics · v2 · {lastRefresh.toLocaleTimeString()}
           </p>
         </div>
         <button
           onClick={load}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-black uppercase tracking-widest text-gray-500 hover:text-[#1a237e] hover:border-indigo-200 transition-all shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-black uppercase tracking-widest text-gray-500 hover:text-slate-700 hover:border-slate-300 transition-all shadow-sm"
         >
           <RefreshCw className="w-3.5 h-3.5" />刷新数据
         </button>
@@ -237,16 +241,16 @@ const SalesDashboard: React.FC = () => {
         <SecHead icon={<Layers className="w-4 h-4" />} title="本月经营拆解" sub="MONTHLY BUSINESS BREAKDOWN" />
         <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <BreakCard label="Direct Sale"  sub="本月直销"   value={`AED ${fmt(breakdown.directAmt)}`}
-            pct={kpi.monthRevenue > 0 ? breakdown.directAmt  / kpi.monthRevenue : 0} barClass="bg-[#1a237e]" />
+            pct={kpi.monthRevenue > 0 ? breakdown.directAmt  / kpi.monthRevenue : 0} barClass="bg-[#080D1E]" />
           <BreakCard label="Consignment"  sub="本月寄售"   value={`AED ${fmt(breakdown.consignAmt)}`}
-            pct={kpi.monthRevenue > 0 ? breakdown.consignAmt / kpi.monthRevenue : 0} barClass="bg-violet-500" />
+            pct={kpi.monthRevenue > 0 ? breakdown.consignAmt / kpi.monthRevenue : 0} barClass="bg-slate-400" />
           <BreakCard label="已收款"       sub="COLLECTED"  value={`AED ${fmt(breakdown.collected)}`}
             pct={kpi.monthRevenue > 0 ? breakdown.collected  / kpi.monthRevenue : 0} barClass="bg-emerald-500" />
           <BreakCard label="未收款"       sub="UNCOLLECTED" value={`AED ${fmt(breakdown.unpaid)}`}
             pct={kpi.monthRevenue > 0 ? breakdown.unpaid     / kpi.monthRevenue : 0} barClass="bg-amber-400" />
           <BreakCard label="逾期应收"     sub="OVERDUE AR"  value={`AED ${fmt(breakdown.overdueAmt)}`}
             pct={kpi.allOutstanding > 0 ? breakdown.overdueAmt / kpi.allOutstanding : 0}
-            barClass="bg-red-500" alert={breakdown.overdueAmt > 0} />
+            barClass="bg-[#E0846A]" alert={breakdown.overdueAmt > 0} />
         </div>
       </div>
 
@@ -257,16 +261,16 @@ const SalesDashboard: React.FC = () => {
           <ChannelBar
             label="Consignment / 寄售" count={channelMix.consign.count}
             total={channelMix.consign.total} pct={channelMix.consign.pct}
-            barClass="bg-violet-500" dotClass="bg-violet-500"
+            barClass="bg-slate-400" dotClass="bg-slate-400"
           />
           <ChannelBar
             label="Direct / Other" subTag="渠道待录入" count={channelMix.other.count}
             total={channelMix.other.total} pct={channelMix.other.pct}
-            barClass="bg-[#1a237e]" dotClass="bg-[#1a237e]"
+            barClass="bg-[#080D1E]" dotClass="bg-[#080D1E]"
           />
           <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
             <span className="text-xs font-black uppercase tracking-widest text-gray-400">合计 · All Orders</span>
-            <span className="text-xl font-black font-mono text-[#1a237e]">AED {fmt(channelMix.grand)}</span>
+            <span className="text-xl font-black font-mono text-[#080D1E]">AED {fmt(channelMix.grand)}</span>
           </div>
           <p className="text-xs text-gray-400 font-semibold leading-relaxed">
             ℹ 当前订单未设 salesChannel 字段。Consignment 按 transactionMode 识别，其余统一归为 Other。
@@ -286,7 +290,7 @@ const SalesDashboard: React.FC = () => {
               : topCustomers.map((c, i) => (
                 <RankRow key={c.name} rank={i + 1} label={c.name}
                   sub={`${c.count} 单`} value={`AED ${fmt(c.total)}`}
-                  pct={c.total / maxCust} barClass="bg-[#1a237e]" />
+                  pct={c.total / maxCust} barClass="bg-[#080D1E]" />
               ))
             }
           </div>
@@ -300,7 +304,7 @@ const SalesDashboard: React.FC = () => {
               : topProducts.map((p, i) => (
                 <RankRow key={p.name + i} rank={i + 1} label={p.name}
                   sub={`Qty: ${p.qty}`} value={`AED ${fmt(p.total)}`}
-                  pct={p.total / maxProd} barClass="bg-violet-500" />
+                  pct={p.total / maxProd} barClass="bg-slate-400" />
               ))
             }
           </div>
@@ -322,14 +326,14 @@ const SalesDashboard: React.FC = () => {
               <EmptyState text="暂无逾期应收 · All Clear" icon="✅" green />
             ) : (
               overdueList.map(o => (
-                <div key={o.id} className="flex items-center justify-between p-3.5 rounded-xl bg-red-50 border border-red-100">
+                <div key={o.id} className="flex items-center justify-between p-3.5 rounded-xl bg-[#FBF1EE] border border-[#E0846A]/20">
                   <div className="min-w-0">
                     <div className="text-sm font-black text-gray-800 truncate">{o.customerName || '—'}</div>
                     <div className="text-xs font-bold text-gray-400 mt-0.5 font-mono">{o.id}</div>
                   </div>
                   <div className="text-right shrink-0 ml-3">
-                    <div className="text-sm font-black font-mono text-red-600">AED {fmt(Number(o.outstandingAmount) || 0)}</div>
-                    <div className="text-xs font-bold text-red-400 mt-0.5">+{o.diffDays}d 逾期</div>
+                    <div className="text-sm font-black font-mono text-[#A85D45]">AED {fmt(Number(o.outstandingAmount) || 0)}</div>
+                    <div className="text-xs font-bold text-[#C17F66] mt-0.5">+{o.diffDays}d 逾期</div>
                   </div>
                 </div>
               ))
@@ -365,10 +369,10 @@ const SalesDashboard: React.FC = () => {
           {/* Direct Sale */}
           <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 space-y-3">
             <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#1a237e]" />
+              <div className="w-2.5 h-2.5 rounded-full bg-[#080D1E]" />
               <span className="text-sm font-black uppercase tracking-widest text-gray-700">Direct Sale</span>
             </div>
-            <div className="text-[28px] font-black font-mono text-[#1a237e] leading-tight">
+            <div className="text-[28px] font-black font-mono text-[#080D1E] leading-tight">
               AED {fmt(modePerf.direct.total)}
             </div>
             <div className="flex gap-4 text-xs font-bold text-gray-500">
@@ -376,27 +380,27 @@ const SalesDashboard: React.FC = () => {
               <span>占比 {modePerf.direct.pct}%</span>
             </div>
             <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div className="h-full bg-[#1a237e] rounded-full transition-all"
+              <div className="h-full bg-[#080D1E] rounded-full transition-all"
                 style={{ width: `${Math.max(modePerf.direct.pct, modePerf.direct.count > 0 ? 2 : 0)}%` }} />
             </div>
           </div>
 
           {/* Consignment (Orders) */}
-          <div className="bg-violet-50 rounded-2xl p-5 border border-violet-100 space-y-3">
+          <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200 space-y-3">
             <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-violet-500" />
-              <span className="text-sm font-black uppercase tracking-widest text-violet-700">Consignment</span>
-              <span className="text-xs font-bold text-violet-400">SO 记录</span>
+              <div className="w-2.5 h-2.5 rounded-full bg-slate-400" />
+              <span className="text-sm font-black uppercase tracking-widest text-slate-700">Consignment</span>
+              <span className="text-xs font-bold text-slate-400">SO 记录</span>
             </div>
-            <div className="text-[28px] font-black font-mono text-violet-700 leading-tight">
+            <div className="text-[28px] font-black font-mono text-slate-700 leading-tight">
               AED {fmt(modePerf.consign.total)}
             </div>
-            <div className="flex gap-4 text-xs font-bold text-violet-400">
+            <div className="flex gap-4 text-xs font-bold text-slate-400">
               <span>{modePerf.consign.count} 单</span>
               <span>占比 {modePerf.consign.pct}%</span>
             </div>
-            <div className="h-2 bg-violet-200 rounded-full overflow-hidden">
-              <div className="h-full bg-violet-500 rounded-full transition-all"
+            <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+              <div className="h-full bg-slate-400 rounded-full transition-all"
                 style={{ width: `${Math.max(modePerf.consign.pct, modePerf.consign.count > 0 ? 2 : 0)}%` }} />
             </div>
           </div>
@@ -418,8 +422,8 @@ const SalesDashboard: React.FC = () => {
                 <span className="text-sm font-black font-mono text-emerald-700">AED {fmt(modePerf.ledger.settled)}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs font-black uppercase tracking-wide text-red-500">未结算</span>
-                <span className="text-sm font-black font-mono text-red-600">AED {fmt(modePerf.ledger.unsettled)}</span>
+                <span className="text-xs font-black uppercase tracking-wide text-[#E0846A]">未结算</span>
+                <span className="text-sm font-black font-mono text-[#A85D45]">AED {fmt(modePerf.ledger.unsettled)}</span>
               </div>
               <div className="flex justify-between items-center pt-2 border-t border-amber-100">
                 <span className="text-xs font-black uppercase tracking-wide text-gray-400">台账记录</span>
@@ -443,11 +447,16 @@ const SalesDashboard: React.FC = () => {
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
 // KPI Card
+// Key names kept as-is (call sites below use c="indigo"/"violet" etc) --
+// only the literal colors changed. 'indigo' was already secretly gold,
+// 'amber' was already secretly rose/danger; 'violet' was real purple and
+// is now neutral gray per the V2 baseline (no purple as a regular status
+// color).
 const KPI_C = {
   indigo:  { border: 'border-[#E5D5A0]',   iconBg: 'bg-[#FFF5D0]',  icon: 'text-[#8A6D2F]', val: 'text-[#4A3A14]',   bg: 'bg-[#FFFBEF]' },
   emerald: { border: 'border-emerald-100',  iconBg: 'bg-emerald-50', icon: 'text-emerald-600', val: 'text-emerald-800', bg: 'bg-[#F0FBF5]' },
   amber:   { border: 'border-rose-100',     iconBg: 'bg-rose-50',    icon: 'text-rose-500',    val: 'text-rose-700',    bg: 'bg-[#FFF1F3]' },
-  violet:  { border: 'border-violet-100',   iconBg: 'bg-violet-50',  icon: 'text-violet-500',  val: 'text-violet-800',  bg: 'bg-[#F5F0FF]' },
+  violet:  { border: 'border-slate-200',    iconBg: 'bg-slate-100', icon: 'text-slate-500',   val: 'text-slate-700',   bg: 'bg-slate-50' },
 } as const;
 
 const KpiCard: React.FC<{
@@ -471,9 +480,9 @@ const SecHead: React.FC<{
   icon: React.ReactNode; title: string; sub: string; accentRed?: boolean;
 }> = ({ icon, title, sub, accentRed }) => (
   <div className="bg-gray-50 border-b border-gray-100 px-5 py-4 flex items-center gap-2.5">
-    <div className={accentRed ? 'text-red-500' : 'text-indigo-500'}>{icon}</div>
+    <div style={{ color: accentRed ? colors.statusDanger : GOLD }}>{icon}</div>
     <div>
-      <div className={`text-base font-black uppercase tracking-widest ${accentRed ? 'text-red-600' : 'text-gray-700'}`}>{title}</div>
+      <div className="text-base font-black uppercase tracking-widest" style={{ color: accentRed ? colors.statusDanger : '#374151' }}>{title}</div>
       <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-0.5">{sub}</div>
     </div>
   </div>
@@ -483,10 +492,10 @@ const SecHead: React.FC<{
 const BreakCard: React.FC<{
   label: string; sub: string; value: string; pct: number; barClass: string; alert?: boolean;
 }> = ({ label, sub, value, pct, barClass, alert }) => (
-  <div className={`rounded-xl p-4 border ${alert ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-gray-100'}`}>
+  <div className={`rounded-xl p-4 border ${alert ? 'bg-[#FBF1EE] border-[#E0846A]/20' : 'bg-gray-50 border-gray-100'}`}>
     <div className="text-xs font-black uppercase tracking-wide text-gray-400 mb-0.5">{sub}</div>
-    <div className={`text-sm font-black uppercase ${alert ? 'text-red-700' : 'text-gray-700'} mb-2`}>{label}</div>
-    <div className={`text-lg font-black font-mono ${alert ? 'text-red-600' : 'text-[#1a237e]'} leading-tight mb-3`}>{value}</div>
+    <div className={`text-sm font-black uppercase ${alert ? 'text-[#A85D45]' : 'text-gray-700'} mb-2`}>{label}</div>
+    <div className={`text-lg font-black font-mono ${alert ? 'text-[#A85D45]' : 'text-[#080D1E]'} leading-tight mb-3`}>{value}</div>
     <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
       <div className={`h-full ${barClass} rounded-full`}
         style={{ width: `${Math.max(pct * 100, pct > 0 ? 2 : 0)}%` }} />
@@ -538,7 +547,7 @@ const RankRow: React.FC<{
           <div className="text-xs font-bold text-gray-400">{sub}</div>
         </div>
       </div>
-      <div className="text-sm font-black font-mono text-[#1a237e] shrink-0">{value}</div>
+      <div className="text-sm font-black font-mono text-[#080D1E] shrink-0">{value}</div>
     </div>
     <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden ml-8">
       <div className={`h-full ${barClass} rounded-full`}
