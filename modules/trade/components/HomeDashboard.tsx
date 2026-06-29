@@ -465,11 +465,15 @@ const TrendBadgeDark: React.FC<{ trend: TrendData }> = ({ trend }) => {
 };
 
 // ── CommandStatCard — right-side stat stack ───────────────────────────────
+// rose/emerald/gold here are already the exact GCI design-system status
+// colors (danger/success/gold) as literal hex. 'violet' used to be a 4th
+// accent color outside the 5 allowed status colors (danger/warning/
+// success/info/neutral) -- replaced with neutral gray per the V2 baseline.
 const CSTAT_MAP = {
   rose:    { bar: 'bg-[#E0846A]',   bg: 'bg-gradient-to-br from-white to-[#FBF1EE]',     border: 'border-[#E0846A]/20',   val: 'text-[#A85D45]',   sub: 'text-[#C17F66]'      },
   emerald: { bar: 'bg-[#6FBF8E]',   bg: 'bg-gradient-to-br from-white to-[#F1F8F4]',     border: 'border-[#6FBF8E]/20',   val: 'text-[#3F7D58]',   sub: 'text-[#6FA582]'      },
   gold:    { bar: 'bg-[#C9A84C]',   bg: 'bg-gradient-to-br from-white to-[#FFFBEF]/60',  border: 'border-[#E5D5A0]/80',   val: 'text-[#6B4E15]',   sub: 'text-[#B89040]/80'   },
-  violet:  { bar: 'bg-[#B69BD0]',   bg: 'bg-gradient-to-br from-white to-[#F6F2FA]',     border: 'border-[#B69BD0]/20',   val: 'text-[#7A5F95]',   sub: 'text-[#A48BBA]'      },
+  violet:  { bar: 'bg-[#94A3B8]',   bg: 'bg-gradient-to-br from-white to-[#F8FAFC]',     border: 'border-[#94A3B8]/20',   val: 'text-[#475569]',   sub: 'text-[#64748B]'      },
 } as const;
 
 const CommandStatCard: React.FC<{
@@ -527,7 +531,7 @@ const CustomerMixCard: React.FC<{ slices: MixSlice[]; loading: boolean }> = ({ s
     <div className="bg-white rounded-[18px] border shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col" style={{ borderColor: '#0F1E4514' }}>
       {/* Header */}
       <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2.5">
-        <div className="w-2 h-2 rounded-full bg-[#B69BD0]" />
+        <div className="w-2 h-2 rounded-full bg-[#94A3B8]" />
         <span className="font-mono-label text-sm uppercase tracking-wide text-gray-700">客户结构</span>
         <span className="font-mono-label text-xs text-gray-400 uppercase">Customer Segment</span>
         <span className={`ml-auto text-xs font-black px-2 py-0.5 rounded-full border ${
@@ -706,12 +710,12 @@ const TodayActionsPanel: React.FC<{ actions: string[]; loading: boolean }> = ({ 
             {[1,2,3].map(i => <div key={i} className="h-9 bg-gray-100 rounded-xl" />)}
           </div>
         ) : actions.length === 0 ? (
-          <div className="flex items-center gap-3 px-4 py-2.5 bg-[#B69BD0]/10 border border-[#B69BD0]/20 rounded-xl">
-            <CheckCircle2 className="w-4 h-4 text-[#9579B0] flex-shrink-0" />
-            <span className="text-sm font-semibold text-[#7A5F95]">近期暂无紧急待办，正常开单即可</span>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-[#6FBF8E]/10 border border-[#6FBF8E]/20 rounded-xl">
+            <CheckCircle2 className="w-4 h-4 text-[#3F7D58] flex-shrink-0" />
+            <span className="text-sm font-semibold text-[#3F7D58]">近期暂无紧急待办，正常开单即可</span>
           </div>
         ) : actions.map((a, i) => (
-          <div key={i} className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl hover:bg-[#B69BD0]/8 hover:border-[#B69BD0]/20 transition-all cursor-default">
+          <div key={i} className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl hover:bg-[#C9A84C]/8 hover:border-[#C9A84C]/20 transition-all cursor-default">
             <span className={`text-xs font-black px-1.5 py-0.5 rounded-full flex-shrink-0 min-w-[22px] text-center ${P_CLS[i] ?? P_CLS[3]}`}>
               P{i + 1}
             </span>
