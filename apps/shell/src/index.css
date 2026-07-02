@@ -2,8 +2,12 @@
 @import "../../../packages/design-system/src/tokens.css";
 
 /* Tailwind v4 auto-detects sources from the Vite root (apps/shell) --
-   modules/* live outside that tree, so their classes need an explicit
-   @source or the utilities they use never get generated. */
+   modules/* and packages/* live outside that tree, so their classes need
+   an explicit @source or the utilities they use never get generated.
+   packages/design-system is critical: Sidebar uses md:flex-col which only
+   appears there, and without this @source it is silently dropped from the
+   build output, collapsing the sidebar layout to flex-row. */
+@source "../../../packages/design-system/src/**/*.{ts,tsx}";
 @source "../../../modules/trade/**/*.{ts,tsx}";
 @source "../../../modules/crm/**/*.{ts,tsx}";
 @source "../../../modules/quotation/**/*.{ts,tsx}";
