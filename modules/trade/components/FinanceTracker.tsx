@@ -135,18 +135,18 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
     return (
       <div className="h-[calc(100vh-250px)] flex items-center justify-center">
         <div className="bg-white p-12 rounded-[40px] shadow-2xl border border-gray-100 max-w-md w-full text-center space-y-8 animate-in zoom-in-95 duration-300">
-          <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto text-[#1a237e]">
+          <div className="w-20 h-20 bg-[#CBA85C]/10 rounded-full flex items-center justify-center mx-auto text-[#CBA85C]">
             <Lock className="w-10 h-10" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-xl font-black text-[#1a237e] uppercase tracking-tighter">Private Area</h2>
+            <h2 className="text-xl font-black text-[#080D1E] uppercase tracking-tighter">Private Area</h2>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Please Enter Password to Access Ledger</p>
           </div>
           <form onSubmit={handleVerify} className="space-y-4">
             <input
               type="password"
               autoFocus
-              className="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-[24px] outline-none font-black text-center text-2xl tracking-[0.5em] focus:border-[#1a237e]"
+              className="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-[24px] outline-none font-black text-center text-2xl tracking-[0.5em] focus:border-[#CBA85C]"
               placeholder="••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -161,7 +161,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
               </button>
               <button
                 type="submit"
-                className="flex items-center justify-center gap-2 py-4 rounded-[20px] bg-[#1a237e] text-white font-black text-[10px] uppercase shadow-lg shadow-indigo-100 hover:bg-black transition-all"
+                className="flex items-center justify-center gap-2 py-4 rounded-[20px] bg-[#080D1E] text-white font-black text-[10px] uppercase shadow-lg hover:bg-[#CBA85C] transition-all"
               >
                 Verify
               </button>
@@ -189,7 +189,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
             onClick={() => setActiveAccount(acc.id)}
             className={`flex-1 flex items-center justify-center gap-2 py-4 px-4 rounded-xl text-sm font-black transition-all ${
               activeAccount === acc.id
-                ? 'bg-[#1a237e] text-white shadow-lg'
+                ? 'bg-[#080D1E] text-white shadow-lg'
                 : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
             }`}
           >
@@ -202,17 +202,17 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
       <div className="flex-1 flex flex-col lg:flex-row gap-8">
         <div className="lg:w-2/5 flex flex-col gap-6">
           <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100 relative overflow-hidden group">
-            <div className={`absolute top-0 left-0 w-1.5 h-full transition-colors ${balance >= 0 ? 'bg-emerald-500' : 'bg-red-500'}`} />
+            <div className={`absolute top-0 left-0 w-1.5 h-full transition-colors ${balance >= 0 ? 'bg-[#6FBF8E]' : 'bg-[#E0846A]'}`} />
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">
                   Current Balance ({activeAccount})
                 </p>
-                <p className={`text-4xl font-black font-mono tracking-tighter ${balance >= 0 ? 'text-gray-800' : 'text-red-600'}`}>
+                <p className={`text-4xl font-black font-mono tracking-tighter ${balance >= 0 ? 'text-gray-800' : 'text-[#E0846A]'}`}>
                   AED {balance.toFixed(2)}
                 </p>
               </div>
-              <div className={`p-4 rounded-2xl ${balance >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+              <div className={`p-4 rounded-2xl ${balance >= 0 ? 'bg-[#6FBF8E]/10 text-[#3F7D58]' : 'bg-[#E0846A]/10 text-[#E0846A]'}`}>
                 <DollarSign className="w-8 h-8" />
               </div>
             </div>
@@ -220,14 +220,14 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
             <div className="mt-8 grid grid-cols-2 gap-6 border-t border-gray-50 pt-6">
               <div>
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Income</p>
-                <p className="text-lg font-black text-emerald-600 flex items-center gap-1.5 font-mono">
+                <p className="text-lg font-black text-[#3F7D58] flex items-center gap-1.5 font-mono">
                   <TrendingUp className="w-4 h-4" />
                   {totalIncome.toFixed(2)}
                 </p>
               </div>
               <div>
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Expense</p>
-                <p className="text-lg font-black text-red-600 flex items-center gap-1.5 font-mono">
+                <p className="text-lg font-black text-[#E0846A] flex items-center gap-1.5 font-mono">
                   <TrendingDown className="w-4 h-4" />
                   {totalExpense.toFixed(2)}
                 </p>
@@ -238,13 +238,13 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
             <div className="flex justify-between items-center mb-8 pb-4 border-b border-gray-50">
               <h3 className="font-black text-gray-800 flex items-center gap-3 uppercase text-sm tracking-widest">
-                <PlusCircle className="w-5 h-5 text-indigo-600" />
+                <PlusCircle className="w-5 h-5 text-[#CBA85C]" />
                 Quick Entry
               </h3>
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isAnalyzing}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-[#1a237e] rounded-xl hover:bg-indigo-100 transition-all text-[11px] font-black uppercase tracking-widest border border-indigo-100 shadow-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-[#CBA85C]/10 text-[#CBA85C] rounded-xl hover:bg-[#CBA85C]/20 transition-all text-[11px] font-black uppercase tracking-widest border border-[#CBA85C]/20 shadow-sm"
               >
                 {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
                 {isAnalyzing ? "Processing..." : "AI Scan"}
@@ -259,7 +259,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                   <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="date"
-                    className="w-full pl-10 p-4 border border-gray-300 rounded-xl outline-none focus:border-[#1a237e] focus:ring-4 focus:ring-[#e8eaf6] bg-white font-bold text-gray-700 font-mono"
+                    className="w-full pl-10 p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] focus:ring-4 focus:ring-[#CBA85C]/20 bg-white font-bold text-gray-700 font-mono"
                     value={date}
                     onChange={e => setDate(e.target.value)}
                   />
@@ -272,7 +272,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                   <FileText className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="text"
-                    className="w-full pl-10 p-4 border border-gray-300 rounded-xl outline-none focus:border-[#1a237e] focus:ring-4 focus:ring-[#e8eaf6] bg-white font-bold text-gray-700"
+                    className="w-full pl-10 p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] focus:ring-4 focus:ring-[#CBA85C]/20 bg-white font-bold text-gray-700"
                     placeholder="e.g. Sales Deposit"
                     value={note}
                     onChange={e => setNote(e.target.value)}
@@ -287,7 +287,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                   <input
                     type="number"
                     step="0.01"
-                    className="w-full pl-10 p-4 border border-gray-300 rounded-xl outline-none focus:border-[#1a237e] focus:ring-4 focus:ring-[#e8eaf6] bg-white font-bold text-gray-700 font-mono text-xl"
+                    className="w-full pl-10 p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] focus:ring-4 focus:ring-[#CBA85C]/20 bg-white font-bold text-gray-700 font-mono text-xl"
                     placeholder="0.00"
                     value={amount}
                     onChange={e => setAmount(e.target.value)}
@@ -299,14 +299,14 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                 <button
                   onClick={() => addTransaction('in')}
                   disabled={!note || !amount || isAnalyzing}
-                  className="flex items-center justify-center gap-2 p-4 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg font-black uppercase text-xs tracking-widest"
+                  className="flex items-center justify-center gap-2 p-4 rounded-xl bg-[#3F7D58] text-white hover:bg-[#2d5c40] shadow-lg font-black uppercase text-xs tracking-widest"
                 >
                   <TrendingUp className="w-4 h-4" /> Income
                 </button>
                 <button
                   onClick={() => addTransaction('out')}
                   disabled={!note || !amount || isAnalyzing}
-                  className="flex items-center justify-center gap-2 p-4 rounded-xl bg-red-600 text-white hover:bg-red-700 shadow-lg font-black uppercase text-xs tracking-widest"
+                  className="flex items-center justify-center gap-2 p-4 rounded-xl bg-[#A85D45] text-white hover:bg-[#8b4c37] shadow-lg font-black uppercase text-xs tracking-widest"
                 >
                   <TrendingDown className="w-4 h-4" /> Expense
                 </button>
@@ -318,7 +318,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
         <div className="flex-1 bg-white rounded-2xl shadow-xl border border-gray-100 flex flex-col overflow-hidden">
           <div className="p-6 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
             <span className="font-black text-gray-800 uppercase text-xs tracking-[0.2em] flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-indigo-600" />
+              <Calendar className="w-4 h-4 text-[#CBA85C]" />
               {activeAccount} Ledger
             </span>
             <span className="text-[10px] px-3 py-1 bg-white border border-gray-200 rounded-full text-gray-600 font-black tracking-widest">
@@ -338,21 +338,21 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {currentTransactions.map(t => (
-                  <tr key={t.id} className="hover:bg-indigo-50/30 transition-colors group">
+                  <tr key={t.id} className="hover:bg-[#CBA85C]/5 transition-colors group">
                     <td className="px-6 py-5 text-gray-400 font-mono text-[11px] whitespace-nowrap">{t.date}</td>
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full ${t.type === 'in' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                        <div className={`w-2 h-2 rounded-full ${t.type === 'in' ? 'bg-[#6FBF8E]' : 'bg-[#E0846A]'}`} />
                         <span className="text-sm font-bold text-gray-700 uppercase">{t.note}</span>
                       </div>
                     </td>
-                    <td className={`px-6 py-5 text-right font-black font-mono text-sm tracking-tighter ${t.type === 'in' ? 'text-emerald-600' : 'text-red-600'}`}>
+                    <td className={`px-6 py-5 text-right font-black font-mono text-sm tracking-tighter ${t.type === 'in' ? 'text-[#3F7D58]' : 'text-[#E0846A]'}`}>
                       {t.type === 'in' ? '+' : '-'}{t.amount.toFixed(2)}
                     </td>
                     <td className="px-4 py-5 text-right">
                       <button
                         onClick={() => handleDelete(t.id)}
-                        className="text-gray-200 hover:text-red-500 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                        className="text-gray-200 hover:text-[#E0846A] p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
