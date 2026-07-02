@@ -353,7 +353,7 @@ function WAModal({ item, onClose }: { item: ActionItem; onClose: () => void }) {
         </div>
         {draft ? (
           <textarea
-            className="w-full rounded-xl border border-slate-200 p-3 text-sm font-medium resize-none focus:outline-none focus:ring-2 focus:ring-amber-300"
+            className="w-full rounded-xl border border-slate-200 p-3 text-sm font-medium resize-none focus:outline-none focus:ring-2 focus:ring-[#CBA85C]/40"
             style={{ minHeight: '110px' }}
             value={draft} onChange={e => setDraft(e.target.value)}
           />
@@ -377,7 +377,7 @@ function WAModal({ item, onClose }: { item: ActionItem; onClose: () => void }) {
           </button>
           {draft && (
             <button onClick={copy}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[13px] font-black border-2 hover:bg-amber-50"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[13px] font-black border-2 hover:bg-[#CBA85C]/10"
               style={{ borderColor: GOLD, color: GOLD }}>
               {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
               {copied ? '已复制' : '复制'}

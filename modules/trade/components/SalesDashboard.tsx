@@ -245,9 +245,9 @@ const SalesDashboard: React.FC = () => {
           <BreakCard label="Consignment"  sub="本月寄售"   value={`AED ${fmt(breakdown.consignAmt)}`}
             pct={kpi.monthRevenue > 0 ? breakdown.consignAmt / kpi.monthRevenue : 0} barClass="bg-slate-400" />
           <BreakCard label="已收款"       sub="COLLECTED"  value={`AED ${fmt(breakdown.collected)}`}
-            pct={kpi.monthRevenue > 0 ? breakdown.collected  / kpi.monthRevenue : 0} barClass="bg-emerald-500" />
+            pct={kpi.monthRevenue > 0 ? breakdown.collected  / kpi.monthRevenue : 0} barClass="bg-[#6FBF8E]" />
           <BreakCard label="未收款"       sub="UNCOLLECTED" value={`AED ${fmt(breakdown.unpaid)}`}
-            pct={kpi.monthRevenue > 0 ? breakdown.unpaid     / kpi.monthRevenue : 0} barClass="bg-amber-400" />
+            pct={kpi.monthRevenue > 0 ? breakdown.unpaid     / kpi.monthRevenue : 0} barClass="bg-[#D4A843]" />
           <BreakCard label="逾期应收"     sub="OVERDUE AR"  value={`AED ${fmt(breakdown.overdueAmt)}`}
             pct={kpi.allOutstanding > 0 ? breakdown.overdueAmt / kpi.allOutstanding : 0}
             barClass="bg-[#E0846A]" alert={breakdown.overdueAmt > 0} />
@@ -353,7 +353,7 @@ const SalesDashboard: React.FC = () => {
               : custOutstanding.map((c, i) => (
                 <RankRow key={c.name} rank={i + 1} label={c.name}
                   sub={`${c.count} 单未结`} value={`AED ${fmt(c.outstanding)}`}
-                  pct={c.outstanding / maxOut} barClass="bg-amber-400" />
+                  pct={c.outstanding / maxOut} barClass="bg-[#D4A843]" />
               ))
             }
           </div>
@@ -406,26 +406,26 @@ const SalesDashboard: React.FC = () => {
           </div>
 
           {/* Consignment Ledger */}
-          <div className="bg-amber-50 rounded-2xl p-5 border border-amber-100 space-y-3">
+          <div className="bg-[#D4A843]/10 rounded-2xl p-5 border border-[#D4A843]/20 space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-              <span className="text-sm font-black uppercase tracking-widest text-amber-700">寄售台账</span>
-              <span className="text-xs font-bold text-amber-400 uppercase">Consignment Ledger</span>
+              <div className="w-2.5 h-2.5 rounded-full bg-[#D4A843]" />
+              <span className="text-sm font-black uppercase tracking-widest text-[#8A6B2A]">寄售台账</span>
+              <span className="text-xs font-bold text-[#D4A843]/70 uppercase">Consignment Ledger</span>
             </div>
             <div className="space-y-2.5">
               <div className="flex justify-between items-center">
-                <span className="text-xs font-black uppercase tracking-wide text-amber-600">寄售总额</span>
-                <span className="text-sm font-black font-mono text-amber-700">AED {fmt(modePerf.ledger.total)}</span>
+                <span className="text-xs font-black uppercase tracking-wide text-[#D4A843]">寄售总额</span>
+                <span className="text-sm font-black font-mono text-[#8A6B2A]">AED {fmt(modePerf.ledger.total)}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs font-black uppercase tracking-wide text-emerald-600">已结算</span>
-                <span className="text-sm font-black font-mono text-emerald-700">AED {fmt(modePerf.ledger.settled)}</span>
+                <span className="text-xs font-black uppercase tracking-wide text-[#3F7D58]">已结算</span>
+                <span className="text-sm font-black font-mono text-[#2d5c40]">AED {fmt(modePerf.ledger.settled)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-xs font-black uppercase tracking-wide text-[#E0846A]">未结算</span>
                 <span className="text-sm font-black font-mono text-[#A85D45]">AED {fmt(modePerf.ledger.unsettled)}</span>
               </div>
-              <div className="flex justify-between items-center pt-2 border-t border-amber-100">
+              <div className="flex justify-between items-center pt-2 border-t border-[#D4A843]/20">
                 <span className="text-xs font-black uppercase tracking-wide text-gray-400">台账记录</span>
                 <span className="text-sm font-black text-gray-600">{modePerf.ledger.count} 条</span>
               </div>
@@ -454,8 +454,8 @@ const SalesDashboard: React.FC = () => {
 // color).
 const KPI_C = {
   indigo:  { border: 'border-[#E5D5A0]',   iconBg: 'bg-[#FFF5D0]',  icon: 'text-[#8A6D2F]', val: 'text-[#4A3A14]',   bg: 'bg-[#FFFBEF]' },
-  emerald: { border: 'border-emerald-100',  iconBg: 'bg-emerald-50', icon: 'text-emerald-600', val: 'text-emerald-800', bg: 'bg-[#F0FBF5]' },
-  amber:   { border: 'border-rose-100',     iconBg: 'bg-rose-50',    icon: 'text-rose-500',    val: 'text-rose-700',    bg: 'bg-[#FFF1F3]' },
+  emerald: { border: 'border-[#6FBF8E]/20', iconBg: 'bg-[#6FBF8E]/10', icon: 'text-[#3F7D58]', val: 'text-[#2d5c40]', bg: 'bg-[#F1F8F4]' },
+  amber:   { border: 'border-[#E0846A]/20', iconBg: 'bg-[#E0846A]/10', icon: 'text-[#E0846A]', val: 'text-[#A85D45]', bg: 'bg-[#FFF1EE]' },
   violet:  { border: 'border-slate-200',    iconBg: 'bg-slate-100', icon: 'text-slate-500',   val: 'text-slate-700',   bg: 'bg-slate-50' },
 } as const;
 
@@ -514,7 +514,7 @@ const ChannelBar: React.FC<{
         <div className={`w-2.5 h-2.5 rounded-full ${dotClass} shrink-0`} />
         <span className="text-sm font-black text-gray-700">{label}</span>
         {subTag && (
-          <span className="text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
+          <span className="text-xs font-bold text-[#D4A843] bg-[#D4A843]/10 border border-[#D4A843]/25 px-1.5 py-0.5 rounded-full">
             {subTag}
           </span>
         )}
@@ -558,9 +558,9 @@ const RankRow: React.FC<{
 
 // Empty State
 const EmptyState: React.FC<{ text: string; icon?: string; green?: boolean }> = ({ text, icon, green }) => (
-  <div className={`py-10 text-center rounded-xl ${green ? 'bg-emerald-50 border border-emerald-100' : 'bg-gray-50 border border-gray-100'}`}>
+  <div className={`py-10 text-center rounded-xl ${green ? 'bg-[#6FBF8E]/10 border border-[#6FBF8E]/20' : 'bg-gray-50 border border-gray-100'}`}>
     {icon && <div className="text-2xl mb-2">{icon}</div>}
-    <p className={`text-sm font-black uppercase tracking-widest ${green ? 'text-emerald-500' : 'text-gray-300'}`}>{text}</p>
+    <p className={`text-sm font-black uppercase tracking-widest ${green ? 'text-[#6FBF8E]' : 'text-gray-300'}`}>{text}</p>
   </div>
 );
 
