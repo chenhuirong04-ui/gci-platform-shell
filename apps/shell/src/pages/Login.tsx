@@ -8,6 +8,7 @@ export function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -115,26 +116,47 @@ export function Login() {
             <label style={{ fontSize: 11.5, color: '#7A8494', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.08em' }}>
               密码
             </label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="current-password"
-              required
-              style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 10,
-                padding: '11px 14px',
-                fontSize: 14,
-                color: colors.textPrimary,
-                outline: 'none',
-                width: '100%',
-              }}
-              onFocus={e => (e.target.style.borderColor = 'rgba(203,168,92,0.5)')}
-              onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')}
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                required
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 10,
+                  padding: '11px 40px 11px 14px',
+                  fontSize: 14,
+                  color: colors.textPrimary,
+                  outline: 'none',
+                  width: '100%',
+                }}
+                onFocus={e => (e.target.style.borderColor = 'rgba(203,168,92,0.5)')}
+                onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                style={{
+                  position: 'absolute',
+                  right: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#505A70',
+                  fontSize: 15,
+                  padding: 0,
+                  lineHeight: 1,
+                }}
+              >
+                {showPassword ? '🙈' : '👁'}
+              </button>
+            </div>
           </div>
 
           {error && (
