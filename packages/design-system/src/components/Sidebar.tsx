@@ -40,6 +40,11 @@ interface SidebarProps {
   sections: NavSection[];
   userName: string;
   userRole: string;
+  /** When provided, only nav items whose `code` is in this set are rendered.
+   * Pass undefined (or omit) to show all items (e.g. during loading). */
+  visibleModules?: string[];
+  /** Called when user clicks the sign-out icon in the user card. */
+  onSignOut?: () => void;
   footer?: ReactNode;
   className?: string;
 }
@@ -108,7 +113,25 @@ function NavRow({ item }: { item: NavModItem }) {
   );
 }
 
-export function Sidebar({ navTop, workspaceLabel, sections, userName, userRole, footer, className }: SidebarProps) {
+export function Sidebar({ navTop, workspaceLabel, sections, userName, userRole, visibleModules, onSignOut, footer, className }: SidebarProps) {
+  // When visibleModules is provided, filter nav items by module path prefix.
+  // Items without a path (e.g. AI, Settings) are always shown.
+  // Section headers are hidden when all their items are filtered out.
+  const MODULE_PATH_MAP: Record<string, string> = {
+    crm: '/crm', trade: '/trade', quotation: '/quotation',
+    finance: '/trade?tab=finance', warehouse: '/trade?tab=inventory',
+  };
+  function itemVisible(item: NavModItem): boolean {
+    if (!visibleModules) return true;
+    if (!item.href && !item.onClick) return true; // no-path items always shown
+    // Match by path prefix against module paths the user has access to
+    const itemPath = (item as any).path as string | undefined;
+    if (!itemPath) return true;
+    return visibleModules.some(mod => {
+      const prefix = MODULE_PATH_MAP[mod];
+      return prefix && itemPath.startsWith(prefix.split('?')[0]);
+    });
+  }
   return (
     <aside
       className={`shrink-0 hidden md:flex md:flex-col relative sticky top-0 overflow-y-auto${className ? ` ${className}` : ''}`}
@@ -196,18 +219,22 @@ export function Sidebar({ navTop, workspaceLabel, sections, userName, userRole, 
         </span>
       </div>
 
-      {sections.map((section) => (
-        <div key={section.label}>
-          <div className="font-mono-label" style={{ fontSize: 8.5, letterSpacing: '0.2em', color: '#4A5268', padding: '16px 8px 8px' }}>
-            {section.label}
+      {sections.map((section) => {
+        const visibleItems = section.items.filter(itemVisible);
+        if (visibleItems.length === 0) return null;
+        return (
+          <div key={section.label}>
+            <div className="font-mono-label" style={{ fontSize: 8.5, letterSpacing: '0.2em', color: '#4A5268', padding: '16px 8px 8px' }}>
+              {section.label}
+            </div>
+            <nav>
+              {visibleItems.map((n) => (
+                <NavRow key={n.code} item={n} />
+              ))}
+            </nav>
           </div>
-          <nav>
-            {section.items.map((n) => (
-              <NavRow key={n.code} item={n} />
-            ))}
-          </nav>
-        </div>
-      ))}
+        );
+      })}
 
       <div
         className="flex items-center"
@@ -230,7 +257,17 @@ export function Sidebar({ navTop, workspaceLabel, sections, userName, userRole, 
           <div style={{ fontSize: 12.5, fontWeight: 600, color: '#D8D0B8', lineHeight: 1.1 }}>{userName}</div>
           <div style={{ fontSize: 10, color: '#505A70', marginTop: 1 }}>{userRole}</div>
         </div>
-        <span style={{ color: '#4A5268', fontSize: 14 }}>⚙</span>
+        {onSignOut && (
+          <span
+            title="退出登录"
+            onClick={onSignOut}
+            style={{ color: '#4A5268', fontSize: 14, cursor: 'pointer', transition: 'color 0.14s' }}
+            onMouseEnter={e => ((e.target as HTMLElement).style.color = '#E0846A')}
+            onMouseLeave={e => ((e.target as HTMLElement).style.color = '#4A5268')}
+          >
+            ⏻
+          </span>
+        )}
       </div>
       {footer}
     </aside>
