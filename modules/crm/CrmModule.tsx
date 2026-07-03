@@ -970,10 +970,6 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
    只是 AppInner 改名 CrmInner 且不再渲染 AppShell。
    ========================= */
 export default function CrmModule({ initialTab }: { initialTab?: CrmTab } = {}) {
-  const [passed, setPassed] = useState(false);
-
-  if (!passed) return <PasswordGate onPass={() => setPassed(true)} />;
-
   return (
     <ErrorBoundary>
       <CrmInner initialTab={initialTab} />
