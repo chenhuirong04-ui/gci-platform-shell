@@ -11,6 +11,7 @@ import {
 } from '../lib/invoiceStore';
 import { useAuth } from '../contexts/AuthContext';
 import { InvoicePreview } from '../components/invoice/InvoicePreview';
+import { BillingProfileDraftPanel } from '../components/invoice/BillingProfileDraftPanel';
 
 const GOLD = '#CBA85C';
 const GOLD_L = '#E2C988';
@@ -133,38 +134,56 @@ function DraftsList({ drafts, loading, onStatusChange }: {
 }
 
 // ── Billing profiles list ─────────────────────────────────────────────────────
-function ProfilesList({ profiles, loading }: { profiles: BillingProfile[]; loading: boolean }) {
+function ProfilesList({ profiles, loading, onAdded }: { profiles: BillingProfile[]; loading: boolean; onAdded: (p: BillingProfile) => void }) {
+  const [showPanel, setShowPanel] = useState(false);
   if (loading) {
     return <div style={{ padding: '60px 24px', textAlign: 'center', color: MUTED, fontSize: 13, fontFamily: 'IBM Plex Mono, monospace' }}>Loading billing profiles from Supabase…</div>;
   }
 
-  if (profiles.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', padding: '80px 24px', color: MUTED }}>
-        <div style={{ fontSize: 36, marginBottom: 16, opacity: 0.3 }}>🏢</div>
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>暂无账单资料</div>
-        <div style={{ fontSize: 13 }}>在 AI Workspace 创建第一张发票时，账单资料将自动保存至 Supabase，团队所有成员均可复用</div>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
-      {profiles.map(p => (
-        <div key={p.id} style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '18px 20px' }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: TEXT, marginBottom: 4 }}>{p.customerName}</div>
-          {p.billingName && p.billingName !== p.customerName && (
-            <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 4 }}>Billing: {p.billingName}</div>
-          )}
-          <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 2 }}>{p.billingAddress}</div>
-          {p.trn && <div style={{ fontSize: 11, color: MUTED, fontFamily: 'monospace', marginBottom: 2 }}>TRN: {p.trn}</div>}
-          {p.phone && <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 2 }}>{p.phone}</div>}
-          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 10.5, color: GOLD, fontFamily: 'IBM Plex Mono, monospace' }}>{p.defaultCurrency} · VAT {p.defaultVatRate}%</span>
-            {p.lastInvoiceDate && <span style={{ fontSize: 10.5, color: MUTED }}>Last invoice: {p.lastInvoiceDate}</span>}
-          </div>
+    <div>
+      {/* Add profile button + panel */}
+      <div style={{ marginBottom: 20 }}>
+        {!showPanel && (
+          <button
+            onClick={() => setShowPanel(true)}
+            style={{ padding: '10px 22px', borderRadius: 9, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: '#000', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
+          >+ 新增开票资料</button>
+        )}
+        {showPanel && (
+          <BillingProfileDraftPanel
+            directMode
+            onClose={() => setShowPanel(false)}
+            onSaved={p => { onAdded(p); setShowPanel(false); }}
+          />
+        )}
+      </div>
+
+      {profiles.length === 0 && !showPanel && (
+        <div style={{ textAlign: 'center', padding: '60px 24px', color: MUTED }}>
+          <div style={{ fontSize: 36, marginBottom: 16, opacity: 0.3 }}>🏢</div>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>暂无账单资料</div>
+          <div style={{ fontSize: 13 }}>点击上方「新增开票资料」，或在 AI Workspace 输入「帮我保存开票资料」</div>
         </div>
-      ))}
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
+        {profiles.map(p => (
+          <div key={p.id} style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '18px 20px' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: TEXT, marginBottom: 4 }}>{p.customerName}</div>
+            {p.billingName && p.billingName !== p.customerName && (
+              <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 4 }}>Billing: {p.billingName}</div>
+            )}
+            <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 2 }}>{p.billingAddress}</div>
+            {p.trn && <div style={{ fontSize: 11, color: MUTED, fontFamily: 'monospace', marginBottom: 2 }}>TRN: {p.trn}</div>}
+            {p.phone && <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 2 }}>{p.phone}</div>}
+            <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 10.5, color: GOLD, fontFamily: 'IBM Plex Mono, monospace' }}>{p.defaultCurrency} · VAT {p.defaultVatRate}%</span>
+              {p.lastInvoiceDate && <span style={{ fontSize: 10.5, color: MUTED }}>Last invoice: {p.lastInvoiceDate}</span>}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -235,7 +254,7 @@ export function InvoicePage() {
       </div>
 
       {tab === 'drafts'   && <DraftsList   drafts={drafts}     loading={loading} onStatusChange={handleStatusChange} />}
-      {tab === 'profiles' && <ProfilesList profiles={profiles} loading={loading} />}
+      {tab === 'profiles' && <ProfilesList profiles={profiles} loading={loading} onAdded={p => setProfiles(prev => [p, ...prev])} />}
     </div>
   );
 }

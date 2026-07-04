@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { colors } from '@gci/design-system';
 import { InvoiceAssistantPanel } from '../components/invoice/InvoiceAssistantPanel';
+import { BillingProfileDraftPanel } from '../components/invoice/BillingProfileDraftPanel';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const GOLD = '#CBA85C';
@@ -643,6 +644,8 @@ export function AIPage() {
   const [heroInput, setHeroInput] = useState('');
   const [cmdState, setCmdState] = useState<CmdState | null>(null);
   const [invoiceMode, setInvoiceMode] = useState(false);
+  const [billingProfileMode, setBillingProfileMode] = useState(false);
+  const [billingProfileInitialText, setBillingProfileInitialText] = useState('');
   const runner = useStepRunner();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -659,8 +662,25 @@ export function AIPage() {
     if (!raw.trim()) return;
     const intent = detectIntent(raw.trim());
 
-    // Invoice intent → open InvoiceAssistantPanel instead of generic mock steps
     const t = raw.toLowerCase();
+
+    // Billing profile intent — must be checked BEFORE invoice intent
+    const isBillingProfile =
+      (t.includes('保存') && (t.includes('开票') || t.includes('资料'))) ||
+      t.includes('开票资料') || t.includes('billing profile') ||
+      t.includes('新增开票') || t.includes('存起来') ||
+      (t.includes('保存') && t.includes('客户'));
+    if (isBillingProfile) {
+      setTab('assistant');
+      setCmdState(null);
+      setInvoiceMode(false);
+      setBillingProfileInitialText(raw);
+      setBillingProfileMode(true);
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Invoice intent → open InvoiceAssistantPanel instead of generic mock steps
     if (t.includes('发票') || t.includes('invoice')) {
       setTab('assistant');
       setCmdState(null);
@@ -702,6 +722,8 @@ export function AIPage() {
     runner.clear();
     setCmdState(null);
     setInvoiceMode(false);
+    setBillingProfileMode(false);
+    setBillingProfileInitialText('');
   }
 
   return (
@@ -732,6 +754,14 @@ export function AIPage() {
           >↵</button>
         </div>
       </div>
+
+      {/* Billing profile panel — shown when billing profile intent detected */}
+      {billingProfileMode && tab === 'assistant' && (
+        <BillingProfileDraftPanel
+          initialText={billingProfileInitialText}
+          onClose={clearCmd}
+        />
+      )}
 
       {/* Invoice wizard — shown when invoice intent detected */}
       {invoiceMode && tab === 'assistant' && (

@@ -191,6 +191,31 @@ export async function stampLastInvoiceDate(billingProfileId: string): Promise<vo
   });
 }
 
+// Check for existing profile by TRN (exact) or customer_name (case-insensitive).
+// TRN takes priority — it is the most reliable unique identifier.
+export async function checkDuplicateProfile(
+  customerName: string,
+  trn: string,
+): Promise<BillingProfile | null> {
+  if (trn.trim()) {
+    const { data } = await supabase
+      .from('invoice_billing_profiles')
+      .select('*')
+      .eq('trn', trn.trim())
+      .limit(1);
+    if (data && data.length > 0) return mapProfile(data[0]);
+  }
+  if (customerName.trim()) {
+    const { data } = await supabase
+      .from('invoice_billing_profiles')
+      .select('*')
+      .ilike('customer_name', customerName.trim())
+      .limit(1);
+    if (data && data.length > 0) return mapProfile(data[0]);
+  }
+  return null;
+}
+
 // ── Invoice Drafts ────────────────────────────────────────────────────────────
 
 export async function getDrafts(): Promise<InvoiceDraft[]> {
