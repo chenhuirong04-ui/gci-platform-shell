@@ -22,13 +22,18 @@ interface Props {
 
 const GOLD = '#B8960C';
 const NAVY = '#0F172A';
+const CARD   = '#0F1E35';
+const CARD2  = '#162A45';
+const BORDER = 'rgba(255,255,255,0.09)';
+const T1     = '#E8F0FF';
+const T2     = '#7A9CC5';
 
-function SectionHeader({ icon, title, color = NAVY }: {
+function SectionHeader({ icon, title, color = T1 }: {
   icon: React.ReactNode; title: string; color?: string;
 }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <div style={{ color }}>{icon}</div>
+      <div style={{ color: GOLD }}>{icon}</div>
       <h2 className="font-mono-label text-sm font-black uppercase tracking-widest" style={{ color }}>{title}</h2>
     </div>
   );
@@ -37,12 +42,14 @@ function SectionHeader({ icon, title, color = NAVY }: {
 function TaskRow({ task, onClick }: { task: FollowUpTask; onClick: () => void }) {
   const isOverdue = task.nextFollowUpAt &&
     task.nextFollowUpAt.slice(0, 10) < new Date().toISOString().slice(0, 10);
-  // Prefer task.businessId (Notion-synced) over derived ID
   const bizId = (task as any).businessId || getTaskBusinessId(task.id);
   return (
     <button
       onClick={onClick}
-      className="w-full text-left flex items-center justify-between px-4 py-3 rounded-xl hover:bg-slate-50 transition-colors border border-slate-100 mb-2"
+      className="w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-colors mb-2"
+      style={{ background: CARD2, border: `1px solid ${BORDER}` }}
+      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(184,150,12,0.08)')}
+      onMouseLeave={e => (e.currentTarget.style.background = CARD2)}
     >
       <div className="flex items-center gap-3 min-w-0">
         <div className="w-2 h-2 rounded-full flex-shrink-0"
@@ -51,49 +58,49 @@ function TaskRow({ task, onClick }: { task: FollowUpTask; onClick: () => void })
           <div className="flex items-center gap-1.5 min-w-0">
             {bizId && (
               <span className="text-[9px] font-black px-1.5 py-0.5 rounded flex-shrink-0"
-                style={{ backgroundColor: NAVY + '10', color: NAVY }}>{bizId}</span>
+                style={{ backgroundColor: `${GOLD}22`, color: GOLD }}>{bizId}</span>
             )}
-            <div className="text-sm font-black text-slate-800 truncate">{task.clientName}</div>
+            <div className="text-sm font-black truncate" style={{ color: T1 }}>{task.clientName}</div>
           </div>
-          <div className="text-xs text-slate-400 truncate mt-0.5">{task.goal}</div>
+          <div className="text-xs truncate mt-0.5" style={{ color: T2 }}>{task.goal}</div>
         </div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0 ml-3">
         {isOverdue && (
-          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-100 text-red-600">逾期</span>
+          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-900/40 text-red-400">逾期</span>
         )}
-        <span className="text-[10px] font-bold text-slate-400">{task.nextFollowUpAt?.slice(0, 10)}</span>
-        <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+        <span className="text-[10px] font-bold" style={{ color: T2 }}>{task.nextFollowUpAt?.slice(0, 10)}</span>
+        <ChevronRight className="w-3.5 h-3.5" style={{ color: T2 }} />
       </div>
     </button>
   );
 }
 
 function ProjectRow({ project }: { project: Project }) {
-  const typeColor = project.type === '项目型' ? '#6366F1' : GOLD;
-  // Prefer project.businessId (from Notion-synced tasks) over derived ID
+  const typeColor = project.type === '项目型' ? '#8FA6D4' : GOLD;
   const bizId = (project as any).businessId || getProjectBusinessId(project.id);
   return (
-    <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-slate-100 bg-white mb-2">
+    <div className="flex items-center justify-between px-4 py-3 rounded-xl mb-2"
+      style={{ background: CARD2, border: `1px solid ${BORDER}` }}>
       <div className="flex items-center gap-3 min-w-0">
         <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: typeColor }} />
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 min-w-0">
             {bizId && (
               <span className="text-[9px] font-black px-1.5 py-0.5 rounded flex-shrink-0"
-                style={{ backgroundColor: NAVY + '10', color: NAVY }}>{bizId}</span>
+                style={{ backgroundColor: `${GOLD}22`, color: GOLD }}>{bizId}</span>
             )}
-            <div className="text-sm font-black truncate" style={{ color: NAVY }}>{project.clientName}</div>
+            <div className="text-sm font-black truncate" style={{ color: T1 }}>{project.clientName}</div>
           </div>
-          <div className="text-xs text-slate-400 truncate mt-0.5">{project.name}</div>
+          <div className="text-xs truncate mt-0.5" style={{ color: T2 }}>{project.name}</div>
         </div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0 ml-3">
         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-          style={{ backgroundColor: typeColor + '15', color: typeColor }}>
+          style={{ backgroundColor: typeColor + '22', color: typeColor }}>
           {project.type}
         </span>
-        <span className="text-[10px] font-bold text-slate-400">{project.tradeStatus}</span>
+        <span className="text-[10px] font-bold" style={{ color: T2 }}>{project.tradeStatus}</span>
       </div>
     </div>
   );
@@ -120,7 +127,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
   });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" style={{ color: T1 }}>
 
       {/* Header — shared PageHeader (GCI Design System V1 pilot) */}
       <PageHeader title="控制中心" eyebrow={nowLabel} />
@@ -137,7 +144,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* 成交漏斗 */}
-        <div className="rounded-[18px] border p-6 shadow-sm lg:col-span-1" style={{ backgroundColor: '#F8FAFC', borderColor: NAVY + '14' }}>
+        <div className="rounded-[18px] border p-6 shadow-sm lg:col-span-1" style={{ backgroundColor: CARD, borderColor: BORDER }}>
           <SectionHeader icon={<TrendingUp className="w-4 h-4" />} title="成交漏斗" color={NAVY} />
           {(() => {
             const stages: { label: string; statuses: string[]; color: string }[] = [
@@ -154,10 +161,10 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
                 {stages.map((s, i) => (
                   <div key={s.label}>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-bold text-slate-500">{s.label}</span>
+                      <span className="text-xs font-bold" style={{ color: T2 }}>{s.label}</span>
                       <span className="text-xs font-black" style={{ color: s.color }}>{counts[i]}</span>
                     </div>
-                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
                       <div className="h-full rounded-full transition-all duration-500"
                         style={{ width: `${(counts[i] / max) * 100}%`, backgroundColor: s.color }} />
                     </div>
@@ -169,7 +176,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
         </div>
 
         {/* 优先级分布 */}
-        <div className="rounded-[18px] border p-6 shadow-sm" style={{ backgroundColor: '#F8FAFC', borderColor: NAVY + '14' }}>
+        <div className="rounded-[18px] border p-6 shadow-sm" style={{ backgroundColor: CARD, borderColor: BORDER }}>
           <SectionHeader icon={<AlertTriangle className="w-4 h-4" />} title="优先级分布" color={NAVY} />
           {(() => {
             // Source: 全部业务主档案 — A+B+C == totalBusinesses (invariant)
@@ -187,10 +194,10 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
                   return (
                     <div key={g.label}>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-slate-500">{g.label}</span>
+                        <span className="text-xs font-bold" style={{ color: T2 }}>{g.label}</span>
                         <span className="text-xs font-black" style={{ color: g.color }}>{g.count} 条 · {pct}%</span>
                       </div>
-                      <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
                         <div className="h-full rounded-full transition-all duration-500"
                           style={{ width: `${pct}%`, backgroundColor: g.color }} />
                       </div>
@@ -198,7 +205,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
                   );
                 })}
                 <div className="mt-4 rounded-xl px-4 py-2 text-xs font-black text-center"
-                  style={{ backgroundColor: '#F1F5F9', color: NAVY }}>
+                  style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: T1 }}>
                   共 {total} 条业务主档案
                 </div>
               </div>
@@ -207,7 +214,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
         </div>
 
         {/* 项目类型占比 */}
-        <div className="rounded-[18px] border p-6 shadow-sm" style={{ backgroundColor: '#F8FAFC', borderColor: NAVY + '14' }}>
+        <div className="rounded-[18px] border p-6 shadow-sm" style={{ backgroundColor: CARD, borderColor: BORDER }}>
           <SectionHeader icon={<Briefcase className="w-4 h-4" />} title="项目类型占比" color={NAVY} />
           {(() => {
             // Source: 全部业务主档案 (same source as totalBusinesses)
@@ -220,36 +227,36 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
               <div className="space-y-5 mt-2">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-slate-500">项目型</span>
+                    <span className="text-xs font-bold" style={{ color: T2 }}>项目型</span>
                     <span className="text-xs font-black" style={{ color: NAVY }}>{proj} 个 · {projPct}%</span>
                   </div>
-                  <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
                     <div className="h-full rounded-full transition-all duration-500"
                       style={{ width: `${projPct}%`, backgroundColor: NAVY }} />
                   </div>
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-slate-500">贸易型</span>
+                    <span className="text-xs font-bold" style={{ color: T2 }}>贸易型</span>
                     <span className="text-xs font-black" style={{ color: GOLD }}>{trade} 个 · {tradePct}%</span>
                   </div>
-                  <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
                     <div className="h-full rounded-full transition-all duration-500"
                       style={{ width: `${tradePct}%`, backgroundColor: GOLD }} />
                   </div>
                 </div>
                 <div className="mt-2 flex gap-2">
-                  <div className="flex-1 rounded-xl p-3 text-center bg-slate-50">
+                  <div className="flex-1 rounded-xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.06)' }}>
                     <div className="text-lg font-black" style={{ color: NAVY }}>{proj}</div>
-                    <div className="text-[10px] font-bold text-slate-400">项目型</div>
+                    <div className="text-[10px] font-bold" style={{ color: T2 }}>项目型</div>
                   </div>
-                  <div className="flex-1 rounded-xl p-3 text-center bg-slate-50">
+                  <div className="flex-1 rounded-xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.06)' }}>
                     <div className="text-lg font-black" style={{ color: GOLD }}>{trade}</div>
-                    <div className="text-[10px] font-bold text-slate-400">贸易型</div>
+                    <div className="text-[10px] font-bold" style={{ color: T2 }}>贸易型</div>
                   </div>
-                  <div className="flex-1 rounded-xl p-3 text-center bg-slate-50">
-                    <div className="text-lg font-black text-slate-700">{dashboardStats.totalBusinesses}</div>
-                    <div className="text-[10px] font-bold text-slate-400">总计</div>
+                  <div className="flex-1 rounded-xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    <div className="text-lg font-black" style={{ color: T1 }}>{dashboardStats.totalBusinesses}</div>
+                    <div className="text-[10px] font-bold" style={{ color: T2 }}>总计</div>
                   </div>
                 </div>
               </div>
@@ -262,7 +269,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
       <div>
         <div className="flex items-center gap-2 mb-4">
           <Activity className="w-4 h-4" style={{ color: GOLD }} />
-          <h2 className="font-mono-label text-sm font-black uppercase tracking-widest" style={{ color: NAVY }}>
+          <h2 className="font-mono-label text-sm font-black uppercase tracking-widest" style={{ color: T1 }}>
             今日行动中心 · AI Action Center
           </h2>
         </div>

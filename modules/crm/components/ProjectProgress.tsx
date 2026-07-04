@@ -10,6 +10,11 @@ import ProjectCopilot from './ProjectCopilot';
 
 const GOLD = colors.goldBase;
 const NAVY = colors.bgBase;
+const CARD   = '#0F1E35';
+const CARD2  = '#162A45';
+const BORDER = 'rgba(255,255,255,0.09)';
+const T1     = '#E8F0FF';
+const T2     = '#7A9CC5';
 
 // Canonical Notion 行动状态 -> centralized StatusKey, reusing the same 5
 // allowed colors instead of the old per-status Tailwind rainbow classes.
@@ -190,22 +195,22 @@ const ProjectProgress: React.FC<ProjectProgressProps> = ({
 
   const KanbanColumn: React.FC<{ stage: TradeStatus, items: Project[] }> = ({ stage, items }) => (
     <div className="min-w-[300px] w-[300px] flex flex-col gap-4">
-      <div className="bg-white px-5 py-4 rounded-[24px] border border-slate-200 flex items-center justify-between shadow-sm shrink-0">
-         <span className="text-xs font-black uppercase tracking-widest text-slate-600">{stage}</span>
-         <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-lg text-[10px] font-black">{items.length}</span>
+      <div className="px-5 py-4 rounded-[24px] flex items-center justify-between shrink-0" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+         <span className="text-xs font-black uppercase tracking-widest" style={{ color: T1 }}>{stage}</span>
+         <span className="px-2 py-0.5 rounded-lg text-[10px] font-black" style={{ background: 'rgba(255,255,255,0.07)', color: T2 }}>{items.length}</span>
       </div>
       <div className="flex-grow overflow-y-auto space-y-4 pb-12 pr-2 custom-scrollbar">
         {items.map(p => (
-          <div key={p.id} onClick={() => { setSelectedProjectId(p.id); setViewType('list'); }} className="bg-white p-5 rounded-[28px] border border-slate-100 shadow-sm hover:border-slate-300 transition-all cursor-pointer group animate-slideIn">
+          <div key={p.id} onClick={() => { setSelectedProjectId(p.id); setViewType('list'); }} className="p-5 rounded-[28px] transition-all cursor-pointer group animate-slideIn" style={{ background: CARD2, border: `1px solid ${BORDER}` }} onMouseEnter={e => (e.currentTarget.style.borderColor = GOLD + '60')} onMouseLeave={e => (e.currentTarget.style.borderColor = BORDER)}>
             <div className="flex justify-between items-start mb-2">
               <Badge color={p.type === '贸易型' ? GOLD : colors.statusInfo} bg={p.type === '贸易型' ? `${GOLD}18` : 'rgba(143,166,212,0.16)'} label={p.type} className="uppercase" />
-              <span className="text-[13px] font-bold text-slate-300">档案 ID: {p.id.slice(-4)}</span>
+              <span className="text-[13px] font-bold" style={{ color: T2 }}>ID: {p.id.slice(-4)}</span>
             </div>
-            <h4 className="text-sm font-black text-slate-800 mb-1 leading-tight line-clamp-2">{p.name}</h4>
-            <p className="text-[13px] text-slate-400 font-bold mb-3">{p.clientName} · {p.countryCity}</p>
-            <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
-              <span className="text-[12px] font-black text-slate-400 uppercase">{p.owner}</span>
-              <ChevronRight className="w-4 h-4 text-slate-200 group-hover:text-slate-400" />
+            <h4 className="text-sm font-black mb-1 leading-tight line-clamp-2" style={{ color: T1 }}>{p.name}</h4>
+            <p className="text-[13px] font-bold mb-3" style={{ color: T2 }}>{p.clientName} · {p.countryCity}</p>
+            <div className="pt-4 flex items-center justify-between" style={{ borderTop: `1px solid ${BORDER}` }}>
+              <span className="text-[12px] font-black uppercase" style={{ color: T2 }}>{p.owner}</span>
+              <ChevronRight className="w-4 h-4" style={{ color: T2 }} />
             </div>
           </div>
         ))}
@@ -216,42 +221,42 @@ const ProjectProgress: React.FC<ProjectProgressProps> = ({
   return (
     <div className="flex flex-col gap-6 h-[calc(100vh-180px)]">
       {/* SALES 分区页面标题，跟控制中心/客户跟进保持一致的标题样式 */}
-      <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>业务中心</h1>
+      <h1 className="text-2xl font-semibold" style={{ color: T1, fontFamily: "'Space Grotesk',sans-serif" }}>业务中心</h1>
 
       {/* 顶部控制栏：业务分流器 + 视图切换 */}
-      <div className="bg-white p-5 rounded-[32px] border border-slate-200 shadow-sm flex flex-col gap-6 shrink-0">
+      <div className="p-5 rounded-[32px] shadow-sm flex flex-col gap-6 shrink-0" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-               <div className="p-2.5 rounded-2xl text-white shadow-lg" style={{ backgroundColor: NAVY }}><Briefcase className="w-5 h-5" /></div>
+               <div className="p-2.5 rounded-2xl text-white shadow-lg" style={{ backgroundColor: GOLD }}><Briefcase className="w-5 h-5" /></div>
                <div>
-                  <h3 className="text-sm font-black uppercase text-slate-800 tracking-tight">业务跟进中心</h3>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">项目客户与贸易询盘统一跟进</p>
+                  <h3 className="text-sm font-black uppercase tracking-tight" style={{ color: T1 }}>业务跟进中心</h3>
+                  <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: T2 }}>项目客户与贸易询盘统一跟进</p>
                </div>
             </div>
 
-            {/* 业务分流器 (Segmented Control) — 选中态统一用金色，不再用 indigo/amber */}
-            <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200">
+            {/* 业务分流器 (Segmented Control) */}
+            <div className="flex p-1 rounded-2xl" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER}` }}>
                <button onClick={() => handleFilterChange('全部')} className="px-6 py-2.5 rounded-xl text-[13px] font-black uppercase transition-all flex items-center gap-2"
-                 style={filterType === '全部' ? { backgroundColor: '#fff', color: GOLD, boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' } : { color: '#94A3B8' }}>全部业务</button>
+                 style={filterType === '全部' ? { backgroundColor: CARD2, color: GOLD, border: `1px solid ${BORDER}` } : { color: T2 }}>全部业务</button>
                <button onClick={() => handleFilterChange('项目型')} className="px-6 py-2.5 rounded-xl text-[13px] font-black uppercase transition-all flex items-center gap-2"
-                 style={filterType === '项目型' ? { backgroundColor: GOLD, color: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' } : { color: '#94A3B8' }}>项目型客户</button>
+                 style={filterType === '项目型' ? { backgroundColor: GOLD, color: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' } : { color: T2 }}>项目型客户</button>
                <button onClick={() => handleFilterChange('贸易型')} className="px-6 py-2.5 rounded-xl text-[13px] font-black uppercase transition-all flex items-center gap-2"
-                 style={filterType === '贸易型' ? { backgroundColor: GOLD, color: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' } : { color: '#94A3B8' }}>贸易型询盘</button>
+                 style={filterType === '贸易型' ? { backgroundColor: GOLD, color: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' } : { color: T2 }}>贸易型询盘</button>
             </div>
 
-            <button onClick={() => setShowAddModal(true)} className="px-6 py-3 text-white rounded-2xl text-[13px] font-black uppercase shadow-xl hover:opacity-90 transition-all active:scale-95" style={{ backgroundColor: NAVY }}><Plus className="w-4 h-4 inline mr-2" /> 手动建档</button>
+            <button onClick={() => setShowAddModal(true)} className="px-6 py-3 text-white rounded-2xl text-[13px] font-black uppercase shadow-xl hover:opacity-90 transition-all active:scale-95" style={{ backgroundColor: GOLD }}><Plus className="w-4 h-4 inline mr-2" /> 手动建档</button>
          </div>
 
-         <div className="h-px bg-slate-100 w-full" />
+         <div className="h-px w-full" style={{ background: BORDER }} />
 
          <div className="flex items-center justify-center">
-            <div className="flex bg-slate-50 p-1 rounded-2xl border border-slate-100">
+            <div className="flex p-1 rounded-2xl" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORDER}` }}>
                <button onClick={() => setViewType('list')} className="px-8 py-2 rounded-xl text-[13px] font-black uppercase transition-all flex items-center gap-2"
-                 style={viewType === 'list' ? { backgroundColor: '#fff', color: GOLD, boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' } : { color: '#94A3B8' }}><List className="w-3.5 h-3.5" /> 业务列表</button>
+                 style={viewType === 'list' ? { backgroundColor: CARD2, color: GOLD, border: `1px solid ${BORDER}` } : { color: T2 }}><List className="w-3.5 h-3.5" /> 业务列表</button>
                <button onClick={() => setViewType('kanban')} className="px-8 py-2 rounded-xl text-[13px] font-black uppercase transition-all flex items-center gap-2"
-                 style={viewType === 'kanban' ? { backgroundColor: '#fff', color: GOLD, boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' } : { color: '#94A3B8' }}><ClipboardList className="w-3.5 h-3.5" /> 项目进度</button>
+                 style={viewType === 'kanban' ? { backgroundColor: CARD2, color: GOLD, border: `1px solid ${BORDER}` } : { color: T2 }}><ClipboardList className="w-3.5 h-3.5" /> 项目进度</button>
                <button onClick={() => setViewType('tradeFollowup')} className="px-8 py-2 rounded-xl text-[13px] font-black uppercase transition-all flex items-center gap-2"
-                 style={viewType === 'tradeFollowup' ? { backgroundColor: '#fff', color: GOLD, boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' } : { color: '#94A3B8' }}><ShoppingBag className="w-3.5 h-3.5" /> 贸易跟进</button>
+                 style={viewType === 'tradeFollowup' ? { backgroundColor: CARD2, color: GOLD, border: `1px solid ${BORDER}` } : { color: T2 }}><ShoppingBag className="w-3.5 h-3.5" /> 贸易跟进</button>
             </div>
          </div>
       </div>
@@ -267,12 +272,12 @@ const ProjectProgress: React.FC<ProjectProgressProps> = ({
           <div className="h-full flex flex-col lg:flex-row gap-8">
             <aside className="w-full lg:w-80 h-full overflow-y-auto custom-scrollbar pr-2 space-y-3 shrink-0">
                <div className="relative mb-4">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-                  <input type="text" placeholder={`搜索${filterType === '全部' ? '业务' : filterType}...`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-[13px] font-bold outline-none shadow-sm" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: T2 }} />
+                  <input type="text" placeholder={`搜索${filterType === '全部' ? '业务' : filterType}...`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-3 rounded-2xl text-[13px] font-bold outline-none" style={{ background: CARD, border: `1px solid ${BORDER}`, color: T1 }} />
                </div>
                <div className="flex items-center justify-between px-2 mb-2">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{filterType === '项目型' ? '项目列表' : filterType === '贸易型' ? '贸易询盘列表' : '全部档案列表'}</span>
-                  <span className="text-[9px] font-bold text-slate-300">{filtered.length} 条</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: T2 }}>{filterType === '项目型' ? '项目列表' : filterType === '贸易型' ? '贸易询盘列表' : '全部档案列表'}</span>
+                  <span className="text-[9px] font-bold" style={{ color: T2 }}>{filtered.length} 条</span>
                </div>
                {filtered.map(p => {
                  const bizId   = ((p as any).businessId || '').trim();
@@ -298,12 +303,12 @@ const ProjectProgress: React.FC<ProjectProgressProps> = ({
                      onClick={() => setSelectedProjectId(p.id)}
                      className="w-full text-left px-5 py-4 rounded-[24px] border transition-all"
                      style={isActive
-                       ? { backgroundColor: `${GOLD}0F`, borderColor: GOLD, color: NAVY, boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }
-                       : { backgroundColor: '#fff', borderColor: '#f1f5f9', color: '#1e293b' }}
+                       ? { backgroundColor: `${GOLD}18`, borderColor: GOLD, color: T1 }
+                       : { backgroundColor: CARD2, borderColor: BORDER, color: T1 }}
                    >
                      {/* ── Row 1: ID + client name (prominent) ── */}
                      <div className="flex items-start justify-between gap-2 mb-1.5">
-                       <p className="text-sm font-black leading-tight" style={{ color: isActive ? NAVY : '#0f172a' }}>
+                       <p className="text-sm font-black leading-tight" style={{ color: T1 }}>
                          <span className="font-mono mr-1" style={{ color: GOLD }}>{idLabel}</span>
                          <span>| {nameLabel}</span>
                        </p>
@@ -320,16 +325,16 @@ const ProjectProgress: React.FC<ProjectProgressProps> = ({
 
                      {/* ── Row 3: latest follow-up note preview ── */}
                      {notePreview && (
-                       <p className="text-[13px] font-medium leading-snug truncate" style={{ color: isActive ? '#64748B' : '#94A3B8' }}>
+                       <p className="text-[13px] font-medium leading-snug truncate" style={{ color: T2 }}>
                          最近跟进：{notePreview}
                        </p>
                      )}
                    </button>
                  );
                })}
-               {filtered.length === 0 && <div className="py-20 text-center text-slate-300 italic text-xs">暂无匹配记录</div>}
+               {filtered.length === 0 && <div className="py-20 text-center italic text-xs" style={{ color: T2 }}>暂无匹配记录</div>}
             </aside>
-            <div className="flex-grow h-full overflow-y-auto bg-white rounded-[40px] p-8 border border-slate-200 custom-scrollbar relative shadow-sm">
+            <div className="flex-grow h-full overflow-y-auto rounded-[40px] p-8 custom-scrollbar relative" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
               {selected ? (
                 <div className="space-y-8 pb-20 animate-fadeIn">
                    {/* 档案核心信息区 */}
@@ -390,14 +395,14 @@ const ProjectProgress: React.FC<ProjectProgressProps> = ({
                    </div>
 
                    {/* 追加跟进区 */}
-                   <div className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 space-y-4 shadow-inner">
-                      <h3 className="text-xs font-black text-slate-800 flex items-center gap-2 uppercase tracking-widest"><MessageSquare className="w-4 h-4" style={{ color: GOLD }} /> 追加本次跟进事实</h3>
+                   <div className="p-6 rounded-[32px] space-y-4" style={{ background: CARD2, border: `1px solid ${BORDER}` }}>
+                      <h3 className="text-xs font-black flex items-center gap-2 uppercase tracking-widest" style={{ color: T1 }}><MessageSquare className="w-4 h-4" style={{ color: GOLD }} /> 追加本次跟进事实</h3>
                       <div className="grid grid-cols-2 gap-4">
-                         <select value={followUpMethod} onChange={e => setFollowUpMethod(e.target.value)} className="bg-white border border-slate-200 rounded-2xl px-5 py-3 text-[13px] font-bold outline-none"><option>微信/WhatsApp</option><option>电话回访</option><option>邮件往来</option><option>面谈会议</option><option>合同签约</option></select>
-                         <div className="relative"><Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" /><input type="date" value={nextFollowDate} onChange={e => setNextFollowDate(e.target.value)} className="w-full bg-white border border-slate-200 rounded-2xl pl-10 pr-5 py-3 text-[13px] font-bold outline-none" /></div>
+                         <select value={followUpMethod} onChange={e => setFollowUpMethod(e.target.value)} className="rounded-2xl px-5 py-3 text-[13px] font-bold outline-none" style={{ background: CARD, border: `1px solid ${BORDER}`, color: T1 }}><option>微信/WhatsApp</option><option>电话回访</option><option>邮件往来</option><option>面谈会议</option><option>合同签约</option></select>
+                         <div className="relative"><Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: T2 }} /><input type="date" value={nextFollowDate} onChange={e => setNextFollowDate(e.target.value)} className="w-full rounded-2xl pl-10 pr-5 py-3 text-[13px] font-bold outline-none" style={{ background: CARD, border: `1px solid ${BORDER}`, color: T1 }} /></div>
                       </div>
-                      <textarea value={followUpContent} onChange={e => setFollowUpContent(e.target.value)} placeholder="记录核心事实：客户提了什么要求？我们的对策是什么？下一步何时联系？" className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none h-32 resize-none shadow-sm focus:ring-2 focus:ring-slate-200" />
-                      <button onClick={handleAddFollowUp} className="w-full text-white py-4 rounded-2xl font-black text-[13px] uppercase shadow-lg hover:opacity-90 active:scale-95 transition-all" style={{ backgroundColor: NAVY }}>提交跟进记录</button>
+                      <textarea value={followUpContent} onChange={e => setFollowUpContent(e.target.value)} placeholder="记录核心事实：客户提了什么要求？我们的对策是什么？下一步何时联系？" className="w-full rounded-2xl px-6 py-4 text-sm font-bold outline-none h-32 resize-none" style={{ background: CARD, border: `1px solid ${BORDER}`, color: T1 }} />
+                      <button onClick={handleAddFollowUp} className="w-full text-white py-4 rounded-2xl font-black text-[13px] uppercase shadow-lg hover:opacity-90 active:scale-95 transition-all" style={{ backgroundColor: GOLD }}>提交跟进记录</button>
                       <div className="flex gap-3 pt-2">
                         <button
                           onClick={() => { if (window.confirm('确定归档此业务档案？')) { onArchiveProject(selected.id); setSelectedProjectId(''); } }}
@@ -418,27 +423,27 @@ const ProjectProgress: React.FC<ProjectProgressProps> = ({
 
                    {/* 记录时间轴 */}
                    <div className="space-y-6 relative">
-                      <div className="absolute left-6 top-4 bottom-4 w-px bg-slate-100" />
-                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest ml-12">历史推进轨迹</h3>
+                      <div className="absolute left-6 top-4 bottom-4 w-px" style={{ background: BORDER }} />
+                      <h3 className="text-xs font-black uppercase tracking-widest ml-12" style={{ color: T2 }}>历史推进轨迹</h3>
                       {selected.projectFollowUps?.map((log, i) => (
                         <div key={i} className="relative pl-16 animate-fadeIn">
-                          <div className="absolute left-4 top-2 w-4 h-4 rounded-full bg-white z-10" style={{ border: `4px solid ${GOLD}` }} />
-                          <div className="bg-slate-50 p-5 rounded-[24px] border border-slate-100 shadow-sm">
-                             <div className="flex items-center justify-between mb-2"><span className="text-[13px] font-black flex items-center gap-1" style={{ color: GOLD }}><Clock className="w-3 h-3" /> {log.time}</span><span className="text-[12px] font-bold text-slate-400">主责人: {log.author}</span></div>
-                             <p className="text-sm font-bold text-slate-700 whitespace-pre-wrap leading-relaxed">{log.content}</p>
+                          <div className="absolute left-4 top-2 w-4 h-4 rounded-full z-10" style={{ background: CARD, border: `4px solid ${GOLD}` }} />
+                          <div className="p-5 rounded-[24px]" style={{ background: CARD2, border: `1px solid ${BORDER}` }}>
+                             <div className="flex items-center justify-between mb-2"><span className="text-[13px] font-black flex items-center gap-1" style={{ color: GOLD }}><Clock className="w-3 h-3" /> {log.time}</span><span className="text-[12px] font-bold" style={{ color: T2 }}>主责人: {log.author}</span></div>
+                             <p className="text-sm font-bold whitespace-pre-wrap leading-relaxed" style={{ color: T1 }}>{log.content}</p>
                           </div>
                         </div>
                       ))}
                       <div className="relative pl-16">
-                         <div className="absolute left-4 top-2 w-4 h-4 rounded-full border-4 border-white z-10" style={{ backgroundColor: `${GOLD}30` }} />
-                         <div className="bg-slate-50 p-5 rounded-[24px] border border-slate-100 opacity-60">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">初始录入背景</span>
-                            <p className="text-sm font-bold text-slate-500 italic">{selected.initialContext}</p>
+                         <div className="absolute left-4 top-2 w-4 h-4 rounded-full border-4 z-10" style={{ borderColor: CARD2, backgroundColor: `${GOLD}30` }} />
+                         <div className="p-5 rounded-[24px] opacity-60" style={{ background: CARD2, border: `1px solid ${BORDER}` }}>
+                            <span className="text-[10px] font-black uppercase tracking-widest block mb-1" style={{ color: T2 }}>初始录入背景</span>
+                            <p className="text-sm font-bold italic" style={{ color: T1 }}>{selected.initialContext}</p>
                          </div>
                       </div>
                    </div>
                 </div>
-              ) : <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4"><Briefcase className="w-16 h-16 opacity-10" /><p className="font-black uppercase tracking-widest text-sm italic">请选择项目或贸易项开始推进</p></div>}
+              ) : <div className="h-full flex flex-col items-center justify-center gap-4" style={{ color: T2 }}><Briefcase className="w-16 h-16 opacity-10" /><p className="font-black uppercase tracking-widest text-sm italic">请选择项目或贸易项开始推进</p></div>}
             </div>
           </div>
         ) : viewType === 'kanban' ? (
@@ -454,29 +459,29 @@ const ProjectProgress: React.FC<ProjectProgressProps> = ({
 
       {showAddModal && (
         <div className="fixed inset-0 z-[5000] flex items-center justify-center p-6"><div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
-        <form onSubmit={(e) => { 
-          e.preventDefault(); 
-          const form = e.target as any; 
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          const form = e.target as any;
           const ptype = form.ptype.value as any;
-          onAddProject({ 
-            id: `P_${Date.now()}`, name: form.pname.value, clientName: form.cname.value, countryCity: form.city.value, 
-            contactKey: "", type: ptype, owner: '本人', status: '进行中', tradeStatus: ptype === '贸易型' ? '新询盘' : '新建', 
-            initialContext: "手动创建", projectFollowUps: [], attachments: [], createdAt: new Date().toISOString() 
-          }); 
-          setShowAddModal(false); 
-        }} className="relative bg-white rounded-[40px] p-10 w-full max-w-lg shadow-2xl space-y-6">
-          <h2 className="text-xl font-black text-slate-800 uppercase text-center">创建业务档案</h2>
+          onAddProject({
+            id: `P_${Date.now()}`, name: form.pname.value, clientName: form.cname.value, countryCity: form.city.value,
+            contactKey: "", type: ptype, owner: '本人', status: '进行中', tradeStatus: ptype === '贸易型' ? '新询盘' : '新建',
+            initialContext: "手动创建", projectFollowUps: [], attachments: [], createdAt: new Date().toISOString()
+          });
+          setShowAddModal(false);
+        }} className="relative rounded-[40px] p-10 w-full max-w-lg shadow-2xl space-y-6" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+          <h2 className="text-xl font-black uppercase text-center" style={{ color: T1 }}>创建业务档案</h2>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <select name="ptype" className="bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold outline-none">
+              <select name="ptype" className="rounded-2xl px-5 py-4 text-sm font-bold outline-none" style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}>
                 <option value="项目型">项目型</option><option value="贸易型">贸易型</option>
               </select>
-              <input name="city" required type="text" placeholder="国家 / 城市" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none" />
+              <input name="city" required type="text" placeholder="国家 / 城市" className="w-full rounded-2xl px-6 py-4 text-sm font-bold outline-none" style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }} />
             </div>
-            <input name="pname" required type="text" placeholder="档案名称 / 方案名称" className="w-full bg-slate-50 border border-slate-200 rounded-3xl px-6 py-5 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-300" />
-            <input name="cname" required type="text" placeholder="客户姓名" className="w-full bg-slate-50 border border-slate-200 rounded-3xl px-6 py-5 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-300" />
+            <input name="pname" required type="text" placeholder="档案名称 / 方案名称" className="w-full rounded-3xl px-6 py-5 text-sm font-bold outline-none" style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }} />
+            <input name="cname" required type="text" placeholder="客户姓名" className="w-full rounded-3xl px-6 py-5 text-sm font-bold outline-none" style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }} />
           </div>
-          <button type="submit" className="w-full text-white py-6 rounded-[32px] font-black text-sm uppercase shadow-xl hover:opacity-90 transition-all" style={{ backgroundColor: NAVY }}>开启跟进</button>
+          <button type="submit" className="w-full text-white py-6 rounded-[32px] font-black text-sm uppercase shadow-xl hover:opacity-90 transition-all" style={{ backgroundColor: GOLD }}>开启跟进</button>
         </form></div>
       )}
     </div>

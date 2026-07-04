@@ -7,6 +7,12 @@ import {
 } from 'lucide-react';
 
 const INTERNAL_TASKS_KEY = "ICARE_INTERNAL_TASKS_V1";
+const GOLD   = '#B8960C';
+const CARD   = '#0F1E35';
+const CARD2  = '#162A45';
+const BORDER = 'rgba(255,255,255,0.09)';
+const T1     = '#E8F0FF';
+const T2     = '#7A9CC5';
 
 interface InternalTasksViewProps {
   lang: 'zh' | 'en';
@@ -76,12 +82,13 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
     <div className="flex flex-col gap-6 animate-fadeIn">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="bg-indigo-600 p-2 rounded-xl text-white shadow-lg"><LayoutGrid className="w-5 h-5" /></div>
-          <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">内部事项看板</h2>
+          <div className="p-2 rounded-xl text-white shadow-lg" style={{ backgroundColor: GOLD }}><LayoutGrid className="w-5 h-5" /></div>
+          <h2 className="text-xl font-black uppercase tracking-tight" style={{ color: T1 }}>内部事项看板</h2>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase shadow-xl flex items-center gap-2 transition-all active:scale-95"
+          className="text-white px-6 py-3 rounded-2xl font-black text-xs uppercase shadow-xl flex items-center gap-2 transition-all active:scale-95 hover:opacity-90"
+          style={{ backgroundColor: GOLD }}
         >
           <Plus className="w-4 h-4" /> 新增待办
         </button>
@@ -92,12 +99,12 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
           const colTasks = (tasks || []).filter(t => t.status === status);
           return (
             <div key={status} className="flex flex-col gap-4 h-full overflow-hidden">
-              <div className="bg-white px-5 py-4 rounded-[24px] border border-slate-200 shadow-sm flex items-center justify-between shrink-0">
+              <div className="px-5 py-4 rounded-[24px] flex items-center justify-between shrink-0" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
                 <div className="flex items-center gap-2">
                   {getStatusIcon(status)}
-                  <span className="text-xs font-black uppercase tracking-widest text-slate-600">{status}</span>
+                  <span className="text-xs font-black uppercase tracking-widest" style={{ color: T1 }}>{status}</span>
                 </div>
-                <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-lg text-[10px] font-black">{colTasks.length}</span>
+                <span className="px-2 py-0.5 rounded-lg text-[10px] font-black" style={{ background: 'rgba(255,255,255,0.07)', color: T2 }}>{colTasks.length}</span>
               </div>
 
               <div className="flex-grow overflow-y-auto space-y-4 pb-12 pr-1 custom-scrollbar">
@@ -105,20 +112,23 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
                   <div
                     key={task.id}
                     onClick={() => setEditingTask({ ...task })}
-                    className="bg-white p-5 rounded-[28px] border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer animate-slideIn group"
+                    className="p-5 rounded-[28px] transition-all cursor-pointer animate-slideIn group"
+                    style={{ background: CARD2, border: `1px solid ${BORDER}` }}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = `${GOLD}60`)}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = BORDER)}
                   >
                     <div className="flex justify-between items-start mb-3">
-                      <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md text-[9px] font-black uppercase">{task.category}</span>
-                      {task.description && <AlignLeft className="w-3 h-3 text-slate-300" />}
+                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase" style={{ background: 'rgba(255,255,255,0.07)', color: T2 }}>{task.category}</span>
+                      {task.description && <AlignLeft className="w-3 h-3" style={{ color: T2 }} />}
                     </div>
 
-                    <h3 className="text-sm font-black text-slate-800 mb-4 line-clamp-2 leading-tight">{task.title}</h3>
+                    <h3 className="text-sm font-black mb-4 line-clamp-2 leading-tight" style={{ color: T1 }}>{task.title}</h3>
 
-                    <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
+                    <div className="flex items-center justify-between pt-4" style={{ borderTop: `1px solid ${BORDER}` }}>
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold" style={{ color: T2 }}>
                         <Calendar className="w-3 h-3" />{task.dueDate}
                       </div>
-                      <div className="flex items-center gap-1.5 text-[10px] font-black text-indigo-500 uppercase">
+                      <div className="flex items-center gap-1.5 text-[10px] font-black uppercase" style={{ color: GOLD }}>
                         <User className="w-3 h-3" />{task.owner}
                       </div>
                     </div>
@@ -133,8 +143,8 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
       {showAddModal && (
         <div className="fixed inset-0 z-[3000] flex items-center justify-center p-6">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
-          <form onSubmit={handleCreateTask} className="relative bg-white rounded-[40px] p-8 w-full max-w-md shadow-2xl space-y-6">
-            <h2 className="text-xl font-black text-slate-800 uppercase">创建事项</h2>
+          <form onSubmit={handleCreateTask} className="relative rounded-[40px] p-8 w-full max-w-md shadow-2xl space-y-6" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+            <h2 className="text-xl font-black uppercase" style={{ color: T1 }}>创建事项</h2>
 
             <input
               required
@@ -142,14 +152,16 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
               value={newTask.title}
               onChange={e => setNewTask({ ...newTask, title: e.target.value })}
               placeholder="事项标题"
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-2xl px-5 py-4 text-sm font-bold outline-none"
+              style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
             />
 
             <div className="grid grid-cols-2 gap-4">
               <select
                 value={newTask.category}
                 onChange={e => setNewTask({ ...newTask, category: e.target.value as any })}
-                className="bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 text-xs font-bold outline-none"
+                className="rounded-2xl px-4 py-4 text-xs font-bold outline-none"
+                style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
               >
                 <option value="销售">销售</option>
                 <option value="财务">财务</option>
@@ -161,7 +173,8 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
               <select
                 value={newTask.status}
                 onChange={e => setNewTask({ ...newTask, status: e.target.value as any })}
-                className="bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 text-xs font-bold outline-none"
+                className="rounded-2xl px-4 py-4 text-xs font-bold outline-none"
+                style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
               >
                 <option value="待处理">待处理</option>
                 <option value="进行中">进行中</option>
@@ -172,13 +185,14 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: T2 }} />
                 <input
                   type="text"
                   value={newTask.owner}
                   onChange={e => setNewTask({ ...newTask, owner: e.target.value })}
                   placeholder="负责人"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-4 text-xs font-bold outline-none"
+                  className="w-full rounded-2xl pl-10 pr-4 py-4 text-xs font-bold outline-none"
+                  style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
                 />
               </div>
 
@@ -186,13 +200,15 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
                 type="date"
                 value={newTask.dueDate}
                 onChange={e => setNewTask({ ...newTask, dueDate: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 text-xs font-bold outline-none"
+                className="w-full rounded-2xl px-4 py-4 text-xs font-bold outline-none"
+                style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
               />
             </div>
 
             <button
               type="submit"
-              className="w-full bg-indigo-600 text-white py-5 rounded-[24px] font-black text-sm uppercase shadow-xl hover:bg-indigo-700 transition-all"
+              className="w-full text-white py-5 rounded-[24px] font-black text-sm uppercase shadow-xl hover:opacity-90 transition-all"
+              style={{ backgroundColor: GOLD }}
             >
               确认添加
             </button>
@@ -203,15 +219,16 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
       {editingTask && (
         <div className="fixed inset-0 z-[3000] flex items-center justify-center p-6">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setEditingTask(null)} />
-          <form onSubmit={handleUpdateTask} className="relative bg-white rounded-[40px] p-8 w-full max-w-md shadow-2xl space-y-6">
+          <form onSubmit={handleUpdateTask} className="relative rounded-[40px] p-8 w-full max-w-md shadow-2xl space-y-6" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-black text-slate-800 uppercase">编辑事项</h2>
+              <h2 className="text-xl font-black uppercase" style={{ color: T1 }}>编辑事项</h2>
               <button
                 type="button"
                 onClick={() => setEditingTask(null)}
-                className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+                className="p-2 rounded-full transition-colors"
+                style={{ color: T2 }}
               >
-                <X className="w-5 h-5 text-slate-400" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -221,23 +238,26 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
               value={editingTask.title}
               onChange={e => setEditingTask({ ...editingTask, title: e.target.value })}
               placeholder="事项标题"
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-2xl px-5 py-4 text-sm font-bold outline-none"
+              style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
             />
 
             <textarea
               value={editingTask.description || ''}
               onChange={e => setEditingTask({ ...editingTask, description: e.target.value })}
               placeholder="添加备注或详情描述..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold outline-none h-24 resize-none focus:ring-2 focus:ring-indigo-500 shadow-inner"
+              className="w-full rounded-2xl px-5 py-4 text-sm font-bold outline-none h-24 resize-none"
+              style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
             />
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">所属分类</label>
+                <label className="text-[10px] font-black uppercase tracking-widest ml-2" style={{ color: T2 }}>所属分类</label>
                 <select
                   value={editingTask.category}
                   onChange={e => setEditingTask({ ...editingTask, category: e.target.value as any })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-xs font-bold outline-none"
+                  className="w-full rounded-2xl px-4 py-3.5 text-xs font-bold outline-none"
+                  style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
                 >
                   <option value="销售">销售</option>
                   <option value="财务">财务</option>
@@ -248,11 +268,12 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest ml-2">事项状态</label>
+                <label className="text-[10px] font-black uppercase tracking-widest ml-2" style={{ color: GOLD }}>事项状态</label>
                 <select
                   value={editingTask.status}
                   onChange={e => setEditingTask({ ...editingTask, status: e.target.value as any })}
-                  className="w-full bg-white border-2 border-indigo-100 rounded-2xl px-4 py-3.5 text-xs font-black text-indigo-600 outline-none shadow-sm"
+                  className="w-full rounded-2xl px-4 py-3.5 text-xs font-black outline-none"
+                  style={{ background: CARD2, border: `1px solid ${GOLD}40`, color: GOLD }}
                 >
                   <option value="待处理">待处理</option>
                   <option value="进行中">进行中</option>
@@ -264,33 +285,36 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">执行人</label>
+                <label className="text-[10px] font-black uppercase tracking-widest ml-2" style={{ color: T2 }}>执行人</label>
                 <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: T2 }} />
                   <input
                     type="text"
                     value={editingTask.owner}
                     onChange={e => setEditingTask({ ...editingTask, owner: e.target.value })}
                     placeholder="负责人"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-3.5 text-xs font-bold outline-none"
+                    className="w-full rounded-2xl pl-10 pr-4 py-3.5 text-xs font-bold outline-none"
+                    style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">截止日期</label>
+                <label className="text-[10px] font-black uppercase tracking-widest ml-2" style={{ color: T2 }}>截止日期</label>
                 <input
                   type="date"
                   value={editingTask.dueDate}
                   onChange={e => setEditingTask({ ...editingTask, dueDate: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-xs font-bold outline-none"
+                  className="w-full rounded-2xl px-4 py-3.5 text-xs font-bold outline-none"
+                  style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
                 />
               </div>
             </div>
 
             <button
               type="submit"
-              className="w-full bg-slate-900 text-white py-5 rounded-[24px] font-black text-sm uppercase shadow-xl hover:bg-black transition-all"
+              className="w-full text-white py-5 rounded-[24px] font-black text-sm uppercase shadow-xl hover:opacity-90 transition-all"
+              style={{ backgroundColor: GOLD }}
             >
               保存更改
             </button>

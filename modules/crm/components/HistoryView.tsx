@@ -14,6 +14,11 @@ import { colors, statusMap, type StatusKey, Badge as DSBadge } from '@gci/design
 
 const GOLD = colors.goldBase;
 const NAVY = colors.bgBase;
+const CARD   = '#0F1E35';
+const CARD2  = '#162A45';
+const BORDER = 'rgba(255,255,255,0.09)';
+const T1     = '#E8F0FF';
+const T2     = '#7A9CC5';
 
 // Task/record lifecycle status -> centralized StatusKey (5 allowed colors).
 const RECORD_STATUS_KEY: Record<string, StatusKey> = {
@@ -183,54 +188,54 @@ const HistoryView: React.FC<HistoryViewProps> = ({
   const ProjectDrawer = ({ project }: { project: Project }) => (
     <div className="fixed inset-0 z-50 flex items-center justify-end" onClick={() => setSelectedProject(null)}>
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-      <div className="relative z-10 w-full max-w-lg h-full bg-white shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="flex items-start justify-between px-8 py-5 border-b border-slate-100 bg-slate-50 shrink-0">
+      <div className="relative z-10 w-full max-w-lg h-full shadow-2xl flex flex-col overflow-hidden" style={{ background: CARD }} onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between px-8 py-5 shrink-0" style={{ borderBottom: `1px solid ${BORDER}`, background: CARD2 }}>
           <div className="flex-1 min-w-0 pr-4">
-            <h2 className="text-lg font-black text-slate-800 truncate">{project.clientName}</h2>
-            <p className="text-xs text-slate-400 font-bold mt-0.5 flex items-center gap-2 flex-wrap">
+            <h2 className="text-lg font-black truncate" style={{ color: T1 }}>{project.clientName}</h2>
+            <p className="text-xs font-bold mt-0.5 flex items-center gap-2 flex-wrap" style={{ color: T2 }}>
               <Globe className="w-3 h-3 shrink-0" />{project.countryCity || '—'}
               <DSBadge color={project.type === '项目型' ? colors.statusInfo : GOLD} bg={project.type === '项目型' ? 'rgba(143,166,212,0.16)' : `${GOLD}18`} label={project.type} className="ml-2 uppercase" />
             </p>
           </div>
-          <button onClick={() => setSelectedProject(null)} className="p-2 rounded-full hover:bg-slate-200 transition-colors text-slate-400 shrink-0">
+          <button onClick={() => setSelectedProject(null)} className="p-2 rounded-full transition-colors shrink-0" style={{ color: T2 }}>
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
-          <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
+          <div className="grid grid-cols-2 gap-2 text-xs" style={{ color: T2 }}>
             {project.whatsapp  && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{project.whatsapp}</span>}
             {project.phoneE164 && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{project.phoneE164}</span>}
             {project.email     && <span className="flex items-center gap-1 col-span-2"><Mail className="w-3 h-3" />{project.email}</span>}
           </div>
 
           <div className="flex gap-6 flex-wrap">
-            <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">阶段</p><p className="text-sm font-black" style={{ color: GOLD }}>{project.tradeStatus}</p></div>
-            <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">状态</p><p className="text-sm font-black text-slate-700">{project.status}</p></div>
-            <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">负责人</p><p className="text-sm font-black text-slate-700">{project.owner || '—'}</p></div>
+            <div><p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: T2 }}>阶段</p><p className="text-sm font-black" style={{ color: GOLD }}>{project.tradeStatus}</p></div>
+            <div><p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: T2 }}>状态</p><p className="text-sm font-black" style={{ color: T1 }}>{project.status}</p></div>
+            <div><p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: T2 }}>负责人</p><p className="text-sm font-black" style={{ color: T1 }}>{project.owner || '—'}</p></div>
             {project.nextActionAt && (
               <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" />下次跟进</p>
+                <p className="text-[10px] font-black uppercase tracking-widest mb-1 flex items-center gap-1" style={{ color: T2 }}><Calendar className="w-3 h-3" />下次跟进</p>
                 <p className="text-sm font-black" style={{ color: GOLD }}>{new Date(project.nextActionAt).toLocaleDateString()}</p>
               </div>
             )}
           </div>
 
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1"><MessageSquare className="w-3 h-3" />项目背景</p>
-            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{project.initialContext || '—'}</p>
+            <p className="text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1" style={{ color: T2 }}><MessageSquare className="w-3 h-3" />项目背景</p>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: T1 }}>{project.initialContext || '—'}</p>
           </div>
 
           {Array.isArray(project.projectFollowUps) && project.projectFollowUps.length > 0 && (
             <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
+              <p className="text-[10px] font-black uppercase tracking-widest mb-3 flex items-center gap-1" style={{ color: T2 }}>
                 <FileText className="w-3 h-3" /> 跟进记录 ({project.projectFollowUps.length})
               </p>
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                 {project.projectFollowUps.map((f, i) => (
-                  <div key={i} className="flex gap-3 text-xs border-l-2 border-slate-100 pl-3">
-                    <span className="text-slate-300 font-bold shrink-0 w-[76px]">{f.time}</span>
-                    <span className="text-slate-500 leading-relaxed">{f.content}</span>
+                  <div key={i} className="flex gap-3 text-xs pl-3" style={{ borderLeft: `2px solid ${BORDER}` }}>
+                    <span className="font-bold shrink-0 w-[76px]" style={{ color: T2 }}>{f.time}</span>
+                    <span className="leading-relaxed" style={{ color: T1 }}>{f.content}</span>
                   </div>
                 ))}
               </div>
@@ -238,8 +243,8 @@ const HistoryView: React.FC<HistoryViewProps> = ({
           )}
         </div>
 
-        <div className="px-8 py-4 border-t border-slate-100 bg-slate-50 shrink-0">
-          <p className="text-[10px] font-bold text-slate-400 text-center">此记录来自业务跟进中心 · 如需编辑请前往"业务跟进"页面</p>
+        <div className="px-8 py-4 shrink-0" style={{ borderTop: `1px solid ${BORDER}`, background: CARD2 }}>
+          <p className="text-[10px] font-bold text-center" style={{ color: T2 }}>此记录来自业务跟进中心 · 如需编辑请前往"业务跟进"页面</p>
         </div>
       </div>
     </div>
@@ -323,29 +328,33 @@ const HistoryView: React.FC<HistoryViewProps> = ({
       setAppend({ method: 'WhatsApp', content: '', nextAction: '', nextFollowUpAt: '' });
     };
 
-    const inputCls = 'w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-slate-300 bg-slate-50';
-    const labelCls = 'text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1';
+    const inputCls = 'w-full rounded-xl px-3 py-2 text-sm outline-none';
+    const inputStyle = { background: CARD2, border: `1px solid ${BORDER}`, color: T1 };
+    const labelCls = 'text-[10px] font-black uppercase tracking-widest mb-1';
+    const labelStyle = { color: T2 };
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-end" onClick={() => setSelectedTask(null)}>
         <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
         <div
-          className="relative z-10 w-full max-w-lg h-full bg-white shadow-2xl flex flex-col overflow-hidden"
+          className="relative z-10 w-full max-w-lg h-full shadow-2xl flex flex-col overflow-hidden"
+          style={{ background: CARD }}
           onClick={e => e.stopPropagation()}
         >
           {/* ── 顶部 header ── */}
-          <div className="flex items-start justify-between px-8 py-5 border-b border-slate-100 bg-slate-50 shrink-0">
+          <div className="flex items-start justify-between px-8 py-5 shrink-0" style={{ borderBottom: `1px solid ${BORDER}`, background: CARD2 }}>
             <div className="flex-1 min-w-0 pr-4">
               {mode === 'edit' ? (
                 <input
                   className={inputCls + ' text-base font-black'}
+                  style={inputStyle}
                   value={draft.clientName}
                   onChange={e => setDraft(d => ({ ...d, clientName: e.target.value }))}
                 />
               ) : (
-                <h2 className="text-lg font-black text-slate-800 truncate">{task.clientName}</h2>
+                <h2 className="text-lg font-black truncate" style={{ color: T1 }}>{task.clientName}</h2>
               )}
-              <p className="text-xs text-slate-400 font-bold mt-0.5 flex items-center gap-2 flex-wrap">
+              <p className="text-xs font-bold mt-0.5 flex items-center gap-2 flex-wrap" style={{ color: T2 }}>
                 <Globe className="w-3 h-3 shrink-0" />{task.countryCity || '—'}
               </p>
             </div>
@@ -364,7 +373,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                   <button onClick={handleSaveEdit} className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-white text-[13px] font-black transition-colors hover:opacity-90" style={{ backgroundColor: colors.statusSuccess }}>
                     <Save className="w-3 h-3" /> 保存
                   </button>
-                  <button onClick={() => setMode('view')} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-600 text-[13px] font-black transition-colors">
+                  <button onClick={() => setMode('view')} className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[13px] font-black transition-colors" style={{ background: 'rgba(255,255,255,0.08)', color: T2 }}>
                     <XCircle className="w-3 h-3" /> 取消
                   </button>
                 </>
@@ -374,12 +383,12 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                   <button onClick={handleSaveAppend} className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-white text-[13px] font-black transition-colors hover:opacity-90" style={{ backgroundColor: colors.statusSuccess }}>
                     <Save className="w-3 h-3" /> 确认追加
                   </button>
-                  <button onClick={() => setMode('view')} className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-600 text-[13px] font-black transition-colors">
+                  <button onClick={() => setMode('view')} className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[13px] font-black transition-colors" style={{ background: 'rgba(255,255,255,0.08)', color: T2 }}>
                     <XCircle className="w-3 h-3" /> 取消
                   </button>
                 </>
               )}
-              <button onClick={() => setSelectedTask(null)} className="p-2 rounded-full hover:bg-slate-200 transition-colors text-slate-400">
+              <button onClick={() => setSelectedTask(null)} className="p-2 rounded-full transition-colors" style={{ color: T2 }}>
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -393,46 +402,46 @@ const HistoryView: React.FC<HistoryViewProps> = ({
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className={labelCls}><Phone className="w-3 h-3 inline mr-1" />电话</p>
-                    <input className={inputCls} value={draft.phoneE164} onChange={e => setDraft(d => ({ ...d, phoneE164: e.target.value }))} placeholder="+971..." />
+                    <p className={labelCls} style={labelStyle}><Phone className="w-3 h-3 inline mr-1" />电话</p>
+                    <input className={inputCls} style={inputStyle} value={draft.phoneE164} onChange={e => setDraft(d => ({ ...d, phoneE164: e.target.value }))} placeholder="+971..." />
                   </div>
                   <div>
-                    <p className={labelCls}><MessageSquare className="w-3 h-3 inline mr-1" />WhatsApp</p>
-                    <input className={inputCls} value={draft.whatsapp} onChange={e => setDraft(d => ({ ...d, whatsapp: e.target.value }))} placeholder="+971..." />
+                    <p className={labelCls} style={labelStyle}><MessageSquare className="w-3 h-3 inline mr-1" />WhatsApp</p>
+                    <input className={inputCls} style={inputStyle} value={draft.whatsapp} onChange={e => setDraft(d => ({ ...d, whatsapp: e.target.value }))} placeholder="+971..." />
                   </div>
                   <div className="col-span-2">
-                    <p className={labelCls}><Mail className="w-3 h-3 inline mr-1" />邮箱</p>
-                    <input className={inputCls} value={draft.email || ''} onChange={e => setDraft(d => ({ ...d, email: e.target.value }))} placeholder="email@..." />
+                    <p className={labelCls} style={labelStyle}><Mail className="w-3 h-3 inline mr-1" />邮箱</p>
+                    <input className={inputCls} style={inputStyle} value={draft.email || ''} onChange={e => setDraft(d => ({ ...d, email: e.target.value }))} placeholder="email@..." />
                   </div>
                 </div>
                 <div>
-                  <p className={labelCls}>咨询内容摘要</p>
-                  <textarea rows={3} className={inputCls} value={draft.inquirySummary} onChange={e => setDraft(d => ({ ...d, inquirySummary: e.target.value }))} />
+                  <p className={labelCls} style={labelStyle}>咨询内容摘要</p>
+                  <textarea rows={3} className={inputCls} style={inputStyle} value={draft.inquirySummary} onChange={e => setDraft(d => ({ ...d, inquirySummary: e.target.value }))} />
                 </div>
                 <div>
-                  <p className={labelCls}>最近跟进详情</p>
-                  <textarea rows={3} className={inputCls} value={draft.lastNote} onChange={e => setDraft(d => ({ ...d, lastNote: e.target.value }))} />
+                  <p className={labelCls} style={labelStyle}>最近跟进详情</p>
+                  <textarea rows={3} className={inputCls} style={inputStyle} value={draft.lastNote} onChange={e => setDraft(d => ({ ...d, lastNote: e.target.value }))} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className={labelCls}><Calendar className="w-3 h-3 inline mr-1" />下次跟进日期</p>
-                    <input type="date" className={inputCls} value={draft.nextFollowUpAt} onChange={e => setDraft(d => ({ ...d, nextFollowUpAt: e.target.value }))} />
+                    <p className={labelCls} style={labelStyle}><Calendar className="w-3 h-3 inline mr-1" />下次跟进日期</p>
+                    <input type="date" className={inputCls} style={inputStyle} value={draft.nextFollowUpAt} onChange={e => setDraft(d => ({ ...d, nextFollowUpAt: e.target.value }))} />
                   </div>
                   <div>
-                    <p className={labelCls}><User className="w-3 h-3 inline mr-1" />负责人</p>
-                    <select className={inputCls} value={draft.owner} onChange={e => setDraft(d => ({ ...d, owner: e.target.value }))}>
+                    <p className={labelCls} style={labelStyle}><User className="w-3 h-3 inline mr-1" />负责人</p>
+                    <select className={inputCls} style={inputStyle} value={draft.owner} onChange={e => setDraft(d => ({ ...d, owner: e.target.value }))}>
                       {OWNERS.map(o => <option key={o}>{o}</option>)}
                     </select>
                   </div>
                   <div>
-                    <p className={labelCls}>状态</p>
-                    <select className={inputCls} value={draft.status} onChange={e => setDraft(d => ({ ...d, status: e.target.value }))}>
+                    <p className={labelCls} style={labelStyle}>状态</p>
+                    <select className={inputCls} style={inputStyle} value={draft.status} onChange={e => setDraft(d => ({ ...d, status: e.target.value }))}>
                       {STATUSES.map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
                     </select>
                   </div>
                   <div>
-                    <p className={labelCls}>业务类型</p>
-                    <select className={inputCls} value={draft.businessType} onChange={e => setDraft(d => ({ ...d, businessType: e.target.value as BusinessType }))}>
+                    <p className={labelCls} style={labelStyle}>业务类型</p>
+                    <select className={inputCls} style={inputStyle} value={draft.businessType} onChange={e => setDraft(d => ({ ...d, businessType: e.target.value as BusinessType }))}>
                       {BIZ_TYPES.map(b => <option key={b} value={b}>{BIZ_LABELS[b]}</option>)}
                     </select>
                   </div>
@@ -448,23 +457,23 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                 </p>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className={labelCls}>跟进方式</p>
-                    <select className={inputCls} value={append.method} onChange={e => setAppend(a => ({ ...a, method: e.target.value }))}>
+                    <p className={labelCls} style={labelStyle}>跟进方式</p>
+                    <select className={inputCls} style={inputStyle} value={append.method} onChange={e => setAppend(a => ({ ...a, method: e.target.value }))}>
                       {METHODS.map(m => <option key={m}>{m}</option>)}
                     </select>
                   </div>
                   <div>
-                    <p className={labelCls}><Calendar className="w-3 h-3 inline mr-1" />下次跟进日期</p>
-                    <input type="date" className={inputCls} value={append.nextFollowUpAt} onChange={e => setAppend(a => ({ ...a, nextFollowUpAt: e.target.value }))} />
+                    <p className={labelCls} style={labelStyle}><Calendar className="w-3 h-3 inline mr-1" />下次跟进日期</p>
+                    <input type="date" className={inputCls} style={inputStyle} value={append.nextFollowUpAt} onChange={e => setAppend(a => ({ ...a, nextFollowUpAt: e.target.value }))} />
                   </div>
                 </div>
                 <div>
-                  <p className={labelCls}>跟进内容 *</p>
-                  <textarea rows={4} className={inputCls} placeholder="本次跟进了什么？客户反馈如何？" value={append.content} onChange={e => setAppend(a => ({ ...a, content: e.target.value }))} />
+                  <p className={labelCls} style={labelStyle}>跟进内容 *</p>
+                  <textarea rows={4} className={inputCls} style={inputStyle} placeholder="本次跟进了什么？客户反馈如何？" value={append.content} onChange={e => setAppend(a => ({ ...a, content: e.target.value }))} />
                 </div>
                 <div>
-                  <p className={labelCls}>下次行动</p>
-                  <input className={inputCls} placeholder="例：发报价单、安排看样..." value={append.nextAction} onChange={e => setAppend(a => ({ ...a, nextAction: e.target.value }))} />
+                  <p className={labelCls} style={labelStyle}>下次行动</p>
+                  <input className={inputCls} style={inputStyle} placeholder="例：发报价单、安排看样..." value={append.nextAction} onChange={e => setAppend(a => ({ ...a, nextAction: e.target.value }))} />
                 </div>
               </div>
             )}
@@ -472,7 +481,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({
             {/* ── 查看模式 ── */}
             {mode === 'view' && (
               <>
-                <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
+                <div className="grid grid-cols-2 gap-2 text-xs" style={{ color: T2 }}>
                   {(task.phoneE164 || (task as any).phone) && (
                     <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{task.phoneE164 || (task as any).phone}</span>
                   )}
@@ -485,19 +494,19 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                 </div>
 
                 <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1" style={{ color: T2 }}>
                     <MessageSquare className="w-3 h-3" /> 咨询内容
                   </p>
-                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: T1 }}>
                     {task.inquirySummary || task.lastContext || task.goal || '—'}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1" style={{ color: T2 }}>
                     <Clock className="w-3 h-3" /> 最近跟进详情
                   </p>
-                  <p className="text-sm text-slate-600 leading-relaxed italic whitespace-pre-wrap">
+                  <p className="text-sm leading-relaxed italic whitespace-pre-wrap" style={{ color: T1 }}>
                     {task.lastNote || task.lastContext || task.goal || '—'}
                   </p>
                 </div>
@@ -505,7 +514,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                 <div className="flex gap-6">
                   {task.nextFollowUpAt && (
                     <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+                      <p className="text-[10px] font-black uppercase tracking-widest mb-1 flex items-center gap-1" style={{ color: T2 }}>
                         <Calendar className="w-3 h-3" /> 下次跟进
                       </p>
                       <p className="text-sm font-black" style={{ color: GOLD }}>
@@ -515,30 +524,30 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                   )}
                   {task.owner && (
                     <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+                      <p className="text-[10px] font-black uppercase tracking-widest mb-1 flex items-center gap-1" style={{ color: T2 }}>
                         <User className="w-3 h-3" /> 负责人
                       </p>
-                      <p className="text-sm font-black text-slate-700">{task.owner}</p>
+                      <p className="text-sm font-black" style={{ color: T1 }}>{task.owner}</p>
                     </div>
                   )}
                 </div>
 
                 {Array.isArray((task as any).history) && (task as any).history.length > 0 && (
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest mb-3 flex items-center gap-1" style={{ color: T2 }}>
                       <FileText className="w-3 h-3" /> 历史记录 ({(task as any).history.length})
                     </p>
                     <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                       {[...(task as any).history].reverse().map((h: any, i: number) => (
-                        <div key={i} className="flex gap-3 text-xs border-l-2 border-slate-100 pl-3">
-                          <span className="text-slate-300 font-bold shrink-0 w-[76px]">
+                        <div key={i} className="flex gap-3 text-xs pl-3" style={{ borderLeft: `2px solid ${BORDER}` }}>
+                          <span className="font-bold shrink-0 w-[76px]" style={{ color: T2 }}>
                             {h.at
                               ? new Date(h.at).toLocaleDateString()
                               : h.timestamp
                               ? new Date(h.timestamp).toLocaleDateString()
                               : '—'}
                           </span>
-                          <span className="text-slate-500 leading-relaxed">{h.summary || h.message || '—'}</span>
+                          <span className="leading-relaxed" style={{ color: T1 }}>{h.summary || h.message || '—'}</span>
                         </div>
                       ))}
                     </div>
@@ -550,7 +559,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({
 
           {/* ── 底部操作栏 ── */}
           {mode === 'view' && (
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center gap-2 shrink-0 flex-wrap">
+            <div className="px-6 py-4 flex items-center gap-2 shrink-0 flex-wrap" style={{ borderTop: `1px solid ${BORDER}`, background: CARD2 }}>
               <button
                 onClick={() => setMode('append')}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-[13px] font-black transition-colors shadow-md hover:opacity-90"
@@ -606,7 +615,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({
       {record.bizType === 'TRADE'    ? <ShoppingBag className="w-3 h-3" style={{ color: GOLD }} />
        : record.bizType === 'PROJECT' ? <Briefcase   className="w-3 h-3" style={{ color: colors.statusInfo }} />
        : <FileSearch className="w-3 h-3 text-slate-400" />}
-      <span className="text-[10px] font-black text-slate-600 uppercase">{record.bizTypeLabel}</span>
+      <span className="text-[10px] font-black uppercase" style={{ color: T1 }}>{record.bizTypeLabel}</span>
       {record.source === 'merged' && (
         <DSBadge color={colors.statusInfo} bg="rgba(143,166,212,0.16)" label="关联" size="sm" />
       )}
@@ -623,25 +632,26 @@ const HistoryView: React.FC<HistoryViewProps> = ({
       {selectedProject && <ProjectDrawer project={selectedProject} />}
 
       {/* SALES 分区页面标题，跟控制中心/客户跟进保持一致的标题样式 */}
-      <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>历史归档</h1>
+      <h1 className="text-2xl font-semibold" style={{ color: T1, fontFamily: "'Space Grotesk',sans-serif" }}>历史归档</h1>
 
       {/* 搜索与筛选 */}
-      <div className="bg-white rounded-[40px] p-8 shadow-2xl border border-slate-200 flex flex-col gap-6">
+      <div className="rounded-[40px] p-8 shadow-2xl flex flex-col gap-6" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-grow relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: T2 }} />
             <input
               type="text"
               placeholder="搜索客户、电话、产品、摘要或跟进备注..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-6 py-5 bg-slate-50 border border-slate-200 rounded-[24px] outline-none focus:ring-2 focus:ring-slate-300 font-bold text-[13px] transition-all shadow-inner"
+              className="w-full pl-12 pr-6 py-5 rounded-[24px] outline-none font-bold text-[13px] transition-all"
+              style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
             />
           </div>
           <div className="flex gap-3 shrink-0">
             <div className="flex flex-col gap-1">
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">业务类型</label>
-              <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} className="bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-[13px] font-black text-slate-600 outline-none">
+              <label className="text-[9px] font-black uppercase tracking-widest ml-2" style={{ color: T2 }}>业务类型</label>
+              <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} className="rounded-2xl px-5 py-3 text-[13px] font-black outline-none" style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}>
                 <option value="all">全部类型</option>
                 <option value="TRADE">贸易询盘</option>
                 <option value="PROJECT">项目推进</option>
@@ -649,8 +659,8 @@ const HistoryView: React.FC<HistoryViewProps> = ({
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">状态筛选</label>
-              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-[13px] font-black text-slate-600 outline-none">
+              <label className="text-[9px] font-black uppercase tracking-widest ml-2" style={{ color: T2 }}>状态筛选</label>
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="rounded-2xl px-5 py-3 text-[13px] font-black outline-none" style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}>
                 <option value="all">全部（不含已删除）</option>
                 <option value="todo">跟进中</option>
                 <option value="completed">已完成</option>
@@ -670,22 +680,22 @@ const HistoryView: React.FC<HistoryViewProps> = ({
           </div>
         </div>
         {/* 统计 — 去重后的业务数量（数据源：Follow-up Log） */}
-        <div className="flex items-center gap-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+        <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest" style={{ color: T2 }}>
           <span>共 {unifiedRecords.length} 条业务留底</span>
-          <span className="text-slate-200">·</span>
+          <span style={{ color: 'rgba(255,255,255,0.15)' }}>·</span>
           <span>项目型 {unifiedRecords.filter(r => r.bizType === 'PROJECT').length}</span>
-          <span className="text-slate-200">·</span>
+          <span style={{ color: 'rgba(255,255,255,0.15)' }}>·</span>
           <span>贸易型 {unifiedRecords.filter(r => r.bizType === 'TRADE').length}</span>
-          <span className="text-slate-200">·</span>
+          <span style={{ color: 'rgba(255,255,255,0.15)' }}>·</span>
           <span>有编号 {unifiedRecords.filter(r => !!r.bizId).length}</span>
         </div>
       </div>
 
       {/* 统一数据表格 */}
-      <div className="bg-white rounded-[40px] shadow-2xl border border-slate-200 overflow-hidden">
+      <div className="rounded-[40px] shadow-2xl overflow-hidden" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+            <thead className="text-[10px] font-black uppercase tracking-widest" style={{ background: CARD2, borderBottom: `1px solid ${BORDER}`, color: T2 }}>
               <tr>
                 <th className="px-6 py-6 min-w-[140px]">客户 / 城市</th>
                 <th className="px-6 py-6 min-w-[200px]">咨询内容</th>
@@ -697,11 +707,14 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                 <th className="px-6 py-6">更新时间</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody style={{ borderTop: `1px solid ${BORDER}` }}>
               {unifiedRecords.map(record => (
                 <tr
                   key={record.key}
-                  className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                  className="transition-colors group cursor-pointer"
+                  style={{ borderBottom: `1px solid ${BORDER}` }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   onClick={() => {
                     if (record.task)         setSelectedTask(record.task);
                     else if (record.project) setSelectedProject(record.project);
@@ -715,12 +728,12 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                           {record.bizId}
                         </span>
                       )}
-                      <span className="font-black text-slate-800 text-sm transition-colors">{record.clientName}</span>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1 mt-1">
+                      <span className="font-black text-sm" style={{ color: T1 }}>{record.clientName}</span>
+                      <p className="text-[10px] font-bold uppercase flex items-center gap-1 mt-1" style={{ color: T2 }}>
                         <Globe className="w-3 h-3" /> {record.countryCity || '—'}
                       </p>
                       {record.owner && (
-                        <p className="text-[9px] text-slate-300 font-bold flex items-center gap-1 mt-0.5">
+                        <p className="text-[9px] font-bold flex items-center gap-1 mt-0.5" style={{ color: T2 }}>
                           <User className="w-2.5 h-2.5" /> {record.owner}
                         </p>
                       )}
@@ -729,7 +742,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                   <td className="px-6 py-6">
                     <div className="flex items-start gap-2">
                       <MessageSquare className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: GOLD }} />
-                      <p className="text-[13px] font-bold text-slate-700 leading-relaxed line-clamp-2 max-w-[250px]">
+                      <p className="text-[13px] font-bold leading-relaxed line-clamp-2 max-w-[250px]" style={{ color: T1 }}>
                         {record.inquirySummary || '—'}
                       </p>
                     </div>
@@ -738,7 +751,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                     <div className="flex flex-wrap gap-1 max-w-[180px]">
                       {record.categories
                         ? record.categories.split(/[，,]/).map((cat, i) => (
-                            <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-black uppercase border border-slate-200">
+                            <span key={i} className="px-2 py-0.5 rounded text-[9px] font-black uppercase" style={{ background: 'rgba(255,255,255,0.07)', color: T2, border: `1px solid ${BORDER}` }}>
                               {cat.trim()}
                             </span>
                           ))
@@ -749,7 +762,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                   </td>
                   <td className="px-6 py-6">
                     <div className="flex flex-col gap-1">
-                      <p className="text-[13px] font-bold text-slate-500 line-clamp-2 max-w-[250px] italic">
+                      <p className="text-[13px] font-bold line-clamp-2 max-w-[250px] italic" style={{ color: T2 }}>
                         {record.lastContent || '—'}
                       </p>
                       <span className="text-[12px] font-black flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: GOLD }}>
@@ -762,7 +775,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                       ? <div className="flex items-center gap-1.5 text-[10px] font-black uppercase" style={{ color: GOLD }}>
                           <Calendar className="w-3 h-3" /> {new Date(record.nextFollowUpAt).toLocaleDateString()}
                         </div>
-                      : <span className="text-slate-300 text-[10px] font-bold">—</span>}
+                      : <span className="text-[10px] font-bold" style={{ color: T2 }}>—</span>}
                   </td>
                   <td className="px-6 py-6">
                     <StatusBadge status={record.displayStatus} />
@@ -772,11 +785,11 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                   </td>
                   <td className="px-6 py-6">
                     <div className="flex flex-col">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">
+                      <span className="text-[10px] font-black uppercase tracking-tighter" style={{ color: T2 }}>
                         <Clock className="w-3 h-3 inline mr-1" />
                         {new Date(record.sortTime).toLocaleDateString()}
                       </span>
-                      <span className="text-[8px] text-slate-300 font-bold">
+                      <span className="text-[8px] font-bold" style={{ color: T2 }}>
                         {new Date(record.sortTime).toLocaleTimeString()}
                       </span>
                     </div>
@@ -786,7 +799,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({
             </tbody>
           </table>
           {unifiedRecords.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-24 text-slate-300 gap-4">
+            <div className="flex flex-col items-center justify-center py-24 gap-4" style={{ color: T2 }}>
               <FileSearch className="w-16 h-16 opacity-10" />
               <p className="text-sm font-black uppercase tracking-widest italic">暂无匹配的记录</p>
             </div>
