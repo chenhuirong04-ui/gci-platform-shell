@@ -117,16 +117,23 @@ export function Sidebar({ navTop, workspaceLabel, sections, userName, userRole, 
   // When visibleModules is provided, filter nav items by module path prefix.
   // Items without a path (e.g. AI, Settings) are always shown.
   // Section headers are hidden when all their items are filtered out.
+  // Maps module keys (from user_profiles.modules[]) to the path prefix they gate.
+  // Paths NOT listed here are platform-level pages (AI, Invoice, etc.) and are
+  // always visible to any authenticated user — no module key required.
   const MODULE_PATH_MAP: Record<string, string> = {
     crm: '/crm', trade: '/trade', quotation: '/quotation',
     finance: '/trade?tab=finance', warehouse: '/trade?tab=inventory',
   };
+  const GATED_PREFIXES = Object.values(MODULE_PATH_MAP).map(p => p.split('?')[0]);
+
   function itemVisible(item: NavModItem): boolean {
     if (!visibleModules) return true;
-    if (!item.href && !item.onClick) return true; // no-path items always shown
-    // Match by path prefix against module paths the user has access to
+    if (!item.href && !item.onClick) return true;
     const itemPath = (item as any).path as string | undefined;
     if (!itemPath) return true;
+    // If this path is not claimed by any module gate, it is a platform-level page — always show.
+    const isClaimed = GATED_PREFIXES.some(prefix => itemPath.startsWith(prefix));
+    if (!isClaimed) return true;
     return visibleModules.some(mod => {
       const prefix = MODULE_PATH_MAP[mod];
       return prefix && itemPath.startsWith(prefix.split('?')[0]);
