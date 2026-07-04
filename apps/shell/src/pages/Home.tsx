@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { StatCard, AlertRow, QuickActionCard, colors } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
 import { statCardSpecs } from '../data/mock';
+import { AIWorkspace } from '../components/AIWorkspace';
 
 // ─── localStorage helpers (same keys the Trade + CRM modules use) ──────────
 function safeLocalGet<T = any>(key: string): T[] {
@@ -271,6 +272,9 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
           {buildSummary()}
         </p>
       </div>
+
+      {/* AI WORKSPACE */}
+      <AIWorkspace />
 
       {/* TODAY stats */}
       <SectionHeader label={dict.workspace.today} />
