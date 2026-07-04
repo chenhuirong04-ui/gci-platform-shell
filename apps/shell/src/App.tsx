@@ -9,6 +9,7 @@ import { AccessDenied } from './pages/AccessDenied';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AIPage } from './pages/AIPage';
+import { InvoicePage } from './pages/InvoicePage';
 import TradeModule from '../../../modules/trade/TradeModule';
 import CrmModule from '../../../modules/crm/CrmModule';
 import QuotationModule from '../../../modules/quotation/QuotationModule';
@@ -113,6 +114,7 @@ function Shell() {
         <Routes>
           <Route path="/" element={<Home onFlash={flash} />} />
           <Route path="/ai" element={<AIPage />} />
+          <Route path="/invoice" element={<InvoicePage />} />
           <Route path="/access-denied" element={<AccessDenied />} />
 
           <Route

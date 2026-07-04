@@ -18,6 +18,7 @@ export interface ModuleDef {
     | 'internalTasks'
     | 'cashFlow'
     | 'financeLedger'
+    | 'invoiceManager'
     | 'aiAssistant'
     | 'settings';
   count?: string;
@@ -89,6 +90,7 @@ export const sections: SectionDef[] = [
     items: [
       { code: 'CH', nameKey: 'cashFlow', path: '/trade?tab=cashflow' },
       { code: 'FL', nameKey: 'financeLedger', path: '/trade?tab=finance' },
+      { code: 'IV', nameKey: 'invoiceManager', path: '/invoice' },
     ],
   },
   {

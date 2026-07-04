@@ -25,6 +25,7 @@ export const zh: typeof en = {
     internalTasks: '内部事项',
     cashFlow: '资金流水',
     financeLedger: '财务账',
+    invoiceManager: '发票管理',
     aiAssistant: 'AI 助手',
     settings: '设置',
   },

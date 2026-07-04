@@ -23,6 +23,7 @@ export const en = {
     internalTasks: 'Internal Tasks',
     cashFlow: 'Cash Flow',
     financeLedger: 'Finance Ledger',
+    invoiceManager: 'Invoice Manager',
     aiAssistant: 'AI Assistant',
     settings: 'Settings',
   },

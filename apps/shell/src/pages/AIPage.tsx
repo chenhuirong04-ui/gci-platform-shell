@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { colors } from '@gci/design-system';
+import { InvoiceAssistantPanel } from '../components/invoice/InvoiceAssistantPanel';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const GOLD = '#CBA85C';
@@ -641,6 +642,7 @@ export function AIPage() {
   const [tab, setTab] = useState<TabKey>('chat');
   const [heroInput, setHeroInput] = useState('');
   const [cmdState, setCmdState] = useState<CmdState | null>(null);
+  const [invoiceMode, setInvoiceMode] = useState(false);
   const runner = useStepRunner();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -655,6 +657,17 @@ export function AIPage() {
   function handleCommand(raw: string) {
     if (!raw.trim()) return;
     const intent = detectIntent(raw.trim());
+
+    // Invoice intent → open InvoiceAssistantPanel instead of generic mock steps
+    const t = raw.toLowerCase();
+    if (t.includes('发票') || t.includes('invoice')) {
+      setTab('assistant');
+      setCmdState(null);
+      setInvoiceMode(true);
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
     setTab(intent.tab);
     const state: CmdState = { raw: raw.trim(), intent, phase: 'processing', step: 0 };
     setCmdState(state);
@@ -687,6 +700,7 @@ export function AIPage() {
   function clearCmd() {
     runner.clear();
     setCmdState(null);
+    setInvoiceMode(false);
   }
 
   return (
@@ -718,8 +732,13 @@ export function AIPage() {
         </div>
       </div>
 
-      {/* Command panel — shows intent routing result */}
-      {cmdState && (
+      {/* Invoice wizard — shown when invoice intent detected */}
+      {invoiceMode && tab === 'assistant' && (
+        <InvoiceAssistantPanel onClose={clearCmd} />
+      )}
+
+      {/* Command panel — shows intent routing result for non-invoice commands */}
+      {cmdState && !invoiceMode && (
         <CommandPanel
           state={cmdState}
           onApprove={clearCmd}
