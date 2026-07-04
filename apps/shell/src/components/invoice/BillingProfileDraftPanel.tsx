@@ -15,7 +15,8 @@ import { saveProfile, updateProfile, checkDuplicateProfile } from '../../lib/inv
 const GOLD = '#CBA85C';
 const GOLD_L = '#E2C988';
 const TEXT = colors.textPrimary;
-const MUTED = '#505A70';
+const MUTED = '#8A97B0';  // lifted for readability
+const DIM  = '#5A6A84';
 
 // ── Simple regex extraction (V1 — no OCR, no AI) ─────────────────────────────
 // Source reference only — does not claim OCR or AI file reading.
@@ -85,14 +86,14 @@ function extractFromText(raw: string): Partial<FormData> {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 const inputStyle: React.CSSProperties = {
-  width: '100%', background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
-  padding: '9px 12px', fontSize: 13, color: TEXT,
+  width: '100%', background: 'rgba(255,255,255,0.06)',
+  border: '1px solid rgba(255,255,255,0.16)', borderRadius: 8,
+  padding: '10px 13px', fontSize: 14, color: TEXT,
   outline: 'none', boxSizing: 'border-box',
 };
 const labelStyle: React.CSSProperties = {
-  fontSize: 10.5, color: MUTED,
-  fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.08em',
+  fontSize: 12.5, color: MUTED,
+  fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.05em',
   marginBottom: 4, display: 'block',
 };
 
@@ -123,20 +124,20 @@ function DupeWarning({ existing, onUpdate, onCreateNew, onCancel }: {
 }) {
   return (
     <div style={{ background: 'rgba(212,168,67,0.08)', border: '1px solid rgba(212,168,67,0.3)', borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
-      <div style={{ fontSize: 11, color: '#D4A843', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.12em', marginBottom: 8 }}>⚠ DUPLICATE FOUND</div>
-      <div style={{ fontSize: 13, color: TEXT, marginBottom: 4 }}>
+      <div style={{ fontSize: 12, color: '#D4A843', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, marginBottom: 8 }}>⚠ 检测到重复开票资料</div>
+      <div style={{ fontSize: 14, color: TEXT, marginBottom: 6 }}>
         已找到相同客户开票资料：<strong>{existing.customerName}</strong>
       </div>
-      {existing.trn && <div style={{ fontSize: 11, color: MUTED, fontFamily: 'monospace', marginBottom: 12 }}>TRN: {existing.trn}</div>}
-      <div style={{ fontSize: 12, color: MUTED, marginBottom: 14 }}>是否更新现有资料，还是新建一条？</div>
+      {existing.trn && <div style={{ fontSize: 13, color: MUTED, fontFamily: 'monospace', marginBottom: 12 }}>TRN: {existing.trn}</div>}
+      <div style={{ fontSize: 13, color: MUTED, marginBottom: 14 }}>是否更新现有资料，还是新建一条？</div>
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={onUpdate} style={{ flex: 1, padding: '8px', borderRadius: 7, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: '#000', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+        <button onClick={onUpdate} style={{ flex: 1, padding: '10px', borderRadius: 7, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: '#000', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
           更新现有资料
         </button>
-        <button onClick={onCreateNew} style={{ flex: 1, padding: '8px', borderRadius: 7, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: TEXT, fontSize: 12, cursor: 'pointer' }}>
+        <button onClick={onCreateNew} style={{ flex: 1, padding: '10px', borderRadius: 7, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)', color: TEXT, fontSize: 14, cursor: 'pointer' }}>
           新建一条
         </button>
-        <button onClick={onCancel} style={{ padding: '8px 14px', borderRadius: 7, background: 'none', border: '1px solid rgba(255,255,255,0.08)', color: MUTED, fontSize: 12, cursor: 'pointer' }}>
+        <button onClick={onCancel} style={{ padding: '10px 14px', borderRadius: 7, background: 'none', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>
           取消
         </button>
       </div>
@@ -251,21 +252,21 @@ export function BillingProfileDraftPanel({ initialText = '', directMode = false,
       <div style={{ background: 'rgba(203,168,92,0.06)', borderBottom: '1px solid rgba(203,168,92,0.15)', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: GOLD }} />
-          <span style={{ fontSize: 11, color: GOLD, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.18em' }}>
-            {directMode ? 'BILLING PROFILE LIBRARY · NEW PROFILE' : 'AI ASSISTANT · SAVE BILLING PROFILE'}
+          <span style={{ fontSize: 13, color: GOLD, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }}>
+            {directMode ? '开票资料库 · 新增资料' : 'AI 助手 · 保存开票资料'}
           </span>
         </div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, fontSize: 18, lineHeight: 1, padding: 0 }}>×</button>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, fontSize: 22, lineHeight: 1, padding: 0 }}>×</button>
       </div>
 
       {/* Step bar */}
       <div style={{ display: 'flex', padding: '14px 24px', borderBottom: '1px solid rgba(255,255,255,0.05)', gap: 0 }}>
         {STEPS.map((s, i) => (
           <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 8, flex: i < STEPS.length - 1 ? 1 : undefined }}>
-            <div style={{ width: 22, height: 22, borderRadius: '50%', background: i === stepIndex ? GOLD : i < stepIndex ? 'rgba(203,168,92,0.3)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: i === stepIndex ? '#000' : i < stepIndex ? GOLD_L : MUTED, flexShrink: 0 }}>
+            <div style={{ width: 24, height: 24, borderRadius: '50%', background: i === stepIndex ? GOLD : i < stepIndex ? 'rgba(203,168,92,0.4)' : 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: i === stepIndex ? '#000' : i < stepIndex ? GOLD_L : '#6A7A94', flexShrink: 0 }}>
               {i < stepIndex ? '✓' : i + 1}
             </div>
-            <span style={{ fontSize: 11.5, color: i === stepIndex ? GOLD_L : MUTED, fontWeight: i === stepIndex ? 600 : 400, whiteSpace: 'nowrap' }}>{s}</span>
+            <span style={{ fontSize: 13, color: i === stepIndex ? GOLD_L : i < stepIndex ? '#7A8EA8' : DIM, fontWeight: i === stepIndex ? 700 : 400, whiteSpace: 'nowrap' }}>{s}</span>
             {i < STEPS.length - 1 && <div style={{ flex: 1, height: 1, background: i < stepIndex ? 'rgba(203,168,92,0.3)' : 'rgba(255,255,255,0.06)', margin: '0 12px' }} />}
           </div>
         ))}
@@ -277,7 +278,7 @@ export function BillingProfileDraftPanel({ initialText = '', directMode = false,
         {/* Step 0: paste raw text */}
         {step === 0 && (
           <div>
-            <div style={{ fontSize: 13, color: MUTED, marginBottom: 16 }}>
+            <div style={{ fontSize: 14, color: MUTED, marginBottom: 16 }}>
               将客户开票信息粘贴到下方。系统会自动识别公司名、地址、TRN、电话等字段。
             </div>
             <textarea
@@ -287,16 +288,16 @@ export function BillingProfileDraftPanel({ initialText = '', directMode = false,
               rows={8}
               style={{ ...inputStyle, resize: 'vertical', fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.6 }}
             />
-            <div style={{ fontSize: 11, color: '#3A4255', marginTop: 8, marginBottom: 20, fontFamily: 'IBM Plex Mono, monospace' }}>
+            <div style={{ fontSize: 12, color: DIM, marginTop: 8, marginBottom: 20, fontFamily: 'IBM Plex Mono, monospace' }}>
               Source reference only. File / OCR extraction not connected in V1.
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button
                 onClick={applyExtraction}
                 disabled={!rawText.trim()}
-                style={{ flex: 1, padding: '10px', borderRadius: 8, background: rawText.trim() ? `linear-gradient(135deg,${GOLD},${GOLD_L})` : 'rgba(255,255,255,0.06)', border: 'none', color: '#000', fontWeight: 700, fontSize: 13, cursor: rawText.trim() ? 'pointer' : 'not-allowed', fontFamily: "'Space Grotesk',sans-serif" }}
+                style={{ flex: 1, padding: '11px', borderRadius: 8, background: rawText.trim() ? `linear-gradient(135deg,${GOLD},${GOLD_L})` : 'rgba(255,255,255,0.06)', border: 'none', color: '#000', fontWeight: 700, fontSize: 14, cursor: rawText.trim() ? 'pointer' : 'not-allowed', fontFamily: "'Space Grotesk',sans-serif" }}
               >识别并填写字段 →</button>
-              <button onClick={() => setStep(1)} style={{ padding: '10px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: MUTED, fontSize: 13, cursor: 'pointer' }}>跳过 / 手动填写</button>
+              <button onClick={() => setStep(1)} style={{ padding: '11px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.16)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>跳过 / 手动填写</button>
             </div>
           </div>
         )}
@@ -316,7 +317,7 @@ export function BillingProfileDraftPanel({ initialText = '', directMode = false,
 
             {/* Extracted hint */}
             {!directMode && rawText && (
-              <div style={{ background: 'rgba(111,191,142,0.06)', border: '1px solid rgba(111,191,142,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 18, fontSize: 12, color: '#6FBF8E' }}>
+              <div style={{ background: 'rgba(111,191,142,0.06)', border: '1px solid rgba(111,191,142,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 18, fontSize: 13.5, color: '#6FBF8E' }}>
                 ✓ 已从文字中自动识别部分字段，请检查并补充缺失内容
               </div>
             )}
@@ -354,7 +355,7 @@ export function BillingProfileDraftPanel({ initialText = '', directMode = false,
 
               {/* Source reference section */}
               <div style={{ gridColumn: '1 / -1', marginTop: 8, padding: '14px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10 }}>
-                <div style={{ fontSize: 10, color: MUTED, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.12em', marginBottom: 10 }}>SOURCE REFERENCE (OPTIONAL)</div>
+                <div style={{ fontSize: 12, color: MUTED, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 500, marginBottom: 10 }}>来源备注（选填）</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
                   <div style={{ marginBottom: 12 }}>
                     <label style={labelStyle}>Source Type</label>
@@ -365,19 +366,19 @@ export function BillingProfileDraftPanel({ initialText = '', directMode = false,
                   <Field label="Source File Name" value={form.sourceFileName} onChange={set('sourceFileName')} placeholder="e.g. IFZA invoice.pdf" />
                 </div>
                 <Field label="Notes" value={form.notes} onChange={set('notes')} placeholder="e.g. Seeded from INV-000143" />
-                <div style={{ fontSize: 10.5, color: '#3A4255', fontFamily: 'IBM Plex Mono, monospace' }}>
+                <div style={{ fontSize: 12, color: DIM, fontFamily: 'IBM Plex Mono, monospace' }}>
                   Source reference only. File storage / OCR not connected in V1.
                 </div>
               </div>
             </div>
 
             <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-              {!directMode && <button onClick={() => setStep(0)} style={{ padding: '10px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: MUTED, fontSize: 13, cursor: 'pointer' }}>← 返回</button>}
-              <button onClick={onClose} style={{ padding: '10px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: MUTED, fontSize: 13, cursor: 'pointer' }}>取消</button>
+              {!directMode && <button onClick={() => setStep(0)} style={{ padding: '11px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.16)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>← 返回</button>}
+              <button onClick={onClose} style={{ padding: '11px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.16)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>取消</button>
               <button
                 onClick={() => handleSave(false)}
                 disabled={!canSave || saving}
-                style={{ flex: 1, padding: '10px', borderRadius: 8, background: canSave && !saving ? `linear-gradient(135deg,${GOLD},${GOLD_L})` : 'rgba(255,255,255,0.06)', border: 'none', color: '#000', fontWeight: 700, fontSize: 13, cursor: canSave && !saving ? 'pointer' : 'not-allowed', fontFamily: "'Space Grotesk',sans-serif" }}
+                style={{ flex: 1, padding: '11px', borderRadius: 8, background: canSave && !saving ? `linear-gradient(135deg,${GOLD},${GOLD_L})` : 'rgba(255,255,255,0.06)', border: 'none', color: '#000', fontWeight: 700, fontSize: 14, cursor: canSave && !saving ? 'pointer' : 'not-allowed', fontFamily: "'Space Grotesk',sans-serif" }}
               >{saving ? '保存中…' : '保存开票资料'}</button>
             </div>
           </div>
@@ -389,17 +390,17 @@ export function BillingProfileDraftPanel({ initialText = '', directMode = false,
             <div style={{ fontSize: 32, marginBottom: 16 }}>✓</div>
             <div style={{ fontSize: 18, fontWeight: 600, color: TEXT, marginBottom: 8 }}>开票资料已保存</div>
             <div style={{ fontSize: 13.5, color: GOLD, marginBottom: 6 }}>{savedProfile.customerName}</div>
-            {savedProfile.trn && <div style={{ fontSize: 11, color: MUTED, fontFamily: 'monospace', marginBottom: 6 }}>TRN: {savedProfile.trn}</div>}
-            <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>
+            {savedProfile.trn && <div style={{ fontSize: 13, color: MUTED, fontFamily: 'monospace', marginBottom: 6 }}>TRN: {savedProfile.trn}</div>}
+            <div style={{ fontSize: 13.5, color: MUTED, marginBottom: 8 }}>
               已存入 Supabase，迪拜和中国团队均可在发票向导中直接选用。
             </div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 14px', borderRadius: 20, background: 'rgba(111,191,142,0.10)', border: '1px solid rgba(111,191,142,0.3)', marginBottom: 24 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 20, background: 'rgba(111,191,142,0.10)', border: '1px solid rgba(111,191,142,0.3)', marginBottom: 24 }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#6FBF8E' }} />
-              <span style={{ fontSize: 10.5, color: '#6FBF8E', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.1em' }}>Cloud Sync: Connected — 团队共享</span>
+              <span style={{ fontSize: 12, color: '#6FBF8E', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.06em' }}>Cloud Sync: Connected — 团队共享</span>
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <a href="/invoice?tab=profiles" style={{ padding: '10px 24px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: TEXT, fontSize: 13, textDecoration: 'none' }}>查看账单资料库</a>
-              <button onClick={onClose} style={{ padding: '10px 24px', borderRadius: 8, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: '#000', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>完成</button>
+              <a href="/invoice?tab=profiles" style={{ padding: '11px 24px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)', color: TEXT, fontSize: 14, textDecoration: 'none' }}>查看账单资料库</a>
+              <button onClick={onClose} style={{ padding: '11px 24px', borderRadius: 8, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: '#000', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>完成</button>
             </div>
           </div>
         )}

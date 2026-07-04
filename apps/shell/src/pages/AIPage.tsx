@@ -9,8 +9,8 @@ const GOLD = '#CBA85C';
 const GOLD_L = '#E2C988';
 const NAVY = '#080D1E';
 const TEXT = colors.textPrimary;
-const MUTED = '#505A70';
-const SUBTLE = '#3A4255';
+const MUTED = '#8A97B0';   // lifted for readability — was #505A70
+const SUBTLE = '#5A6A84';  // was #3A4255, invisible on dark bg
 
 type TabKey = 'chat' | 'assistant' | 'agent' | 'daily' | 'workflow' | 'inbox';
 
@@ -190,8 +190,8 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
       {/* Routing badge */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: modColor }} />
-        <span className="font-mono-label" style={{ fontSize: 9.5, color: modColor, letterSpacing: '0.15em' }}>
-          ROUTED TO {TAB_LABELS[intent.tab].toUpperCase()} · {intent.module.toUpperCase()}
+        <span style={{ fontSize: 11.5, color: modColor, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }}>
+          已路由至 {TAB_LABELS[intent.tab]} · {intent.module}
         </span>
         <div style={{ flex: 1, height: 1, background: `rgba(255,255,255,0.06)` }} />
         <span style={{ fontSize: 12, color: '#3A4255', fontStyle: 'italic' }}>"{raw}"</span>
@@ -215,8 +215,9 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                 {stepState === 'active' && <div style={{ width: 7, height: 7, borderRadius: '50%', background: modColor, animation: 'pulse 1s ease infinite' }} />}
                 {stepState === 'pending' && <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />}
               </div>
-              <span className="font-mono-label" style={{
-                fontSize: 12,
+              <span style={{
+                fontSize: 13,
+                fontFamily: "'Space Grotesk', sans-serif",
                 color: stepState === 'done'
                   ? (isLast ? modColor : '#6FBF8E')
                   : stepState === 'active' ? TEXT : SUBTLE,
@@ -236,25 +237,25 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
           <div className="font-mono-label" style={{ fontSize: 9.5, color: intent.showApproval ? '#6FBF8E' : GOLD, letterSpacing: '0.15em', marginBottom: 8 }}>
             {intent.showApproval ? 'WAITING FOR APPROVAL' : 'DONE'}
           </div>
-          <div style={{ fontSize: 13.5, color: TEXT, marginBottom: intent.showApproval ? 14 : 0 }}>
+          <div style={{ fontSize: 14, color: TEXT, marginBottom: intent.showApproval ? 14 : 0 }}>
             {intent.resultLabel}
           </div>
           {intent.showApproval && (
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={onApprove} style={{ flex: 1, padding: '10px', borderRadius: 9, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: NAVY, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>
-                Approve →
+              <button onClick={onApprove} style={{ flex: 1, padding: '11px', borderRadius: 9, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: NAVY, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>
+                确认执行 →
               </button>
-              <button onClick={onEdit} style={{ padding: '10px 18px', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: TEXT, fontSize: 13, cursor: 'pointer' }}>
-                Edit
+              <button onClick={onEdit} style={{ padding: '11px 18px', borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', color: TEXT, fontSize: 14, cursor: 'pointer' }}>
+                编辑
               </button>
-              <button onClick={onCancel} style={{ padding: '10px 18px', borderRadius: 9, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: MUTED, fontSize: 13, cursor: 'pointer' }}>
-                Cancel
+              <button onClick={onCancel} style={{ padding: '11px 18px', borderRadius: 9, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>
+                取消
               </button>
             </div>
           )}
           {!intent.showApproval && (
-            <button onClick={onCancel} style={{ marginTop: 10, padding: '9px 18px', borderRadius: 9, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: MUTED, fontSize: 13, cursor: 'pointer' }}>
-              Close
+            <button onClick={onCancel} style={{ marginTop: 10, padding: '10px 18px', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>
+              关闭
             </button>
           )}
         </div>
@@ -267,7 +268,7 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
 function SectionLabel({ text }: { text: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
-      <span className="font-mono-label" style={{ fontSize: 10, letterSpacing: '0.22em', color: GOLD }}>{text}</span>
+      <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', color: GOLD, fontFamily: "'Space Grotesk', sans-serif", whiteSpace: 'nowrap' }}>{text}</span>
       <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,rgba(203,168,92,0.3),transparent)' }} />
     </div>
   );
@@ -297,7 +298,7 @@ function ActionChip({ label, onClick }: { label: string; onClick?: () => void })
       onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      style={{ padding: '7px 14px', borderRadius: 20, background: hover ? 'rgba(203,168,92,0.1)' : 'rgba(255,255,255,0.04)', border: `1px solid ${hover ? 'rgba(203,168,92,0.35)' : 'rgba(255,255,255,0.08)'}`, color: hover ? GOLD_L : '#7A8494', fontSize: 12.5, cursor: 'pointer', transition: 'all 0.14s', whiteSpace: 'nowrap' }}
+      style={{ padding: '8px 16px', borderRadius: 20, background: hover ? 'rgba(203,168,92,0.1)' : 'rgba(255,255,255,0.05)', border: `1px solid ${hover ? 'rgba(203,168,92,0.45)' : 'rgba(255,255,255,0.12)'}`, color: hover ? GOLD_L : MUTED, fontSize: 13, cursor: 'pointer', transition: 'all 0.14s', whiteSpace: 'nowrap' }}
     >{label}</button>
   );
 }
@@ -344,9 +345,9 @@ function AIChatTab({ onSubmit }: { onSubmit: (v: string) => void }) {
 
   return (
     <div>
-      <SectionLabel text="AI CHAT — QUERY ONLY · NO DATA MODIFICATION" />
+      <SectionLabel text="AI 对话 — 仅查询，不修改数据" />
       <Card style={{ marginBottom: 16 }}>
-        <p style={{ fontSize: 13, color: MUTED, margin: '0 0 16px', lineHeight: 1.7 }}>
+        <p style={{ fontSize: 14, color: MUTED, margin: '0 0 16px', lineHeight: 1.7 }}>
           直接问 GCI 任何问题，AI 从现有数据中查询并回答。<strong style={{ color: TEXT }}>只读，不修改任何数据。</strong>
         </p>
         <div style={{ position: 'relative' }}>
@@ -358,7 +359,7 @@ function AIChatTab({ onSubmit }: { onSubmit: (v: string) => void }) {
           <button onClick={() => submit()} disabled={!query.trim()} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 34, height: 34, borderRadius: 8, background: query.trim() ? `linear-gradient(135deg,${GOLD},${GOLD_L})` : 'rgba(255,255,255,0.06)', border: 'none', cursor: query.trim() ? 'pointer' : 'not-allowed', fontSize: 15 }}>↵</button>
         </div>
       </Card>
-      <SectionLabel text="SUGGESTED QUERIES" />
+      <SectionLabel text="快捷提问" />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {CHAT_SUGGESTIONS.map(s => <ActionChip key={s} label={s} onClick={() => submit(s)} />)}
       </div>
@@ -381,9 +382,9 @@ function AIAssistantTab({ onSubmit }: { onSubmit: (v: string) => void }) {
 
   return (
     <div>
-      <SectionLabel text="AI ASSISTANT — EXECUTION ENGINE" />
+      <SectionLabel text="AI 助手 — 执行引擎" />
       <Card style={{ marginBottom: 20 }}>
-        <p style={{ fontSize: 13, color: MUTED, margin: '0 0 16px', lineHeight: 1.7 }}>告诉 AI 你要完成的操作，AI 自动识别模块并执行。</p>
+        <p style={{ fontSize: 14, color: MUTED, margin: '0 0 16px', lineHeight: 1.7 }}>告诉 AI 你要完成的操作，AI 自动识别模块并执行。</p>
         <div style={{ position: 'relative' }}>
           <input value={cmd} onChange={e => setCmd(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { onSubmit(cmd); setCmd(''); } }}
             placeholder="帮我...  e.g. 帮我给迪拜客户生成一份 PI"
@@ -432,9 +433,9 @@ function AIAgentTab() {
   const [agents, setAgents] = useState(AGENTS.map(a => ({ ...a })));
   return (
     <div>
-      <SectionLabel text="AI AGENT — AUTONOMOUS OPERATIONS" />
+      <SectionLabel text="AI Agent — 自动运行" />
       <Card style={{ marginBottom: 20 }}>
-        <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.7, margin: 0 }}>
+        <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.7, margin: 0 }}>
           AI Agent 在后台自动运行，不需要你每次手动触发。设定规则后，AI 自动监控、提醒、生成报告。
           <span style={{ color: '#D4A843', marginLeft: 8 }}>Phase 2 接入真实调度系统。</span>
         </p>
@@ -444,10 +445,10 @@ function AIAgentTab() {
           <Card key={agent.name} style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                <span style={{ fontSize: 13.5, fontWeight: 600, color: TEXT }}>{agent.name}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: TEXT }}>{agent.name}</span>
                 <StatusBadge status="soon" />
               </div>
-              <div style={{ fontSize: 12, color: MUTED }}>{agent.desc}</div>
+              <div style={{ fontSize: 13, color: MUTED }}>{agent.desc}</div>
             </div>
             <div style={{ flexShrink: 0, textAlign: 'right' }}>
               <div className="font-mono-label" style={{ fontSize: 10, color: SUBTLE, marginBottom: 8 }}>{agent.schedule}</div>
@@ -481,28 +482,28 @@ const INSIGHTS = [
 function AIDailyTab() {
   return (
     <div>
-      <SectionLabel text="AI DAILY — BOSS DASHBOARD" />
+      <SectionLabel text="AI Daily — 今日总览" />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, marginBottom: 20 }}>
         {DAILY_STATS.map(s => (
           <Card key={s.label} style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 26, fontWeight: 700, color: s.color, fontFamily: "'Space Grotesk',sans-serif", marginBottom: 4 }}>{s.value}</div>
-            <div className="font-mono-label" style={{ fontSize: 9, color: SUBTLE, letterSpacing: '0.12em' }}>{s.unit}</div>
-            <div style={{ fontSize: 11.5, color: MUTED, marginTop: 6 }}>{s.label}</div>
+            <div style={{ fontSize: 11, color: SUBTLE, fontFamily: 'IBM Plex Mono, monospace' }}>{s.unit}</div>
+            <div style={{ fontSize: 13, color: MUTED, marginTop: 6 }}>{s.label}</div>
           </Card>
         ))}
       </div>
-      <SectionLabel text="AI INSIGHTS" />
+      <SectionLabel text="AI 洞察" />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 20 }}>
         {INSIGHTS.map(ins => (
           <Card key={ins.label}>
             <div style={{ fontSize: 22, marginBottom: 10 }}>{ins.icon}</div>
-            <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 6 }}>{ins.label}</div>
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 6 }}>{ins.label}</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: TEXT, marginBottom: 4 }}>{ins.value}</div>
-            <div style={{ fontSize: 11, color: SUBTLE }}>{ins.sub}</div>
+            <div style={{ fontSize: 12, color: SUBTLE }}>{ins.sub}</div>
           </Card>
         ))}
       </div>
-      <SectionLabel text="TODAY'S BRIEFING" />
+      <SectionLabel text="今日简报" />
       <Card>
         {['今日暂无高优先级事项。', '所有跟进均在正常节奏内。', '建议今天重点跟进报价超过 3 天未回复的客户。', '库存整体正常，无紧急补货需求。'].map((line, i) => (
           <div key={i} style={{ display: 'flex', gap: 10, padding: '7px 0', borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
@@ -536,14 +537,14 @@ const WORKFLOW_STEPS = [
 function AIWorkflowTab() {
   return (
     <div>
-      <SectionLabel text="AI WORKFLOW — ENTERPRISE AUTOMATION" />
+      <SectionLabel text="AI 流程 — 企业自动化" />
       <Card style={{ marginBottom: 20 }}>
-        <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.7, margin: 0 }}>
+        <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.7, margin: 0 }}>
           设定触发条件，AI 自动串联多个模块，完成完整业务流程。无需手动切换系统。
           <span style={{ color: '#D4A843', marginLeft: 8 }}>Phase 2 启用。</span>
         </p>
       </Card>
-      <SectionLabel text="SAMPLE WORKFLOW — CUSTOMER BOQ → PAYMENT" />
+      <SectionLabel text="示例流程 — 客户 BOQ 到收款" />
       <div style={{ position: 'relative', paddingLeft: 24 }}>
         <div style={{ position: 'absolute', left: 11, top: 0, bottom: 0, width: 1, background: 'linear-gradient(180deg,rgba(203,168,92,0.4),rgba(203,168,92,0.05))' }} />
         {WORKFLOW_STEPS.map((s, i) => (
@@ -590,7 +591,7 @@ function AIInboxTab({ onSubmit }: { onSubmit: (v: string) => void }) {
 
   return (
     <div>
-      <SectionLabel text="AI INBOX — ANYTHING IN, INTELLIGENCE OUT" />
+      <SectionLabel text="AI Inbox — 什么都能丢进来" />
       <div
         onDragOver={e => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
@@ -614,7 +615,7 @@ function AIInboxTab({ onSubmit }: { onSubmit: (v: string) => void }) {
           </button>
         )}
       </div>
-      <SectionLabel text="SUPPORTED SOURCES" />
+      <SectionLabel text="支持的来源类型" />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 24 }}>
         {INBOX_SOURCES.map(s => (
           <Card key={s.label} style={{ textAlign: 'center', padding: '14px 12px' }}>
@@ -624,13 +625,13 @@ function AIInboxTab({ onSubmit }: { onSubmit: (v: string) => void }) {
           </Card>
         ))}
       </div>
-      <SectionLabel text="EXAMPLES" />
+      <SectionLabel text="使用示例" />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {INBOX_EXAMPLES.map(ex => (
           <div key={ex.input} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: ex.color, flexShrink: 0 }} />
-            <span style={{ fontSize: 13, color: TEXT, flex: 1 }}>丢进一{ex.input}</span>
-            <span style={{ fontSize: 13, color: ex.color, fontWeight: 500 }}>{ex.output}</span>
+            <span style={{ fontSize: 14, color: TEXT, flex: 1 }}>丢进一{ex.input}</span>
+            <span style={{ fontSize: 14, color: ex.color, fontWeight: 500 }}>{ex.output}</span>
           </div>
         ))}
       </div>

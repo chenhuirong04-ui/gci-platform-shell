@@ -21,7 +21,8 @@ import { useAuth } from '../../contexts/AuthContext';
 const GOLD = '#CBA85C';
 const GOLD_L = '#E2C988';
 const TEXT = colors.textPrimary;
-const MUTED = '#505A70';
+const MUTED = '#8A97B0';   // lifted for readability — was #505A70
+const DIM  = '#5A6A84';   // secondary labels, previously invisible #3A4255
 
 function uid() {
   return typeof crypto !== 'undefined' && crypto.randomUUID
@@ -88,39 +89,39 @@ function ProfileStep({ onSelect }: { onSelect: (p: BillingProfile) => void }) {
     display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10,
     flexDirection: 'column',
   };
-  const labelStyle: React.CSSProperties = { fontSize: 11, color: MUTED, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.08em' };
-  const inputStyle: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '9px 12px', fontSize: 13, color: TEXT, outline: 'none', boxSizing: 'border-box' };
+  const labelStyle: React.CSSProperties = { fontSize: 12.5, color: MUTED, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.06em' };
+  const inputStyle: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 8, padding: '10px 13px', fontSize: 14, color: TEXT, outline: 'none', boxSizing: 'border-box' };
 
   return (
     <div>
-      <div style={{ fontSize: 13, color: MUTED, marginBottom: 16 }}>
+      <div style={{ fontSize: 14, color: MUTED, marginBottom: 18 }}>
         选择已有账单资料，或录入新客户。账单资料保存后，以后开发票无需重复填写。
       </div>
 
       {/* Existing profiles */}
       {loadingProfiles && (
-        <div style={{ fontSize: 12, color: MUTED, marginBottom: 16, fontFamily: 'IBM Plex Mono, monospace' }}>Loading shared profiles…</div>
+        <div style={{ fontSize: 13, color: MUTED, marginBottom: 16, fontFamily: 'IBM Plex Mono, monospace' }}>正在加载共享开票资料…</div>
       )}
 
       {!loadingProfiles && profiles.length > 0 && (
         <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 10.5, color: GOLD, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.18em', marginBottom: 10 }}>SAVED BILLING PROFILES</div>
+          <div style={{ fontSize: 11, color: GOLD, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.12em', marginBottom: 10 }}>已保存开票资料</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {profiles.map(p => (
               <button
                 key={p.id}
                 onClick={() => onSelect(p)}
-                style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 16px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.15s' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(203,168,92,0.4)'; (e.currentTarget as HTMLButtonElement).style.background = 'rgba(203,168,92,0.05)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.025)'; }}
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '14px 16px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.15s' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(203,168,92,0.5)'; (e.currentTarget as HTMLButtonElement).style.background = 'rgba(203,168,92,0.07)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.12)'; (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)'; }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: 13.5, fontWeight: 600, color: TEXT, marginBottom: 2 }}>{p.customerName}</div>
-                    <div style={{ fontSize: 11, color: MUTED }}>{p.billingAddress}</div>
-                    {p.trn && <div style={{ fontSize: 10.5, color: MUTED, fontFamily: 'monospace' }}>TRN: {p.trn}</div>}
+                    <div style={{ fontSize: 15, fontWeight: 700, color: TEXT, marginBottom: 4 }}>{p.customerName}</div>
+                    <div style={{ fontSize: 13, color: MUTED, marginBottom: 2 }}>{p.billingAddress}</div>
+                    {p.trn && <div style={{ fontSize: 12.5, color: MUTED, fontFamily: 'monospace' }}>TRN: {p.trn}</div>}
                   </div>
-                  <div style={{ fontSize: 11, color: GOLD, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.1em', marginLeft: 16 }}>SELECT →</div>
+                  <div style={{ fontSize: 12, color: GOLD, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, marginLeft: 16, flexShrink: 0 }}>使用此客户开票 →</div>
                 </div>
               </button>
             ))}
@@ -136,7 +137,7 @@ function ProfileStep({ onSelect }: { onSelect: (p: BillingProfile) => void }) {
         >+ 新增账单资料</button>
       ) : (
         <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20 }}>
-          <div style={{ fontSize: 12, color: GOLD, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.15em', marginBottom: 16 }}>NEW BILLING PROFILE</div>
+          <div style={{ fontSize: 12, color: GOLD, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, marginBottom: 16 }}>新增开票资料</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
             {[
               { key: 'customerName', label: 'Customer Name *', placeholder: 'e.g. IFZA FZCO', full: true },
@@ -185,8 +186,8 @@ function InvoiceFormStep({ profile, fields, onChange, onBack, onNext }: {
   onBack: () => void;
   onNext: () => void;
 }) {
-  const inputStyle: React.CSSProperties = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 11px', fontSize: 13, color: TEXT, outline: 'none', boxSizing: 'border-box', width: '100%' };
-  const labelStyle: React.CSSProperties = { fontSize: 10.5, color: MUTED, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.08em', marginBottom: 4, display: 'block' };
+  const inputStyle: React.CSSProperties = { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 8, padding: '10px 12px', fontSize: 14, color: TEXT, outline: 'none', boxSizing: 'border-box', width: '100%' };
+  const labelStyle: React.CSSProperties = { fontSize: 12.5, color: MUTED, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.05em', marginBottom: 4, display: 'block' };
 
   function updateItem(id: string, patch: Partial<InvoiceLineItem>) {
     const updated = fields.items.map(it => {
@@ -213,10 +214,10 @@ function InvoiceFormStep({ profile, fields, onChange, onBack, onNext }: {
     <div>
       {/* Bill To info card */}
       <div style={{ background: 'rgba(203,168,92,0.06)', border: '1px solid rgba(203,168,92,0.2)', borderRadius: 10, padding: '12px 16px', marginBottom: 20 }}>
-        <div style={{ fontSize: 10, color: GOLD, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.15em', marginBottom: 6 }}>BILL TO — 已自动带出，以后无需重复输入</div>
-        <div style={{ fontSize: 13.5, fontWeight: 600, color: TEXT }}>{profile.customerName}</div>
-        <div style={{ fontSize: 12, color: MUTED }}>{profile.billingAddress}</div>
-        {profile.trn && <div style={{ fontSize: 11, color: MUTED, fontFamily: 'monospace' }}>TRN: {profile.trn}</div>}
+        <div style={{ fontSize: 11.5, color: GOLD, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 500, marginBottom: 8 }}>开票客户 — 已自动带出，以后无需重复输入</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: TEXT, marginBottom: 3 }}>{profile.customerName}</div>
+        <div style={{ fontSize: 13, color: MUTED, marginBottom: 2 }}>{profile.billingAddress}</div>
+        {profile.trn && <div style={{ fontSize: 13, color: MUTED, fontFamily: 'monospace' }}>TRN: {profile.trn}</div>}
       </div>
 
       {/* Dates + currency row */}
@@ -241,26 +242,26 @@ function InvoiceFormStep({ profile, fields, onChange, onBack, onNext }: {
 
       {/* Items table */}
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 10.5, color: GOLD, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.15em', marginBottom: 10 }}>INVOICE ITEMS</div>
+        <div style={{ fontSize: 12, color: GOLD, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, marginBottom: 10 }}>发票明细</div>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, overflow: 'hidden' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px 80px 110px 36px', gap: 0, background: 'rgba(255,255,255,0.04)', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             {['Description', 'Unit Price', 'Qty', 'Amount', ''].map(h => (
-              <div key={h} style={{ fontSize: 10.5, color: MUTED, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.08em' }}>{h}</div>
+              <div key={h} style={{ fontSize: 12, color: MUTED, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.04em' }}>{h}</div>
             ))}
           </div>
           {fields.items.map((item, i) => (
             <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1fr 130px 80px 110px 36px', gap: 0, padding: '8px 12px', borderBottom: i < fields.items.length - 1 ? '1px solid rgba(255,255,255,0.04)' : undefined, alignItems: 'center' }}>
-              <input value={item.description} onChange={e => updateItem(item.id, { description: e.target.value })} placeholder="Service / product description" style={{ ...inputStyle, fontSize: 12 }} />
-              <input type="number" value={item.unitPrice || ''} onChange={e => updateItem(item.id, { unitPrice: Number(e.target.value) })} placeholder="0.00" style={{ ...inputStyle, fontSize: 12, marginLeft: 6 }} />
-              <input type="number" value={item.qty} min={1} onChange={e => updateItem(item.id, { qty: Number(e.target.value) })} style={{ ...inputStyle, fontSize: 12, marginLeft: 6 }} />
+              <input value={item.description} onChange={e => updateItem(item.id, { description: e.target.value })} placeholder="Service / product description" style={{ ...inputStyle, fontSize: 13 }} />
+              <input type="number" value={item.unitPrice || ''} onChange={e => updateItem(item.id, { unitPrice: Number(e.target.value) })} placeholder="0.00" style={{ ...inputStyle, fontSize: 13, marginLeft: 6 }} />
+              <input type="number" value={item.qty} min={1} onChange={e => updateItem(item.id, { qty: Number(e.target.value) })} style={{ ...inputStyle, fontSize: 13, marginLeft: 6 }} />
               <div style={{ fontSize: 13, color: TEXT, textAlign: 'right', fontFamily: 'IBM Plex Mono, monospace', paddingRight: 4 }}>
                 {item.amount > 0 ? item.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
               </div>
-              <button onClick={() => removeItem(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3A4255', fontSize: 16, lineHeight: 1 }} title="Remove row">×</button>
+              <button onClick={() => removeItem(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, lineHeight: 1 }} title="Remove row">×</button>
             </div>
           ))}
         </div>
-        <button onClick={addItem} style={{ marginTop: 8, background: 'none', border: '1px dashed rgba(255,255,255,0.12)', borderRadius: 8, padding: '7px 16px', color: MUTED, fontSize: 12, cursor: 'pointer', width: '100%' }}>+ Add line item</button>
+        <button onClick={addItem} style={{ marginTop: 8, background: 'none', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: 8, padding: '9px 16px', color: MUTED, fontSize: 13, cursor: 'pointer', width: '100%' }}>+ 新增明细行</button>
       </div>
 
       {/* Totals preview */}
@@ -270,7 +271,7 @@ function InvoiceFormStep({ profile, fields, onChange, onBack, onNext }: {
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
             <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '12px 20px', minWidth: 220 }}>
               {[['Subtotal', subtotal], ['VAT ' + fields.vatRate + '%', vatAmount]].map(([l, v]) => (
-                <div key={String(l)} style={{ display: 'flex', justifyContent: 'space-between', gap: 24, fontSize: 12, color: MUTED, marginBottom: 4 }}>
+                <div key={String(l)} style={{ display: 'flex', justifyContent: 'space-between', gap: 24, fontSize: 13, color: MUTED, marginBottom: 4 }}>
                   <span>{l}</span><span>{Number(v).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                 </div>
               ))}
@@ -294,11 +295,11 @@ function InvoiceFormStep({ profile, fields, onChange, onBack, onNext }: {
       </div>
 
       <div style={{ display: 'flex', gap: 10 }}>
-        <button onClick={onBack} style={{ padding: '10px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: MUTED, fontSize: 13, cursor: 'pointer' }}>← Back</button>
+        <button onClick={onBack} style={{ padding: '10px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.16)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>← 返回</button>
         <button
           onClick={onNext}
           disabled={!hasItems}
-          style={{ flex: 1, padding: '10px', borderRadius: 8, background: hasItems ? `linear-gradient(135deg,${GOLD},${GOLD_L})` : 'rgba(255,255,255,0.06)', border: 'none', color: '#000', fontWeight: 700, fontSize: 13, cursor: hasItems ? 'pointer' : 'not-allowed', fontFamily: "'Space Grotesk',sans-serif" }}
+          style={{ flex: 1, padding: '11px', borderRadius: 8, background: hasItems ? `linear-gradient(135deg,${GOLD},${GOLD_L})` : 'rgba(255,255,255,0.06)', border: 'none', color: '#000', fontWeight: 700, fontSize: 14, cursor: hasItems ? 'pointer' : 'not-allowed', fontFamily: "'Space Grotesk',sans-serif" }}
         >预览发票 →</button>
       </div>
     </div>
@@ -396,19 +397,19 @@ export function InvoiceAssistantPanel({ onClose }: Props) {
       <div style={{ background: 'rgba(203,168,92,0.06)', borderBottom: '1px solid rgba(203,168,92,0.15)', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: GOLD }} />
-          <span style={{ fontSize: 11, color: GOLD, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.18em' }}>AI ASSISTANT · INVOICE WIZARD</span>
+          <span style={{ fontSize: 13, color: GOLD, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }}>AI 助手 · 发票向导</span>
         </div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, fontSize: 18, lineHeight: 1, padding: 0 }}>×</button>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, fontSize: 22, lineHeight: 1, padding: 0 }}>×</button>
       </div>
 
       {/* Step bar */}
       <div style={{ display: 'flex', padding: '14px 24px', borderBottom: '1px solid rgba(255,255,255,0.05)', gap: 0 }}>
         {STEPS.map((s, i) => (
           <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 8, flex: i < STEPS.length - 1 ? 1 : undefined }}>
-            <div style={{ width: 22, height: 22, borderRadius: '50%', background: i === step ? GOLD : i < step ? 'rgba(203,168,92,0.3)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: i === step ? '#000' : i < step ? GOLD_L : MUTED, flexShrink: 0 }}>
+            <div style={{ width: 24, height: 24, borderRadius: '50%', background: i === step ? GOLD : i < step ? 'rgba(203,168,92,0.4)' : 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: i === step ? '#000' : i < step ? GOLD_L : '#6A7A94', flexShrink: 0 }}>
               {i < step ? '✓' : i + 1}
             </div>
-            <span style={{ fontSize: 11.5, color: i === step ? GOLD_L : MUTED, fontWeight: i === step ? 600 : 400, whiteSpace: 'nowrap' }}>{s}</span>
+            <span style={{ fontSize: 13, color: i === step ? GOLD_L : i < step ? '#7A8EA8' : DIM, fontWeight: i === step ? 700 : 400, whiteSpace: 'nowrap' }}>{s}</span>
             {i < STEPS.length - 1 && <div style={{ flex: 1, height: 1, background: i < step ? 'rgba(203,168,92,0.3)' : 'rgba(255,255,255,0.06)', margin: '0 12px' }} />}
           </div>
         ))}
@@ -430,16 +431,16 @@ export function InvoiceAssistantPanel({ onClose }: Props) {
 
         {step === 2 && profile && (
           <div>
-            <div style={{ fontSize: 12, color: MUTED, marginBottom: 16 }}>
+            <div style={{ fontSize: 14, color: MUTED, marginBottom: 16 }}>
               请检查发票内容。确认无误后可保存为草稿，或直接提交审批。
             </div>
             <div style={{ overflowX: 'auto', marginBottom: 24 }}>
               <InvoicePreview draft={buildPreviewDraft()} />
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setStep(1)} style={{ padding: '10px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: MUTED, fontSize: 13, cursor: 'pointer' }}>← 修改</button>
-              <button onClick={() => handleSaveDraft('draft')} disabled={saving} style={{ flex: 1, padding: '10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: TEXT, fontSize: 13, cursor: saving ? 'wait' : 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>{saving ? '保存中…' : '保存为草稿'}</button>
-              <button onClick={() => handleSaveDraft('waiting_approval')} disabled={saving} style={{ flex: 2, padding: '10px', borderRadius: 8, background: saving ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: saving ? TEXT : '#000', fontWeight: 700, fontSize: 13, cursor: saving ? 'wait' : 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>{saving ? '保存中…' : '提交审批 →'}</button>
+              <button onClick={() => setStep(1)} style={{ padding: '10px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.16)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>← 修改</button>
+              <button onClick={() => handleSaveDraft('draft')} disabled={saving} style={{ flex: 1, padding: '11px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)', color: TEXT, fontSize: 14, cursor: saving ? 'wait' : 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>{saving ? '保存中…' : '保存为草稿'}</button>
+              <button onClick={() => handleSaveDraft('waiting_approval')} disabled={saving} style={{ flex: 2, padding: '11px', borderRadius: 8, background: saving ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: saving ? TEXT : '#000', fontWeight: 700, fontSize: 14, cursor: saving ? 'wait' : 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>{saving ? '保存中…' : '提交审批 →'}</button>
             </div>
           </div>
         )}
@@ -450,21 +451,21 @@ export function InvoiceAssistantPanel({ onClose }: Props) {
             <div style={{ fontSize: 18, fontWeight: 600, color: TEXT, marginBottom: 8 }}>
               {savedDraft.status === 'waiting_approval' ? '发票已提交审批' : '草稿已保存'}
             </div>
-            <div style={{ fontSize: 13, color: MUTED, marginBottom: 6 }}>
-              Invoice No: <span style={{ color: GOLD, fontFamily: 'IBM Plex Mono, monospace' }}>{savedDraft.invoiceNo}</span>
+            <div style={{ fontSize: 14, color: MUTED, marginBottom: 6 }}>
+              发票编号：<span style={{ color: GOLD, fontFamily: 'IBM Plex Mono, monospace' }}>{savedDraft.invoiceNo}</span>
             </div>
-            <div style={{ fontSize: 12, color: MUTED, marginBottom: 12 }}>
+            <div style={{ fontSize: 13.5, color: MUTED, marginBottom: 12 }}>
               客户账单资料已保存。下次为该客户开发票，账单信息将自动带出。
             </div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: getCloudStatus() === 'connected' ? 'rgba(111,191,142,0.12)' : 'rgba(212,168,67,0.12)', border: `1px solid ${getCloudStatus() === 'connected' ? 'rgba(111,191,142,0.35)' : 'rgba(212,168,67,0.35)'}`, marginBottom: 20 }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: getCloudStatus() === 'connected' ? '#6FBF8E' : '#D4A843' }} />
-              <span style={{ fontSize: 10.5, color: getCloudStatus() === 'connected' ? '#6FBF8E' : '#D4A843', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.1em' }}>
+              <span style={{ fontSize: 12, color: getCloudStatus() === 'connected' ? '#6FBF8E' : '#D4A843', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.06em' }}>
                 {getCloudStatus() === 'connected' ? 'Cloud Sync: Connected — 团队共享' : 'Cloud Sync: Fallback — 仅本地，团队不可见'}
               </span>
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <a href="/invoice" style={{ padding: '10px 24px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: TEXT, fontSize: 13, textDecoration: 'none' }}>查看发票列表</a>
-              <button onClick={onClose} style={{ padding: '10px 24px', borderRadius: 8, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: '#000', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>完成</button>
+              <a href="/invoice" style={{ padding: '11px 24px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)', color: TEXT, fontSize: 14, textDecoration: 'none' }}>查看发票列表</a>
+              <button onClick={onClose} style={{ padding: '11px 24px', borderRadius: 8, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: '#000', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>完成</button>
             </div>
           </div>
         )}
