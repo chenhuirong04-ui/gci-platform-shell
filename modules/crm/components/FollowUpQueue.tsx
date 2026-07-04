@@ -2,8 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { FollowUpTask, TradeStatus } from '../types';
 import { Language, translations } from '../services/i18n';
 import {
-  Clock, Archive, Globe, User, Sparkles, ChevronRight,
-  LayoutList, LayoutGrid, AlertCircle, CheckCircle2,
+  Clock, Archive, Sparkles, ChevronRight,
+  LayoutList, LayoutGrid, AlertCircle, Search, X as XIcon,
 } from 'lucide-react';
 import { getTaskBusinessId } from '../utils/businessId';
 
@@ -196,8 +196,22 @@ const FollowUpQueue: React.FC<FollowUpQueueProps> = ({
   const [view, setView] = useState<'list' | 'kanban'>('list');
   const [chip, setChip] = useState<FilterChip>('全部');
 
+  const [searchQ, setSearchQ] = useState('');
+
   const aiPriority = useMemo(() => pickAIPriority(tasks), [tasks]);
-  const filtered = useMemo(() => applyFilter(tasks, chip), [tasks, chip]);
+
+  const filtered = useMemo(() => {
+    const base = applyFilter(tasks, chip);
+    if (!searchQ.trim()) return base;
+    const q = searchQ.trim().toLowerCase();
+    return base.filter(t => [
+      t.clientName, t.inquirySummary, t.lastContext, t.goal,
+      t.suggestedAction, t.owner, t.tradeStatus, t.countryCity,
+      t.email, t.whatsapp, t.phoneE164,
+      t.aiInsights?.nextActionSuggestion, t.aiInsights?.realNeed,
+      t.businessType,
+    ].some(v => v && String(v).toLowerCase().includes(q)));
+  }, [tasks, chip, searchQ]);
 
   // ── List view ───────────────────────────────────────────────────
   const ListView = () => (
@@ -219,50 +233,48 @@ const FollowUpQueue: React.FC<FollowUpQueueProps> = ({
 
       {/* Rows */}
       {filtered.length === 0 ? (
-        <div className="py-16 text-center text-slate-300 text-sm font-bold">
-          暂无记录
+        <div className="py-16 text-center text-slate-500 text-sm font-bold">
+          {searchQ.trim() ? '没有找到相关跟进记录' : '暂无记录'}
         </div>
       ) : filtered.map((task, idx) => {
         const overdue = isOverdue(task.nextFollowUpAt);
         const nextDate = relativeDate(task.nextFollowUpAt);
         const pri = task.priority || 'B';
         const name = task.clientName || task.inquirySummary || '未知客户';
-        const summary = task.lastContext || task.aiInsights?.nextActionSuggestion || task.inquirySummary || '';
+        const subtitle = task.lastContext || task.aiInsights?.realNeed || task.inquirySummary || '';
+        const nextAction = task.aiInsights?.nextActionSuggestion || task.suggestedAction || '';
 
         return (
           <div
             key={task.id}
             onClick={() => onAction(task)}
-            className={`grid items-center px-4 py-3 cursor-pointer transition-colors hover:bg-slate-50 group ${idx > 0 ? 'border-t border-slate-100' : ''} ${overdue ? 'bg-red-50/30' : ''}`}
+            className={`grid items-center px-4 py-3 cursor-pointer transition-colors hover:bg-slate-50 group ${idx > 0 ? 'border-t border-slate-100' : ''} ${overdue ? 'bg-red-50/40' : ''}`}
             style={{ gridTemplateColumns: '2fr 60px 110px 48px 80px 1.5fr 60px 90px' }}
           >
             {/* Customer / Title */}
             <div className="min-w-0 pr-3">
-              <div className="font-black text-sm text-slate-800 truncate">{name}</div>
-              {summary ? (
-                <div className="text-[10px] text-slate-400 truncate mt-0.5">{summary}</div>
+              <div className="font-black text-sm text-slate-900 truncate">{name}</div>
+              {subtitle ? (
+                <div className="text-[10px] text-slate-500 truncate mt-0.5">{subtitle}</div>
               ) : (
-                <div className="text-[10px] text-slate-300 mt-0.5 italic">下一步待补充</div>
+                <div className="text-[10px] text-slate-400 mt-0.5 italic">下一步待补充</div>
               )}
             </div>
 
             {/* Type */}
             <div>
               <span className="text-[9px] font-black px-1.5 py-0.5 rounded"
-                style={{ backgroundColor: `${NAVY}10`, color: NAVY }}>
+                style={{ backgroundColor: `${NAVY}12`, color: NAVY }}>
                 {TYPE_LABEL[task.businessType || 'TRADE'] ?? '贸易'}
               </span>
             </div>
 
             {/* Status */}
-            <div
-              onClick={e => e.stopPropagation()}
-              className="pr-2"
-            >
+            <div onClick={e => e.stopPropagation()} className="pr-2">
               <select
                 value={task.tradeStatus || '新询盘'}
                 onChange={e => onUpdateTradeStatus(task.id, e.target.value as TradeStatus)}
-                className="w-full bg-slate-50 border border-slate-100 rounded-lg px-2 py-1 text-[9px] font-black outline-none cursor-pointer"
+                className="w-full bg-slate-100 border border-slate-200 rounded-lg px-2 py-1 text-[9px] font-black text-slate-700 outline-none cursor-pointer"
                 title={task.tradeStatus}
               >
                 {TRADE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -273,7 +285,7 @@ const FollowUpQueue: React.FC<FollowUpQueueProps> = ({
             <div>
               <span
                 className="text-[10px] font-black px-1.5 py-0.5 rounded"
-                style={{ backgroundColor: `${PRIORITY_COLOR[pri]}15`, color: PRIORITY_COLOR[pri] }}
+                style={{ backgroundColor: `${PRIORITY_COLOR[pri]}20`, color: PRIORITY_COLOR[pri] }}
               >
                 {PRIORITY_LABEL[pri]}
               </span>
@@ -281,9 +293,7 @@ const FollowUpQueue: React.FC<FollowUpQueueProps> = ({
 
             {/* Next follow-up date */}
             <div>
-              <span
-                className={`text-[10px] font-bold flex items-center gap-1 ${overdue ? 'text-red-500' : 'text-slate-500'}`}
-              >
+              <span className={`text-[10px] font-bold flex items-center gap-1 ${overdue ? 'text-red-600' : 'text-slate-600'}`}>
                 {overdue && <AlertCircle className="w-3 h-3 shrink-0" />}
                 {nextDate}
               </span>
@@ -291,16 +301,18 @@ const FollowUpQueue: React.FC<FollowUpQueueProps> = ({
 
             {/* Next action */}
             <div className="pr-3 min-w-0">
-              <span className="text-[10px] text-slate-600 truncate block">
-                {task.aiInsights?.nextActionSuggestion || task.suggestedAction || (
-                  <span className="text-slate-300 italic">详情待补充</span>
-                )}
-              </span>
+              {nextAction ? (
+                <span className="text-[10px] text-slate-700 truncate block">{nextAction}</span>
+              ) : (
+                <span className="text-[10px] text-slate-400 italic">详情待补充</span>
+              )}
             </div>
 
             {/* Owner */}
             <div>
-              <span className="text-[10px] font-bold" style={{ color: GOLD }}>{task.owner || '—'}</span>
+              <span className="text-[10px] font-bold" style={{ color: task.owner ? GOLD : '#94A3B8' }}>
+                {task.owner || '待分配'}
+              </span>
             </div>
 
             {/* Action */}
@@ -314,7 +326,7 @@ const FollowUpQueue: React.FC<FollowUpQueueProps> = ({
               </button>
               <button
                 onClick={() => onUpdateStatus(task.id, 'archived')}
-                className="p-1.5 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                 title="归档"
               >
                 <Archive className="w-3.5 h-3.5" />
@@ -371,6 +383,26 @@ const FollowUpQueue: React.FC<FollowUpQueueProps> = ({
         </div>
       )}
 
+      {/* ── Search ─────────────────────────────────────────────── */}
+      <div className="relative">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        <input
+          type="text"
+          value={searchQ}
+          onChange={e => setSearchQ(e.target.value)}
+          placeholder="搜索客户、标题、联系人、备注、下一步动作..."
+          className="w-full pl-10 pr-9 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 placeholder:text-slate-400 outline-none focus:border-slate-400 transition-colors"
+        />
+        {searchQ && (
+          <button
+            onClick={() => setSearchQ('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            <XIcon className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
       {/* ── Toolbar: filters + view switch ─────────────────────── */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         {/* Filter chips */}
@@ -389,8 +421,8 @@ const FollowUpQueue: React.FC<FollowUpQueueProps> = ({
               {c}
             </button>
           ))}
-          {chip !== '全部' && (
-            <span className="text-[10px] font-bold text-slate-400">
+          {(chip !== '全部' || searchQ.trim()) && (
+            <span className="text-[10px] font-bold text-slate-500">
               {filtered.length} 条
             </span>
           )}
