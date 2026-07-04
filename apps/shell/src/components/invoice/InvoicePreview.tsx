@@ -5,7 +5,24 @@ import { GCI_COMPANY } from '../../types/invoice';
 const GREEN = '#2D6A4F';
 const GREEN_BG = '#2D6A4F';
 
-// Scoped CSS reset — defeats any dark-theme CSS that leaks into the invoice node.
+// ── Safe number helpers ───────────────────────────────────────────────────────
+function toNum(value: unknown, fallback = 0): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function fmt(value: unknown, decimals = 2): string {
+  return toNum(value).toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
+function fmtRate(value: unknown, decimals = 3): string {
+  return toNum(value).toFixed(decimals);
+}
+
+// ── Scoped CSS reset — defeats any dark-theme CSS that leaks into the invoice node.
 // Uses #gci-invoice-preview specificity so it only affects this component.
 // filter:none + color-scheme:light guard against:
 //  - Tailwind dark: variants
@@ -61,13 +78,29 @@ interface Props {
   };
 }
 
-function fmt(n: number, decimals = 2) {
-  return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-}
-
 export function InvoicePreview({ draft, printAreaId }: Props & { printAreaId?: string }) {
-  const { billTo, items, invoiceDate, dueDate, currency, subtotal, vatRate, vatAmount, total,
-    paymentTerms, otherComments, invoiceNo } = draft;
+  if (!draft) {
+    return (
+      <div style={{ padding: 32, background: '#fff', color: '#c00', fontFamily: 'Arial,sans-serif' }}>
+        发票预览数据不完整，请返回修改。
+      </div>
+    );
+  }
+
+  const { billTo, items: rawItems, invoiceDate, dueDate, currency, paymentTerms, otherComments, invoiceNo } = draft;
+
+  // Normalize all numeric fields — guard against undefined/NaN from partial state
+  const safeItems = (rawItems ?? []).map(it => {
+    const up = toNum(it.unitPrice);
+    const qty = toNum(it.qty, 1);
+    const amount = toNum(it.amount) || up * qty;
+    return { ...it, unitPrice: up, qty, amount };
+  });
+
+  const subtotal = toNum(draft.subtotal) || safeItems.reduce((s, it) => s + it.amount, 0);
+  const vatRate  = toNum(draft.vatRate, 5);
+  const vatAmount = toNum(draft.vatAmount) || Math.round(subtotal * vatRate) / 100;
+  const total    = toNum(draft.total) || subtotal + vatAmount;
 
   return (
     <>
@@ -156,19 +189,20 @@ export function InvoicePreview({ draft, printAreaId }: Props & { printAreaId?: s
           </tr>
         </thead>
         <tbody>
-          {items.filter(it => it.description || it.unitPrice).map((item, i) => (
+          {safeItems.filter(it => it.description || it.unitPrice).map((item, i) => (
             <tr key={item.id} style={{ background: i % 2 === 0 ? '#fff' : '#f9f9f9', borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: '6px 10px' }}>{item.description}</td>
-              <td style={{ padding: '6px 10px', textAlign: 'right' }}>{fmt(item.unitPrice)}</td>
-              <td style={{ padding: '6px 10px', textAlign: 'right' }}>{item.qty}</td>
-              <td style={{ padding: '6px 10px', textAlign: 'right' }}>{fmt(item.amount)}</td>
+              <td style={{ padding: '6px 10px', color: '#111', background: i % 2 === 0 ? '#fff' : '#f9f9f9' }}>{item.description}</td>
+              <td style={{ padding: '6px 10px', textAlign: 'right', color: '#111', background: i % 2 === 0 ? '#fff' : '#f9f9f9' }}>{fmt(item.unitPrice)}</td>
+              <td style={{ padding: '6px 10px', textAlign: 'right', color: '#111', background: i % 2 === 0 ? '#fff' : '#f9f9f9' }}>{item.qty}</td>
+              <td style={{ padding: '6px 10px', textAlign: 'right', color: '#111', background: i % 2 === 0 ? '#fff' : '#f9f9f9' }}>{fmt(item.amount)}</td>
             </tr>
           ))}
           {/* Pad to minimum 5 rows */}
-          {Array.from({ length: Math.max(0, 5 - items.filter(it => it.description || it.unitPrice).length) }).map((_, i) => (
-            <tr key={`pad-${i}`} style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: '6px 10px' }}>&nbsp;</td>
-              <td /><td /><td style={{ padding: '6px 10px', textAlign: 'right', color: '#ccc' }}>-</td>
+          {Array.from({ length: Math.max(0, 5 - safeItems.filter(it => it.description || it.unitPrice).length) }).map((_, i) => (
+            <tr key={`pad-${i}`} style={{ borderBottom: '1px solid #eee', background: '#fff' }}>
+              <td style={{ padding: '6px 10px', background: '#fff', color: '#111' }}>&nbsp;</td>
+              <td style={{ background: '#fff' }} /><td style={{ background: '#fff' }} />
+              <td style={{ padding: '6px 10px', textAlign: 'right', color: '#ccc', background: '#fff' }}>-</td>
             </tr>
           ))}
         </tbody>
@@ -195,7 +229,7 @@ export function InvoicePreview({ draft, printAreaId }: Props & { printAreaId?: s
               </tr>
               <tr>
                 <td style={{ padding: '4px 8px', textAlign: 'right', color: '#555' }}>TAX rate:</td>
-                <td style={{ padding: '4px 8px', textAlign: 'right' }}>{vatRate.toFixed(3)}%</td>
+                <td style={{ padding: '4px 8px', textAlign: 'right' }}>{fmtRate(vatRate)}%</td>
               </tr>
               <tr>
                 <td style={{ padding: '4px 8px', textAlign: 'right', color: '#555' }}>TAX amount:</td>

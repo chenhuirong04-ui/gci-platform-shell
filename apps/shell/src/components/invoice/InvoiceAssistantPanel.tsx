@@ -53,10 +53,30 @@ function emptyItem(): InvoiceLineItem {
   return { id: uid(), description: '', unitPrice: 0, qty: 1, amount: 0 };
 }
 
+// Safe number coercion — prevents toFixed/toLocaleString crashes on undefined
+function toNum(v: unknown, fallback = 0): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function fmtMoney(v: unknown): string {
+  return toNum(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function computeTotals(items: InvoiceLineItem[], vatRate: number) {
-  const subtotal = items.reduce((s, it) => s + it.amount, 0);
-  const vatAmount = Math.round(subtotal * vatRate) / 100;
+  const safeRate = toNum(vatRate, 5);
+  const subtotal = items.reduce((s, it) => s + toNum(it.amount), 0);
+  const vatAmount = Math.round(subtotal * safeRate) / 100;
   return { subtotal, vatAmount, total: subtotal + vatAmount };
+}
+
+function normalizeItems(items: InvoiceLineItem[]): InvoiceLineItem[] {
+  return (items ?? []).map(it => {
+    const unitPrice = toNum(it.unitPrice);
+    const qty       = toNum(it.qty, 1);
+    const amount    = toNum(it.amount) || unitPrice * qty;
+    return { ...it, unitPrice, qty, amount };
+  });
 }
 
 // ── Step 0: Profile selection ─────────────────────────────────────────────────
@@ -255,7 +275,7 @@ function InvoiceFormStep({ profile, fields, onChange, onBack, onNext }: {
               <input type="number" value={item.unitPrice || ''} onChange={e => updateItem(item.id, { unitPrice: Number(e.target.value) })} placeholder="0.00" style={{ ...inputStyle, fontSize: 13, marginLeft: 6 }} />
               <input type="number" value={item.qty} min={1} onChange={e => updateItem(item.id, { qty: Number(e.target.value) })} style={{ ...inputStyle, fontSize: 13, marginLeft: 6 }} />
               <div style={{ fontSize: 13, color: TEXT, textAlign: 'right', fontFamily: 'IBM Plex Mono, monospace', paddingRight: 4 }}>
-                {item.amount > 0 ? item.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+                {toNum(item.amount) > 0 ? fmtMoney(item.amount) : '—'}
               </div>
               <button onClick={() => removeItem(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, lineHeight: 1 }} title="Remove row">×</button>
             </div>
@@ -266,18 +286,19 @@ function InvoiceFormStep({ profile, fields, onChange, onBack, onNext }: {
 
       {/* Totals preview */}
       {hasItems && (() => {
-        const { subtotal, vatAmount, total } = computeTotals(fields.items, fields.vatRate);
+        const normalized = normalizeItems(fields.items);
+        const { subtotal, vatAmount, total } = computeTotals(normalized, fields.vatRate);
         return (
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
             <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '12px 20px', minWidth: 220 }}>
-              {[['Subtotal', subtotal], ['VAT ' + fields.vatRate + '%', vatAmount]].map(([l, v]) => (
-                <div key={String(l)} style={{ display: 'flex', justifyContent: 'space-between', gap: 24, fontSize: 13, color: MUTED, marginBottom: 4 }}>
-                  <span>{l}</span><span>{Number(v).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+              {([['Subtotal', subtotal], ['VAT ' + toNum(fields.vatRate, 5) + '%', vatAmount]] as [string, number][]).map(([l, v]) => (
+                <div key={l} style={{ display: 'flex', justifyContent: 'space-between', gap: 24, fontSize: 13, color: MUTED, marginBottom: 4 }}>
+                  <span>{l}</span><span>{fmtMoney(v)}</span>
                 </div>
               ))}
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24, fontSize: 14, fontWeight: 700, color: TEXT, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 8, marginTop: 4 }}>
                 <span>Total ({fields.currency})</span>
-                <span>{total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                <span>{fmtMoney(total)}</span>
               </div>
             </div>
           </div>
@@ -487,16 +508,18 @@ export function InvoiceAssistantPanel({ onClose }: Props) {
   }
 
   function buildPreviewDraft() {
-    const { subtotal, vatAmount, total } = computeTotals(fields.items, fields.vatRate);
+    const items = normalizeItems(fields.items);
+    const vatRate = toNum(fields.vatRate, 5);
+    const { subtotal, vatAmount, total } = computeTotals(items, vatRate);
     return {
       billTo: buildBillTo(profile!),
-      items: fields.items,
-      invoiceDate: fields.invoiceDate,
-      dueDate: fields.dueDate,
-      currency: fields.currency,
-      subtotal, vatAmount, total,
-      paymentTerms: fields.paymentTerms,
-      otherComments: fields.otherComments,
+      items,
+      invoiceDate: fields.invoiceDate || new Date().toISOString().split('T')[0],
+      dueDate: fields.dueDate || new Date().toISOString().split('T')[0],
+      currency: fields.currency || 'AED',
+      subtotal, vatRate, vatAmount, total,
+      paymentTerms: fields.paymentTerms || '',
+      otherComments: fields.otherComments || '',
     };
   }
 
