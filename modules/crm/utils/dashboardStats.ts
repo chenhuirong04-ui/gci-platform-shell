@@ -160,8 +160,11 @@ export function buildDashboardStats(
   const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10);
 
   // ── 1. 全部业务主档案 ─────────────────────────────────────────────────────
+  // "All businesses" = active only (not deleted, not archived/暂缓).
+  // Archived records have been closed and should not inflate stats.
   const nonDeleted = tasks.filter(t => t.status !== 'deleted');
-  const allBusinesses = dedupByBizId(nonDeleted, 'first');
+  const activeOnly  = nonDeleted.filter(t => t.status !== 'archived');
+  const allBusinesses = dedupByBizId(activeOnly, 'first');
   const totalBusinesses = allBusinesses.length;
   const totalProjects = allBusinesses.filter(t =>
     (t as any).businessType === 'PROJECT' || (t as any).businessType === '项目型'
