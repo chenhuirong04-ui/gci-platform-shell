@@ -349,6 +349,68 @@ function PreviewStep({ previewDraft, saving, onBack, onSaveDraft }: {
   onSaveDraft: (status: 'draft' | 'waiting_approval') => void;
 }) {
   const { dict } = useI18n();
+  const [downloading, setDownloading] = useState(false);
+
+  // Build a clean filename from invoice number + customer name
+  function buildFileName(): string {
+    const raw = previewDraft.billTo?.name ?? 'GCI';
+    const safeName = raw.replace(/[^a-zA-Z0-9一-龥]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    const invNo = (previewDraft as any).invoiceNo;
+    if (invNo && invNo !== 'DRAFT') {
+      return `INV-${invNo}-${safeName}.pdf`;
+    }
+    return `GCI-TAX-INVOICE-DRAFT-${safeName}.pdf`;
+  }
+
+  async function handleDownloadPDF() {
+    const node = document.getElementById('gci-invoice-preview');
+    if (!node) { alert('Invoice preview not loaded. Please try again.'); return; }
+    setDownloading(true);
+    try {
+      const { default: html2canvas } = await import('html2canvas');
+      const { jsPDF } = await import('jspdf');
+
+      // Render only the invoice node — override background to ensure white
+      const canvas = await html2canvas(node, {
+        scale: 2,               // 2× for print-quality resolution
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        // Remove any clip that might cut off bottom content
+        windowWidth: node.scrollWidth,
+        windowHeight: node.scrollHeight,
+      });
+
+      // A4 dimensions in mm
+      const A4_W = 210;
+      const A4_H = 297;
+      const imgW = A4_W;
+      const imgH = (canvas.height * A4_W) / canvas.width;
+
+      const pdf = new jsPDF({
+        orientation: imgH > A4_H ? 'portrait' : 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      // If invoice is longer than one A4 page, split across pages
+      let y = 0;
+      const pageH = A4_H;
+      while (y < imgH) {
+        if (y > 0) pdf.addPage();
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, -y, imgW, imgH);
+        y += pageH;
+      }
+
+      pdf.save(buildFileName());
+    } catch (err) {
+      console.error('PDF download failed:', err);
+      alert('PDF 下载失败，请使用「打印」按钮选择「另存为 PDF」。');
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   function handlePrint() {
     const node = document.getElementById('gci-invoice-preview');
     if (!node) { alert('预览未加载，请重试'); return; }
@@ -361,7 +423,6 @@ function PreviewStep({ previewDraft, saving, onBack, onSaveDraft }: {
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>GCI TAX INVOICE ${(previewDraft as any).invoiceNo ?? 'DRAFT'}</title>
   <style>
-    /* Hard reset — no dark theme should bleed into print */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       background: #ffffff !important;
@@ -393,70 +454,60 @@ function PreviewStep({ previewDraft, saving, onBack, onSaveDraft }: {
     setTimeout(() => { win.print(); win.close(); }, 500);
   }
 
+  const btnBase: React.CSSProperties = {
+    padding: '11px 18px', borderRadius: 8, fontSize: 14, cursor: 'pointer',
+    fontFamily: "'Space Grotesk',sans-serif", border: '1px solid rgba(255,255,255,0.16)',
+  };
+
   return (
     <div>
       <div style={{ fontSize: 14, color: MUTED, marginBottom: 16 }}>
         {dict.ai.invoice.previewNote}
       </div>
 
-      {/* Light-grey tray — provides visual separation from dark shell */}
-      <div style={{
-        background: '#e5e7eb',
-        borderRadius: 12,
-        padding: '20px 16px',
-        marginBottom: 24,
-        overflowX: 'auto',
-      }}>
-        {/* Debug marker — confirms this component mounted */}
-        <div style={{
-          fontSize: 11,
-          color: '#374151',
-          background: '#d1fae5',
-          border: '1px solid #6ee7b7',
-          borderRadius: 6,
-          padding: '4px 12px',
-          marginBottom: 12,
-          fontFamily: 'monospace',
-          display: 'inline-block',
-        }}>
-          ✓ Invoice Preview Loaded
-        </div>
-
-        {/* White A4 paper — must stay white regardless of dark shell */}
-        <div style={{
-          background: '#ffffff',
-          backgroundColor: '#ffffff',
-          minHeight: 400,
-          boxShadow: '0 4px 24px rgba(0,0,0,0.18)',
-          borderRadius: 4,
-          overflow: 'hidden',
-        }}>
+      {/* Light-grey tray */}
+      <div style={{ background: '#e5e7eb', borderRadius: 12, padding: '20px 16px', marginBottom: 24, overflowX: 'auto' }}>
+        {/* White A4 paper */}
+        <div style={{ background: '#ffffff', backgroundColor: '#ffffff', minHeight: 400, boxShadow: '0 4px 24px rgba(0,0,0,0.18)', borderRadius: 4, overflow: 'hidden' }}>
           <InvoicePreview draft={previewDraft} />
         </div>
       </div>
 
-      {/* Action buttons */}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        <button
-          onClick={onBack}
-          style={{ padding: '11px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.16)', color: MUTED, fontSize: 14, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
-        >{dict.ai.invoice.backBtn}</button>
+      {/* Action bar: ← 返回修改 | 保存草稿 | 下载 PDF | 打印 | 提交审批 → */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
 
-        <button
-          onClick={handlePrint}
-          style={{ padding: '11px 18px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)', color: TEXT, fontSize: 14, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
-        >{dict.ai.invoice.printBtn}</button>
+        {/* ← 返回修改 */}
+        <button onClick={onBack} style={{ ...btnBase, background: 'none', color: MUTED }}>
+          {dict.ai.invoice.backBtn}
+        </button>
 
+        {/* 保存草稿 */}
         <button
           onClick={() => onSaveDraft('draft')}
           disabled={saving}
-          style={{ flex: 1, minWidth: 120, padding: '11px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)', color: TEXT, fontSize: 14, cursor: saving ? 'wait' : 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
+          style={{ ...btnBase, background: 'rgba(255,255,255,0.07)', color: TEXT, cursor: saving ? 'wait' : 'pointer' }}
         >{saving ? dict.ai.invoice.saving : dict.ai.invoice.saveDraftBtn}</button>
 
+        {/* 下载 PDF — uses html2canvas + jsPDF, no print dialog */}
+        <button
+          onClick={handleDownloadPDF}
+          disabled={downloading}
+          style={{ ...btnBase, background: 'rgba(255,255,255,0.09)', color: TEXT, cursor: downloading ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+        >
+          {downloading ? '生成中…' : '⬇ ' + dict.ai.invoice.downloadPdfBtn}
+        </button>
+
+        {/* 打印 — opens browser print dialog */}
+        <button
+          onClick={handlePrint}
+          style={{ ...btnBase, background: 'rgba(255,255,255,0.05)', color: MUTED }}
+        >{dict.ai.invoice.printBtn}</button>
+
+        {/* 提交审批 → */}
         <button
           onClick={() => onSaveDraft('waiting_approval')}
           disabled={saving}
-          style={{ flex: 2, minWidth: 140, padding: '11px', borderRadius: 8, background: saving ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: saving ? TEXT : '#000', fontWeight: 700, fontSize: 14, cursor: saving ? 'wait' : 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
+          style={{ flex: 1, minWidth: 140, padding: '11px', borderRadius: 8, background: saving ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: saving ? TEXT : '#000', fontWeight: 700, fontSize: 14, cursor: saving ? 'wait' : 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
         >{saving ? dict.ai.invoice.saving : dict.ai.invoice.submitBtn}</button>
       </div>
     </div>
