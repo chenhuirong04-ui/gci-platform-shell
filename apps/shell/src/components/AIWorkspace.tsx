@@ -13,22 +13,24 @@ const SUGGESTIONS = [
   '整理 WhatsApp 消息',
 ];
 
+// cmd: triggers mock intent routing on /ai; tab: just switches to that tab
 const SHORTCUTS = [
-  { key: 'chat',      icon: '💬', label: 'AI Chat',      desc: '查询数据' },
-  { key: 'assistant', icon: '⚡', label: 'AI Assistant', desc: '执行操作' },
-  { key: 'agent',     icon: '🤖', label: 'AI Agent',     desc: '自动运行' },
-  { key: 'daily',     icon: '📋', label: 'AI Daily',     desc: '今日驾驶舱' },
-  { key: 'workflow',  icon: '🔄', label: 'AI Workflow',  desc: '自动流程' },
-  { key: 'inbox',     icon: '📥', label: 'AI Inbox',     desc: '丢进任何内容' },
+  { icon: '💬', label: 'AI Chat',      desc: '查询数据',     tab: 'chat',      cmd: '' },
+  { icon: '⚡', label: 'AI Assistant', desc: '执行操作',     tab: 'assistant', cmd: '' },
+  { icon: '🤖', label: 'AI Agent',     desc: '自动运行',     tab: 'agent',     cmd: '' },
+  { icon: '📋', label: 'AI Daily',     desc: '今日驾驶舱',   tab: '',          cmd: '生成今日简报' },
+  { icon: '🔄', label: 'AI Workflow',  desc: '自动流程',     tab: 'workflow',  cmd: '' },
+  { icon: '📥', label: 'AI Inbox',     desc: '丢进任何内容', tab: '',          cmd: '整理 WhatsApp 消息' },
 ];
 
 export function AIWorkspace() {
   const navigate = useNavigate();
   const [input, setInput] = useState('');
 
-  function goAI(tab?: string) {
-    const q = tab ? `/ai?tab=${tab}` : input.trim() ? `/ai?q=${encodeURIComponent(input.trim())}` : '/ai';
-    navigate(q);
+  function goAI(cmd?: string, tab?: string) {
+    if (cmd) navigate(`/ai?q=${encodeURIComponent(cmd)}`);
+    else if (tab) navigate(`/ai?tab=${tab}`);
+    else navigate(input.trim() ? `/ai?q=${encodeURIComponent(input.trim())}` : '/ai');
   }
 
   return (
@@ -70,7 +72,7 @@ export function AIWorkspace() {
           {SUGGESTIONS.map(s => (
             <button
               key={s}
-              onClick={() => { setInput(s); navigate(`/ai?q=${encodeURIComponent(s)}`); }}
+              onClick={() => navigate(`/ai?q=${encodeURIComponent(s)}`)}
               style={{ padding: '5px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#7A8494', fontSize: 12, cursor: 'pointer', transition: 'all 0.14s', whiteSpace: 'nowrap' }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(203,168,92,0.35)'; (e.currentTarget as HTMLButtonElement).style.color = GOLD_L; }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLButtonElement).style.color = '#7A8494'; }}
@@ -83,8 +85,8 @@ export function AIWorkspace() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 8 }}>
         {SHORTCUTS.map(s => (
           <button
-            key={s.key}
-            onClick={() => goAI(s.key)}
+            key={s.label}
+            onClick={() => goAI(s.cmd || undefined, s.tab || undefined)}
             style={{ padding: '11px 8px', borderRadius: 11, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s' }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(203,168,92,0.25)'; (e.currentTarget as HTMLButtonElement).style.background = 'rgba(203,168,92,0.06)'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.06)'; (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.025)'; }}

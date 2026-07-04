@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { colors } from '@gci/design-system';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -641,6 +642,12 @@ export function AIPage() {
   const [heroInput, setHeroInput] = useState('');
   const [cmdState, setCmdState] = useState<CmdState | null>(null);
   const runner = useStepRunner();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Capture URL params once at mount — useState initializer runs synchronously
+  const [autoCmd] = useState(() => searchParams.get('q') ?? '');
+  const [autoTab] = useState(() => (searchParams.get('tab') ?? '') as TabKey | '');
+  const didAutoRun = useRef(false);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
@@ -658,9 +665,24 @@ export function AIPage() {
       ()  => setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev),
     );
 
-    // Scroll to top after a tiny delay so tab switch completes first
     setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
   }
+
+  // Auto-execute command passed from Home via ?q= or switch tab via ?tab=
+  // Runs once on mount; clears URL params so back-navigation doesn't re-fire.
+  useEffect(() => {
+    if (didAutoRun.current) return;
+    didAutoRun.current = true;
+    if (searchParams.get('q') || searchParams.get('tab')) {
+      setSearchParams({}, { replace: true });
+    }
+    if (autoCmd) {
+      handleCommand(autoCmd);
+    } else if (autoTab && TABS.some(t => t.key === autoTab)) {
+      setTab(autoTab as TabKey);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function clearCmd() {
     runner.clear();
