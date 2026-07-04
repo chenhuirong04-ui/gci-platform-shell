@@ -7,7 +7,7 @@ import { notionSyncService } from './services/notionSync';
 import { ADMIN_IMPORT_TASKS, ADMIN_IMPORT_PROJECTS } from './adminImportData';
 import LeadMasterDetail from './components/LeadMasterDetail';
 import QuickFollowUpPanel from './components/QuickFollowUpPanel';
-import ManualRecordForm from './components/ManualRecordForm';
+import AIIntakePanel from './components/AIIntakePanel';
 import FollowUpQueue from './components/FollowUpQueue';
 import HistoryView from './components/HistoryView';
 import ProjectProgress from './components/ProjectProgress';
@@ -842,17 +842,14 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
             </div>
 
             {intakeOpen && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                <ManualRecordForm
-                  onAdd={async (data) => {
-                    await handleAddTask(data);
-                    showToast('记录已创建', 'success');
-                  }}
-                  isLoading={isGenerating}
-                  lang={'zh'}
-                  projects={projects}
-                />
-              </div>
+              <AIIntakePanel
+                onAdd={async (data) => {
+                  await handleAddTask(data);
+                  showToast('记录已创建', 'success');
+                }}
+                isLoading={isGenerating}
+                projects={projects}
+              />
             )}
 
             <FollowUpQueue
