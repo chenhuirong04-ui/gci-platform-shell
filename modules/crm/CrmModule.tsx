@@ -878,6 +878,7 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
               onAction={setSelectedTask}
               onUpdateStatus={updateTaskStatus}
               onUpdateTradeStatus={updateTradeStatus}
+              onArchiveTask={archiveTask}
               lang={'zh'}
             />
           </div>
@@ -953,6 +954,7 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
             showToast('跟进记录已保存', 'success');
           }}
           onViewFull={() => setActiveTab('project')}
+          onArchiveTask={archiveTask}
         />
       )}
 

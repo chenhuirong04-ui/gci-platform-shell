@@ -23,6 +23,7 @@ interface FollowUpQueueProps {
   onAction: (task: FollowUpTask) => void;
   onUpdateStatus: (id: string, status: FollowUpTask['status']) => void;
   onUpdateTradeStatus: (id: string, status: TradeStatus) => void;
+  onArchiveTask?: (id: string) => void;
   lang: Language;
 }
 
@@ -157,7 +158,7 @@ function KanbanView({ tasks, onAction, onUpdateTradeStatus }: {
 
 // ── Main ──────────────────────────────────────────────────────────────
 const FollowUpQueue: React.FC<FollowUpQueueProps> = ({
-  tasks, onAction, onUpdateStatus, onUpdateTradeStatus, lang,
+  tasks, onAction, onUpdateStatus, onUpdateTradeStatus, onArchiveTask, lang,
 }) => {
   const _t = translations[lang]; void _t;
   const [view, setView]   = useState<'list'|'kanban'>('list');
@@ -288,9 +289,12 @@ const FollowUpQueue: React.FC<FollowUpQueueProps> = ({
                 style={{ background: '#0F172A', border: `1px solid ${GOLD}50` }}>
                 跟进 <ChevronRight className="w-3.5 h-3.5" />
               </button>
-              <button onClick={() => onUpdateStatus(task.id, 'archived')}
+              <button
+                onClick={() => onArchiveTask ? onArchiveTask(task.id) : onUpdateStatus(task.id, 'archived')}
                 className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
-                title="归档" style={{ color: T3 }}>
+                title="关闭本次跟进"
+                style={{ color: T3 }}
+              >
                 <Archive className="w-4 h-4" />
               </button>
             </div>
