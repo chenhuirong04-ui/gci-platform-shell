@@ -26,12 +26,30 @@ function fmt(n: number, decimals = 2) {
   return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
-export function InvoicePreview({ draft }: Props) {
+export function InvoicePreview({ draft, printAreaId }: Props & { printAreaId?: string }) {
   const { billTo, items, invoiceDate, dueDate, currency, subtotal, vatRate, vatAmount, total,
     paymentTerms, otherComments, invoiceNo } = draft;
 
   return (
-    <div style={{ background: '#fff', color: '#111', fontFamily: 'Arial, sans-serif', fontSize: 12, maxWidth: 780, margin: '0 auto', border: '1px solid #ddd', padding: 32, lineHeight: 1.5 }}>
+    // colorScheme: 'light' is critical — it prevents the dark app shell from
+    // cascading color-scheme:dark into the invoice white surface.
+    <div
+      id={printAreaId ?? 'gci-invoice-preview'}
+      style={{
+        colorScheme: 'light',
+        background: '#ffffff',
+        color: '#111111',
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontSize: 12,
+        maxWidth: 780,
+        margin: '0 auto',
+        border: '1px solid #d0d0d0',
+        padding: 32,
+        lineHeight: 1.5,
+        // Isolate this node from any inherited filter / color transforms
+        isolation: 'isolate',
+      }}
+    >
 
       {/* ── Header ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
