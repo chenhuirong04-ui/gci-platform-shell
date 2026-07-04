@@ -679,7 +679,7 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
 
     // Notion write-back (only for records with a real Notion page ID)
     const pageId = task.leadId;
-    const hasNotionPage = pageId && !/^(LEAD_|HIST_|SYNTH_|INT_)/i.test(pageId);
+    const hasNotionPage = pageId && !/^(LEAD_|HIST_|SYNTH_|INT_|NOTION-)/i.test(pageId) && pageId.includes('-');
     if (hasNotionPage) {
       const base = typeof window !== 'undefined' ? window.location.origin : '';
       fetch(`${base}/api/crm/notion-update`, {
@@ -687,16 +687,60 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pageId, action: 'close_followup', tradeStatus: '暂缓' }),
       })
-        .then(res => {
-          if (!res.ok) return res.json().then(err => {
-            console.error('[archiveTask] Notion write-back failed:', err);
-            showToast('已关闭（本地），Notion 同步失败，请重试', 'error');
-          });
+        .then(async res => {
+          if (res.ok) {
+            showToast(`已关闭 · Notion 已同步`, 'success');
+          } else {
+            const err = await res.json().catch(() => ({}));
+            console.error('[archiveTask] Notion write-back failed:', res.status, err);
+            showToast(`已关闭（本地）· Notion 同步失败 ${res.status}`, 'error');
+          }
         })
         .catch(e => {
           console.error('[archiveTask] Notion error:', e);
-          showToast('已关闭（本地），Notion 连接失败', 'error');
+          showToast('已关闭（本地）· Notion 连接失败', 'error');
         });
+    } else {
+      showToast('已关闭（本地快照）', 'info');
+    }
+  };
+
+  // ── 批量同步本地已归档记录 → Notion ────────────────────────────────
+  // For records that were archived before Notion write-back was available,
+  // or if individual write-backs failed. Runs in parallel, shows summary.
+  const [batchSyncing, setBatchSyncing] = useState(false);
+
+  const syncArchivedToNotion = async () => {
+    const archived = tasks.filter(t =>
+      t.status === 'archived' &&
+      t.leadId &&
+      !/^(LEAD_|HIST_|SYNTH_|INT_|NOTION-)/i.test(t.leadId) &&
+      t.leadId.includes('-')
+    );
+    if (archived.length === 0) {
+      showToast('没有需要同步到 Notion 的归档记录', 'info');
+      return;
+    }
+    setBatchSyncing(true);
+    showToast(`正在同步 ${archived.length} 条归档记录到 Notion…`, 'info');
+    const base = typeof window !== 'undefined' ? window.location.origin : '';
+    let ok = 0, fail = 0;
+    await Promise.allSettled(
+      archived.map(task =>
+        fetch(`${base}/api/crm/notion-update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pageId: task.leadId, action: 'close_followup', tradeStatus: '暂缓' }),
+        })
+          .then(res => { if (res.ok) ok++; else fail++; })
+          .catch(() => { fail++; })
+      )
+    );
+    setBatchSyncing(false);
+    if (fail === 0) {
+      showToast(`✓ ${ok} 条归档已同步到 Notion`, 'success');
+    } else {
+      showToast(`同步完成：${ok} 成功 / ${fail} 失败`, fail > 0 ? 'error' : 'success');
     }
   };
 
@@ -810,6 +854,19 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
                   return diff < 1 ? '刚刚' : `${diff}分钟前`;
                 })()}
               </span>
+            )}
+            {/* 批量同步归档→Notion */}
+            {tasks.some(t => t.status === 'archived' && t.leadId?.includes('-') && !/^(LEAD_|HIST_|SYNTH_|INT_|NOTION-)/i.test(t.leadId)) && (
+              <button
+                onClick={syncArchivedToNotion}
+                disabled={batchSyncing}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black transition-all disabled:opacity-50"
+                style={{ backgroundColor: 'rgba(184,150,12,0.15)', color: '#B8960C', border: '1px solid rgba(184,150,12,0.35)' }}
+                title="将本地归档记录同步到 Notion"
+              >
+                <RefreshCw className={`w-3 h-3 ${batchSyncing ? 'animate-spin' : ''}`} />
+                {batchSyncing ? '同步中…' : '↑ 归档→Notion'}
+              </button>
             )}
             <button
               onClick={() => syncFromNotion()}
