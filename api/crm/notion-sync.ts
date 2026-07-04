@@ -352,12 +352,21 @@ export default async function handler(request: Request): Promise<Response> {
 
       const pageId = entry._pageId;
 
+      const finalTradeStatus = entry.tradeStatus || '待人工确认';
+
+      // Derive status from tradeStatus so that Notion-closed records don't
+      // reappear as active after the next sync overwrites localStorage.
+      // '暂缓' / '已归档' / '已成交' in Notion → archived locally.
+      const CLOSED_TRADE_STATUSES = ['暂缓', '已归档', '已成交', '已关闭'];
+      const derivedStatus: 'todo' | 'archived' =
+        CLOSED_TRADE_STATUSES.includes(finalTradeStatus) ? 'archived' : 'todo';
+
       const task = {
         id: toTaskId(pageId),
         leadId: pageId,
         businessId: entry._businessId || '',
         clientName: entry.clientName || contact.clientName || '未命名',
-        tradeStatus: entry.tradeStatus || '待人工确认',
+        tradeStatus: finalTradeStatus,
         businessType: finalBusinessType,
         nextFollowUpAt: entry.nextFollowUpAt || new Date().toISOString(),
         lastContext: entry.lastContext || '',
@@ -374,7 +383,7 @@ export default async function handler(request: Request): Promise<Response> {
           .replace(/[\s+]/g, '').toLowerCase(),
         // required FollowUpTask fields with defaults
         myRole: 'SELLER' as const,
-        status: 'todo' as const,
+        status: derivedStatus,
         attachments: [],
         history: [],
         importedHistorical: true,

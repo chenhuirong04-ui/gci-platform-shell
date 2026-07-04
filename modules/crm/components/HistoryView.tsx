@@ -571,9 +571,9 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                 <button
                   onClick={() => { onArchiveTask(task.id); setSelectedTask(null); }}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-black transition-colors"
-                  style={{ backgroundColor: statusMap.inProgress.bg, color: statusMap.inProgress.color, border: `1px solid ${statusMap.inProgress.color}40` }}
+                  style={{ backgroundColor: 'rgba(184,150,12,0.12)', color: '#B8960C', border: '1px solid rgba(184,150,12,0.3)' }}
                 >
-                  <Archive className="w-3.5 h-3.5" /> 归档
+                  <Archive className="w-3.5 h-3.5" /> 关闭本次跟进
                 </button>
               )}
               <button

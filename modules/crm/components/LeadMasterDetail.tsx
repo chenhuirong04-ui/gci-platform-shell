@@ -628,9 +628,10 @@ const LeadMasterDetail: React.FC<LeadMasterDetailProps> = ({ task, onClose, onUp
                 {task.status !== 'archived' && task.status !== 'deleted' && (
                   <button
                     onClick={() => { onArchiveTask(task.id); onClose(); }}
-                    className="flex-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 py-2.5 rounded-[24px] text-xs font-black text-amber-700 flex items-center justify-center gap-1.5 transition-all"
+                    className="flex-1 py-2.5 rounded-[24px] text-xs font-black flex items-center justify-center gap-1.5 transition-all hover:opacity-80"
+                    style={{ background: 'rgba(184,150,12,0.12)', color: '#B8960C', border: '1px solid rgba(184,150,12,0.3)' }}
                   >
-                    <Archive className="w-3.5 h-3.5" /> 归档
+                    <Archive className="w-3.5 h-3.5" /> 关闭本次跟进
                   </button>
                 )}
                 <button

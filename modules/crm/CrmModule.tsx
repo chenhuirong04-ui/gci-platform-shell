@@ -663,17 +663,40 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
     return false;
   };
 
-  // ── 归档 / 软删除（task）— 同步到对应 project ──────────────────
+  // ── 关闭本次跟进 — writes '暂缓' to Notion Follow-up Log ──────────
+  // Optimistic: update local state immediately, then persist to Notion.
   const archiveTask = (id: string) => {
     const now = new Date().toISOString();
     const task = tasks.find(t => t.id === id);
+    if (!task) return;
+
+    // Optimistic update: status=archived + tradeStatus=暂缓
     setTasks(prev => prev.map(t =>
-      t.id === id ? { ...t, status: 'archived', updatedAt: now } : t
+      t.id === id
+        ? { ...t, status: 'archived', tradeStatus: '暂缓', updatedAt: now }
+        : t
     ));
-    if (task) {
-      setProjects(prev => prev.map(p =>
-        taskMatchesProject(task, p) ? { ...p, archivedAt: now } : p
-      ));
+
+    // Notion write-back (only for records with a real Notion page ID)
+    const pageId = task.leadId;
+    const hasNotionPage = pageId && !/^(LEAD_|HIST_|SYNTH_|INT_)/i.test(pageId);
+    if (hasNotionPage) {
+      const base = typeof window !== 'undefined' ? window.location.origin : '';
+      fetch(`${base}/api/crm/notion-update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pageId, action: 'close_followup', tradeStatus: '暂缓' }),
+      })
+        .then(res => {
+          if (!res.ok) return res.json().then(err => {
+            console.error('[archiveTask] Notion write-back failed:', err);
+            showToast('已关闭（本地），Notion 同步失败，请重试', 'error');
+          });
+        })
+        .catch(e => {
+          console.error('[archiveTask] Notion error:', e);
+          showToast('已关闭（本地），Notion 连接失败', 'error');
+        });
     }
   };
 
