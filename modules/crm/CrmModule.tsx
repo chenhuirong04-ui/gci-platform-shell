@@ -677,6 +677,19 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
         : t
     ));
 
+    // Immediately decrement "今日待跟进" stat so Control Center reflects the change
+    // without waiting for the next Notion sync.
+    const todayISO = new Date().toISOString().slice(0, 10);
+    const EXCLUDED = ['暂缓', '已成交', '已归档', '执行中'];
+    const wasInTodayCount =
+      task.status === 'todo' &&
+      !EXCLUDED.includes(task.tradeStatus || '') &&
+      !!task.nextFollowUpAt &&
+      task.nextFollowUpAt.slice(0, 10) <= todayISO;
+    if (wasInTodayCount) {
+      setTodayFollowupCount(prev => (prev !== null ? Math.max(0, prev - 1) : null));
+    }
+
     // Notion write-back (only for records with a real Notion page ID)
     const pageId = task.leadId;
     const hasNotionPage = pageId && !/^(LEAD_|HIST_|SYNTH_|INT_|NOTION-)/i.test(pageId) && pageId.includes('-');
