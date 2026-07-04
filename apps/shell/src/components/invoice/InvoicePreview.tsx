@@ -5,6 +5,45 @@ import { GCI_COMPANY } from '../../types/invoice';
 const GREEN = '#2D6A4F';
 const GREEN_BG = '#2D6A4F';
 
+// Scoped CSS reset — defeats any dark-theme CSS that leaks into the invoice node.
+// Uses #gci-invoice-preview specificity so it only affects this component.
+// filter:none + color-scheme:light guard against:
+//  - Tailwind dark: variants
+//  - color:inherit from dark :root
+//  - webkit-text-fill-color overrides
+const INVOICE_SCOPED_CSS = `
+  #gci-invoice-preview {
+    all: revert;
+    font-family: Arial, Helvetica, sans-serif !important;
+    background: #ffffff !important;
+    color: #111111 !important;
+    color-scheme: light !important;
+    -webkit-text-fill-color: #111111 !important;
+    filter: none !important;
+    opacity: 1 !important;
+    mix-blend-mode: normal !important;
+  }
+  #gci-invoice-preview *,
+  #gci-invoice-preview ::before,
+  #gci-invoice-preview ::after {
+    -webkit-text-fill-color: currentColor !important;
+    filter: none !important;
+    opacity: 1 !important;
+    mix-blend-mode: normal !important;
+  }
+  #gci-invoice-preview table,
+  #gci-invoice-preview thead,
+  #gci-invoice-preview tbody,
+  #gci-invoice-preview tr {
+    background-color: transparent !important;
+  }
+  #gci-invoice-preview td,
+  #gci-invoice-preview th {
+    background-color: inherit !important;
+    color: inherit !important;
+  }
+`;
+
 interface Props {
   draft: Partial<InvoiceDraft> & {
     billTo: InvoiceDraft['billTo'];
@@ -31,24 +70,33 @@ export function InvoicePreview({ draft, printAreaId }: Props & { printAreaId?: s
     paymentTerms, otherComments, invoiceNo } = draft;
 
   return (
-    // colorScheme: 'light' is critical — it prevents the dark app shell from
-    // cascading color-scheme:dark into the invoice white surface.
+    <>
+      {/* Scoped style tag — beats any inherited dark-app-shell CSS */}
+      <style dangerouslySetInnerHTML={{ __html: INVOICE_SCOPED_CSS }} />
     <div
       id={printAreaId ?? 'gci-invoice-preview'}
       style={{
-        colorScheme: 'light',
+        /* --- layout ------------------------------------------------ */
+        maxWidth: 780,
+        margin: '0 auto',
+        padding: 32,
+        border: '1px solid #d0d0d0',
+        lineHeight: 1.5,
+        /* --- force white-paper rendering regardless of shell theme --- */
         background: '#ffffff',
+        backgroundColor: '#ffffff',
         color: '#111111',
         fontFamily: 'Arial, Helvetica, sans-serif',
         fontSize: 12,
-        maxWidth: 780,
-        margin: '0 auto',
-        border: '1px solid #d0d0d0',
-        padding: 32,
-        lineHeight: 1.5,
-        // Isolate this node from any inherited filter / color transforms
+        /* --- isolation: block any parent filter / blend-mode ------- */
+        colorScheme: 'light',
         isolation: 'isolate',
-      }}
+        contain: 'paint',
+        filter: 'none',
+        opacity: 1,
+        mixBlendMode: 'normal',
+        WebkitTextFillColor: '#111111',
+      } as React.CSSProperties}
     >
 
       {/* ── Header ── */}
@@ -191,5 +239,6 @@ export function InvoicePreview({ draft, printAreaId }: Props & { printAreaId?: s
         </span>
       </div>
     </div>
+    </>
   );
 }

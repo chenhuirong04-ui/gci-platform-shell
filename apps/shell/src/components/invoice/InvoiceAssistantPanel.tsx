@@ -306,6 +306,139 @@ function InvoiceFormStep({ profile, fields, onChange, onBack, onNext }: {
   );
 }
 
+// ── Step 2: Preview ──────────────────────────────────────────────────────────
+// Extracted from IIFE to a named component — eliminates conditional-render edge cases.
+type PreviewDraft = ReturnType<typeof computeTotals> & {
+  billTo: InvoiceDraft['billTo'];
+  items: InvoiceDraft['items'];
+  invoiceDate: string;
+  dueDate: string;
+  currency: string;
+  paymentTerms: string;
+  otherComments: string;
+  invoiceNo?: string;
+};
+
+function PreviewStep({ previewDraft, saving, onBack, onSaveDraft }: {
+  previewDraft: PreviewDraft;
+  saving: boolean;
+  onBack: () => void;
+  onSaveDraft: (status: 'draft' | 'waiting_approval') => void;
+}) {
+  function handlePrint() {
+    const node = document.getElementById('gci-invoice-preview');
+    if (!node) { alert('预览未加载，请重试'); return; }
+    const win = window.open('', '_blank', 'width=960,height=1280');
+    if (!win) { alert('浏览器阻止了弹出窗口，请允许后重试'); return; }
+    win.document.write(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>GCI TAX INVOICE ${(previewDraft as any).invoiceNo ?? 'DRAFT'}</title>
+  <style>
+    /* Hard reset — no dark theme should bleed into print */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      background: #ffffff !important;
+      color: #111111 !important;
+      font-family: Arial, Helvetica, sans-serif;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    #invoice-print-root {
+      background: #ffffff !important;
+      color: #111111 !important;
+      padding: 24px;
+    }
+    table { border-collapse: collapse; }
+    td, th { background-color: transparent; color: inherit; }
+    @media print {
+      @page { margin: 1.2cm; size: A4; }
+      html, body { padding: 0; }
+      #invoice-print-root { padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div id="invoice-print-root">${node.outerHTML}</div>
+</body>
+</html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); win.close(); }, 500);
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: 14, color: MUTED, marginBottom: 16 }}>
+        请检查发票内容。确认无误后保存草稿，或提交审批。打印时可选择「另存为 PDF」。
+      </div>
+
+      {/* Light-grey tray — provides visual separation from dark shell */}
+      <div style={{
+        background: '#e5e7eb',
+        borderRadius: 12,
+        padding: '20px 16px',
+        marginBottom: 24,
+        overflowX: 'auto',
+      }}>
+        {/* Debug marker — confirms this component mounted */}
+        <div style={{
+          fontSize: 11,
+          color: '#374151',
+          background: '#d1fae5',
+          border: '1px solid #6ee7b7',
+          borderRadius: 6,
+          padding: '4px 12px',
+          marginBottom: 12,
+          fontFamily: 'monospace',
+          display: 'inline-block',
+        }}>
+          ✓ Invoice Preview Loaded
+        </div>
+
+        {/* White A4 paper — must stay white regardless of dark shell */}
+        <div style={{
+          background: '#ffffff',
+          backgroundColor: '#ffffff',
+          minHeight: 400,
+          boxShadow: '0 4px 24px rgba(0,0,0,0.18)',
+          borderRadius: 4,
+          overflow: 'hidden',
+        }}>
+          <InvoicePreview draft={previewDraft} />
+        </div>
+      </div>
+
+      {/* Action buttons */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <button
+          onClick={onBack}
+          style={{ padding: '11px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.16)', color: MUTED, fontSize: 14, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
+        >← 返回修改</button>
+
+        <button
+          onClick={handlePrint}
+          style={{ padding: '11px 18px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)', color: TEXT, fontSize: 14, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
+        >🖨 打印 / 保存 PDF</button>
+
+        <button
+          onClick={() => onSaveDraft('draft')}
+          disabled={saving}
+          style={{ flex: 1, minWidth: 120, padding: '11px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)', color: TEXT, fontSize: 14, cursor: saving ? 'wait' : 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
+        >{saving ? '保存中…' : '保存草稿'}</button>
+
+        <button
+          onClick={() => onSaveDraft('waiting_approval')}
+          disabled={saving}
+          style={{ flex: 2, minWidth: 140, padding: '11px', borderRadius: 8, background: saving ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: saving ? TEXT : '#000', fontWeight: 700, fontSize: 14, cursor: saving ? 'wait' : 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
+        >{saving ? '保存中…' : '提交审批 →'}</button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main wizard ───────────────────────────────────────────────────────────────
 interface Props {
   onClose: () => void;
@@ -429,75 +562,14 @@ export function InvoiceAssistantPanel({ onClose }: Props) {
           />
         )}
 
-        {step === 2 && profile && (() => {
-          const previewDraft = buildPreviewDraft();
-
-          function handlePrint() {
-            const node = document.getElementById('gci-invoice-preview');
-            if (!node) return;
-            const win = window.open('', '_blank', 'width=900,height=1200');
-            if (!win) return;
-            win.document.write(`<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <title>GCI TAX INVOICE ${previewDraft.invoiceNo ?? 'DRAFT'}</title>
-  <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; padding: 24px; font-family: Arial, Helvetica, sans-serif; background: #fff; color: #111; }
-    @media print {
-      @page { margin: 1.2cm; size: A4; }
-      body { padding: 0; }
-    }
-  </style>
-</head>
-<body>
-${node.outerHTML}
-</body>
-</html>`);
-            win.document.close();
-            win.focus();
-            setTimeout(() => { win.print(); win.close(); }, 400);
-          }
-
-          return (
-            <div>
-              <div style={{ fontSize: 14, color: MUTED, marginBottom: 16 }}>
-                请检查发票内容。确认无误后保存草稿，或提交审批。打印时可选择「另存为 PDF」。
-              </div>
-
-              {/* White invoice preview — surrounded by a light-grey tray so it stands out from dark shell */}
-              <div style={{ background: '#E8EAED', borderRadius: 10, padding: '24px 16px', marginBottom: 24, overflowX: 'auto' }}>
-                <InvoicePreview draft={previewDraft} />
-              </div>
-
-              {/* Action buttons */}
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <button
-                  onClick={() => setStep(1)}
-                  style={{ padding: '11px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.16)', color: MUTED, fontSize: 14, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
-                >← 返回修改</button>
-
-                <button
-                  onClick={handlePrint}
-                  style={{ padding: '11px 18px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)', color: TEXT, fontSize: 14, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
-                >🖨 打印 / 保存 PDF</button>
-
-                <button
-                  onClick={() => handleSaveDraft('draft')}
-                  disabled={saving}
-                  style={{ flex: 1, minWidth: 120, padding: '11px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)', color: TEXT, fontSize: 14, cursor: saving ? 'wait' : 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
-                >{saving ? '保存中…' : '保存草稿'}</button>
-
-                <button
-                  onClick={() => handleSaveDraft('waiting_approval')}
-                  disabled={saving}
-                  style={{ flex: 2, minWidth: 140, padding: '11px', borderRadius: 8, background: saving ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: saving ? TEXT : '#000', fontWeight: 700, fontSize: 14, cursor: saving ? 'wait' : 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
-                >{saving ? '保存中…' : '提交审批 →'}</button>
-              </div>
-            </div>
-          );
-        })()}
+        {step === 2 && profile !== null && (
+          <PreviewStep
+            previewDraft={buildPreviewDraft() as PreviewDraft}
+            saving={saving}
+            onBack={() => setStep(1)}
+            onSaveDraft={handleSaveDraft}
+          />
+        )}
 
         {step === 3 && savedDraft && (
           <div style={{ textAlign: 'center', padding: '24px 0' }}>
