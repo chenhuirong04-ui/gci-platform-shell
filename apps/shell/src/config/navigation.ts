@@ -94,7 +94,7 @@ export const sections: SectionDef[] = [
   {
     labelKey: 'platformSection',
     items: [
-      { code: 'AI', nameKey: 'aiAssistant' },
+      { code: 'AI', nameKey: 'aiAssistant', path: '/ai' },
       { code: 'ST', nameKey: 'settings' },
     ],
   },
