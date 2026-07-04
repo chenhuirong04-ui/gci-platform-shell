@@ -1,119 +1,298 @@
+// ── GCI Invoice Store ─────────────────────────────────────────────────────────
+// PRIMARY storage: Supabase (invoice_billing_profiles + invoice_drafts tables).
+// Shared across Dubai and China team members — all authenticated users see the
+// same data in real time.
+//
+// FALLBACK: localStorage is used ONLY if Supabase is unreachable (network error,
+// misconfiguration). localStorage is NOT the source of truth for production use.
+// Any data written to the fallback is local to that browser and NOT shared.
+
+import { supabase } from './supabase';
 import type { BillingProfile, InvoiceDraft, InvoiceStatus } from '../types/invoice';
 
-// ── Storage keys ──────────────────────────────────────────────────────────────
-const PROFILES_KEY = 'GCI_BILLING_PROFILES_V1';
-const DRAFTS_KEY   = 'GCI_INVOICE_DRAFTS_V1';
+// Fallback localStorage keys — clearly labelled as fallback
+const LS_PROFILES = 'GCI_INVOICE_PROFILES_FALLBACK_V1';
+const LS_DRAFTS   = 'GCI_INVOICE_DRAFTS_FALLBACK_V1';
 
-// ── Notion integration stubs ──────────────────────────────────────────────────
-// TODO: When Notion is configured, replace these with actual API calls.
-// Database IDs should be stored in environment variables:
-//   VITE_NOTION_INVOICE_CUSTOMERS_DB_ID=<your-db-id>
-//   VITE_NOTION_INVOICE_DRAFTS_DB_ID=<your-db-id>
-// Use the existing Make.com → Notion webhook pattern already in the project.
-// Do NOT call Notion directly from the browser — route through a secure backend.
-// async function notionCreateProfile(profile: BillingProfile) { /* TODO */ }
-// async function notionCreateDraft(draft: InvoiceDraft)       { /* TODO */ }
-// async function notionUpdateDraft(id: string, patch: Partial<InvoiceDraft>) { /* TODO */ }
+// ── Cloud health state ────────────────────────────────────────────────────────
+let _cloudOk: boolean | null = null;
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function safeGet<T>(key: string): T[] {
+export function getCloudStatus(): 'connected' | 'fallback' | 'unknown' {
+  if (_cloudOk === true)  return 'connected';
+  if (_cloudOk === false) return 'fallback';
+  return 'unknown';
+}
+
+// ── Supabase row → TypeScript type mappers ────────────────────────────────────
+// Supabase columns are snake_case; our TypeScript types are camelCase.
+
+function mapProfile(row: Record<string, any>): BillingProfile {
+  return {
+    id:                   row.id,
+    customerName:         row.customer_name,
+    billingName:          row.billing_name          ?? '',
+    billingAddress:       row.billing_address       ?? '',
+    phone:                row.phone                 ?? '',
+    email:                row.email                 ?? '',
+    trn:                  row.trn                   ?? '',
+    country:              row.country               ?? 'UAE',
+    city:                 row.city                  ?? 'Dubai',
+    defaultCurrency:      row.default_currency      ?? 'AED',
+    defaultVatRate:       Number(row.default_vat_rate ?? 5),
+    defaultPaymentTerms:  row.default_payment_terms ?? '',
+    notes:                row.notes                 ?? '',
+    status:               row.status                ?? 'active',
+    lastInvoiceDate:      row.last_invoice_date     ?? undefined,
+    createdAt:            row.created_at,
+    updatedAt:            row.updated_at,
+    createdBy:            row.created_by            ?? undefined,
+  };
+}
+
+function mapDraft(row: Record<string, any>): InvoiceDraft {
+  return {
+    id:               row.id,
+    invoiceNo:        row.invoice_no,
+    customerName:     row.customer_name,
+    billingProfileId: row.billing_profile_id  ?? undefined,
+    billTo:           row.bill_to             ?? {},
+    invoiceDate:      row.invoice_date,
+    dueDate:          row.due_date,
+    currency:         row.currency            ?? 'AED',
+    items:            row.items               ?? [],
+    subtotal:         Number(row.subtotal     ?? 0),
+    vatRate:          Number(row.vat_rate     ?? 5),
+    vatAmount:        Number(row.vat_amount   ?? 0),
+    total:            Number(row.total        ?? 0),
+    paymentTerms:     row.payment_terms       ?? '',
+    otherComments:    row.other_comments      ?? '',
+    relatedPI:        row.related_pi          ?? '',
+    relatedQuotation: row.related_quotation   ?? '',
+    relatedOrder:     row.related_order       ?? '',
+    status:           row.status              ?? 'draft',
+    pdfUrl:           row.pdf_url             ?? undefined,
+    notes:            row.notes               ?? '',
+    createdAt:        row.created_at,
+    approvedAt:       row.approved_at         ?? undefined,
+    createdBy:        row.created_by          ?? undefined,
+    approvedBy:       row.approved_by         ?? undefined,
+  };
+}
+
+// ── localStorage fallback helpers ─────────────────────────────────────────────
+// localStorage is fallback only. Cloud database is required for production
+// invoice usage. Data written here is NOT visible to other team members.
+
+function lsGet<T>(key: string): T[] {
   try { return JSON.parse(localStorage.getItem(key) || '[]') || []; }
   catch { return []; }
 }
-function safeSet(key: string, data: unknown) {
+function lsSet(key: string, data: unknown) {
   try { localStorage.setItem(key, JSON.stringify(data)); }
-  catch { /* storage full */ }
+  catch { /* storage full — silently skip */ }
 }
-function uid(): string {
+function uid() {
   return typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-// ── Billing Profile CRUD ──────────────────────────────────────────────────────
-export function getProfiles(): BillingProfile[] {
-  return safeGet<BillingProfile>(PROFILES_KEY)
-    .filter(p => p.status !== 'inactive');
+// ── Billing Profiles ──────────────────────────────────────────────────────────
+
+export async function getProfiles(): Promise<BillingProfile[]> {
+  const { data, error } = await supabase
+    .from('invoice_billing_profiles')
+    .select('*')
+    .neq('status', 'archived')
+    .order('customer_name', { ascending: true });
+
+  if (error || !data) {
+    _cloudOk = false;
+    console.warn('[invoiceStore] Supabase profiles read failed — using localStorage fallback. Data is NOT shared.', error?.message);
+    return lsGet<BillingProfile>(LS_PROFILES);
+  }
+
+  _cloudOk = true;
+  return data.map(mapProfile);
 }
 
-export function getAllProfiles(): BillingProfile[] {
-  return safeGet<BillingProfile>(PROFILES_KEY);
+export async function saveProfile(
+  data: Omit<BillingProfile, 'id' | 'createdAt' | 'updatedAt'>,
+  userId?: string,
+): Promise<BillingProfile> {
+  const row = {
+    customer_name:         data.customerName,
+    billing_name:          data.billingName,
+    billing_address:       data.billingAddress,
+    phone:                 data.phone,
+    email:                 data.email,
+    trn:                   data.trn,
+    country:               data.country,
+    city:                  data.city,
+    default_currency:      data.defaultCurrency,
+    default_vat_rate:      data.defaultVatRate,
+    default_payment_terms: data.defaultPaymentTerms,
+    notes:                 data.notes,
+    status:                data.status,
+    last_invoice_date:     data.lastInvoiceDate ?? null,
+    created_by:            userId ?? null,
+  };
+
+  const { data: inserted, error } = await supabase
+    .from('invoice_billing_profiles')
+    .insert(row)
+    .select()
+    .single();
+
+  if (error || !inserted) {
+    _cloudOk = false;
+    console.warn('[invoiceStore] Supabase profile insert failed — saving to localStorage fallback. This record will NOT be visible to other team members.', error?.message);
+    const now = new Date().toISOString();
+    const fallback: BillingProfile = { ...data, id: uid(), createdAt: now, updatedAt: now };
+    lsSet(LS_PROFILES, [...lsGet<BillingProfile>(LS_PROFILES), fallback]);
+    return fallback;
+  }
+
+  _cloudOk = true;
+  return mapProfile(inserted);
 }
 
-export function saveProfile(
-  data: Omit<BillingProfile, 'id' | 'createdAt' | 'updatedAt'>
-): BillingProfile {
-  const all = safeGet<BillingProfile>(PROFILES_KEY);
-  const now = new Date().toISOString();
-  const record: BillingProfile = { ...data, id: uid(), createdAt: now, updatedAt: now };
-  safeSet(PROFILES_KEY, [...all, record]);
-  // TODO: notionCreateProfile(record)
-  return record;
+export async function updateProfile(
+  id: string,
+  patch: Partial<Pick<BillingProfile, 'customerName' | 'billingName' | 'billingAddress' | 'phone' | 'email' | 'trn' | 'status' | 'lastInvoiceDate'>>,
+): Promise<BillingProfile | null> {
+  const row: Record<string, any> = {};
+  if (patch.customerName   !== undefined) row.customer_name    = patch.customerName;
+  if (patch.billingName    !== undefined) row.billing_name     = patch.billingName;
+  if (patch.billingAddress !== undefined) row.billing_address  = patch.billingAddress;
+  if (patch.phone          !== undefined) row.phone            = patch.phone;
+  if (patch.email          !== undefined) row.email            = patch.email;
+  if (patch.trn            !== undefined) row.trn              = patch.trn;
+  if (patch.status         !== undefined) row.status           = patch.status;
+  if (patch.lastInvoiceDate !== undefined) row.last_invoice_date = patch.lastInvoiceDate ?? null;
+
+  const { data, error } = await supabase
+    .from('invoice_billing_profiles')
+    .update(row)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error || !data) {
+    console.warn('[invoiceStore] Supabase profile update failed', error?.message);
+    return null;
+  }
+  return mapProfile(data);
 }
 
-export function updateProfile(id: string, patch: Partial<BillingProfile>): BillingProfile | null {
-  const all = safeGet<BillingProfile>(PROFILES_KEY);
-  const idx = all.findIndex(p => p.id === id);
-  if (idx === -1) return null;
-  const updated: BillingProfile = { ...all[idx], ...patch, updatedAt: new Date().toISOString() };
-  all[idx] = updated;
-  safeSet(PROFILES_KEY, all);
-  // TODO: notionUpdateProfile(updated.notionPageId, patch)
-  return updated;
+export async function stampLastInvoiceDate(billingProfileId: string): Promise<void> {
+  await updateProfile(billingProfileId, {
+    lastInvoiceDate: new Date().toISOString().split('T')[0],
+  });
 }
 
-// ── Invoice Draft CRUD ────────────────────────────────────────────────────────
-export function getDrafts(): InvoiceDraft[] {
-  return safeGet<InvoiceDraft>(DRAFTS_KEY);
+// ── Invoice Drafts ────────────────────────────────────────────────────────────
+
+export async function getDrafts(): Promise<InvoiceDraft[]> {
+  const { data, error } = await supabase
+    .from('invoice_drafts')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error || !data) {
+    _cloudOk = false;
+    console.warn('[invoiceStore] Supabase drafts read failed — using localStorage fallback. Data is NOT shared.', error?.message);
+    return lsGet<InvoiceDraft>(LS_DRAFTS);
+  }
+
+  _cloudOk = true;
+  return data.map(mapDraft);
 }
 
-export function getDraftById(id: string): InvoiceDraft | null {
-  return getDrafts().find(d => d.id === id) ?? null;
-}
+async function nextInvoiceNo(): Promise<string> {
+  const { data } = await supabase
+    .from('invoice_drafts')
+    .select('invoice_no')
+    .order('created_at', { ascending: false });
 
-function nextInvoiceNo(): string {
-  const drafts = safeGet<InvoiceDraft>(DRAFTS_KEY);
-  const nums = drafts
-    .map(d => parseInt(d.invoiceNo.replace(/^INV-0*/, ''), 10))
-    .filter(n => !isNaN(n));
-  // Last known issued invoice is INV-000143; start from 144 for new drafts
+  const nums = (data ?? [])
+    .map((r: any) => parseInt(String(r.invoice_no).replace(/^INV-0*/, ''), 10))
+    .filter((n: number) => !isNaN(n));
+
+  // Last known issued invoice is INV-000143; first draft starts at INV-000144
   const max = nums.length ? Math.max(...nums) : 143;
   return `INV-${String(max + 1).padStart(6, '0')}`;
 }
 
-export function saveDraft(
-  data: Omit<InvoiceDraft, 'id' | 'invoiceNo' | 'createdAt'>
-): InvoiceDraft {
-  const all = safeGet<InvoiceDraft>(DRAFTS_KEY);
-  const now = new Date().toISOString();
-  const record: InvoiceDraft = {
-    ...data,
-    id: uid(),
-    invoiceNo: nextInvoiceNo(),
-    createdAt: now,
+export async function saveDraft(
+  data: Omit<InvoiceDraft, 'id' | 'invoiceNo' | 'createdAt'>,
+  userId?: string,
+): Promise<InvoiceDraft> {
+  const invoiceNo = await nextInvoiceNo();
+
+  const row = {
+    invoice_no:         invoiceNo,
+    customer_name:      data.customerName,
+    billing_profile_id: data.billingProfileId ?? null,
+    bill_to:            data.billTo,
+    invoice_date:       data.invoiceDate,
+    due_date:           data.dueDate,
+    currency:           data.currency,
+    items:              data.items,
+    subtotal:           data.subtotal,
+    vat_rate:           data.vatRate,
+    vat_amount:         data.vatAmount,
+    total:              data.total,
+    payment_terms:      data.paymentTerms,
+    other_comments:     data.otherComments,
+    related_pi:         data.relatedPI         ?? '',
+    related_quotation:  data.relatedQuotation  ?? '',
+    related_order:      data.relatedOrder      ?? '',
+    status:             data.status,
+    notes:              data.notes,
+    created_by:         userId ?? null,
   };
-  safeSet(DRAFTS_KEY, [...all, record]);
-  // TODO: notionCreateDraft(record)
-  return record;
+
+  const { data: inserted, error } = await supabase
+    .from('invoice_drafts')
+    .insert(row)
+    .select()
+    .single();
+
+  if (error || !inserted) {
+    _cloudOk = false;
+    console.warn('[invoiceStore] Supabase draft insert failed — saving to localStorage fallback. This record will NOT be visible to other team members.', error?.message);
+    const now = new Date().toISOString();
+    const fallback: InvoiceDraft = { ...data, id: uid(), invoiceNo, createdAt: now };
+    lsSet(LS_DRAFTS, [...lsGet<InvoiceDraft>(LS_DRAFTS), fallback]);
+    return fallback;
+  }
+
+  _cloudOk = true;
+  return mapDraft(inserted);
 }
 
-export function updateDraft(id: string, patch: Partial<InvoiceDraft>): InvoiceDraft | null {
-  const all = safeGet<InvoiceDraft>(DRAFTS_KEY);
-  const idx = all.findIndex(d => d.id === id);
-  if (idx === -1) return null;
-  all[idx] = { ...all[idx], ...patch };
-  safeSet(DRAFTS_KEY, all);
-  // TODO: notionUpdateDraft(all[idx].notionPageId, patch)
-  return all[idx];
-}
+export async function updateDraftStatus(
+  id: string,
+  status: InvoiceStatus,
+  userId?: string,
+): Promise<InvoiceDraft | null> {
+  const patch: Record<string, any> = { status };
+  if (status === 'approved') {
+    patch.approved_at = new Date().toISOString();
+    if (userId) patch.approved_by = userId;
+  }
 
-export function updateDraftStatus(id: string, status: InvoiceStatus): InvoiceDraft | null {
-  const patch: Partial<InvoiceDraft> = { status };
-  if (status === 'approved') patch.approvedAt = new Date().toISOString();
-  return updateDraft(id, patch);
-}
+  const { data, error } = await supabase
+    .from('invoice_drafts')
+    .update(patch)
+    .eq('id', id)
+    .select()
+    .single();
 
-// Stamp last invoice date on billing profile when a draft is saved/approved
-export function stampLastInvoiceDate(billingProfileId: string) {
-  updateProfile(billingProfileId, { lastInvoiceDate: new Date().toISOString().split('T')[0] });
+  if (error || !data) {
+    console.warn('[invoiceStore] Supabase status update failed', error?.message);
+    return null;
+  }
+  return mapDraft(data);
 }

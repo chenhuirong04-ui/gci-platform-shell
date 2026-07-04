@@ -19,8 +19,7 @@ export interface BillingProfile {
   lastInvoiceDate?: string;   // ISO date string
   createdAt: string;
   updatedAt: string;
-  // TODO: set this when Notion sync is configured
-  notionPageId?: string;
+  createdBy?: string;         // Supabase auth.users.id of the team member who saved this
 }
 
 export interface InvoiceLineItem {
@@ -88,8 +87,8 @@ export interface InvoiceDraft {
   notes: string;
   createdAt: string;
   approvedAt?: string;
-  // TODO: set this when Notion sync is configured
-  notionPageId?: string;
+  createdBy?: string;   // Supabase auth.users.id of the team member who created this
+  approvedBy?: string;  // Supabase auth.users.id of the approver
 }
 
 // GCI company defaults — matches actual TAX INVOICE template

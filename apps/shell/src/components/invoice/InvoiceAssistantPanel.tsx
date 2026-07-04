@@ -3,15 +3,20 @@
 // Step 1: Invoice details (items, dates)
 // Step 2: Preview (paper style)
 // Step 3: Saved confirmation
-import { useState, useCallback } from 'react';
+//
+// Data is saved to Supabase (shared across Dubai + China team).
+// localStorage is fallback only — shown clearly in cloud status.
+import { useState, useCallback, useEffect } from 'react';
 import type { BillingProfile, InvoiceDraft, InvoiceLineItem } from '../../types/invoice';
 import { GCI_COMPANY } from '../../types/invoice';
 import {
   getProfiles, saveProfile,
-  saveDraft, updateDraftStatus, stampLastInvoiceDate,
+  saveDraft, stampLastInvoiceDate,
+  getCloudStatus,
 } from '../../lib/invoiceStore';
 import { InvoicePreview } from './InvoicePreview';
 import { colors } from '@gci/design-system';
+import { useAuth } from '../../contexts/AuthContext';
 
 const GOLD = '#CBA85C';
 const GOLD_L = '#E2C988';
@@ -55,8 +60,13 @@ function computeTotals(items: InvoiceLineItem[], vatRate: number) {
 
 // ── Step 0: Profile selection ─────────────────────────────────────────────────
 function ProfileStep({ onSelect }: { onSelect: (p: BillingProfile) => void }) {
-  const [profiles, setProfiles] = useState<BillingProfile[]>(() => getProfiles());
+  const [profiles, setProfiles] = useState<BillingProfile[]>([]);
+  const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => {
+    getProfiles().then(p => { setProfiles(p); setLoadingProfiles(false); });
+  }, []);
   const [form, setForm] = useState({
     customerName: '', billingName: '', billingAddress: '',
     phone: '', email: '', trn: '', country: 'UAE', city: 'Dubai',
@@ -64,10 +74,13 @@ function ProfileStep({ onSelect }: { onSelect: (p: BillingProfile) => void }) {
     defaultPaymentTerms: GCI_COMPANY.defaultPaymentTerms, notes: '',
   });
 
-  function handleSaveNew() {
-    if (!form.customerName.trim() || !form.billingAddress.trim()) return;
-    const p = saveProfile({ ...form, status: 'active' });
-    setProfiles(getProfiles());
+  const [saving, setSaving] = useState(false);
+
+  async function handleSaveNew() {
+    if (!form.customerName.trim() || !form.billingAddress.trim() || saving) return;
+    setSaving(true);
+    const p = await saveProfile({ ...form, status: 'active' });
+    setSaving(false);
     onSelect(p);
   }
 
@@ -85,7 +98,11 @@ function ProfileStep({ onSelect }: { onSelect: (p: BillingProfile) => void }) {
       </div>
 
       {/* Existing profiles */}
-      {profiles.length > 0 && (
+      {loadingProfiles && (
+        <div style={{ fontSize: 12, color: MUTED, marginBottom: 16, fontFamily: 'IBM Plex Mono, monospace' }}>Loading shared profiles…</div>
+      )}
+
+      {!loadingProfiles && profiles.length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <div style={{ fontSize: 10.5, color: GOLD, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.18em', marginBottom: 10 }}>SAVED BILLING PROFILES</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -149,9 +166,9 @@ function ProfileStep({ onSelect }: { onSelect: (p: BillingProfile) => void }) {
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
             <button
               onClick={handleSaveNew}
-              disabled={!form.customerName.trim() || !form.billingAddress.trim()}
-              style={{ flex: 1, padding: '10px', borderRadius: 8, background: form.customerName.trim() && form.billingAddress.trim() ? `linear-gradient(135deg,${GOLD},${GOLD_L})` : 'rgba(255,255,255,0.06)', border: 'none', color: '#000', fontWeight: 700, fontSize: 13, cursor: form.customerName.trim() ? 'pointer' : 'not-allowed', fontFamily: "'Space Grotesk',sans-serif" }}
-            >保存账单资料并继续</button>
+              disabled={!form.customerName.trim() || !form.billingAddress.trim() || saving}
+              style={{ flex: 1, padding: '10px', borderRadius: 8, background: form.customerName.trim() && form.billingAddress.trim() && !saving ? `linear-gradient(135deg,${GOLD},${GOLD_L})` : 'rgba(255,255,255,0.06)', border: 'none', color: '#000', fontWeight: 700, fontSize: 13, cursor: saving ? 'wait' : form.customerName.trim() ? 'pointer' : 'not-allowed', fontFamily: "'Space Grotesk',sans-serif" }}
+            >{saving ? '保存中…' : '保存账单资料并继续'}</button>
             <button onClick={() => setShowForm(false)} style={{ padding: '10px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: MUTED, fontSize: 13, cursor: 'pointer' }}>取消</button>
           </div>
         </div>
@@ -294,7 +311,9 @@ interface Props {
 }
 
 export function InvoiceAssistantPanel({ onClose }: Props) {
+  const { user } = useAuth();
   const [step, setStep] = useState(0);
+  const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<BillingProfile | null>(null);
   const [fields, setFields] = useState<DraftFields>({
     currency: GCI_COMPANY.defaultCurrency,
@@ -347,20 +366,23 @@ export function InvoiceAssistantPanel({ onClose }: Props) {
     };
   }
 
-  function handleSaveDraft(status: 'draft' | 'waiting_approval') {
+  async function handleSaveDraft(status: 'draft' | 'waiting_approval') {
+    if (saving) return;
+    setSaving(true);
     const { subtotal, vatAmount, total } = computeTotals(fields.items, fields.vatRate);
-    const draft = saveDraft({
-      customerName: profile!.customerName,
-      billingProfileId: profile!.id,
-      billTo: buildBillTo(profile!),
-      ...fields,
-      subtotal, vatAmount, total,
-      status,
-    });
-    if (status === 'waiting_approval') {
-      updateDraftStatus(draft.id, 'waiting_approval');
-    }
-    if (profile?.id) stampLastInvoiceDate(profile.id);
+    const draft = await saveDraft(
+      {
+        customerName: profile!.customerName,
+        billingProfileId: profile!.id,
+        billTo: buildBillTo(profile!),
+        ...fields,
+        subtotal, vatAmount, total,
+        status,
+      },
+      user?.id,
+    );
+    if (profile?.id) await stampLastInvoiceDate(profile.id);
+    setSaving(false);
     setSavedDraft(draft);
     setStep(3);
   }
@@ -416,8 +438,8 @@ export function InvoiceAssistantPanel({ onClose }: Props) {
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setStep(1)} style={{ padding: '10px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: MUTED, fontSize: 13, cursor: 'pointer' }}>← 修改</button>
-              <button onClick={() => handleSaveDraft('draft')} style={{ flex: 1, padding: '10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: TEXT, fontSize: 13, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>保存为草稿</button>
-              <button onClick={() => handleSaveDraft('waiting_approval')} style={{ flex: 2, padding: '10px', borderRadius: 8, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: '#000', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>提交审批 →</button>
+              <button onClick={() => handleSaveDraft('draft')} disabled={saving} style={{ flex: 1, padding: '10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: TEXT, fontSize: 13, cursor: saving ? 'wait' : 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>{saving ? '保存中…' : '保存为草稿'}</button>
+              <button onClick={() => handleSaveDraft('waiting_approval')} disabled={saving} style={{ flex: 2, padding: '10px', borderRadius: 8, background: saving ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: saving ? TEXT : '#000', fontWeight: 700, fontSize: 13, cursor: saving ? 'wait' : 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>{saving ? '保存中…' : '提交审批 →'}</button>
             </div>
           </div>
         )}
@@ -431,8 +453,14 @@ export function InvoiceAssistantPanel({ onClose }: Props) {
             <div style={{ fontSize: 13, color: MUTED, marginBottom: 6 }}>
               Invoice No: <span style={{ color: GOLD, fontFamily: 'IBM Plex Mono, monospace' }}>{savedDraft.invoiceNo}</span>
             </div>
-            <div style={{ fontSize: 12, color: MUTED, marginBottom: 24 }}>
+            <div style={{ fontSize: 12, color: MUTED, marginBottom: 12 }}>
               客户账单资料已保存。下次为该客户开发票，账单信息将自动带出。
+            </div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: getCloudStatus() === 'connected' ? 'rgba(111,191,142,0.12)' : 'rgba(212,168,67,0.12)', border: `1px solid ${getCloudStatus() === 'connected' ? 'rgba(111,191,142,0.35)' : 'rgba(212,168,67,0.35)'}`, marginBottom: 20 }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: getCloudStatus() === 'connected' ? '#6FBF8E' : '#D4A843' }} />
+              <span style={{ fontSize: 10.5, color: getCloudStatus() === 'connected' ? '#6FBF8E' : '#D4A843', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.1em' }}>
+                {getCloudStatus() === 'connected' ? 'Cloud Sync: Connected — 团队共享' : 'Cloud Sync: Fallback — 仅本地，团队不可见'}
+              </span>
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               <a href="/invoice" style={{ padding: '10px 24px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: TEXT, fontSize: 13, textDecoration: 'none' }}>查看发票列表</a>
