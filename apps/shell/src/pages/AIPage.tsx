@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { colors } from '@gci/design-system';
 import { InvoiceAssistantPanel } from '../components/invoice/InvoiceAssistantPanel';
 import { BillingProfileDraftPanel } from '../components/invoice/BillingProfileDraftPanel';
+import { detectAIIntent, getIntentSteps } from '../ai/aiRouter';
+import type { AIIntentMatch } from '../ai/aiRouter';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const GOLD = '#CBA85C';
@@ -29,141 +31,20 @@ const STATUS_STYLES: Record<string, { label: string; color: string; bg: string }
   live: { label: 'LIVE',        color: '#6FBF8E', bg: 'rgba(111,191,142,0.12)' },
 };
 
-// ── Intent detection ──────────────────────────────────────────────────────────
-interface IntentResult {
-  tab: TabKey;
-  task: string;
-  taskZh: string;
-  steps: string[];
-  showApproval: boolean;
-  resultLabel: string;
-  module: string;
-}
-
-function detectIntent(raw: string): IntentResult {
-  const t = raw.toLowerCase();
-
-  // Invoice
-  if (t.includes('发票') || t.includes('invoice')) {
-    return {
-      tab: 'assistant', task: 'Create Invoice Draft', taskZh: '生成发票草稿', module: 'Trade',
-      steps: ['Understanding request…', 'Detected task: Create Invoice', 'Checking customer records…', 'Checking quotation / PI / order data…', 'Preparing invoice draft…', 'Waiting for approval.'],
-      showApproval: true, resultLabel: '发票草稿已准备，等待确认后生成',
-    };
-  }
-
-  // Quotation
-  if (t.includes('报价') || t.includes('quotation') || t.includes('quote') || t.includes('报价单') || t.includes('boq')) {
-    return {
-      tab: 'assistant', task: 'Create Quotation Draft', taskZh: '生成报价草稿', module: 'Quotation',
-      steps: ['Understanding request…', 'Detected task: Create Quotation', 'Checking customer…', 'Checking product / BOQ / supplier data…', 'Preparing quotation draft…', 'Waiting for approval.'],
-      showApproval: true, resultLabel: '报价草稿已准备，等待确认后生成',
-    };
-  }
-
-  // PI / Proforma
-  if (t.includes('pi') || t.includes('proforma') || t.includes('pro forma') || t.includes('订单')) {
-    return {
-      tab: 'assistant', task: 'Create PI / Order', taskZh: '生成 PI / 订单', module: 'Trade',
-      steps: ['Understanding request…', 'Detected task: Create PI', 'Checking customer & quotation…', 'Checking payment terms…', 'Preparing PI draft…', 'Waiting for approval.'],
-      showApproval: true, resultLabel: 'PI 草稿已准备，等待确认后生成',
-    };
-  }
-
-  // Customer / Lead
-  if (t.includes('客户') || t.includes('customer') || t.includes('lead') || t.includes('新客户') || t.includes('名片')) {
-    return {
-      tab: 'assistant', task: 'Create Customer / Lead', taskZh: '创建客户档案', module: 'CRM',
-      steps: ['Understanding request…', 'Detected task: Create Customer', 'Checking duplicate customer records…', 'Preparing customer profile…', 'Waiting for approval.'],
-      showApproval: true, resultLabel: '客户档案已准备，等待确认后录入',
-    };
-  }
-
-  // Inventory — query vs action
-  if (t.includes('库存') || t.includes('inventory') || t.includes('stock') || t.includes('sku')) {
-    const isAction = t.includes('更新') || t.includes('创建') || t.includes('导入') || t.includes('扣') || t.includes('补') || t.includes('盘点');
-    return {
-      tab: isAction ? 'assistant' : 'chat',
-      task: isAction ? 'Update Inventory' : 'Query Inventory',
-      taskZh: isAction ? '更新库存' : '查询库存',
-      module: 'Warehouse',
-      steps: isAction
-        ? ['Understanding request…', 'Detected task: Update Inventory', 'Checking current stock levels…', 'Preparing inventory update…', 'Waiting for approval.']
-        : ['Checking inventory database…', 'Finding matching SKUs…', 'Calculating stock levels…', 'Preparing answer…', 'Done.'],
-      showApproval: isAction,
-      resultLabel: isAction ? '库存更新已准备，等待确认' : '库存查询结果已准备',
-    };
-  }
-
-  // WhatsApp / Email / File content → Inbox
-  if (
-    t.includes('whatsapp') || t.includes('email') || t.includes('邮件') ||
-    t.includes('pdf') || t.includes('excel') || t.includes('图片') ||
-    t.includes('合同') || t.includes('语音') || t.includes('微信') || t.includes('整理')
-  ) {
-    return {
-      tab: 'inbox', task: 'Classify & Route Content', taskZh: '内容识别与分类', module: 'AI Inbox',
-      steps: ['Reading input…', 'Identifying content type…', 'Detecting business context…', 'Suggesting target module…', 'Waiting for approval.'],
-      showApproval: true, resultLabel: '内容已分类，请确认下一步操作',
-    };
-  }
-
-  // Daily brief
-  if (
-    t.includes('今日简报') || t.includes('daily brief') || t.includes('morning brief') ||
-    t.includes('今天重点') || t.includes('今日重点') || t.includes('简报') || t.includes('日报')
-  ) {
-    return {
-      tab: 'daily', task: 'Generate Daily Brief', taskZh: '生成今日简报', module: 'AI Daily',
-      steps: ['Checking CRM follow-ups…', 'Checking quotations…', 'Checking overdue payments…', 'Checking inventory alerts…', 'Preparing daily brief…', 'Done.'],
-      showApproval: false, resultLabel: '今日简报已生成',
-    };
-  }
-
-  // Workflow / Automation
-  if (t.includes('流程') || t.includes('workflow') || t.includes('自动化') || t.includes('approval') || t.includes('审批')) {
-    return {
-      tab: 'workflow', task: 'Configure Workflow', taskZh: '配置自动化流程', module: 'AI Workflow',
-      steps: ['Understanding workflow request…', 'Mapping business process…', 'Identifying trigger conditions…', 'Setting up automation steps…', 'Ready for review.'],
-      showApproval: true, resultLabel: '流程已准备，等待配置确认',
-    };
-  }
-
-  // Finance / Payment / 应收应付
-  if (t.includes('收款') || t.includes('付款') || t.includes('财务') || t.includes('应收') || t.includes('应付') || t.includes('cash flow')) {
-    return {
-      tab: 'assistant', task: 'Finance Entry', taskZh: '财务记录', module: 'Finance',
-      steps: ['Understanding request…', 'Detected task: Finance Entry', 'Checking relevant records…', 'Preparing entry draft…', 'Waiting for approval.'],
-      showApproval: true, resultLabel: '财务记录已准备，等待确认',
-    };
-  }
-
-  // Default: question → chat, command → assistant
-  const isQuestion =
-    t.endsWith('?') || t.endsWith('？') ||
-    t.includes('哪些') || t.includes('谁') || t.includes('多少') ||
-    t.includes('什么') || t.includes('几') || t.includes('查') || t.includes('看');
-
-  return {
-    tab: isQuestion ? 'chat' : 'assistant',
-    task: isQuestion ? 'Query Answer' : 'Execute Command',
-    taskZh: isQuestion ? '数据查询' : '执行操作',
-    module: isQuestion ? 'AI Chat' : 'AI Assistant',
-    steps: isQuestion
-      ? ['Understanding question…', 'Searching relevant data…', 'Cross-referencing records…', 'Preparing answer…', 'Done.']
-      : ['Understanding request…', 'Detecting task type…', 'Checking relevant data…', 'Preparing action…', 'Waiting for approval.'],
-    showApproval: !isQuestion,
-    resultLabel: isQuestion ? '查询结果已准备' : '操作已准备，等待确认',
-  };
-}
-
 // ── Command processing panel ──────────────────────────────────────────────────
 interface CmdState {
   raw: string;
-  intent: IntentResult;
-  phase: 'processing' | 'done';
+  match: AIIntentMatch;
+  phase: 'processing' | 'done' | 'not_connected';
   step: number;
 }
+
+const IMPL_STATUS_COLORS: Record<string, string> = {
+  real: '#6FBF8E', partial: GOLD, mock: '#D4A843', missing: '#E0846A',
+};
+const IMPL_STATUS_LABELS: Record<string, string> = {
+  real: '已接入', partial: '部分接入', mock: '模拟', missing: '未接入',
+};
 
 function CommandPanel({ state, onApprove, onEdit, onCancel }: {
   state: CmdState;
@@ -171,7 +52,8 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
   onEdit: () => void;
   onCancel: () => void;
 }) {
-  const { raw, intent, phase, step } = state;
+  const { raw, match, phase, step } = state;
+  const { intent, confidence } = match;
 
   const TAB_LABELS: Record<TabKey, string> = {
     chat: 'AI Chat', assistant: 'AI Assistant', agent: 'AI Agent',
@@ -182,65 +64,93 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
     Warehouse: '#D4A843', Finance: '#6FBF8E', 'AI Inbox': '#94A3B8',
     'AI Daily': '#8FA6D4', 'AI Workflow': '#B084C9', 'AI Assistant': GOLD, 'AI Chat': '#5BA3C9',
   };
-  const modColor = MODULE_COLORS[intent.module] || GOLD;
+  const modColor = MODULE_COLORS[intent.targetModule] || GOLD;
+  const implColor = IMPL_STATUS_COLORS[intent.implementationStatus] || MUTED;
+  const steps = getIntentSteps(intent);
 
   return (
     <div style={{ margin: '16px 0 28px', padding: '20px 22px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 16 }}>
 
-      {/* Routing badge */}
+      {/* Routing badge row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: modColor }} />
         <span style={{ fontSize: 11.5, color: modColor, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }}>
-          已路由至 {TAB_LABELS[intent.tab]} · {intent.module}
+          已路由至 {TAB_LABELS[intent.targetTab as TabKey]} · {intent.targetModule}
         </span>
-        <div style={{ flex: 1, height: 1, background: `rgba(255,255,255,0.06)` }} />
-        <span style={{ fontSize: 12, color: '#3A4255', fontStyle: 'italic' }}>"{raw}"</span>
+        {/* Implementation status badge */}
+        <span style={{ fontSize: 9.5, color: implColor, background: `${implColor}22`, borderRadius: 4, padding: '2px 7px', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.1em' }}>
+          {IMPL_STATUS_LABELS[intent.implementationStatus]}
+        </span>
+        <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
+        <span style={{ fontSize: 12, color: SUBTLE, fontStyle: 'italic' }}>"{raw}"</span>
+        {confidence > 0 && (
+          <span style={{ fontSize: 10, color: SUBTLE, fontFamily: 'IBM Plex Mono, monospace' }}>
+            {Math.round(confidence * 100)}%
+          </span>
+        )}
       </div>
 
       {/* Task label */}
       <div style={{ marginBottom: 14 }}>
-        <span style={{ fontSize: 15, fontWeight: 600, color: TEXT }}>{intent.taskZh}</span>
-        <span className="font-mono-label" style={{ marginLeft: 10, fontSize: 10, color: MUTED }}>/ {intent.task}</span>
+        <span style={{ fontSize: 15, fontWeight: 600, color: TEXT }}>{intent.intentNameZh}</span>
+        <span className="font-mono-label" style={{ marginLeft: 10, fontSize: 10, color: MUTED }}>/ {intent.intentNameEn}</span>
       </div>
 
-      {/* Steps */}
-      <div style={{ padding: '14px 16px', background: 'rgba(255,255,255,0.02)', borderRadius: 10, marginBottom: 16 }}>
-        {intent.steps.map((s, i) => {
-          const isLast = i === intent.steps.length - 1;
-          const stepState = i < step ? 'done' : i === step ? 'active' : 'pending';
-          return (
-            <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0' }}>
-              <div style={{ width: 18, flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
-                {stepState === 'done' && <span style={{ color: '#6FBF8E', fontSize: 12 }}>✓</span>}
-                {stepState === 'active' && <div style={{ width: 7, height: 7, borderRadius: '50%', background: modColor, animation: 'pulse 1s ease infinite' }} />}
-                {stepState === 'pending' && <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />}
+      {/* NOT CONNECTED — skip animation, show message directly */}
+      {phase === 'not_connected' && (
+        <div style={{ padding: '16px 18px', background: 'rgba(224,132,106,0.08)', border: '1px solid rgba(224,132,106,0.25)', borderRadius: 10 }}>
+          <div className="font-mono-label" style={{ fontSize: 9.5, color: '#E0846A', letterSpacing: '0.15em', marginBottom: 10 }}>
+            ⚠ 功能未接入
+          </div>
+          <div style={{ fontSize: 14, color: TEXT, marginBottom: 14, lineHeight: 1.7 }}>
+            {intent.notConnectedMessage || `「${intent.intentNameZh}」功能暂未接入真实数据源。请前往对应模块手动操作。`}
+          </div>
+          <button onClick={onCancel} style={{ padding: '10px 18px', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>
+            关闭
+          </button>
+        </div>
+      )}
+
+      {/* Step animation — only for non-missing intents */}
+      {phase !== 'not_connected' && (
+        <div style={{ padding: '14px 16px', background: 'rgba(255,255,255,0.02)', borderRadius: 10, marginBottom: 16 }}>
+          {steps.map((s, i) => {
+            const isLast = i === steps.length - 1;
+            const stepState = i < step ? 'done' : i === step ? 'active' : 'pending';
+            return (
+              <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0' }}>
+                <div style={{ width: 18, flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
+                  {stepState === 'done' && <span style={{ color: '#6FBF8E', fontSize: 12 }}>✓</span>}
+                  {stepState === 'active' && <div style={{ width: 7, height: 7, borderRadius: '50%', background: modColor, animation: 'pulse 1s ease infinite' }} />}
+                  {stepState === 'pending' && <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />}
+                </div>
+                <span style={{
+                  fontSize: 13,
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  color: stepState === 'done'
+                    ? (isLast ? modColor : '#6FBF8E')
+                    : stepState === 'active' ? TEXT : SUBTLE,
+                  fontWeight: stepState === 'active' ? 600 : 400,
+                  transition: 'color 0.3s',
+                }}>
+                  {s}
+                </span>
               </div>
-              <span style={{
-                fontSize: 13,
-                fontFamily: "'Space Grotesk', sans-serif",
-                color: stepState === 'done'
-                  ? (isLast ? modColor : '#6FBF8E')
-                  : stepState === 'active' ? TEXT : SUBTLE,
-                fontWeight: stepState === 'active' ? 600 : 400,
-                transition: 'color 0.3s',
-              }}>
-                {s}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
-      {/* Result + actions (done state) */}
+      {/* Result + actions (done state, non-missing) */}
       {phase === 'done' && (
-        <div style={{ padding: '14px 16px', background: intent.showApproval ? 'rgba(111,191,142,0.07)' : 'rgba(203,168,92,0.07)', border: `1px solid ${intent.showApproval ? 'rgba(111,191,142,0.22)' : 'rgba(203,168,92,0.22)'}`, borderRadius: 10 }}>
-          <div className="font-mono-label" style={{ fontSize: 9.5, color: intent.showApproval ? '#6FBF8E' : GOLD, letterSpacing: '0.15em', marginBottom: 8 }}>
-            {intent.showApproval ? 'WAITING FOR APPROVAL' : 'DONE'}
+        <div style={{ padding: '14px 16px', background: intent.approvalRequired ? 'rgba(111,191,142,0.07)' : 'rgba(203,168,92,0.07)', border: `1px solid ${intent.approvalRequired ? 'rgba(111,191,142,0.22)' : 'rgba(203,168,92,0.22)'}`, borderRadius: 10 }}>
+          <div className="font-mono-label" style={{ fontSize: 9.5, color: intent.approvalRequired ? '#6FBF8E' : GOLD, letterSpacing: '0.15em', marginBottom: 8 }}>
+            {intent.approvalRequired ? '等待确认' : '完成'}
           </div>
-          <div style={{ fontSize: 14, color: TEXT, marginBottom: intent.showApproval ? 14 : 0 }}>
-            {intent.resultLabel}
+          <div style={{ fontSize: 14, color: TEXT, marginBottom: intent.approvalRequired ? 14 : 0 }}>
+            {intent.intentNameZh}已准备{intent.approvalRequired ? '，等待确认后执行' : ''}
           </div>
-          {intent.showApproval && (
+          {intent.approvalRequired && (
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={onApprove} style={{ flex: 1, padding: '11px', borderRadius: 9, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: NAVY, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>
                 确认执行 →
@@ -253,7 +163,7 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
               </button>
             </div>
           )}
-          {!intent.showApproval && (
+          {!intent.approvalRequired && (
             <button onClick={onCancel} style={{ marginTop: 10, padding: '10px 18px', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>
               关闭
             </button>
@@ -661,11 +571,9 @@ export function AIPage() {
 
   function handleCommand(raw: string) {
     if (!raw.trim()) return;
-    const intent = detectIntent(raw.trim());
-
     const t = raw.toLowerCase();
 
-    // Billing profile intent — must be checked BEFORE invoice intent
+    // Billing profile intent — opens dedicated UI panel, skip router
     const isBillingProfile =
       (t.includes('保存') && (t.includes('开票') || t.includes('资料'))) ||
       t.includes('开票资料') || t.includes('billing profile') ||
@@ -681,7 +589,7 @@ export function AIPage() {
       return;
     }
 
-    // Invoice intent → open InvoiceAssistantPanel instead of generic mock steps
+    // Invoice intent — opens InvoiceAssistantPanel, skip router
     if (t.includes('发票') || t.includes('invoice')) {
       setTab('assistant');
       setCmdState(null);
@@ -690,15 +598,26 @@ export function AIPage() {
       return;
     }
 
-    setTab(intent.tab);
-    const state: CmdState = { raw: raw.trim(), intent, phase: 'processing', step: 0 };
-    setCmdState(state);
+    // All other commands — use central router
+    const match = detectAIIntent(raw.trim());
+    const { intent } = match;
 
-    runner.run(
-      intent.steps,
-      (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
-      ()  => setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev),
-    );
+    setTab(intent.targetTab as TabKey);
+
+    if (intent.implementationStatus === 'missing') {
+      // Skip animation — go straight to not_connected message
+      const state: CmdState = { raw: raw.trim(), match, phase: 'not_connected', step: 0 };
+      setCmdState(state);
+    } else {
+      const steps = getIntentSteps(intent);
+      const state: CmdState = { raw: raw.trim(), match, phase: 'processing', step: 0 };
+      setCmdState(state);
+      runner.run(
+        steps,
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        ()  => setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev),
+      );
+    }
 
     setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
   }
