@@ -955,6 +955,11 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
           }}
           onViewFull={() => setActiveTab('project')}
           onArchiveTask={archiveTask}
+          onUpdateTask={(updated: any) => {
+            setTasks(v => v.map(t => (t.id === updated.id ? updated : t)));
+            setSelectedTask(updated);
+            showToast('记录已更新', 'success');
+          }}
         />
       )}
 

@@ -1,20 +1,25 @@
 /**
  * FollowUpDetailDrawer (QuickFollowUpPanel)
  *
- * Opens when user clicks a follow-up row / 跟进 / 查看详情.
- * Shows full record info + quick follow-up entry form + action buttons.
- * Dark premium styling — matches CRM dark theme.
+ * View mode: shows full record info
+ * Edit mode: inline editable fields → saves to local state + Supabase snapshot
+ *
+ * Notion write-back scope:
+ *   ✅ 关闭本次跟进 → Notion 行动状态=暂缓 (via /api/crm/notion-update)
+ *   ⚠️ All other edits → localStorage + Supabase snapshot only
+ *      (Notion write-back for individual fields not implemented yet)
  */
 
 import React, { useState } from 'react';
 import { FollowUpTask } from '../types';
 import {
   X, ChevronRight, MessageSquare, Calendar, Phone, Mail, MapPin,
-  User, Tag, Clock, CheckCircle2, Archive, Building2, AlertCircle,
+  User, Clock, CheckCircle2, Archive, Building2, Edit2, Save, XCircle,
+  Paperclip,
 } from 'lucide-react';
 import { getTaskBusinessId } from '../utils/businessId';
 
-// ── Dark theme tokens (match CRM)
+// ── Dark theme tokens
 const BG    = '#0A1628';
 const CARD  = '#0F1E35';
 const CARD2 = '#162A45';
@@ -23,9 +28,14 @@ const GOLD  = '#B8960C';
 const T1    = '#E8F0FF';
 const T2    = '#7A9CC5';
 const T3    = '#4A6080';
-const NAVY  = '#0F172A';
 
 const METHODS = ['WhatsApp', '电话', '邮件', '微信', '当面', '其他'];
+const OWNERS  = ['Chris', 'Lili', 'Jeffrey', 'Yang', '待分配'];
+const BIZ_TYPES = [
+  { value: 'TRADE',    label: '贸易询盘' },
+  { value: 'PROJECT',  label: '项目推进' },
+  { value: 'LOG_ONLY', label: '内部记录' },
+];
 
 const PRIORITY_COLOR: Record<string, string> = { A: '#EF4444', B: '#F59E0B', C: '#64748B' };
 const PRIORITY_LABEL: Record<string, string>  = { A: '高优先', B: '正常', C: '低优先' };
@@ -39,27 +49,52 @@ interface Props {
   onSave: (taskId: string, log: { method: string; content: string; nextDate: string }) => void;
   onViewFull: () => void;
   onArchiveTask?: (id: string) => void;
+  onUpdateTask?: (task: FollowUpTask) => void;
 }
 
+// ── Shared input style
+const inputStyle: React.CSSProperties = {
+  background: CARD2,
+  border: `1px solid ${BORD}`,
+  color: T1,
+  borderRadius: '10px',
+  padding: '8px 12px',
+  fontSize: '13px',
+  fontWeight: 600,
+  width: '100%',
+  outline: 'none',
+};
+
+const labelStyle: React.CSSProperties = {
+  fontSize: '9px',
+  fontWeight: 900,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  color: T3,
+  marginBottom: '4px',
+  display: 'block',
+};
+
+// ── InfoRow (view mode)
 function InfoRow({
-  icon, label, value, empty,
+  icon, label, value, empty, onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   value?: string | null;
   empty?: string;
+  onClick?: () => void;
 }) {
   return (
-    <div className="flex items-start gap-3 py-2.5" style={{ borderBottom: `1px solid ${BORD}` }}>
+    <div
+      className="flex items-start gap-3 py-2.5"
+      style={{ borderBottom: `1px solid ${BORD}`, cursor: onClick ? 'pointer' : 'default' }}
+      onClick={onClick}
+    >
       <div className="shrink-0 mt-0.5" style={{ color: T3 }}>{icon}</div>
       <div className="flex-1 min-w-0">
-        <div className="text-[9px] font-black uppercase tracking-widest mb-0.5" style={{ color: T3 }}>
-          {label}
-        </div>
-        <div
-          className="text-sm font-medium break-words"
-          style={{ color: value ? T1 : T3 }}
-        >
+        <div style={labelStyle}>{label}</div>
+        <div className="text-sm font-medium break-words" style={{ color: value ? T1 : T3 }}>
           {value || empty || '—'}
         </div>
       </div>
@@ -67,154 +102,270 @@ function InfoRow({
   );
 }
 
-export default function QuickFollowUpPanel({ task, onClose, onSave, onViewFull, onArchiveTask }: Props) {
+export default function QuickFollowUpPanel({
+  task, onClose, onSave, onViewFull, onArchiveTask, onUpdateTask,
+}: Props) {
   const bizId    = (task as any).businessId || getTaskBusinessId(task.id);
   const priority = task.priority || 'B';
   const typeLabel = TYPE_LABEL[task.businessType || 'TRADE'] ?? '贸易询盘';
 
-  const [tab, setTab] = useState<'info' | 'action'>('info');
+  const [tab, setTab]   = useState<'info' | 'action'>('info');
+  const [editing, setEditing] = useState(false);
+
+  // Edit form state — initialized from task on each edit open
+  const [draft, setDraft] = useState<Partial<FollowUpTask>>({});
+
+  const openEdit = () => {
+    setDraft({
+      clientName:    task.clientName,
+      countryCity:   task.countryCity,
+      owner:         task.owner,
+      businessType:  task.businessType,
+      goal:          task.goal,
+      lastContext:   task.lastContext,
+      nextFollowUpAt: task.nextFollowUpAt?.slice(0, 10),
+      phoneE164:     task.phoneE164,
+      whatsapp:      task.whatsapp,
+      email:         task.email,
+    });
+    setEditing(true);
+  };
+
+  const cancelEdit = () => { setEditing(false); setDraft({}); };
+
+  const saveEdit = () => {
+    if (!onUpdateTask) { setEditing(false); return; }
+    const updated: FollowUpTask = {
+      ...task,
+      ...draft,
+      updatedAt: new Date().toISOString(),
+    };
+    onUpdateTask(updated);
+    setEditing(false);
+    setDraft({});
+  };
+
+  const set = (k: keyof FollowUpTask, v: string) =>
+    setDraft(prev => ({ ...prev, [k]: v }));
+
+  // Follow-up note tab
   const [method,   setMethod]   = useState(METHODS[0]);
   const [content,  setContent]  = useState('');
   const [nextDate, setNextDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 3);
+    const d = new Date(); d.setDate(d.getDate() + 3);
     return d.toISOString().split('T')[0];
   });
   const [saved, setSaved] = useState(false);
-  const [confirmClose, setConfirmClose] = useState(false);
 
-  const handleSave = () => {
+  const handleSaveNote = () => {
     if (!content.trim()) return;
     onSave(task.id, { method, content: content.trim(), nextDate });
     setSaved(true);
     setTimeout(() => { setSaved(false); setContent(''); }, 1400);
   };
 
+  // Close follow-up confirm
+  const [confirmClose, setConfirmClose] = useState(false);
   const handleCloseFollowUp = () => {
     if (!confirmClose) { setConfirmClose(true); return; }
     if (onArchiveTask) onArchiveTask(task.id);
     onClose();
   };
 
+  // Recent history entries
+  const recentHistory = (task.history || []).slice(0, 3);
+
   return (
     <div className="fixed inset-0 z-[2000] flex justify-end">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Drawer */}
       <div
         className="relative flex flex-col h-full shadow-2xl overflow-hidden"
-        style={{
-          width: '420px',
-          maxWidth: '100vw',
-          background: BG,
-          borderLeft: `2px solid ${GOLD}`,
-        }}
+        style={{ width: '440px', maxWidth: '100vw', background: BG, borderLeft: `2px solid ${GOLD}` }}
       >
-        {/* ── Header ───────────────────────────────────────────── */}
+        {/* ── Header ─────────────────────────────────────────── */}
         <div className="shrink-0 p-5" style={{ background: CARD, borderBottom: `1px solid ${BORD}` }}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              {/* Business ID chip */}
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                 {bizId && (
-                  <span
-                    className="text-[9px] font-black px-2 py-0.5 rounded shrink-0"
-                    style={{ background: `${GOLD}22`, color: GOLD }}
-                  >
-                    {bizId}
-                  </span>
+                  <span className="text-[9px] font-black px-2 py-0.5 rounded shrink-0"
+                    style={{ background: `${GOLD}22`, color: GOLD }}>{bizId}</span>
                 )}
-                <span
-                  className="text-[9px] font-black px-2 py-0.5 rounded shrink-0"
-                  style={{ background: 'rgba(255,255,255,0.07)', color: T2 }}
-                >
-                  {typeLabel}
-                </span>
-                <span
-                  className="text-[9px] font-black px-2 py-0.5 rounded shrink-0"
-                  style={{
-                    background: `${PRIORITY_COLOR[priority]}22`,
-                    color: PRIORITY_COLOR[priority],
-                  }}
-                >
+                <span className="text-[9px] font-black px-2 py-0.5 rounded shrink-0"
+                  style={{ background: 'rgba(255,255,255,0.07)', color: T2 }}>{typeLabel}</span>
+                <span className="text-[9px] font-black px-2 py-0.5 rounded shrink-0"
+                  style={{ background: `${PRIORITY_COLOR[priority]}22`, color: PRIORITY_COLOR[priority] }}>
                   {PRIORITY_LABEL[priority]}
                 </span>
               </div>
-
-              {/* Customer name */}
               <h2 className="text-lg font-black leading-tight" style={{ color: T1 }}>
                 {task.clientName || '未命名客户'}
               </h2>
-
-              {/* Status + owner */}
               <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                <span
-                  className="text-[10px] font-black px-2 py-0.5 rounded-full"
-                  style={{ background: `${GOLD}18`, color: GOLD }}
-                >
+                <span className="text-[10px] font-black px-2 py-0.5 rounded-full"
+                  style={{ background: `${GOLD}18`, color: GOLD }}>
                   {task.tradeStatus || '待确认'}
                 </span>
                 {task.owner && (
-                  <span className="text-[10px] font-bold" style={{ color: T2 }}>
-                    负责：{task.owner}
-                  </span>
+                  <span className="text-[10px] font-bold" style={{ color: T2 }}>负责：{task.owner}</span>
                 )}
               </div>
             </div>
 
-            <button
-              onClick={onClose}
-              className="p-2 rounded-full shrink-0 transition-colors hover:bg-white/10"
-              style={{ color: T2 }}
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              {/* Edit toggle */}
+              {!editing && tab === 'info' && (
+                <button
+                  onClick={openEdit}
+                  className="p-2 rounded-xl transition-all hover:bg-white/10 flex items-center gap-1 text-xs font-black"
+                  style={{ color: GOLD, border: `1px solid ${GOLD}40` }}
+                  title="编辑记录"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  编辑
+                </button>
+              )}
+              <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition-colors ml-1"
+                style={{ color: T2 }}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
-          {/* Tab switcher */}
-          <div className="flex gap-1 mt-4 p-1 rounded-xl" style={{ background: CARD2 }}>
-            {(['info', 'action'] as const).map(t => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className="flex-1 py-1.5 rounded-lg text-xs font-black transition-all"
-                style={
-                  tab === t
-                    ? { background: GOLD, color: '#fff' }
-                    : { color: T3 }
-                }
-              >
-                {t === 'info' ? '客户详情' : '跟进记录'}
-              </button>
-            ))}
-          </div>
+          {/* Tabs */}
+          {!editing && (
+            <div className="flex gap-1 mt-4 p-1 rounded-xl" style={{ background: CARD2 }}>
+              {(['info', 'action'] as const).map(t => (
+                <button key={t} onClick={() => setTab(t)}
+                  className="flex-1 py-1.5 rounded-lg text-xs font-black transition-all"
+                  style={tab === t ? { background: GOLD, color: '#fff' } : { color: T3 }}>
+                  {t === 'info' ? '客户详情' : '跟进记录'}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {editing && (
+            <div className="mt-3 text-xs font-black px-3 py-1.5 rounded-xl"
+              style={{ background: `${GOLD}15`, color: GOLD }}>
+              ✎ 编辑模式 — 修改后点"保存修改"
+            </div>
+          )}
         </div>
 
-        {/* ── Body ─────────────────────────────────────────────── */}
+        {/* ── Body ───────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto">
-          {tab === 'info' && (
+
+          {/* ── EDIT MODE ───── */}
+          {editing && (
+            <div className="p-5 space-y-4">
+              {/* Notice */}
+              <div className="p-3 rounded-xl text-xs font-medium" style={{ background: CARD2, color: T2, border: `1px solid ${BORD}` }}>
+                ⚠️ 修改保存到本地 + Supabase 快照。仅"关闭本次跟进"会同步到 Notion。
+              </div>
+
+              {/* Customer name */}
+              <div>
+                <label style={labelStyle}>客户名称</label>
+                <input value={draft.clientName || ''} onChange={e => set('clientName', e.target.value)}
+                  placeholder="客户名称" style={inputStyle} />
+              </div>
+
+              {/* Owner */}
+              <div>
+                <label style={labelStyle}>负责人</label>
+                <select value={draft.owner || ''} onChange={e => set('owner', e.target.value)}
+                  style={inputStyle}>
+                  <option value="">— 选择负责人 —</option>
+                  {OWNERS.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+
+              {/* Business type */}
+              <div>
+                <label style={labelStyle}>业务类型</label>
+                <select value={draft.businessType || 'TRADE'} onChange={e => set('businessType' as any, e.target.value)}
+                  style={inputStyle}>
+                  {BIZ_TYPES.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
+                </select>
+              </div>
+
+              {/* Goal */}
+              <div>
+                <label style={labelStyle}>目标 / 下一步行动</label>
+                <input value={draft.goal || ''} onChange={e => set('goal', e.target.value)}
+                  placeholder="下一步待补充" style={inputStyle} />
+              </div>
+
+              {/* Last context */}
+              <div>
+                <label style={labelStyle}>最近跟进记录 / 备注</label>
+                <textarea value={draft.lastContext || ''} onChange={e => set('lastContext', e.target.value)}
+                  placeholder="暂无备注" rows={3}
+                  style={{ ...inputStyle, resize: 'vertical' }} />
+              </div>
+
+              {/* Next follow-up date */}
+              <div>
+                <label style={labelStyle}>下次跟进日期</label>
+                <input type="date" value={(draft.nextFollowUpAt || '').slice(0, 10)}
+                  onChange={e => set('nextFollowUpAt', e.target.value)}
+                  style={inputStyle} />
+              </div>
+
+              {/* Contact info */}
+              <div className="p-3 rounded-xl space-y-3" style={{ background: CARD2, border: `1px solid ${BORD}` }}>
+                <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>联系方式</div>
+                <div>
+                  <label style={labelStyle}>WhatsApp</label>
+                  <input value={draft.whatsapp || ''} onChange={e => set('whatsapp', e.target.value)}
+                    placeholder="联系方式待补充" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>电话</label>
+                  <input value={draft.phoneE164 || ''} onChange={e => set('phoneE164', e.target.value)}
+                    placeholder="联系方式待补充" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>邮箱</label>
+                  <input type="email" value={draft.email || ''} onChange={e => set('email', e.target.value)}
+                    placeholder="邮箱待补充" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>城市 / 地区</label>
+                  <input value={draft.countryCity || ''} onChange={e => set('countryCity', e.target.value)}
+                    placeholder="地区待补充" style={inputStyle} />
+                </div>
+              </div>
+
+              {/* Attachment note */}
+              <div className="p-3 rounded-xl flex items-center gap-2" style={{ background: CARD2, border: `1px solid ${BORD}` }}>
+                <Paperclip className="w-4 h-4 shrink-0" style={{ color: T3 }} />
+                <div>
+                  <div style={labelStyle}>附件</div>
+                  <div className="text-xs font-medium" style={{ color: T3 }}>
+                    附件上传将在下一阶段接入
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── VIEW MODE — INFO TAB ─── */}
+          {!editing && tab === 'info' && (
             <div className="p-5 space-y-0">
               {/* Next follow-up alert */}
               {task.nextFollowUpAt && (
-                <div
-                  className="flex items-center gap-2 p-3 rounded-xl mb-4"
+                <div className="flex items-center gap-2 p-3 rounded-xl mb-4"
                   style={{
                     background: (() => {
                       const d = task.nextFollowUpAt.slice(0, 10);
                       const today = new Date().toISOString().slice(0, 10);
-                      return d < today
-                        ? 'rgba(239,68,68,0.1)'
-                        : d === today
-                        ? `${GOLD}15`
-                        : CARD2;
+                      return d < today ? 'rgba(239,68,68,0.1)' : d === today ? `${GOLD}15` : CARD2;
                     })(),
                     border: `1px solid ${BORD}`,
-                  }}
-                >
+                  }}>
                   <Clock className="w-4 h-4 shrink-0" style={{
                     color: (() => {
                       const d = task.nextFollowUpAt.slice(0, 10);
@@ -223,9 +374,7 @@ export default function QuickFollowUpPanel({ task, onClose, onSave, onViewFull, 
                     })()
                   }} />
                   <div>
-                    <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>
-                      下次跟进日期
-                    </div>
+                    <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>下次跟进日期</div>
                     <div className="text-sm font-black" style={{
                       color: (() => {
                         const d = task.nextFollowUpAt.slice(0, 10);
@@ -242,9 +391,10 @@ export default function QuickFollowUpPanel({ task, onClose, onSave, onViewFull, 
                 </div>
               )}
 
-              {/* Goal / next action */}
+              {/* Goal */}
               {(task.goal || task.suggestedAction) && (
-                <div className="p-3 rounded-xl mb-4" style={{ background: `${GOLD}0D`, border: `1px solid ${GOLD}25` }}>
+                <div className="p-3 rounded-xl mb-4"
+                  style={{ background: `${GOLD}0D`, border: `1px solid ${GOLD}25` }}>
                   <div className="text-[9px] font-black uppercase tracking-widest mb-1" style={{ color: GOLD }}>
                     目标 / 下一步
                   </div>
@@ -254,73 +404,63 @@ export default function QuickFollowUpPanel({ task, onClose, onSave, onViewFull, 
                 </div>
               )}
 
-              {/* Last context / notes */}
-              <InfoRow
-                icon={<MessageSquare className="w-3.5 h-3.5" />}
-                label="最近跟进记录"
-                value={task.lastContext || (task as any).lastNote}
-                empty="暂无备注"
-              />
-
-              {/* Contact info */}
-              <InfoRow
-                icon={<Phone className="w-3.5 h-3.5" />}
-                label="WhatsApp / 电话"
-                value={
-                  [task.whatsapp, task.phoneE164].filter(Boolean).join('  /  ') || null
-                }
-                empty="联系方式待补充"
-              />
-              <InfoRow
-                icon={<Mail className="w-3.5 h-3.5" />}
-                label="邮箱"
-                value={task.email || null}
-                empty="邮箱待补充"
-              />
-              <InfoRow
-                icon={<MapPin className="w-3.5 h-3.5" />}
-                label="城市 / 地区"
-                value={task.countryCity || null}
-                empty="地区待补充"
-              />
-
-              {/* Owner */}
-              <InfoRow
-                icon={<User className="w-3.5 h-3.5" />}
-                label="负责人"
-                value={task.owner || null}
-                empty="负责人待分配"
-              />
-
-              {/* Business type */}
-              <InfoRow
-                icon={<Building2 className="w-3.5 h-3.5" />}
-                label="业务类型"
-                value={typeLabel}
-              />
+              <InfoRow icon={<MessageSquare className="w-3.5 h-3.5" />} label="最近跟进记录"
+                value={task.lastContext || (task as any).lastNote} empty="暂无备注"
+                onClick={openEdit} />
+              <InfoRow icon={<Phone className="w-3.5 h-3.5" />} label="WhatsApp / 电话"
+                value={[task.whatsapp, task.phoneE164].filter(Boolean).join('  /  ') || null}
+                empty="联系方式待补充 — 点击编辑" onClick={openEdit} />
+              <InfoRow icon={<Mail className="w-3.5 h-3.5" />} label="邮箱"
+                value={task.email || null} empty="邮箱待补充 — 点击编辑" onClick={openEdit} />
+              <InfoRow icon={<MapPin className="w-3.5 h-3.5" />} label="城市 / 地区"
+                value={task.countryCity || null} empty="地区待补充 — 点击编辑" onClick={openEdit} />
+              <InfoRow icon={<User className="w-3.5 h-3.5" />} label="负责人"
+                value={task.owner || null} empty="负责人待分配 — 点击编辑" onClick={openEdit} />
+              <InfoRow icon={<Building2 className="w-3.5 h-3.5" />} label="业务类型"
+                value={typeLabel} />
 
               {/* Attachments */}
-              <InfoRow
-                icon={<Tag className="w-3.5 h-3.5" />}
-                label="附件"
-                value={
-                  task.attachments && task.attachments.length > 0
-                    ? `${task.attachments.length} 个附件`
-                    : null
-                }
-                empty="暂无附件"
-              />
+              <div className="flex items-start gap-3 py-2.5" style={{ borderBottom: `1px solid ${BORD}` }}>
+                <div className="shrink-0 mt-0.5" style={{ color: T3 }}><Paperclip className="w-3.5 h-3.5" /></div>
+                <div className="flex-1">
+                  <div style={labelStyle}>附件</div>
+                  {task.attachments && task.attachments.length > 0 ? (
+                    <div className="text-sm font-medium" style={{ color: T1 }}>
+                      {task.attachments.length} 个附件
+                    </div>
+                  ) : (
+                    <div className="text-sm font-medium" style={{ color: T3 }}>
+                      暂无附件 · 附件上传将在下一阶段接入
+                    </div>
+                  )}
+                </div>
+              </div>
 
-              {/* Notion page ID indicator */}
+              {/* Recent history */}
+              {recentHistory.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>历史记录</div>
+                  {recentHistory.map((h, i) => (
+                    <div key={i} className="p-2.5 rounded-xl text-xs" style={{ background: CARD2, color: T2 }}>
+                      <span className="font-black" style={{ color: T3 }}>
+                        {new Date(h.timestamp).toLocaleDateString('zh-CN')}
+                      </span>
+                      <span className="ml-2">{h.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {task.leadId && !/^(LEAD_|HIST_)/i.test(task.leadId) && (
                 <div className="mt-3 text-[9px] font-bold" style={{ color: T3 }}>
-                  Notion 已连接 · 操作可同步
+                  Notion 已连接 · 关闭跟进可同步
                 </div>
               )}
             </div>
           )}
 
-          {tab === 'action' && (
+          {/* ── VIEW MODE — FOLLOW-UP TAB ─── */}
+          {!editing && tab === 'action' && (
             <div className="p-5 space-y-5">
               <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>
                 新增跟进记录
@@ -329,33 +469,22 @@ export default function QuickFollowUpPanel({ task, onClose, onSave, onViewFull, 
               {/* Method */}
               <div className="flex flex-wrap gap-2">
                 {METHODS.map(m => (
-                  <button
-                    key={m}
-                    onClick={() => setMethod(m)}
+                  <button key={m} onClick={() => setMethod(m)}
                     className="px-3 py-1.5 rounded-xl text-[10px] font-black transition-all"
-                    style={
-                      method === m
-                        ? { background: GOLD, color: '#fff' }
-                        : { background: CARD2, color: T2, border: `1px solid ${BORD}` }
-                    }
-                  >
+                    style={method === m
+                      ? { background: GOLD, color: '#fff' }
+                      : { background: CARD2, color: T2, border: `1px solid ${BORD}` }}>
                     {m}
                   </button>
                 ))}
               </div>
 
               {/* Content */}
-              <textarea
-                value={content}
-                onChange={e => setContent(e.target.value)}
+              <textarea value={content} onChange={e => setContent(e.target.value)}
                 placeholder="跟进内容：客户说了什么？我们怎么回应？下一步？"
                 rows={5}
                 className="w-full p-4 rounded-2xl text-sm font-medium outline-none resize-none"
-                style={{
-                  background: CARD2,
-                  border: `1px solid ${BORD}`,
-                  color: T1,
-                }}
+                style={{ background: CARD2, border: `1px solid ${BORD}`, color: T1 }}
                 onFocus={e => (e.target.style.borderColor = GOLD)}
                 onBlur={e => (e.target.style.borderColor = BORD)}
               />
@@ -367,73 +496,89 @@ export default function QuickFollowUpPanel({ task, onClose, onSave, onViewFull, 
                   <p className="text-[9px] font-black uppercase tracking-widest mb-1" style={{ color: T3 }}>
                     下次跟进日期
                   </p>
-                  <input
-                    type="date"
-                    value={nextDate}
-                    onChange={e => setNextDate(e.target.value)}
+                  <input type="date" value={nextDate} onChange={e => setNextDate(e.target.value)}
                     className="w-full rounded-xl px-3 py-2 text-sm font-bold outline-none"
-                    style={{ background: CARD2, border: `1px solid ${BORD}`, color: T1 }}
-                  />
+                    style={{ background: CARD2, border: `1px solid ${BORD}`, color: T1 }} />
                 </div>
               </div>
 
-              {/* Save */}
-              <button
-                onClick={handleSave}
-                disabled={!content.trim()}
+              {/* Save note */}
+              <button onClick={handleSaveNote} disabled={!content.trim()}
                 className="w-full py-3.5 rounded-2xl text-sm font-black transition-all active:scale-[0.98]"
-                style={
-                  saved
-                    ? { background: '#10B981', color: '#fff' }
-                    : content.trim()
-                    ? { background: GOLD, color: '#fff' }
-                    : { background: 'rgba(255,255,255,0.06)', color: T3, cursor: 'not-allowed' }
-                }
-              >
+                style={saved
+                  ? { background: '#10B981', color: '#fff' }
+                  : content.trim()
+                  ? { background: GOLD, color: '#fff' }
+                  : { background: 'rgba(255,255,255,0.06)', color: T3, cursor: 'not-allowed' }}>
                 {saved ? '✓ 已保存' : '保存跟进记录'}
               </button>
+
+              {/* Recent notes (after saving, show them) */}
+              {recentHistory.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>
+                    最近记录
+                  </div>
+                  {recentHistory.map((h, i) => (
+                    <div key={i} className="p-2.5 rounded-xl text-xs" style={{ background: CARD2, color: T2 }}>
+                      <span className="font-black block" style={{ color: T3 }}>
+                        {new Date(h.timestamp).toLocaleDateString('zh-CN')}
+                      </span>
+                      <span className="mt-0.5 block">{h.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* ── Footer actions ─────────────────────────────────────── */}
+        {/* ── Footer ─────────────────────────────────────────── */}
         <div className="shrink-0 p-4 space-y-2" style={{ borderTop: `1px solid ${BORD}`, background: CARD }}>
 
-          {/* Primary: close follow-up */}
-          {onArchiveTask && task.status !== 'archived' && (
-            <button
-              onClick={handleCloseFollowUp}
-              className="w-full py-3 rounded-xl text-sm font-black transition-all hover:opacity-90 flex items-center justify-center gap-2"
-              style={
-                confirmClose
-                  ? { background: '#EF4444', color: '#fff' }
-                  : { background: `${GOLD}18`, color: GOLD, border: `1px solid ${GOLD}40` }
-              }
-            >
-              <Archive className="w-4 h-4" />
-              {confirmClose ? '确认关闭本次跟进？再次点击确认' : '关闭本次跟进'}
-            </button>
+          {/* Edit mode: Save / Cancel */}
+          {editing ? (
+            <div className="flex gap-2">
+              <button onClick={saveEdit}
+                className="flex-1 py-3 rounded-xl text-sm font-black flex items-center justify-center gap-1.5 transition-all hover:opacity-90"
+                style={{ background: GOLD, color: '#fff' }}>
+                <Save className="w-4 h-4" /> 保存修改
+              </button>
+              <button onClick={cancelEdit}
+                className="flex-1 py-3 rounded-xl text-sm font-black flex items-center justify-center gap-1.5 transition-all hover:bg-white/5"
+                style={{ border: `1px solid ${BORD}`, color: T2 }}>
+                <XCircle className="w-4 h-4" /> 取消
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Close follow-up */}
+              {onArchiveTask && task.status !== 'archived' && (
+                <button onClick={handleCloseFollowUp}
+                  className="w-full py-3 rounded-xl text-sm font-black transition-all hover:opacity-90 flex items-center justify-center gap-2"
+                  style={confirmClose
+                    ? { background: '#EF4444', color: '#fff' }
+                    : { background: `${GOLD}18`, color: GOLD, border: `1px solid ${GOLD}40` }}>
+                  <Archive className="w-4 h-4" />
+                  {confirmClose ? '确认关闭？再次点击确认' : '关闭本次跟进'}
+                </button>
+              )}
+
+              {/* Mark complete (coming soon) */}
+              <button disabled
+                className="w-full py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-2 opacity-40 cursor-not-allowed"
+                style={{ border: `1px solid ${BORD}`, color: T2 }}>
+                <CheckCircle2 className="w-3.5 h-3.5" /> 标记完成（Coming Soon）
+              </button>
+
+              {/* View full detail */}
+              <button onClick={() => { onViewFull(); onClose(); }}
+                className="w-full py-2.5 rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all hover:bg-white/5"
+                style={{ border: `1px solid ${BORD}`, color: T2 }}>
+                查看业务中心完整详情 <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </>
           )}
-
-          {/* Mark complete (disabled for now) */}
-          <button
-            disabled
-            className="w-full py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-2 opacity-40 cursor-not-allowed"
-            style={{ border: `1px solid ${BORD}`, color: T2 }}
-          >
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            标记完成（Coming Soon）
-          </button>
-
-          {/* View full detail */}
-          <button
-            onClick={() => { onViewFull(); onClose(); }}
-            className="w-full py-2.5 rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all hover:bg-white/5"
-            style={{ border: `1px solid ${BORD}`, color: T2 }}
-          >
-            查看业务中心完整详情
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
         </div>
       </div>
     </div>
