@@ -718,6 +718,56 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
     }
   };
 
+  // ── 恢复归档记录 → status=todo + Notion 行动状态=跟进中 ──────────────
+  const restoreTask = (id: string) => {
+    const now = new Date().toISOString();
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+
+    // Optimistic update: restore to todo + clear 暂缓 status
+    setTasks(prev => prev.map(t =>
+      t.id === id
+        ? { ...t, status: 'todo', tradeStatus: '跟进中', updatedAt: now }
+        : t
+    ));
+
+    // Increment today count if nextFollowUpAt <= today
+    const todayISO = new Date().toISOString().slice(0, 10);
+    const willBeInTodayCount =
+      !!task.nextFollowUpAt &&
+      task.nextFollowUpAt.slice(0, 10) <= todayISO;
+    if (willBeInTodayCount) {
+      setTodayFollowupCount(prev => (prev !== null ? prev + 1 : 1));
+    }
+
+    // Notion write-back
+    const pageId = task.leadId;
+    const hasNotionPage = pageId && !/^(LEAD_|HIST_|SYNTH_|INT_|NOTION-)/i.test(pageId) && pageId.includes('-');
+    if (hasNotionPage) {
+      const base = typeof window !== 'undefined' ? window.location.origin : '';
+      fetch(`${base}/api/crm/notion-update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pageId, action: 'restore_followup' }),
+      })
+        .then(async res => {
+          if (res.ok) {
+            showToast('已恢复跟进 · Notion 已同步', 'success');
+          } else {
+            const err = await res.json().catch(() => ({}));
+            console.error('[restoreTask] Notion write-back failed:', res.status, err);
+            showToast(`已恢复（本地）· Notion 同步失败 ${res.status}`, 'error');
+          }
+        })
+        .catch(e => {
+          console.error('[restoreTask] Notion error:', e);
+          showToast('已恢复（本地）· Notion 连接失败', 'error');
+        });
+    } else {
+      showToast('已恢复（本地快照）', 'info');
+    }
+  };
+
   // ── 批量同步本地已归档记录 → Notion ────────────────────────────────
   // For records that were archived before Notion write-back was available,
   // or if individual write-backs failed. Runs in parallel, shows summary.
@@ -993,6 +1043,7 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
             lang={'zh'}
             onUpdateTask={(u: any) => setTasks(v => v.map(t => t.id === u.id ? u : t))}
             onArchiveTask={archiveTask}
+            onRestoreTask={restoreTask}
             onDeleteTask={deleteTask}
           />
         )}

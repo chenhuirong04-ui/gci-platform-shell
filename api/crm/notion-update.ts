@@ -15,13 +15,12 @@ function json(body: unknown, status = 200) {
   });
 }
 
-// Only one action is supported in V1 — limits blast radius
-type Action = 'close_followup';
+type Action = 'close_followup' | 'restore_followup';
 
 interface UpdatePayload {
   pageId: string;          // Notion page ID of the Follow-up Log record
   action: Action;
-  tradeStatus?: string;    // defaults to '暂缓' for close_followup
+  tradeStatus?: string;    // defaults to '暂缓' for close / '跟进中' for restore
 }
 
 export default async function handler(request: Request): Promise<Response> {
@@ -49,13 +48,19 @@ export default async function handler(request: Request): Promise<Response> {
     return json({ error: 'pageId is a local-only ID — no Notion page exists for this record' }, 422);
   }
 
-  if (action !== 'close_followup') {
-    return json({ error: `Unknown action: ${action}. Only close_followup is supported.` }, 400);
+  if (action !== 'close_followup' && action !== 'restore_followup') {
+    return json({ error: `Unknown action: ${action}. Supported: close_followup, restore_followup.` }, 400);
   }
 
-  // Safety: only allow known valid 行动状态 values
-  const ALLOWED_STATUSES = ['暂缓', '已归档', '已成交', '已关闭'];
-  const statusToWrite = ALLOWED_STATUSES.includes(tradeStatus) ? tradeStatus : '暂缓';
+  // Determine what to write to 行动状态
+  let statusToWrite: string;
+  if (action === 'restore_followup') {
+    statusToWrite = '跟进中';
+  } else {
+    // close_followup: only allow known closed statuses
+    const ALLOWED_CLOSED = ['暂缓', '已归档', '已成交', '已关闭'];
+    statusToWrite = ALLOWED_CLOSED.includes(tradeStatus) ? tradeStatus : '暂缓';
+  }
 
   // PATCH only Follow-up Log — we trust the caller's pageId comes from task.leadId
   // which originates from notion-sync.ts (Follow-up Log only).
@@ -83,7 +88,7 @@ export default async function handler(request: Request): Promise<Response> {
     );
   }
 
-  console.log(`[notion-update] close_followup: pageId=${pageId}, status=${statusToWrite}`);
+  console.log(`[notion-update] ${action}: pageId=${pageId}, status=${statusToWrite}`);
   return json({
     ok: true,
     pageId,

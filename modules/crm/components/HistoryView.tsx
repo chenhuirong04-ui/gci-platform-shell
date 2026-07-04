@@ -37,6 +37,7 @@ interface HistoryViewProps {
   lang: Language;
   onUpdateTask: (task: FollowUpTask) => void;
   onArchiveTask: (id: string) => void;
+  onRestoreTask?: (id: string) => void;
   onDeleteTask: (id: string) => void;
 }
 
@@ -70,7 +71,7 @@ type URecord = {
 };
 
 const HistoryView: React.FC<HistoryViewProps> = ({
-  tasks, projects, lang, onUpdateTask, onArchiveTask, onDeleteTask,
+  tasks, projects, lang, onUpdateTask, onArchiveTask, onRestoreTask, onDeleteTask,
 }) => {
   const t = translations[lang];
   const [searchTerm,      setSearchTerm]      = useState('');
@@ -574,6 +575,15 @@ const HistoryView: React.FC<HistoryViewProps> = ({
                   style={{ backgroundColor: 'rgba(184,150,12,0.12)', color: '#B8960C', border: '1px solid rgba(184,150,12,0.3)' }}
                 >
                   <Archive className="w-3.5 h-3.5" /> 关闭本次跟进
+                </button>
+              )}
+              {task.status === 'archived' && onRestoreTask && (
+                <button
+                  onClick={() => { onRestoreTask(task.id); setSelectedTask(null); }}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-black transition-colors"
+                  style={{ backgroundColor: 'rgba(34,197,94,0.12)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}
+                >
+                  <Archive className="w-3.5 h-3.5" /> 恢复跟进
                 </button>
               )}
               <button
