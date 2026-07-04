@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react';
 import { colors } from '@gci/design-system';
 import { useAuth } from '../../contexts/AuthContext';
+import { useI18n } from '@gci/i18n';
 import type { BillingProfile } from '../../types/invoice';
 import { GCI_COMPANY } from '../../types/invoice';
 import { saveProfile, updateProfile, checkDuplicateProfile } from '../../lib/invoiceStore';
@@ -122,9 +123,10 @@ function DupeWarning({ existing, onUpdate, onCreateNew, onCancel }: {
   onCreateNew: () => void;
   onCancel: () => void;
 }) {
+  const { dict } = useI18n();
   return (
     <div style={{ background: 'rgba(212,168,67,0.08)', border: '1px solid rgba(212,168,67,0.3)', borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
-      <div style={{ fontSize: 12, color: '#D4A843', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, marginBottom: 8 }}>⚠ 检测到重复开票资料</div>
+      <div style={{ fontSize: 12, color: '#D4A843', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, marginBottom: 8 }}>⚠ {dict.ai.billing.duplicateTitle}</div>
       <div style={{ fontSize: 14, color: TEXT, marginBottom: 6 }}>
         已找到相同客户开票资料：<strong>{existing.customerName}</strong>
       </div>
@@ -157,6 +159,7 @@ interface Props {
 
 export function BillingProfileDraftPanel({ initialText = '', directMode = false, onClose, onSaved }: Props) {
   const { user } = useAuth();
+  const { dict } = useI18n();
 
   // 0 = text paste (AI mode), 1 = review form, 2 = saved
   const [step, setStep] = useState(directMode ? 1 : 0);
@@ -253,7 +256,7 @@ export function BillingProfileDraftPanel({ initialText = '', directMode = false,
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: GOLD }} />
           <span style={{ fontSize: 13, color: GOLD, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }}>
-            {directMode ? '开票资料库 · 新增资料' : 'AI 助手 · 保存开票资料'}
+            {directMode ? dict.ai.billing.panelTitle : 'AI 助手 · 保存开票资料'}
           </span>
         </div>
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, fontSize: 22, lineHeight: 1, padding: 0 }}>×</button>
@@ -355,7 +358,7 @@ export function BillingProfileDraftPanel({ initialText = '', directMode = false,
 
               {/* Source reference section */}
               <div style={{ gridColumn: '1 / -1', marginTop: 8, padding: '14px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10 }}>
-                <div style={{ fontSize: 12, color: MUTED, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 500, marginBottom: 10 }}>来源备注（选填）</div>
+                <div style={{ fontSize: 12, color: MUTED, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 500, marginBottom: 10 }}>{dict.ai.billing.sourceLabel}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
                   <div style={{ marginBottom: 12 }}>
                     <label style={labelStyle}>Source Type</label>

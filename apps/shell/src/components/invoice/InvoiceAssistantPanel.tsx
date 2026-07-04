@@ -17,6 +17,7 @@ import {
 import { InvoicePreview } from './InvoicePreview';
 import { colors } from '@gci/design-system';
 import { useAuth } from '../../contexts/AuthContext';
+import { useI18n } from '@gci/i18n';
 
 const GOLD = '#CBA85C';
 const GOLD_L = '#E2C988';
@@ -81,6 +82,7 @@ function normalizeItems(items: InvoiceLineItem[]): InvoiceLineItem[] {
 
 // ── Step 0: Profile selection ─────────────────────────────────────────────────
 function ProfileStep({ onSelect }: { onSelect: (p: BillingProfile) => void }) {
+  const { dict } = useI18n();
   const [profiles, setProfiles] = useState<BillingProfile[]>([]);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -125,7 +127,7 @@ function ProfileStep({ onSelect }: { onSelect: (p: BillingProfile) => void }) {
 
       {!loadingProfiles && profiles.length > 0 && (
         <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 11, color: GOLD, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.12em', marginBottom: 10 }}>已保存开票资料</div>
+          <div style={{ fontSize: 11, color: GOLD, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.12em', marginBottom: 10 }}>{dict.ai.invoice.profileSavedLabel}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {profiles.map(p => (
               <button
@@ -141,7 +143,7 @@ function ProfileStep({ onSelect }: { onSelect: (p: BillingProfile) => void }) {
                     <div style={{ fontSize: 13, color: MUTED, marginBottom: 2 }}>{p.billingAddress}</div>
                     {p.trn && <div style={{ fontSize: 12.5, color: MUTED, fontFamily: 'monospace' }}>TRN: {p.trn}</div>}
                   </div>
-                  <div style={{ fontSize: 12, color: GOLD, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, marginLeft: 16, flexShrink: 0 }}>使用此客户开票 →</div>
+                  <div style={{ fontSize: 12, color: GOLD, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, marginLeft: 16, flexShrink: 0 }}>{dict.ai.invoice.useProfileBtn}</div>
                 </div>
               </button>
             ))}
@@ -154,10 +156,10 @@ function ProfileStep({ onSelect }: { onSelect: (p: BillingProfile) => void }) {
         <button
           onClick={() => setShowForm(true)}
           style={{ width: '100%', padding: '11px', border: `1px dashed rgba(203,168,92,0.35)`, borderRadius: 10, background: 'none', color: GOLD_L, fontSize: 13, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
-        >+ 新增账单资料</button>
+        >{dict.ai.invoice.addProfileBtn}</button>
       ) : (
         <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20 }}>
-          <div style={{ fontSize: 12, color: GOLD, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, marginBottom: 16 }}>新增开票资料</div>
+          <div style={{ fontSize: 12, color: GOLD, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, marginBottom: 16 }}>{dict.ai.invoice.newProfileLabel}</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
             {[
               { key: 'customerName', label: 'Customer Name *', placeholder: 'e.g. IFZA FZCO', full: true },
@@ -189,7 +191,7 @@ function ProfileStep({ onSelect }: { onSelect: (p: BillingProfile) => void }) {
               onClick={handleSaveNew}
               disabled={!form.customerName.trim() || !form.billingAddress.trim() || saving}
               style={{ flex: 1, padding: '10px', borderRadius: 8, background: form.customerName.trim() && form.billingAddress.trim() && !saving ? `linear-gradient(135deg,${GOLD},${GOLD_L})` : 'rgba(255,255,255,0.06)', border: 'none', color: '#000', fontWeight: 700, fontSize: 13, cursor: saving ? 'wait' : form.customerName.trim() ? 'pointer' : 'not-allowed', fontFamily: "'Space Grotesk',sans-serif" }}
-            >{saving ? '保存中…' : '保存账单资料并继续'}</button>
+            >{saving ? dict.ai.invoice.saving : dict.ai.invoice.saveProfileBtn}</button>
             <button onClick={() => setShowForm(false)} style={{ padding: '10px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: MUTED, fontSize: 13, cursor: 'pointer' }}>取消</button>
           </div>
         </div>
@@ -346,6 +348,7 @@ function PreviewStep({ previewDraft, saving, onBack, onSaveDraft }: {
   onBack: () => void;
   onSaveDraft: (status: 'draft' | 'waiting_approval') => void;
 }) {
+  const { dict } = useI18n();
   function handlePrint() {
     const node = document.getElementById('gci-invoice-preview');
     if (!node) { alert('预览未加载，请重试'); return; }
@@ -393,7 +396,7 @@ function PreviewStep({ previewDraft, saving, onBack, onSaveDraft }: {
   return (
     <div>
       <div style={{ fontSize: 14, color: MUTED, marginBottom: 16 }}>
-        请检查发票内容。确认无误后保存草稿，或提交审批。打印时可选择「另存为 PDF」。
+        {dict.ai.invoice.previewNote}
       </div>
 
       {/* Light-grey tray — provides visual separation from dark shell */}
@@ -437,24 +440,24 @@ function PreviewStep({ previewDraft, saving, onBack, onSaveDraft }: {
         <button
           onClick={onBack}
           style={{ padding: '11px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.16)', color: MUTED, fontSize: 14, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
-        >← 返回修改</button>
+        >{dict.ai.invoice.backBtn}</button>
 
         <button
           onClick={handlePrint}
           style={{ padding: '11px 18px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)', color: TEXT, fontSize: 14, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
-        >🖨 打印 / 保存 PDF</button>
+        >{dict.ai.invoice.printBtn}</button>
 
         <button
           onClick={() => onSaveDraft('draft')}
           disabled={saving}
           style={{ flex: 1, minWidth: 120, padding: '11px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)', color: TEXT, fontSize: 14, cursor: saving ? 'wait' : 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
-        >{saving ? '保存中…' : '保存草稿'}</button>
+        >{saving ? dict.ai.invoice.saving : dict.ai.invoice.saveDraftBtn}</button>
 
         <button
           onClick={() => onSaveDraft('waiting_approval')}
           disabled={saving}
           style={{ flex: 2, minWidth: 140, padding: '11px', borderRadius: 8, background: saving ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: saving ? TEXT : '#000', fontWeight: 700, fontSize: 14, cursor: saving ? 'wait' : 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
-        >{saving ? '保存中…' : '提交审批 →'}</button>
+        >{saving ? dict.ai.invoice.saving : dict.ai.invoice.submitBtn}</button>
       </div>
     </div>
   );
@@ -467,6 +470,7 @@ interface Props {
 
 export function InvoiceAssistantPanel({ onClose }: Props) {
   const { user } = useAuth();
+  const { dict } = useI18n();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<BillingProfile | null>(null);
@@ -544,7 +548,7 @@ export function InvoiceAssistantPanel({ onClose }: Props) {
     setStep(3);
   }
 
-  const STEPS = ['客户账单资料', '发票内容', '预览确认', '已保存'];
+  const STEPS = dict.ai.invoice.steps;
 
   return (
     <div style={{ margin: '20px 0 32px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(203,168,92,0.2)', borderRadius: 18, overflow: 'hidden' }}>
@@ -553,7 +557,7 @@ export function InvoiceAssistantPanel({ onClose }: Props) {
       <div style={{ background: 'rgba(203,168,92,0.06)', borderBottom: '1px solid rgba(203,168,92,0.15)', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: GOLD }} />
-          <span style={{ fontSize: 13, color: GOLD, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }}>AI 助手 · 发票向导</span>
+          <span style={{ fontSize: 13, color: GOLD, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }}>{dict.ai.invoice.wizardTitle}</span>
         </div>
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, fontSize: 22, lineHeight: 1, padding: 0 }}>×</button>
       </div>
@@ -613,8 +617,8 @@ export function InvoiceAssistantPanel({ onClose }: Props) {
               </span>
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <a href="/invoice" style={{ padding: '11px 24px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)', color: TEXT, fontSize: 14, textDecoration: 'none' }}>查看发票列表</a>
-              <button onClick={onClose} style={{ padding: '11px 24px', borderRadius: 8, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: '#000', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>完成</button>
+              <a href="/invoice" style={{ padding: '11px 24px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)', color: TEXT, fontSize: 14, textDecoration: 'none' }}>{dict.ai.invoice.viewListBtn}</a>
+              <button onClick={onClose} style={{ padding: '11px 24px', borderRadius: 8, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: '#000', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>{dict.ai.invoice.doneBtn}</button>
             </div>
           </div>
         )}
