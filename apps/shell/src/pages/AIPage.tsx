@@ -10,21 +10,34 @@ import type { AIIntentMatch } from '../ai/aiRouter';
 
 // ── Product name extraction for inventory queries ─────────────────────────────
 // Extracts a product keyword from natural language input, e.g.:
-// "请帮我查一下心想印的库存" → "心想印"
-// "咖啡机的库存还有多少"      → "咖啡机"
-// "查一下库存"                → null (no specific product)
+// "心相印的湿巾还有多少库存？" → "心相印的湿巾"
+// "请帮我查一下心想印的库存"   → "心想印"
+// "咖啡机的库存还有多少"        → "咖啡机"
+// "查一下库存"                  → null (no specific product)
 function extractInventoryProduct(raw: string): string | null {
-  // Pattern: <word>的库存 or 查<word>库存 etc.
-  const before = raw.match(/查(?:一下)?(.+?)(?:的库存|库存)/);
-  if (before?.[1]) {
-    const candidate = before[1].replace(/^[一下帮我请]+/, '').trim();
-    if (candidate.length >= 2 && candidate.length <= 20) return candidate;
+  const s = raw.replace(/[？?。！!，,]/g, '').trim();
+
+  // Pattern 1: <product>还有多少/剩多少/有没有货 ... (product comes before quantity phrases)
+  let m = s.match(/^(.+?)(?:还有多少|剩多少|有没有货|是否有货|能不能出货|有货吗|有多少货|还有货)/u);
+  if (m?.[1]) {
+    const c = m[1].replace(/的$/, '').trim();
+    if (c.length >= 2 && c.length <= 25) return c;
   }
-  const after = raw.match(/(.+?)的库存/);
-  if (after?.[1]) {
-    const candidate = after[1].replace(/^.*(查|看|帮|我|请|一下)\s*/u, '').trim();
-    if (candidate.length >= 2 && candidate.length <= 20) return candidate;
+
+  // Pattern 2: 查/看 <product> 库存
+  m = s.match(/(?:查|看)(?:一下|查看|查询)?(.+?)(?:的)?库存/u);
+  if (m?.[1]) {
+    const c = m[1].replace(/^[帮我请一下\s]+/, '').trim();
+    if (c.length >= 2 && c.length <= 25) return c;
   }
+
+  // Pattern 3: <product>的库存
+  m = s.match(/(.+?)的库存/u);
+  if (m?.[1]) {
+    const c = m[1].replace(/^.*(查|看|帮|我|请|一下)\s*/u, '').trim();
+    if (c.length >= 2 && c.length <= 25) return c;
+  }
+
   return null;
 }
 
@@ -294,9 +307,12 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
             </div>
           )}
           {!intent.approvalRequired && (
-            <button onClick={onCancel} style={{ marginTop: 10, padding: '10px 18px', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>
-              {dict.ai.panel.close}
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+              <button onClick={onCancel} style={{ padding: '10px 18px', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>
+                {dict.ai.panel.close}
+              </button>
+              <span style={{ fontSize: 12, color: SUBTLE }}>— 或在顶部输入框继续追问</span>
+            </div>
           )}
         </div>
       )}
@@ -752,9 +768,9 @@ export function AIPage() {
       )}
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 28, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 0 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 28, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 0, overflowX: 'auto' }}>
         {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: tab === t.key ? `2px solid ${GOLD}` : '2px solid transparent', color: tab === t.key ? GOLD_L : MUTED, fontSize: 13.5, fontWeight: tab === t.key ? 600 : 400, fontFamily: "'Space Grotesk',sans-serif", transition: 'all 0.15s', marginBottom: -1 }}>
+          <button key={t.key} onClick={() => { setTab(t.key); if (cmdState) clearCmd(); }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: tab === t.key ? `2px solid ${GOLD}` : '2px solid transparent', color: tab === t.key ? GOLD_L : MUTED, fontSize: 13, fontWeight: tab === t.key ? 600 : 400, fontFamily: "'Space Grotesk',sans-serif", transition: 'all 0.15s', marginBottom: -1, whiteSpace: 'nowrap', flexShrink: 0 }}>
             <span>{t.icon}</span>
             <span>{t.label}</span>
             {t.status !== 'live' && (
@@ -766,13 +782,18 @@ export function AIPage() {
         ))}
       </div>
 
-      {/* Tab content — each tab passes onSubmit up to handleCommand */}
-      {tab === 'chat'      && <AIChatTab      onSubmit={handleCommand} />}
-      {tab === 'assistant' && <AIAssistantTab onSubmit={handleCommand} />}
-      {tab === 'agent'     && <AIAgentTab />}
-      {tab === 'daily'     && <AIDailyTab />}
-      {tab === 'workflow'  && <AIWorkflowTab />}
-      {tab === 'inbox'     && <AIInboxTab     onSubmit={handleCommand} />}
+      {/* Tab content — hidden while a command result is active (top input is the only entry point).
+          User clicks tab or "关闭" in CommandPanel to restore. */}
+      {!cmdState && !invoiceMode && !billingProfileMode && (
+        <>
+          {tab === 'chat'      && <AIChatTab      onSubmit={handleCommand} />}
+          {tab === 'assistant' && <AIAssistantTab onSubmit={handleCommand} />}
+          {tab === 'agent'     && <AIAgentTab />}
+          {tab === 'daily'     && <AIDailyTab />}
+          {tab === 'workflow'  && <AIWorkflowTab />}
+          {tab === 'inbox'     && <AIInboxTab     onSubmit={handleCommand} />}
+        </>
+      )}
     </div>
   );
 }
