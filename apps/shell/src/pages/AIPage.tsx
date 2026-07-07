@@ -386,35 +386,57 @@ function useStepRunner() {
 // ── TAB 1: AI Chat ─────────────────────────────────────────────────────────────
 function AIChatTab({ onSubmit }: { onSubmit: (v: string) => void }) {
   const { dict } = useI18n();
-  const [query, setQuery] = useState('');
+  const [followUp, setFollowUp] = useState('');
+  const [showFollowUp, setShowFollowUp] = useState(false);
 
-  function submit(v?: string) {
-    const val = v ?? query;
-    if (!val.trim()) return;
-    onSubmit(val);
-    setQuery('');
+  function submit(v: string) {
+    if (!v.trim()) return;
+    onSubmit(v);
+    setFollowUp('');
+    setShowFollowUp(false);
   }
 
   return (
     <div>
-      <SectionLabel text={dict.ai.chat.sectionLabel} />
-      <Card style={{ marginBottom: 16 }}>
-        <p style={{ fontSize: 14, color: MUTED, margin: '0 0 16px', lineHeight: 1.7 }}>
-          {dict.ai.chat.description}<strong style={{ color: TEXT }}>{dict.ai.chat.descriptionBold}</strong>
-        </p>
-        <div style={{ position: 'relative' }}>
-          <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()}
-            placeholder={dict.ai.chat.placeholder}
-            style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '13px 48px 13px 16px', fontSize: 14, color: TEXT, outline: 'none', boxSizing: 'border-box', fontFamily: "'Space Grotesk',sans-serif" }}
-            onFocus={e => (e.target.style.borderColor = 'rgba(203,168,92,0.5)')}
-            onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
-          <button onClick={() => submit()} disabled={!query.trim()} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 34, height: 34, borderRadius: 8, background: query.trim() ? `linear-gradient(135deg,${GOLD},${GOLD_L})` : 'rgba(255,255,255,0.06)', border: 'none', cursor: query.trim() ? 'pointer' : 'not-allowed', fontSize: 15 }}>↵</button>
-        </div>
-      </Card>
-      <SectionLabel text={dict.ai.chat.quickLabel} />
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {dict.ai.chat.suggestions.map(s => <ActionChip key={s} label={s} onClick={() => submit(s)} />)}
+      {/* Hint: top Ask GCI is the primary input */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, padding: '10px 14px', background: 'rgba(203,168,92,0.06)', border: '1px solid rgba(203,168,92,0.15)', borderRadius: 10 }}>
+        <span style={{ fontSize: 18 }}>⬆</span>
+        <span style={{ fontSize: 13, color: MUTED }}>
+          使用上方 <strong style={{ color: GOLD_L }}>Ask GCI</strong> 输入框发送任意指令。AI 自动识别意图并路由到正确功能。
+        </span>
       </div>
+
+      {/* Quick questions */}
+      <SectionLabel text={dict.ai.chat.quickLabel} />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+        {dict.ai.chat.suggestions.map(s => (
+          <ActionChip key={s} label={s} onClick={() => submit(s)} />
+        ))}
+      </div>
+
+      {/* Follow-up input — compact, secondary */}
+      {!showFollowUp ? (
+        <button
+          onClick={() => setShowFollowUp(true)}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 9, color: SUBTLE, fontSize: 13, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
+        >
+          <span style={{ fontSize: 14 }}>✎</span> 继续追问…
+        </button>
+      ) : (
+        <div style={{ position: 'relative', maxWidth: 560 }}>
+          <input
+            autoFocus
+            value={followUp}
+            onChange={e => setFollowUp(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') submit(followUp); if (e.key === 'Escape') setShowFollowUp(false); }}
+            placeholder="继续追问 GCI…"
+            style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(203,168,92,0.3)', borderRadius: 10, padding: '11px 48px 11px 14px', fontSize: 14, color: TEXT, outline: 'none', boxSizing: 'border-box', fontFamily: "'Space Grotesk',sans-serif" }}
+            onFocus={e => (e.target.style.borderColor = 'rgba(203,168,92,0.55)')}
+            onBlur={e => (e.target.style.borderColor = 'rgba(203,168,92,0.3)')}
+          />
+          <button onClick={() => submit(followUp)} disabled={!followUp.trim()} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 32, height: 32, borderRadius: 8, background: followUp.trim() ? `linear-gradient(135deg,${GOLD},${GOLD_L})` : 'rgba(255,255,255,0.06)', border: 'none', cursor: followUp.trim() ? 'pointer' : 'not-allowed', fontSize: 15 }}>↵</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -716,7 +738,7 @@ export function AIPage() {
   }
 
   return (
-    <div style={{ maxWidth: 'var(--content-max-w)', margin: '0 auto', padding: '48px 48px 80px' }}>
+    <div style={{ maxWidth: 1400, width: '100%', margin: '0 auto', padding: '40px 32px 80px' }}>
 
       {/* Hero header */}
       <div style={{ marginBottom: cmdState ? 0 : 36 }}>
@@ -767,8 +789,8 @@ export function AIPage() {
         />
       )}
 
-      {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 28, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 0, overflowX: 'auto' }}>
+      {/* Tab bar — scrollbar hidden via .ai-tab-bar CSS class */}
+      <div className="ai-tab-bar" style={{ display: 'flex', gap: 4, marginBottom: 28, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 0, overflowX: 'auto' }}>
         {TABS.map(t => (
           <button key={t.key} onClick={() => { setTab(t.key); if (cmdState) clearCmd(); }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: tab === t.key ? `2px solid ${GOLD}` : '2px solid transparent', color: tab === t.key ? GOLD_L : MUTED, fontSize: 13, fontWeight: tab === t.key ? 600 : 400, fontFamily: "'Space Grotesk',sans-serif", transition: 'all 0.15s', marginBottom: -1, whiteSpace: 'nowrap', flexShrink: 0 }}>
             <span>{t.icon}</span>

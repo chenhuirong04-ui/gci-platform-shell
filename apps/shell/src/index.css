@@ -93,6 +93,15 @@ body,
   color: #e2c988 !important;
 }
 
+/* AI tab bar — hide scrollbar visually, keep horizontal scroll working */
+.ai-tab-bar {
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* IE/Edge */
+}
+.ai-tab-bar::-webkit-scrollbar {
+  display: none;                  /* Chrome/Safari */
+}
+
 @keyframes fadeUp {
   from {
     opacity: 0;
