@@ -143,9 +143,9 @@ export const AI_CAPABILITY_MAP: AIIntent[] = [
     requiredFields: [],
     approvalRequired: false,
     resultPanel: null,
-    implementationStatus: 'partial',
-    notConnectedMessage: '报价数据表（quotation_records）已存在，但 AI 查询接口尚未接入。\n\n请前往 报价管理 查看超时报价，或在下一期接入真实数据查询。',
-    fallbackBehavior: '显示"部分接入"提示，附上直接链接到报价模块。',
+    implementationStatus: 'real',
+    notConnectedMessage: '',
+    fallbackBehavior: '直接显示待回复报价列表，超7天标红置顶。',
   },
 
   // ── 5. Create Customer Draft ───────────────────────────────────────────────

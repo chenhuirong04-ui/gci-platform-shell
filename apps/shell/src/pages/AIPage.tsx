@@ -193,8 +193,54 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
             </div>
           )}
 
-          {/* ── Default: show intent name for non-inventory done states ── */}
-          {intent.intentId !== 'check_inventory' && (
+          {/* ── Quotation follow-up result panel ── */}
+          {intent.intentId === 'check_quotation_followups' && state.resultData && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>
+                待回复报价共 {state.resultData.total} 笔
+                {state.resultData.overdueCount > 0 && (
+                  <span style={{ marginLeft: 10, color: '#E0846A', fontWeight: 700 }}>
+                    ⚠ {state.resultData.overdueCount} 笔已超 {state.resultData.overdueDays} 天未回复
+                  </span>
+                )}
+                {state.resultData.total === 0 && (
+                  <span style={{ marginLeft: 10, color: '#6FBF8E', fontWeight: 700 }}>✓ 无待跟进报价</span>
+                )}
+              </div>
+              {state.resultData.quotes.length > 0 && (
+                <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {state.resultData.quotes.map((q: any, i: number) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7, background: q.overdue ? 'rgba(224,132,106,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${q.overdue ? 'rgba(224,132,106,0.25)' : 'rgba(255,255,255,0.07)'}` }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ fontSize: 13, color: TEXT, fontWeight: 600 }}>{q.customerName}</span>
+                        {q.projectName && <span style={{ fontSize: 11, color: MUTED, marginLeft: 6 }}>{q.projectName}</span>}
+                      </div>
+                      <span style={{ fontSize: 12, color: GOLD, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                        {q.currency} {Number(q.grandTotal).toLocaleString()}
+                      </span>
+                      <span style={{ fontSize: 11, color: q.overdue ? '#E0846A' : MUTED, whiteSpace: 'nowrap', minWidth: 55, textAlign: 'right' }}>
+                        {q.daysAgo} 天前
+                      </span>
+                      {q.overdue && <span style={{ fontSize: 10, color: '#E0846A', fontWeight: 700 }}>跟进!</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ fontSize: 10, color: MUTED, marginTop: 8 }}>
+                数据来源：quotation_records · {new Date(state.resultData.asOf).toLocaleString('zh-CN')}
+              </div>
+            </div>
+          )}
+
+          {/* ── Quotation follow-up error ── */}
+          {intent.intentId === 'check_quotation_followups' && !state.resultData && (
+            <div style={{ fontSize: 13, color: '#E0846A', marginBottom: 8 }}>
+              报价数据加载失败，请前往 报价管理 查看。
+            </div>
+          )}
+
+          {/* ── Default: show intent name for non-result done states ── */}
+          {intent.intentId !== 'check_inventory' && intent.intentId !== 'check_quotation_followups' && (
             <div style={{ fontSize: 14, color: TEXT, marginBottom: intent.approvalRequired ? 14 : 0 }}>
               {intent.intentNameZh}{intent.approvalRequired ? dict.ai.panel.readyLabel : ''}
             </div>
@@ -612,11 +658,19 @@ export function AIPage() {
             fetch(`${base}/api/trade/check-inventory`)
               .then(r => r.json())
               .then(data => {
-                if (data.ok) {
-                  setCmdState(prev => prev ? { ...prev, resultData: data } : prev);
-                }
+                if (data.ok) setCmdState(prev => prev ? { ...prev, resultData: data } : prev);
               })
               .catch(e => console.error('[check_inventory] fetch failed', e));
+          }
+          // For check_quotation_followups, fetch real data after animation completes
+          if (intent.intentId === 'check_quotation_followups') {
+            const base = typeof window !== 'undefined' ? window.location.origin : '';
+            fetch(`${base}/api/trade/check-quotation-followups`)
+              .then(r => r.json())
+              .then(data => {
+                if (data.ok) setCmdState(prev => prev ? { ...prev, resultData: data } : prev);
+              })
+              .catch(e => console.error('[check_quotation_followups] fetch failed', e));
           }
         },
       );
