@@ -141,7 +141,7 @@ export function Sidebar({ navTop, workspaceLabel, sections, userName, userRole, 
   }
   return (
     <aside
-      className={`shrink-0 hidden md:flex md:flex-col relative sticky top-0 overflow-y-auto${className ? ` ${className}` : ''}`}
+      className={`shrink-0 hidden md:flex md:flex-col relative sticky top-0 overflow-y-auto gci-sidebar${className ? ` ${className}` : ''}`}
       style={{
         width: 'var(--sidebar-w)',
         height: '100vh',
