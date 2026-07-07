@@ -185,9 +185,9 @@ export const AI_CAPABILITY_MAP: AIIntent[] = [
     requiredFields: [],
     approvalRequired: false,
     resultPanel: null,
-    implementationStatus: 'partial',
-    notConnectedMessage: '库存数据表（consignment_stock）已存在，但 AI 实时查询接口尚未接入。\n\n请前往 贸易 → 库存管理 查看实时库存，或在下一期接入直接查询。',
-    fallbackBehavior: '显示"部分接入"提示，附直接链接到库存模块。',
+    implementationStatus: 'real',
+    notConnectedMessage: '',
+    fallbackBehavior: '直接显示库存汇总，低库存产品置顶标红。',
   },
 
   // ── 7. Generate Daily Brief ────────────────────────────────────────────────

@@ -490,7 +490,6 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
     setSelectedTask(baseTask);
 
     // ── Write to Notion Follow-up Log ──────────────────────────────────────
-    // Fire-and-forget: don't block UI, don't show error to user if it fails
     ;(async () => {
       try {
         const followUpMethod = formData.whatsapp ? 'WhatsApp'
@@ -524,12 +523,22 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
         const result = await res.json();
 
         if (res.ok) {
+          // Backfill the real Notion pageId so future archive/restore calls work
+          const notionPageId = result.followUpLogPageId || result.pageId;
+          if (notionPageId) {
+            setTasks(prev => prev.map(t =>
+              t.id === baseTask.id ? { ...t, leadId: notionPageId } : t
+            ));
+          }
+          showToast(`✓ 已同步到 Notion${result.sbId ? ' · ' + result.sbId : ''}`, 'success');
           syncFromNotion().catch((e: any) => console.warn('[LeadSubmit] sync after write failed', e));
         } else {
           console.error('[LeadSubmit] Notion write failed', result);
+          showToast(`已保存到本地，Notion 同步失败（${res.status}）— 请检查网络或联系管理员`, 'error');
         }
       } catch (e: any) {
         console.error('[LeadSubmit] error writing to Notion', e?.message);
+        showToast('已保存到本地，Notion 连接失败 — 数据未同步到云端', 'error');
       }
     })();
     // ──────────────────────────────────────────────────────────────────────

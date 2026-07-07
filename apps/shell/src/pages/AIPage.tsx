@@ -38,6 +38,7 @@ interface CmdState {
   match: AIIntentMatch;
   phase: 'processing' | 'done' | 'not_connected';
   step: number;
+  resultData?: any;
 }
 
 const IMPL_STATUS_COLORS: Record<string, string> = {
@@ -153,9 +154,52 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
           <div className="font-mono-label" style={{ fontSize: 9.5, color: intent.approvalRequired ? '#6FBF8E' : GOLD, letterSpacing: '0.15em', marginBottom: 8 }}>
             {intent.approvalRequired ? dict.ai.panel.waitingApproval : dict.ai.panel.done}
           </div>
-          <div style={{ fontSize: 14, color: TEXT, marginBottom: intent.approvalRequired ? 14 : 0 }}>
-            {intent.intentNameZh}{intent.approvalRequired ? dict.ai.panel.readyLabel : ''}
-          </div>
+
+          {/* ── Inventory result panel ── */}
+          {intent.intentId === 'check_inventory' && state.resultData && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>
+                共 {state.resultData.total} 种产品
+                {state.resultData.lowStockCount > 0 && (
+                  <span style={{ marginLeft: 10, color: '#E0846A', fontWeight: 700 }}>
+                    ⚠ {state.resultData.lowStockCount} 种库存偏低（≤5件）
+                  </span>
+                )}
+              </div>
+              <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {state.resultData.products.map((p: any, i: number) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7, background: p.lowStock ? 'rgba(224,132,106,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${p.lowStock ? 'rgba(224,132,106,0.25)' : 'rgba(255,255,255,0.07)'}` }}>
+                    <span style={{ flex: 1, fontSize: 13, color: TEXT, fontWeight: 600 }}>{p.productName}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: p.lowStock ? '#E0846A' : '#6FBF8E', minWidth: 60, textAlign: 'right' }}>
+                      剩 {p.totalRemaining} 件
+                    </span>
+                    <span style={{ fontSize: 10, color: MUTED, minWidth: 70, textAlign: 'right' }}>
+                      已售 {p.totalSold} / 寄售 {p.totalConsigned}
+                    </span>
+                    {p.lowStock && <span style={{ fontSize: 10, color: '#E0846A', fontWeight: 700 }}>库存偏低</span>}
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 10, color: MUTED, marginTop: 8 }}>
+                数据来源：consignment_stock · {new Date(state.resultData.asOf).toLocaleString('zh-CN')}
+              </div>
+            </div>
+          )}
+
+          {/* ── Inventory error ── */}
+          {intent.intentId === 'check_inventory' && !state.resultData && (
+            <div style={{ fontSize: 13, color: '#E0846A', marginBottom: 8 }}>
+              库存数据加载失败，请前往 贸易 → 库存管理 查看。
+            </div>
+          )}
+
+          {/* ── Default: show intent name for non-inventory done states ── */}
+          {intent.intentId !== 'check_inventory' && (
+            <div style={{ fontSize: 14, color: TEXT, marginBottom: intent.approvalRequired ? 14 : 0 }}>
+              {intent.intentNameZh}{intent.approvalRequired ? dict.ai.panel.readyLabel : ''}
+            </div>
+          )}
+
           {intent.approvalRequired && (
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={onApprove} style={{ flex: 1, padding: '11px', borderRadius: 9, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: NAVY, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>
@@ -560,7 +604,21 @@ export function AIPage() {
       runner.run(
         steps,
         (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
-        ()  => setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev),
+        ()  => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          // For check_inventory, fetch real data after animation completes
+          if (intent.intentId === 'check_inventory') {
+            const base = typeof window !== 'undefined' ? window.location.origin : '';
+            fetch(`${base}/api/trade/check-inventory`)
+              .then(r => r.json())
+              .then(data => {
+                if (data.ok) {
+                  setCmdState(prev => prev ? { ...prev, resultData: data } : prev);
+                }
+              })
+              .catch(e => console.error('[check_inventory] fetch failed', e));
+          }
+        },
       );
     }
 
