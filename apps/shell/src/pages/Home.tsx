@@ -11,16 +11,26 @@ function safeLocalGet<T = any>(key: string): T[] {
   catch { return []; }
 }
 
+// ─── Active follow-up filter — mirrors buildDashboardStats exactly ──────────
+// Any change here must also be reflected in dashboardStats.ts FOLLOWUP_EXCLUDED.
+const FOLLOWUP_EXCLUDED = ['暂缓', '已成交', '已归档', '已关闭', '执行中'];
+
+function isActiveFollowup(t: any, today: string): boolean {
+  if (!t?.nextFollowUpAt) return false;
+  if (t.nextFollowUpAt.slice(0, 10) > today) return false;
+  if (t?.status === 'archived' || t?.status === 'deleted' || t?.status === 'completed') return false;
+  if (FOLLOWUP_EXCLUDED.includes(t?.tradeStatus || '')) return false;
+  if (t?.notionSource === 'contact_only') return false;
+  return true;
+}
+
 // ─── Derived counts from real data ─────────────────────────────────────────
 function loadHomeStats() {
   const today = new Date().toISOString().split('T')[0];
 
-  // CRM: tasks with nextFollowUpAt <= today and status ACTIVE
+  // CRM: active follow-ups due today (same definition as CRM dashboard + DailyWorkbench)
   const crmTasks: any[] = safeLocalGet('ICARE_HISTORY_V1');
-  const followUpsToday = crmTasks.filter(t =>
-    t?.nextFollowUpAt && t.nextFollowUpAt.slice(0, 10) <= today &&
-    t?.status !== 'PAUSED' && t?.status !== 'ARCHIVED'
-  ).length;
+  const followUpsToday = crmTasks.filter(t => isActiveFollowup(t, today)).length;
 
   // Trade: non-terminal quotes
   const quotes: any[] = safeLocalGet('quotes');
@@ -60,13 +70,12 @@ function loadLiveAlerts(lang: 'zh' | 'en'): LiveAlert[] {
   const today = new Date().toISOString().split('T')[0];
   const alerts: LiveAlert[] = [];
 
-  // 1. Overdue CRM follow-ups (top 2)
+  // 1. Overdue CRM follow-ups (top 2) — same active filter as loadHomeStats
   const crmTasks: any[] = safeLocalGet('ICARE_HISTORY_V1');
   const overdueFollowups = crmTasks
     .filter(t =>
-      t?.nextFollowUpAt &&
+      isActiveFollowup(t, today) &&
       t.nextFollowUpAt.slice(0, 10) < today &&
-      t?.status !== 'PAUSED' && t?.status !== 'ARCHIVED' &&
       t?.clientName
     )
     .sort((a, b) => a.nextFollowUpAt.localeCompare(b.nextFollowUpAt))
