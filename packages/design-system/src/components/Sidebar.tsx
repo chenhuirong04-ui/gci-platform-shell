@@ -146,7 +146,7 @@ export function Sidebar({ navTop, workspaceLabel, sections, userName, userRole, 
         width: 'var(--sidebar-w)',
         height: '100vh',
         background: 'var(--bg-shell)',
-        borderRight: '1px solid rgba(255,255,255,0.055)',
+        borderRight: '1px solid rgba(203,168,92,0.07)',
         padding: '22px 14px',
       }}
     >
@@ -157,7 +157,7 @@ export function Sidebar({ navTop, workspaceLabel, sections, userName, userRole, 
           right: 0,
           width: 1,
           height: '60%',
-          background: 'linear-gradient(180deg,transparent,rgba(203,168,92,0.25),transparent)',
+          background: 'linear-gradient(180deg,transparent,rgba(203,168,92,0.12),transparent)',
         }}
       />
 

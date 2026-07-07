@@ -665,6 +665,62 @@ export function AIPage() {
       return;
     }
 
+    // Inventory intent — hardcoded regex, bypass scoring system entirely.
+    // Scoring normalization penalizes intents with many keywords; regex is reliable.
+    const INVENTORY_RE = /库存|还有多少|剩多少|有没有货|是否有货|能不能出货|缺货|低库存|stock|inventory/i;
+    if (INVENTORY_RE.test(t)) {
+      console.log('[AI] inventory intent detected, raw:', raw);
+      const product = extractInventoryProduct(raw.trim());
+      console.log('[AI] extracted product keyword:', product);
+      // Build a minimal intent match inline (avoids importing the whole map)
+      const inventoryMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'check_inventory',
+          intentNameZh: '库存查询结果',
+          intentNameEn: 'Inventory Check',
+          category: 'query',
+          triggerKeywordsZh: [],
+          triggerKeywordsEn: [],
+          targetTab: 'chat',
+          targetModule: 'Inventory',
+          targetRoute: '/trade?tab=inventory',
+          readSources: ['consignment_stock'],
+          writeTargets: [],
+          requiredFields: [],
+          approvalRequired: false,
+          resultPanel: null,
+          implementationStatus: 'real',
+          notConnectedMessage: '',
+          fallbackBehavior: '',
+        },
+        confidence: 1,
+        raw: raw.trim(),
+        detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: inventoryMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在连接库存数据库…', '正在检查库存水位…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          const base = typeof window !== 'undefined' ? window.location.origin : '';
+          const qs = product ? `?product=${encodeURIComponent(product)}` : '';
+          const url = `${base}/api/trade/check-inventory${qs}`;
+          console.log('[AI] fetching inventory:', url);
+          fetch(url)
+            .then(r => r.json())
+            .then(data => {
+              console.log('[AI] inventory API response:', data);
+              if (data.ok) setCmdState(prev => prev ? { ...prev, resultData: data } : prev);
+            })
+            .catch(e => console.error('[AI] inventory fetch failed', e));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
     // All other commands — use central router
     const match = detectAIIntent(raw.trim());
     const { intent } = match;
