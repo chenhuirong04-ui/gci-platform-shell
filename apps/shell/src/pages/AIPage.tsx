@@ -189,8 +189,21 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
             {intent.approvalRequired ? dict.ai.panel.waitingApproval : dict.ai.panel.done}
           </div>
 
+          {/* ── Inventory API error ── */}
+          {intent.intentId === 'check_inventory' && state.resultData && !state.resultData.ok && (
+            <div style={{ fontSize: 13, color: '#E0846A', marginBottom: 12, padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>库存 API 查询失败</div>
+              <div style={{ color: MUTED, fontSize: 12 }}>{state.resultData.error || '未知错误'}</div>
+              {state.resultData.detail && (
+                <div style={{ color: SUBTLE, fontSize: 11, marginTop: 4, fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                  {typeof state.resultData.detail === 'string' ? state.resultData.detail : JSON.stringify(state.resultData.detail)}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── Inventory result panel ── */}
-          {intent.intentId === 'check_inventory' && state.resultData && (
+          {intent.intentId === 'check_inventory' && state.resultData && state.resultData.ok && (
             <div style={{ marginBottom: 12 }}>
               {state.resultData.productFilter && (
                 <div style={{ fontSize: 11, color: GOLD, marginBottom: 6 }}>
@@ -233,10 +246,10 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
             </div>
           )}
 
-          {/* ── Inventory error ── */}
+          {/* ── Inventory loading (resultData not yet returned) ── */}
           {intent.intentId === 'check_inventory' && !state.resultData && (
-            <div style={{ fontSize: 13, color: '#E0846A', marginBottom: 8 }}>
-              库存数据加载失败，请前往 贸易 → 库存管理 查看。
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>
+              正在查询库存数据…
             </div>
           )}
 
@@ -711,8 +724,9 @@ export function AIPage() {
           fetch(url)
             .then(r => r.json())
             .then(data => {
-              console.log('[AI] inventory API response:', data);
-              if (data.ok) setCmdState(prev => prev ? { ...prev, resultData: data } : prev);
+              console.log('[AI] inventory API response:', JSON.stringify(data));
+              // Store result regardless of ok — frontend shows error detail if ok=false
+              setCmdState(prev => prev ? { ...prev, resultData: data } : prev);
             })
             .catch(e => console.error('[AI] inventory fetch failed', e));
         },
