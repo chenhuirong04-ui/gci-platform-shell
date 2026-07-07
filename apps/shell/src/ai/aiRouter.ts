@@ -76,9 +76,10 @@ export function detectAIIntent(raw: string): AIIntentMatch {
   // Pick highest score
   const best = scored.reduce((a, b) => (b.score > a.score ? b : a));
 
-  // Minimum threshold — below 0.05 means no real match
-  if (best.score < 0.05) {
-    // Heuristic: if input looks like a question route to chat, else assistant
+  // Only fall back to generic if NO intent matched any keyword at all (score === 0).
+  // The old 0.05 threshold was too high: intents with many keywords get penalized by
+  // normalization even when a keyword clearly matched (e.g. "库存" → 1/54 = 0.018).
+  if (best.score === 0) {
     const isQuestion =
       raw.endsWith('?') || raw.endsWith('？') ||
       /哪些|谁|多少|什么|几|查|看/.test(raw);

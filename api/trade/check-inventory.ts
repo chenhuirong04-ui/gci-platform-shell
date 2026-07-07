@@ -45,9 +45,18 @@ export default async function handler(request: Request): Promise<Response> {
 
   if (!url || !key) return json({ error: 'Supabase not configured' }, 500);
 
-  // Query all rows from consignment_stock
+  // Optional product keyword filter from ?product=xxx
+  const reqUrl = new URL(request.url);
+  const productFilter = reqUrl.searchParams.get('product')?.trim() || '';
+
+  // Build query — add ilike filter when product keyword is provided
+  const baseQuery = `${url}/rest/v1/consignment_stock?select=productName,customerName,consignedQty,soldQty,remainingQty,unitPrice,settlementStatus&order=productName.asc`;
+  const queryUrl = productFilter
+    ? `${baseQuery}&productName=ilike.*${encodeURIComponent(productFilter)}*`
+    : baseQuery;
+
   const res = await fetch(
-    `${url}/rest/v1/consignment_stock?select=productName,customerName,consignedQty,soldQty,remainingQty,unitPrice,settlementStatus&order=productName.asc`,
+    queryUrl,
     {
       headers: {
         apikey: key,
@@ -104,6 +113,7 @@ export default async function handler(request: Request): Promise<Response> {
     total: products.length,
     lowStockCount: products.filter(p => p.lowStock).length,
     products,
+    productFilter: productFilter || null,
     asOf: new Date().toISOString(),
   });
 }

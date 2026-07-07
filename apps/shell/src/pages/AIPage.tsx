@@ -8,6 +8,26 @@ import { BillingProfileDraftPanel } from '../components/invoice/BillingProfileDr
 import { detectAIIntent, getIntentSteps } from '../ai/aiRouter';
 import type { AIIntentMatch } from '../ai/aiRouter';
 
+// ── Product name extraction for inventory queries ─────────────────────────────
+// Extracts a product keyword from natural language input, e.g.:
+// "请帮我查一下心想印的库存" → "心想印"
+// "咖啡机的库存还有多少"      → "咖啡机"
+// "查一下库存"                → null (no specific product)
+function extractInventoryProduct(raw: string): string | null {
+  // Pattern: <word>的库存 or 查<word>库存 etc.
+  const before = raw.match(/查(?:一下)?(.+?)(?:的库存|库存)/);
+  if (before?.[1]) {
+    const candidate = before[1].replace(/^[一下帮我请]+/, '').trim();
+    if (candidate.length >= 2 && candidate.length <= 20) return candidate;
+  }
+  const after = raw.match(/(.+?)的库存/);
+  if (after?.[1]) {
+    const candidate = after[1].replace(/^.*(查|看|帮|我|请|一下)\s*/u, '').trim();
+    if (candidate.length >= 2 && candidate.length <= 20) return candidate;
+  }
+  return null;
+}
+
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const GOLD = '#CBA85C';
 const GOLD_L = '#E2C988';
@@ -159,28 +179,41 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
           {/* ── Inventory result panel ── */}
           {intent.intentId === 'check_inventory' && state.resultData && (
             <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>
-                共 {state.resultData.total} 种产品
-                {state.resultData.lowStockCount > 0 && (
-                  <span style={{ marginLeft: 10, color: '#E0846A', fontWeight: 700 }}>
-                    ⚠ {state.resultData.lowStockCount} 种库存偏低（≤5件）
-                  </span>
-                )}
-              </div>
-              <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {state.resultData.products.map((p: any, i: number) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7, background: p.lowStock ? 'rgba(224,132,106,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${p.lowStock ? 'rgba(224,132,106,0.25)' : 'rgba(255,255,255,0.07)'}` }}>
-                    <span style={{ flex: 1, fontSize: 13, color: TEXT, fontWeight: 600 }}>{p.productName}</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: p.lowStock ? '#E0846A' : '#6FBF8E', minWidth: 60, textAlign: 'right' }}>
-                      剩 {p.totalRemaining} 件
-                    </span>
-                    <span style={{ fontSize: 10, color: MUTED, minWidth: 70, textAlign: 'right' }}>
-                      已售 {p.totalSold} / 寄售 {p.totalConsigned}
-                    </span>
-                    {p.lowStock && <span style={{ fontSize: 10, color: '#E0846A', fontWeight: 700 }}>库存偏低</span>}
+              {state.resultData.productFilter && (
+                <div style={{ fontSize: 11, color: GOLD, marginBottom: 6 }}>
+                  筛选：「{state.resultData.productFilter}」
+                </div>
+              )}
+              {state.resultData.total === 0 ? (
+                <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 0' }}>
+                  未找到与「{state.resultData.productFilter || '所查产品'}」相关的库存记录。
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>
+                    共 {state.resultData.total} 种产品
+                    {state.resultData.lowStockCount > 0 && (
+                      <span style={{ marginLeft: 10, color: '#E0846A', fontWeight: 700 }}>
+                        ⚠ {state.resultData.lowStockCount} 种库存偏低（≤5件）
+                      </span>
+                    )}
                   </div>
-                ))}
-              </div>
+                  <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {state.resultData.products.map((p: any, i: number) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7, background: p.lowStock ? 'rgba(224,132,106,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${p.lowStock ? 'rgba(224,132,106,0.25)' : 'rgba(255,255,255,0.07)'}` }}>
+                        <span style={{ flex: 1, fontSize: 13, color: TEXT, fontWeight: 600 }}>{p.productName}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: p.lowStock ? '#E0846A' : '#6FBF8E', minWidth: 60, textAlign: 'right' }}>
+                          剩 {p.totalRemaining} 件
+                        </span>
+                        <span style={{ fontSize: 10, color: MUTED, minWidth: 70, textAlign: 'right' }}>
+                          已售 {p.totalSold} / 寄售 {p.totalConsigned}
+                        </span>
+                        {p.lowStock && <span style={{ fontSize: 10, color: '#E0846A', fontWeight: 700 }}>库存偏低</span>}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
               <div style={{ fontSize: 10, color: MUTED, marginTop: 8 }}>
                 数据来源：consignment_stock · {new Date(state.resultData.asOf).toLocaleString('zh-CN')}
               </div>
@@ -616,7 +649,9 @@ export function AIPage() {
           // For check_inventory, fetch real data after animation completes
           if (intent.intentId === 'check_inventory') {
             const base = typeof window !== 'undefined' ? window.location.origin : '';
-            fetch(`${base}/api/trade/check-inventory`)
+            const product = extractInventoryProduct(raw.trim());
+            const qs = product ? `?product=${encodeURIComponent(product)}` : '';
+            fetch(`${base}/api/trade/check-inventory${qs}`)
               .then(r => r.json())
               .then(data => {
                 if (data.ok) setCmdState(prev => prev ? { ...prev, resultData: data } : prev);
