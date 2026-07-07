@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { DailyWorkbench } from '../components/DailyWorkbench';
 import { useSearchParams } from 'react-router-dom';
 import { colors } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
@@ -21,7 +22,7 @@ const TABS: { key: TabKey; label: string; icon: string; status: 'mock' | 'soon' 
   { key: 'chat',      label: 'AI Chat',      icon: '💬', status: 'mock' },
   { key: 'assistant', label: 'AI Assistant', icon: '⚡', status: 'mock' },
   { key: 'agent',     label: 'AI Agent',     icon: '🤖', status: 'soon' },
-  { key: 'daily',     label: 'AI Daily',     icon: '📋', status: 'mock' },
+  { key: 'daily',     label: '今日工作台',    icon: '📋', status: 'live' },
   { key: 'workflow',  label: 'AI Workflow',  icon: '🔄', status: 'soon' },
   { key: 'inbox',     label: 'AI Inbox',     icon: '📥', status: 'mock' },
 ];
@@ -450,49 +451,9 @@ function AIAgentTab() {
   );
 }
 
-// ── TAB 4: AI Daily ────────────────────────────────────────────────────────────
-const DAILY_STAT_COLORS = ['#5BA3C9', GOLD, '#8FA6D4', '#6FBF8E', '#E0846A'];
-
+// ── TAB 4: AI Daily — Today's Workbench ───────────────────────────────────────
 function AIDailyTab() {
-  const { dict } = useI18n();
-  return (
-    <div>
-      <SectionLabel text={dict.ai.daily.sectionLabel} />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, marginBottom: 20 }}>
-        {dict.ai.daily.statsLabels.map((label, i) => (
-          <Card key={label} style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 26, fontWeight: 700, color: DAILY_STAT_COLORS[i], fontFamily: "'Space Grotesk',sans-serif", marginBottom: 4 }}>—</div>
-            <div style={{ fontSize: 11, color: SUBTLE, fontFamily: 'IBM Plex Mono, monospace' }}>{dict.ai.daily.statsUnits[i]}</div>
-            <div style={{ fontSize: 13, color: MUTED, marginTop: 6 }}>{label}</div>
-          </Card>
-        ))}
-      </div>
-      <SectionLabel text={dict.ai.daily.insightLabel} />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 20 }}>
-        {dict.ai.daily.insights.map(ins => (
-          <Card key={ins.label}>
-            <div style={{ fontSize: 22, marginBottom: 10 }}>{ins.icon}</div>
-            <div style={{ fontSize: 13, color: MUTED, marginBottom: 6 }}>{ins.label}</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: TEXT, marginBottom: 4 }}>{ins.value}</div>
-            <div style={{ fontSize: 12, color: SUBTLE }}>{ins.sub}</div>
-          </Card>
-        ))}
-      </div>
-      <SectionLabel text={dict.ai.daily.briefLabel} />
-      <Card>
-        {dict.ai.daily.briefLines.map((line, i) => (
-          <div key={i} style={{ display: 'flex', gap: 10, padding: '7px 0', borderBottom: i < dict.ai.daily.briefLines.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-            <span style={{ color: GOLD, fontSize: 14 }}>·</span>
-            <span style={{ fontSize: 13.5, color: '#8A9AB0', lineHeight: 1.6 }}>{line}</span>
-          </div>
-        ))}
-        <div style={{ marginTop: 14, padding: '10px 14px', background: 'rgba(203,168,92,0.06)', borderRadius: 9, border: '1px solid rgba(203,168,92,0.15)' }}>
-          <span className="font-mono-label" style={{ fontSize: 9.5, color: MUTED }}>{dict.ai.daily.aiSuggestionLabel}</span>
-          <p style={{ fontSize: 13, color: MUTED, margin: '6px 0 0', lineHeight: 1.6 }}>{dict.ai.daily.aiSuggestionText}</p>
-        </div>
-      </Card>
-    </div>
-  );
+  return <DailyWorkbench />;
 }
 
 // ── TAB 5: AI Workflow ─────────────────────────────────────────────────────────
