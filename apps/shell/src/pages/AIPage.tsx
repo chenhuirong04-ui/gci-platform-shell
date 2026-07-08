@@ -41,6 +41,37 @@ function extractInventoryProduct(raw: string): string | null {
   return null;
 }
 
+// ── Customer name extraction for quotation history queries ────────────────────
+// "IFZA 之前报过什么价" → "IFZA"
+// "查 Namas 的历史报价" → "Namas"
+// "查历史报价"          → null (no specific customer)
+function extractCustomerName(raw: string): string | null {
+  const s = raw.replace(/[？?。！!，,]/g, '').trim();
+
+  // Pattern: 查/看 <customer> 的历史报价
+  let m = s.match(/(?:查|看)(?:一下|查看|查询)?\s*(.+?)\s*(?:的)?(?:历史报价|以前报价|之前报价|报价记录)/u);
+  if (m?.[1]) {
+    const c = m[1].replace(/^[帮我请一下\s]+/, '').trim();
+    if (c.length >= 2 && c.length <= 30) return c;
+  }
+
+  // Pattern: <customer> 以前/之前报价/报过
+  m = s.match(/^(.+?)\s*(?:以前|之前|上次|历史)(?:报过|报价|的报价)/u);
+  if (m?.[1]) {
+    const c = m[1].replace(/^[帮我请一下\s]+/, '').trim();
+    if (c.length >= 2 && c.length <= 30) return c;
+  }
+
+  // Pattern: <customer> 报过什么价
+  m = s.match(/^(.+?)\s*报过什么价/u);
+  if (m?.[1]) {
+    const c = m[1].trim();
+    if (c.length >= 2 && c.length <= 30) return c;
+  }
+
+  return null;
+}
+
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const GOLD = '#CBA85C';
 const GOLD_L = '#E2C988';
@@ -292,15 +323,100 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
             </div>
           )}
 
-          {/* ── Quotation follow-up error ── */}
+          {/* ── Quotation follow-up loading ── */}
           {intent.intentId === 'check_quotation_followups' && !state.resultData && (
-            <div style={{ fontSize: 13, color: '#E0846A', marginBottom: 8 }}>
-              报价数据加载失败，请前往 报价管理 查看。
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>
+              正在查询报价数据…
+            </div>
+          )}
+
+          {/* ── Quotation follow-up API error ── */}
+          {intent.intentId === 'check_quotation_followups' && state.resultData && !state.resultData.ok && (
+            <div style={{ fontSize: 13, color: '#E0846A', marginBottom: 12, padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>报价 API 查询失败</div>
+              <div style={{ color: MUTED, fontSize: 12 }}>{state.resultData.error || '未知错误'}</div>
+              {state.resultData.detail && (
+                <div style={{ color: SUBTLE, fontSize: 11, marginTop: 4, fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                  {typeof state.resultData.detail === 'string' ? state.resultData.detail : JSON.stringify(state.resultData.detail)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Quotation history result panel ── */}
+          {intent.intentId === 'check_quotation_history' && state.resultData && state.resultData.ok && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>
+                {state.resultData.customerFilter
+                  ? <>客户「{state.resultData.customerFilter}」共 {state.resultData.total} 条报价记录</>
+                  : <>最近 {state.resultData.total} 条报价记录</>
+                }
+                {state.resultData.total > 0 && (
+                  <span style={{ marginLeft: 12, color: GOLD, fontWeight: 600 }}>
+                    合计 AED {Number(state.resultData.totalAmount).toLocaleString()}
+                  </span>
+                )}
+              </div>
+              {/* Status summary chips */}
+              {state.resultData.statusSummary && (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                  {Object.entries(state.resultData.statusSummary as Record<string, number>).map(([label, count]) => (
+                    <span key={label} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'rgba(203,168,92,0.1)', border: '1px solid rgba(203,168,92,0.2)', color: GOLD }}>
+                      {label} × {count}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {state.resultData.total === 0 ? (
+                <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 0' }}>
+                  {state.resultData.customerFilter
+                    ? `未找到与「${state.resultData.customerFilter}」相关的报价记录。`
+                    : '暂无报价记录。'}
+                </div>
+              ) : (
+                <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {state.resultData.quotes.map((q: any, i: number) => (
+                    <div key={i} style={{ padding: '8px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: TEXT, flex: 1 }}>{q.customerName}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: GOLD, whiteSpace: 'nowrap' }}>
+                          AED {Number(q.grandTotal).toLocaleString()}
+                        </span>
+                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 6, background: q.status === 'GENERATED' ? 'rgba(203,168,92,0.12)' : q.status === 'SENT_TO_TRADE' ? 'rgba(111,191,142,0.12)' : 'rgba(255,255,255,0.06)', color: q.status === 'GENERATED' ? GOLD : q.status === 'SENT_TO_TRADE' ? '#6FBF8E' : MUTED }}>
+                          {q.statusZh}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 12, fontSize: 11, color: MUTED }}>
+                        <span>{q.quoteNo}</span>
+                        {q.projectName && <span>{q.projectName}</span>}
+                        <span>{q.quoteDate ? new Date(q.quoteDate).toLocaleDateString('zh-CN') : '—'}</span>
+                        {q.salesperson && <span>{q.salesperson}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ fontSize: 10, color: SUBTLE, marginTop: 8 }}>
+                数据来源：quotation_records · {new Date(state.resultData.asOf).toLocaleString('zh-CN')}
+              </div>
+            </div>
+          )}
+
+          {/* ── Quotation history loading ── */}
+          {intent.intentId === 'check_quotation_history' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在检索历史报价…</div>
+          )}
+
+          {/* ── Quotation history API error ── */}
+          {intent.intentId === 'check_quotation_history' && state.resultData && !state.resultData.ok && (
+            <div style={{ fontSize: 13, color: '#E0846A', marginBottom: 12, padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>历史报价 API 查询失败</div>
+              <div style={{ color: MUTED, fontSize: 12 }}>{state.resultData.error || '未知错误'}</div>
             </div>
           )}
 
           {/* ── Default: show intent name for non-result done states ── */}
-          {intent.intentId !== 'check_inventory' && intent.intentId !== 'check_quotation_followups' && (
+          {intent.intentId !== 'check_inventory' && intent.intentId !== 'check_quotation_followups' && intent.intentId !== 'check_quotation_history' && (
             <div style={{ fontSize: 14, color: TEXT, marginBottom: intent.approvalRequired ? 14 : 0 }}>
               {intent.intentNameZh}{intent.approvalRequired ? dict.ai.panel.readyLabel : ''}
             </div>
@@ -735,6 +851,101 @@ export function AIPage() {
       return;
     }
 
+    // Quotation follow-up intent — hardcoded regex, bypass scoring.
+    const QUOTATION_FOLLOWUP_RE = /报价.*没回复|报价没有回复|哪些报价|报价跟进|报价超时|超时报价|已报价.*待确认|quotation follow|quoted not replied|pending quotation/i;
+    if (QUOTATION_FOLLOWUP_RE.test(t)) {
+      const quotationMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'check_quotation_followups',
+          intentNameZh: '报价跟进结果',
+          intentNameEn: 'Quotation Follow-up',
+          category: 'query',
+          triggerKeywordsZh: [],
+          triggerKeywordsEn: [],
+          targetTab: 'chat',
+          targetModule: 'Quotation',
+          targetRoute: '/quotation',
+          readSources: ['quotation_records'],
+          writeTargets: [],
+          requiredFields: [],
+          approvalRequired: false,
+          resultPanel: null,
+          implementationStatus: 'real',
+          notConnectedMessage: '',
+          fallbackBehavior: '',
+        },
+        confidence: 1,
+        raw: raw.trim(),
+        detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: quotationMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在连接报价数据库…', '正在筛选待跟进报价…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          const base = typeof window !== 'undefined' ? window.location.origin : '';
+          fetch(`${base}/api/trade/check-quotation-followups`)
+            .then(r => r.json())
+            .then(data => {
+              setCmdState(prev => prev ? { ...prev, resultData: data } : prev);
+            })
+            .catch(e => console.error('[AI] quotation followup fetch failed', e));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Quotation history intent — hardcoded regex.
+    // Must come AFTER quotation followup check (followup is more specific).
+    const QUOTATION_HISTORY_RE = /历史报价|以前报价|之前报价|报价记录|报过什么价|报过价|quotation history|past quote/i;
+    if (QUOTATION_HISTORY_RE.test(t)) {
+      const customer = extractCustomerName(raw.trim());
+      const historyMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'check_quotation_history',
+          intentNameZh: '历史报价',
+          intentNameEn: 'Quotation History',
+          category: 'query',
+          triggerKeywordsZh: [],
+          triggerKeywordsEn: [],
+          targetTab: 'chat',
+          targetModule: 'Quotation',
+          targetRoute: '/quotation',
+          readSources: ['quotation_records'],
+          writeTargets: [],
+          requiredFields: [],
+          approvalRequired: false,
+          resultPanel: null,
+          implementationStatus: 'real',
+          notConnectedMessage: '',
+          fallbackBehavior: '',
+        },
+        confidence: 1,
+        raw: raw.trim(),
+        detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: historyMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在连接报价数据库…', '正在检索历史报价…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          const base = typeof window !== 'undefined' ? window.location.origin : '';
+          const qs = customer ? `?customer=${encodeURIComponent(customer)}` : '';
+          fetch(`${base}/api/ai/quotation-history${qs}`)
+            .then(r => r.json())
+            .then(data => setCmdState(prev => prev ? { ...prev, resultData: data } : prev))
+            .catch(e => console.error('[AI] quotation history fetch failed', e));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
     // All other commands — use central router
     const match = detectAIIntent(raw.trim());
     const { intent } = match;
@@ -772,7 +983,7 @@ export function AIPage() {
             fetch(`${base}/api/trade/check-quotation-followups`)
               .then(r => r.json())
               .then(data => {
-                if (data.ok) setCmdState(prev => prev ? { ...prev, resultData: data } : prev);
+                setCmdState(prev => prev ? { ...prev, resultData: data } : prev);
               })
               .catch(e => console.error('[check_quotation_followups] fetch failed', e));
           }
