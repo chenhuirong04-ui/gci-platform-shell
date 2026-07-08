@@ -72,8 +72,21 @@ function analyseInput(text: string, hasFiles: boolean): FollowUpDraft {
   else if (/low|不急|慢慢|暂时/i.test(text)) priority = 'Low';
 
   let clientName = '待确认';
-  const co = text.match(/([A-Z][A-Za-z&\s]{2,30}(?:LLC|FZCO|Ltd|Co|Corp|Group|Trading|Co\.|Ltd\.|Inc|FZE|EST|Establishment))/);
-  if (co) clientName = co[1].trim();
+  // Priority 1: explicit new-customer Chinese/English patterns
+  const custMatch =
+    text.match(/(?:新增|录入|添加|创建)\s*客户\s+([A-Za-z0-9一-鿿]{1,20})/i) ||
+    text.match(/(?:新增|录入|添加|创建)\s+([A-Za-z0-9一-鿿]{1,20})\s*(?:这个)?客户/i) ||
+    text.match(/把\s+([A-Za-z0-9一-鿿]{1,20})\s*加入(?:客户池|客户)?/i) ||
+    text.match(/(?:add|create|new)\s+customer\s+([A-Za-z0-9]{1,20})/i) ||
+    text.match(/客户\s+([A-Za-z0-9一-鿿]{1,20})(?:\s|，|,|$)/i) ||
+    text.match(/([A-Za-z0-9一-鿿]{1,20})\s*这个客户/i);
+  if (custMatch) {
+    clientName = custMatch[1].trim();
+  } else {
+    // Fallback: formal company name ending in LLC/FZCO/Ltd etc.
+    const co = text.match(/([A-Z][A-Za-z&\s]{2,30}(?:LLC|FZCO|Ltd|Co|Corp|Group|Trading|Co\.|Ltd\.|Inc|FZE|EST|Establishment))/);
+    if (co) clientName = co[1].trim();
+  }
 
   let nextAction = '确认需求并回复';
   if (/confirm|确认/i.test(text)) nextAction = '确认相关信息并回复';
@@ -200,6 +213,10 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
   const [dupRecords, setDupRecords]     = useState<any[]>([]);
   const [quoteError, setQuoteError]     = useState('');
 
+  // edit mode (Bug 3)
+  const [isEditing, setIsEditing]   = useState(false);
+  const [draftEdit, setDraftEdit]   = useState<FollowUpDraft | null>(null);
+
   const hasInput = rawText.trim().length > 0 || attachments.length > 0;
 
   // ── file handling ─────────────────────────────────────────────────
@@ -264,6 +281,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
     setOptional({ clientName:'', countryCity:'', phoneE164:'', whatsapp:'', email:'' });
     setQuoteDraft(null); setRegisterQuote(false);
     setQuotePhase('idle'); setDupRecords([]); setQuoteError('');
+    setIsEditing(false); setDraftEdit(null);
   };
 
   // ── quotation save flow ───────────────────────────────────────────
@@ -548,40 +566,97 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                     <span className="text-xs font-black uppercase tracking-widest" style={{ color: GOLD }}>检测到报价内容</span>
                   </div>
                   <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={registerQuote}
+                    <input type="checkbox" checked={registerQuote}
                       onChange={e => setRegisterQuote(e.target.checked)}
-                      disabled={saved}
-                      className="w-3.5 h-3.5 accent-amber-500"
-                    />
+                      disabled={saved} className="w-3.5 h-3.5 accent-amber-500" />
                     <span className="text-xs font-bold" style={{ color: T2 }}>同时登记为历史报价</span>
                   </label>
                 </div>
+
                 {registerQuote && (
-                  <div className="px-5 pb-3 grid grid-cols-2 gap-x-6 gap-y-1.5">
-                    {([
-                      ['客户', quoteDraft.customerName],
-                      ['金额', quoteDraft.grandTotal != null ? `AED ${quoteDraft.grandTotal.toLocaleString()}` : '⚠ 未检测到金额'],
-                      ['报价日期', quoteDraft.quoteDate],
-                      ['类型', quoteDraft.quoteType],
-                      ['来源', quoteDraft.source],
-                      ...(quoteDraft.itemSummary ? [['产品/项目', quoteDraft.itemSummary]] : []),
-                    ] as [string, string][]).map(([k, v]) => (
-                      <div key={k} className="flex items-start gap-2">
-                        <span className="text-[9px] font-black uppercase tracking-widest w-14 shrink-0 pt-0.5" style={{ color: T3 }}>{k}</span>
-                        <span className="text-xs font-bold" style={{ color: v.startsWith('⚠') ? '#F59E0B' : T1 }}>{v}</span>
+                  <div className="px-5 pb-3 space-y-2">
+                    {/* OCR notice when files attached */}
+                    {attachments.length > 0 && (
+                      <div className="px-3 py-2 rounded-lg flex items-start gap-2 text-xs font-bold"
+                        style={{ background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.25)', color: '#A5B4FC' }}>
+                        <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
+                        当前附件尚未自动识别（暂无 OCR），请粘贴报价文字或在下方手动补充金额。
                       </div>
-                    ))}
+                    )}
+
+                    {/* Field display */}
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                      {([
+                        ['客户', quoteDraft.customerName],
+                        ['报价日期', quoteDraft.quoteDate],
+                        ['类型', quoteDraft.quoteType],
+                        ['来源', quoteDraft.source],
+                      ] as [string, string][]).map(([k, v]) => (
+                        <div key={k} className="flex items-start gap-2">
+                          <span className="text-[9px] font-black uppercase tracking-widest w-14 shrink-0 pt-0.5" style={{ color: T3 }}>{k}</span>
+                          <span className="text-xs font-bold" style={{ color: T1 }}>{v}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Editable: amount */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <span className="text-[9px] font-black uppercase tracking-widest w-14 shrink-0" style={{ color: T3 }}>金额</span>
+                      {quoteDraft.grandTotal != null ? (
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="text-xs font-bold" style={{ color: T1 }}>AED {quoteDraft.grandTotal.toLocaleString()}</span>
+                          <button onClick={() => setQuoteDraft(p => p ? { ...p, grandTotal: null, isReady: false } : null)}
+                            className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                            style={{ color: T3, background: 'rgba(255,255,255,0.07)' }}>修改</button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="text-[10px] font-bold" style={{ color: '#F59E0B' }}>AED</span>
+                          <input
+                            type="number" min="0" placeholder="请输入报价总额"
+                            className="flex-1 rounded-lg px-3 py-1.5 text-sm font-bold outline-none"
+                            style={{ background: CARD, border: `1px solid #F59E0B60`, color: T1 }}
+                            onFocus={e => e.target.style.borderColor = GOLD}
+                            onBlur={e => e.target.style.borderColor = '#F59E0B60'}
+                            onChange={e => {
+                              const v = parseFloat(e.target.value);
+                              setQuoteDraft(p => p ? {
+                                ...p,
+                                grandTotal: isNaN(v) ? null : v,
+                                isReady: !isNaN(v) && p.customerName !== '待确认',
+                              } : null);
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Editable: item summary */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-black uppercase tracking-widest w-14 shrink-0" style={{ color: T3 }}>产品摘要</span>
+                      <input
+                        type="text" placeholder="产品名称 / 项目摘要（可选）"
+                        value={quoteDraft.itemSummary}
+                        onChange={e => setQuoteDraft(p => p ? { ...p, itemSummary: e.target.value } : null)}
+                        className="flex-1 rounded-lg px-3 py-1.5 text-sm font-medium outline-none"
+                        style={{ background: CARD, border: `1px solid ${BORDER}`, color: T1 }}
+                        onFocus={e => e.target.style.borderColor = GOLD}
+                        onBlur={e => e.target.style.borderColor = BORDER}
+                      />
+                    </div>
+
+                    {/* Missing warning */}
+                    {!quoteDraft.isReady && (
+                      <div className="px-3 py-2 rounded-lg flex items-center gap-2 text-xs font-bold"
+                        style={{ background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)', color: '#FCD34D' }}>
+                        <AlertCircle className="w-3 h-3 shrink-0" />
+                        {quoteDraft.customerName === '待确认' && '缺少客户名称。'}
+                        {quoteDraft.grandTotal == null && '缺少报价金额，无法登记历史报价；可以只保存跟进记录。'}
+                      </div>
+                    )}
                   </div>
                 )}
-                {registerQuote && !quoteDraft.isReady && (
-                  <div className="mx-5 mb-3 px-3 py-2 rounded-lg flex items-center gap-2 text-xs font-bold"
-                    style={{ background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)', color: '#FCD34D' }}>
-                    <AlertCircle className="w-3 h-3 shrink-0" />
-                    {quoteDraft.customerName === '待确认' ? '缺少客户名称，' : ''}{quoteDraft.grandTotal == null ? '缺少金额，' : ''}无法登记报价。请先补充缺少信息。
-                  </div>
-                )}
+
                 {/* Dup warning */}
                 {quotePhase === 'dupWarn' && dupRecords.length > 0 && (
                   <div className="mx-5 mb-3 p-3 rounded-xl space-y-2"
@@ -602,6 +677,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                     </div>
                   </div>
                 )}
+
                 {/* Quote phase result */}
                 {quotePhase !== 'idle' && quotePhase !== 'dupWarn' && (
                   <div className="mx-5 mb-3 px-3 py-2 rounded-lg flex items-center gap-2 text-xs font-bold"
@@ -611,32 +687,129 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                       color: quotePhase === 'done' ? '#6EE7B7' : quotePhase === 'failed' ? '#FCA5A5' : T2,
                     }}>
                     {quotePhase === 'checking' && '🔍 检查重复中…'}
-                    {quotePhase === 'saving' && '💾 登记中…'}
-                    {quotePhase === 'done' && <><CheckCircle2 className="w-3 h-3 shrink-0" /> 历史报价已登记</>}
-                    {quotePhase === 'failed' && <><AlertCircle className="w-3 h-3 shrink-0" /> 登记失败：{quoteError}</>}
-                    {quotePhase === 'skipped' && '已跳过报价登记'}
+                    {quotePhase === 'saving'   && '💾 登记中…'}
+                    {quotePhase === 'done'     && <><CheckCircle2 className="w-3 h-3 shrink-0" /> 历史报价已登记</>}
+                    {quotePhase === 'failed'   && <><AlertCircle  className="w-3 h-3 shrink-0" /> 登记失败：{quoteError}</>}
+                    {quotePhase === 'skipped'  && '已跳过报价登记'}
                   </div>
                 )}
               </div>
             )}
 
+            {/* Edit mode panel (Bug 3) */}
+            {isEditing && draftEdit && (
+              <div className="px-5 py-4 space-y-3 rounded-b-none" style={{ background: '#07111F', borderTop: `1px solid ${GOLD}40` }}>
+                <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: GOLD }}>编辑草稿字段</p>
+                {([
+                  ['客户名称', 'clientName', 'text'],
+                  ['下一步',   'nextAction', 'text'],
+                  ['跟进日期', 'dueDate',    'date'],
+                ] as [string, keyof FollowUpDraft, string][]).map(([label, key, type]) => (
+                  <div key={key} className="flex items-center gap-3">
+                    <span className="text-[10px] font-black uppercase tracking-widest w-16 shrink-0" style={{ color: T3 }}>{label}</span>
+                    <input type={type}
+                      value={(draftEdit[key] as string) || ''}
+                      onChange={e => setDraftEdit(p => p ? { ...p, [key]: e.target.value } : null)}
+                      className="flex-1 rounded-lg px-3 py-1.5 text-sm font-medium outline-none"
+                      style={{ background: CARD, border: `1px solid ${BORDER}`, color: T1 }}
+                      onFocus={e => e.target.style.borderColor = GOLD}
+                      onBlur={e => e.target.style.borderColor = BORDER}
+                    />
+                  </div>
+                ))}
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-black uppercase tracking-widest w-16 shrink-0" style={{ color: T3 }}>类型</span>
+                  <select value={draftEdit.type}
+                    onChange={e => setDraftEdit(p => p ? { ...p, type: e.target.value as any } : null)}
+                    className="flex-1 rounded-lg px-3 py-1.5 text-sm font-medium outline-none"
+                    style={{ background: CARD, border: `1px solid ${BORDER}`, color: T1 }}>
+                    <option value="TRADE">贸易询盘</option>
+                    <option value="PROJECT">项目推进</option>
+                    <option value="LOG_ONLY">仅记录</option>
+                    <option value="INTERNAL">内部任务</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-black uppercase tracking-widest w-16 shrink-0" style={{ color: T3 }}>优先级</span>
+                  <select value={draftEdit.priority}
+                    onChange={e => setDraftEdit(p => p ? { ...p, priority: e.target.value as any } : null)}
+                    className="flex-1 rounded-lg px-3 py-1.5 text-sm font-medium outline-none"
+                    style={{ background: CARD, border: `1px solid ${BORDER}`, color: T1 }}>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-black uppercase tracking-widest w-16 shrink-0" style={{ color: T3 }}>负责人</span>
+                  <select value={draftEdit.assignedTo}
+                    onChange={e => setDraftEdit(p => p ? { ...p, assignedTo: e.target.value } : null)}
+                    className="flex-1 rounded-lg px-3 py-1.5 text-sm font-medium outline-none"
+                    style={{ background: CARD, border: `1px solid ${BORDER}`, color: T1 }}>
+                    <option value="本人">本人</option>
+                    <option value="Lili">Lili</option>
+                    <option value="Novie">Novie</option>
+                  </select>
+                </div>
+                {/* Quotation amount edit in edit mode */}
+                {quoteDraft && registerQuote && (
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-black uppercase tracking-widest w-16 shrink-0" style={{ color: T3 }}>报价金额</span>
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className="text-xs font-bold" style={{ color: T3 }}>AED</span>
+                      <input type="number" min="0"
+                        placeholder="手动输入报价总额"
+                        defaultValue={quoteDraft.grandTotal ?? ''}
+                        onChange={e => {
+                          const v = parseFloat(e.target.value);
+                          setQuoteDraft(p => p ? { ...p, grandTotal: isNaN(v) ? null : v, isReady: !isNaN(v) && p.customerName !== '待确认' } : null);
+                        }}
+                        className="flex-1 rounded-lg px-3 py-1.5 text-sm font-bold outline-none"
+                        style={{ background: CARD, border: `1px solid ${BORDER}`, color: T1 }}
+                        onFocus={e => e.target.style.borderColor = GOLD}
+                        onBlur={e => e.target.style.borderColor = BORDER}
+                      />
+                    </div>
+                  </div>
+                )}
+                <button
+                  onClick={() => {
+                    if (draftEdit) {
+                      setDraft(draftEdit);
+                      // sync clientName to quoteDraft
+                      if (quoteDraft && draftEdit.clientName !== '待确认') {
+                        setQuoteDraft(p => p ? { ...p, customerName: draftEdit.clientName, isReady: p.grandTotal != null } : null);
+                      }
+                    }
+                    setIsEditing(false);
+                  }}
+                  className="w-full py-2.5 rounded-xl text-sm font-black text-white transition-all"
+                  style={{ background: `linear-gradient(135deg, #0F172A, #1E3A5F)`, border: `1px solid ${GOLD}` }}>
+                  ✓ 确认修改
+                </button>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="px-5 py-4 flex flex-wrap gap-3" style={{ background: CARD2, borderTop: `1px solid ${BORDER}` }}>
-              <button onClick={handleSave} disabled={isLoading || saved}
+              <button onClick={handleSave} disabled={isLoading || saved || isEditing}
                 className="flex-1 min-w-[120px] py-3 rounded-xl text-sm font-black text-white transition-all active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
                 style={{ background: saved ? '#059669' : '#0F172A', border: `1px solid ${saved ? '#059669' : GOLD}50` }}>
                 {saved
                   ? <><CheckCircle2 className="w-4 h-4" /> 已保存</>
                   : isLoading ? '保存中…' : '保存为跟进记录'}
               </button>
-              <button onClick={() => { setDraft(null); setQuoteDraft(null); setRegisterQuote(false); setQuotePhase('idle'); }}
+              <button
+                onClick={() => {
+                  if (isEditing) { setIsEditing(false); setDraftEdit(null); }
+                  else { setIsEditing(true); setDraftEdit(draft ? { ...draft } : null); }
+                }}
                 disabled={saved}
                 className="px-5 py-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-40"
-                style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORDER}`, color: T2 }}>
-                <Edit2 className="w-3.5 h-3.5 inline mr-1.5" />修改
+                style={{ background: isEditing ? `${GOLD}20` : 'rgba(255,255,255,0.05)', border: `1px solid ${isEditing ? GOLD : BORDER}`, color: isEditing ? GOLD_L : T2 }}>
+                <Edit2 className="w-3.5 h-3.5 inline mr-1.5" />{isEditing ? '收起编辑' : '修改'}
               </button>
-              <button onClick={() => { resetAll(); }}
-                disabled={saved}
+              <button onClick={resetAll} disabled={saved}
                 className="px-5 py-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-40"
                 style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORDER}`, color: T3 }}>
                 取消
