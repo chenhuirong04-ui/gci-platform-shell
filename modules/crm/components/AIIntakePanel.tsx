@@ -8,7 +8,7 @@
  *   Step 3 — user confirms → saved as follow-up record
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Attachment, BusinessType, FollowUpTask, Project } from '../types';
 import {
   Sparkles, UploadCloud, X, ImageIcon, FileText,
@@ -120,6 +120,22 @@ function analyseInput(text: string, hasFiles: boolean): FollowUpDraft {
   };
 }
 
+// ── line item ────────────────────────────────────────────────────────
+interface LineItem {
+  id: string;
+  item_name: string;
+  description: string;
+  qty: number | '';
+  unit: string;
+  selling_price: number | '';
+  line_total: number | '';
+  item_notes: string;
+}
+
+function mkLine(): LineItem {
+  return { id: `LI_${Date.now()}_${Math.random().toString(36).slice(2,5)}`, item_name: '', description: '', qty: '', unit: '件', selling_price: '', line_total: '', item_notes: '' };
+}
+
 const TYPE_LABEL: Record<string, string> = {
   TRADE: '贸易询盘', PROJECT: '项目推进', LOG_ONLY: '仅记录', INTERNAL: '内部任务',
 };
@@ -217,6 +233,10 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
   const [isEditing, setIsEditing]   = useState(false);
   const [draftEdit, setDraftEdit]   = useState<FollowUpDraft | null>(null);
 
+  // line items
+  const [lineItems, setLineItems]   = useState<LineItem[]>([]);
+  const [showItems, setShowItems]   = useState(false);
+
   const hasInput = rawText.trim().length > 0 || attachments.length > 0;
 
   // ── file handling ─────────────────────────────────────────────────
@@ -282,12 +302,48 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
     setQuoteDraft(null); setRegisterQuote(false);
     setQuotePhase('idle'); setDupRecords([]); setQuoteError('');
     setIsEditing(false); setDraftEdit(null);
+    setLineItems([]); setShowItems(false);
   };
+
+  // ── line item helpers ─────────────────────────────────────────────
+  const updateLine = (id: string, field: keyof LineItem, val: any) => {
+    setLineItems(prev => prev.map(li => {
+      if (li.id !== id) return li;
+      const updated: LineItem = { ...li, [field]: val };
+      if (field === 'qty' || field === 'selling_price') {
+        const q  = Number(field === 'qty' ? val : updated.qty);
+        const pr = Number(field === 'selling_price' ? val : updated.selling_price);
+        if (!isNaN(q) && !isNaN(pr) && q > 0 && pr > 0) updated.line_total = q * pr;
+      }
+      return updated;
+    }));
+  };
+
+  // Sync lineItems total → quoteDraft.grandTotal
+  useEffect(() => {
+    if (lineItems.length === 0) return;
+    const total = lineItems.reduce((s, li) => s + (Number(li.line_total) || 0), 0);
+    if (total > 0) {
+      setQuoteDraft(p => p ? { ...p, grandTotal: total, isReady: p.customerName !== '待确认' } : null);
+    }
+  }, [lineItems]);
 
   // ── quotation save flow ───────────────────────────────────────────
   const doSaveQuote = async (qd: QuoteDraft) => {
     setQuotePhase('saving');
     try {
+      const validItems = lineItems
+        .filter(li => li.item_name.trim() && (Number(li.qty) > 0 || Number(li.selling_price) > 0))
+        .map(li => ({
+          item_name:     li.item_name.trim(),
+          description:   li.description || null,
+          qty:           Number(li.qty) || 1,
+          unit:          li.unit || '件',
+          selling_price: Number(li.selling_price) || 0,
+          line_total:    Number(li.line_total) || 0,
+          currency:      'AED',
+          item_notes:    li.item_notes || null,
+        }));
       const res = await fetch('/api/ai/register-quotation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -299,11 +355,15 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
           quote_type: qd.quoteType,
           salesperson: 'Chris',
           status: 'GENERATED',
+          items: validItems,
         }),
       });
       const data = await res.json();
-      if (data.ok) { setQuotePhase('done'); setTimeout(resetAll, 2500); }
-      else { setQuotePhase('failed'); setQuoteError(data.error || '保存失败'); setTimeout(resetAll, 3500); }
+      if (data.ok) {
+        setQuotePhase('done');
+        if (data.itemsWarning) setQuoteError(data.itemsWarning);
+        setTimeout(resetAll, data.itemsWarning ? 4000 : 2500);
+      } else { setQuotePhase('failed'); setQuoteError(data.error || '保存失败'); setTimeout(resetAll, 3500); }
     } catch {
       setQuotePhase('failed'); setQuoteError('网络错误'); setTimeout(resetAll, 3500);
     }
@@ -645,6 +705,104 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                       />
                     </div>
 
+                    {/* Line items section */}
+                    <div className="pt-1">
+                      <button type="button"
+                        onClick={() => { setShowItems(v => !v); if (!showItems && lineItems.length === 0) setLineItems([mkLine()]); }}
+                        className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest mb-2"
+                        style={{ color: showItems ? GOLD_L : T3 }}>
+                        {showItems ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        报价明细（{lineItems.length} 行）
+                      </button>
+
+                      {showItems && (
+                        <div className="space-y-2">
+                          {attachments.length > 0 && lineItems.length === 0 && (
+                            <div className="px-3 py-2 rounded-lg text-xs font-medium"
+                              style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: '#A5B4FC' }}>
+                              当前无法自动读取截图明细，请手动补充报价明细，至少填写产品名称、数量和单价。
+                            </div>
+                          )}
+                          {lineItems.map((li, idx) => (
+                            <div key={li.id} className="p-3 rounded-xl space-y-2"
+                              style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-black" style={{ color: T3 }}>#{idx + 1}</span>
+                                <input placeholder="产品名称 *" value={li.item_name}
+                                  onChange={e => updateLine(li.id, 'item_name', e.target.value)}
+                                  className="flex-1 rounded-lg px-2 py-1 text-xs font-bold outline-none"
+                                  style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
+                                  onFocus={e => e.target.style.borderColor = GOLD}
+                                  onBlur={e => e.target.style.borderColor = BORDER}
+                                />
+                                <button onClick={() => setLineItems(p => p.filter(l => l.id !== li.id))}
+                                  className="p-1 rounded hover:text-red-400 transition-colors" style={{ color: T3 }}>
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <input placeholder="规格 / 描述" value={li.description}
+                                  onChange={e => updateLine(li.id, 'description', e.target.value)}
+                                  className="rounded-lg px-2 py-1 text-xs font-medium outline-none"
+                                  style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
+                                  onFocus={e => e.target.style.borderColor = GOLD}
+                                  onBlur={e => e.target.style.borderColor = BORDER}
+                                />
+                                <div className="flex gap-1">
+                                  <input type="number" placeholder="数量" value={li.qty}
+                                    onChange={e => updateLine(li.id, 'qty', e.target.value === '' ? '' : Number(e.target.value))}
+                                    className="w-16 rounded-lg px-2 py-1 text-xs font-bold outline-none"
+                                    style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
+                                    onFocus={e => e.target.style.borderColor = GOLD}
+                                    onBlur={e => e.target.style.borderColor = BORDER}
+                                  />
+                                  <input placeholder="件" value={li.unit}
+                                    onChange={e => updateLine(li.id, 'unit', e.target.value)}
+                                    className="w-12 rounded-lg px-2 py-1 text-xs font-bold outline-none"
+                                    style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
+                                    onFocus={e => e.target.style.borderColor = GOLD}
+                                    onBlur={e => e.target.style.borderColor = BORDER}
+                                  />
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[9px] font-black shrink-0" style={{ color: T3 }}>单价 AED</span>
+                                  <input type="number" placeholder="0" value={li.selling_price}
+                                    onChange={e => updateLine(li.id, 'selling_price', e.target.value === '' ? '' : Number(e.target.value))}
+                                    className="flex-1 rounded-lg px-2 py-1 text-xs font-bold outline-none"
+                                    style={{ background: CARD2, border: `1px solid ${BORDER}`, color: GOLD_L }}
+                                    onFocus={e => e.target.style.borderColor = GOLD}
+                                    onBlur={e => e.target.style.borderColor = BORDER}
+                                  />
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[9px] font-black shrink-0" style={{ color: T3 }}>合计 AED</span>
+                                  <input type="number" placeholder="自动" value={li.line_total}
+                                    onChange={e => updateLine(li.id, 'line_total', e.target.value === '' ? '' : Number(e.target.value))}
+                                    className="flex-1 rounded-lg px-2 py-1 text-xs font-bold outline-none"
+                                    style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
+                                    onFocus={e => e.target.style.borderColor = GOLD}
+                                    onBlur={e => e.target.style.borderColor = BORDER}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          <button type="button" onClick={() => setLineItems(p => [...p, mkLine()])}
+                            className="w-full py-2 rounded-xl text-xs font-black transition-colors"
+                            style={{ background: 'rgba(255,255,255,0.04)', border: `1px dashed ${BORDER}`, color: T3 }}>
+                            + 添加一行
+                          </button>
+                          {lineItems.length > 0 && (
+                            <div className="text-right text-xs font-black" style={{ color: GOLD }}>
+                              明细合计 AED {lineItems.reduce((s, li) => s + (Number(li.line_total) || 0), 0).toLocaleString()}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
                     {/* Missing warning */}
                     {!quoteDraft.isReady && (
                       <div className="px-3 py-2 rounded-lg flex items-center gap-2 text-xs font-bold"
@@ -688,7 +846,8 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                     }}>
                     {quotePhase === 'checking' && '🔍 检查重复中…'}
                     {quotePhase === 'saving'   && '💾 登记中…'}
-                    {quotePhase === 'done'     && <><CheckCircle2 className="w-3 h-3 shrink-0" /> 历史报价已登记</>}
+                    {quotePhase === 'done' && !quoteError && <><CheckCircle2 className="w-3 h-3 shrink-0" /> 历史报价已登记</>}
+                    {quotePhase === 'done' && quoteError  && <><AlertCircle  className="w-3 h-3 shrink-0" /> {quoteError}</>}
                     {quotePhase === 'failed'   && <><AlertCircle  className="w-3 h-3 shrink-0" /> 登记失败：{quoteError}</>}
                     {quotePhase === 'skipped'  && '已跳过报价登记'}
                   </div>

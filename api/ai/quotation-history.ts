@@ -63,6 +63,35 @@ export default async function handler(request: Request): Promise<Response> {
 
   const rows: any[] = await res.json();
 
+  // Fetch quotation_items for all returned records in one query
+  const recordIds: string[] = rows.map((r: any) => r.id).filter(Boolean);
+  const itemsMap: Record<string, any[]> = {};
+  if (recordIds.length > 0) {
+    const itemsUrl = `${supabaseUrl}/rest/v1/quotation_items`
+      + `?quotation_id=in.(${recordIds.join(',')})`
+      + `&select=quotation_id,item_name,description,qty,unit,selling_price,line_total,currency,item_notes,sort_order`
+      + `&order=sort_order.asc`;
+    const itemsRes = await fetch(itemsUrl, {
+      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    });
+    if (itemsRes.ok) {
+      const itemRows: any[] = await itemsRes.json().catch(() => []);
+      for (const ir of itemRows) {
+        if (!itemsMap[ir.quotation_id]) itemsMap[ir.quotation_id] = [];
+        itemsMap[ir.quotation_id].push({
+          item_name:     ir.item_name     || '',
+          description:   ir.description   || '',
+          qty:           Number(ir.qty)   || 0,
+          unit:          ir.unit          || '件',
+          selling_price: Number(ir.selling_price) || 0,
+          line_total:    Number(ir.line_total)    || 0,
+          currency:      ir.currency      || 'AED',
+          item_notes:    ir.item_notes    || '',
+        });
+      }
+    }
+  }
+
   const quotes = rows.map(q => ({
     id:           q.id,
     quoteNo:      q.quote_no      || '—',
@@ -79,6 +108,7 @@ export default async function handler(request: Request): Promise<Response> {
     salesperson:  q.salesperson || '',
     quoteDate:    q.quote_date || q.created_at || '',
     createdAt:    q.created_at || '',
+    items:        itemsMap[q.id] || [],
   }));
 
   const totalAmount   = quotes.reduce((s, q) => s + q.grandTotal, 0);

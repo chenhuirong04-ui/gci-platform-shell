@@ -605,11 +605,11 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                     : '暂无报价记录。'}
                 </div>
               ) : (
-                <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ maxHeight: 400, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {state.resultData.quotes.map((q: any, i: number) => (
-                    <div key={i} style={{ padding: '8px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: TEXT, flex: 1 }}>{q.customerName}</span>
+                    <div key={i} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: TEXT, flex: 1 }}>{q.customerName}</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: GOLD, whiteSpace: 'nowrap' }}>
                           AED {Number(q.grandTotal).toLocaleString()}
                         </span>
@@ -617,12 +617,31 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                           {q.statusZh}
                         </span>
                       </div>
-                      <div style={{ display: 'flex', gap: 12, fontSize: 11, color: MUTED }}>
+                      <div style={{ display: 'flex', gap: 12, fontSize: 11, color: MUTED, marginBottom: q.items?.length ? 6 : 0 }}>
                         <span>{q.quoteNo}</span>
                         {q.projectName && <span>{q.projectName}</span>}
                         <span>{q.quoteDate ? new Date(q.quoteDate).toLocaleDateString('zh-CN') : '—'}</span>
                         {q.salesperson && <span>{q.salesperson}</span>}
                       </div>
+                      {/* Line items */}
+                      {q.items && q.items.length > 0 && (
+                        <div style={{ marginTop: 4, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                          {q.items.map((it: any, j: number) => (
+                            <div key={j} style={{ display: 'flex', alignItems: 'baseline', gap: 6, fontSize: 11, color: MUTED, padding: '2px 0' }}>
+                              <span style={{ fontWeight: 700, color: TEXT, minWidth: 0, flex: '0 1 auto' }}>{j + 1}. {it.item_name}</span>
+                              {it.description && <span style={{ color: SUBTLE }}>｜{it.description}</span>}
+                              <span>｜×{it.qty} {it.unit}</span>
+                              <span style={{ color: GOLD }}>@ AED {Number(it.selling_price).toLocaleString()}</span>
+                              <span style={{ marginLeft: 'auto', whiteSpace: 'nowrap', fontWeight: 700, color: TEXT }}>
+                                AED {Number(it.line_total).toLocaleString()}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {q.items && q.items.length === 0 && (
+                        <div style={{ fontSize: 10, color: SUBTLE, marginTop: 2 }}>该报价暂无产品明细</div>
+                      )}
                     </div>
                   ))}
                 </div>

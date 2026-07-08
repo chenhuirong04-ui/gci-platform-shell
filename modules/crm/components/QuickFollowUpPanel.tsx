@@ -15,7 +15,7 @@ import { FollowUpTask } from '../types';
 import {
   X, ChevronRight, MessageSquare, Calendar, Phone, Mail, MapPin,
   User, Clock, CheckCircle2, Archive, Building2, Edit2, Save, XCircle,
-  Paperclip,
+  Paperclip, FileText, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { getTaskBusinessId } from '../utils/businessId';
 
@@ -109,8 +109,24 @@ export default function QuickFollowUpPanel({
   const priority = task.priority || 'B';
   const typeLabel = TYPE_LABEL[task.businessType || 'TRADE'] ?? '贸易询盘';
 
-  const [tab, setTab]   = useState<'info' | 'action'>('info');
+  const [tab, setTab]   = useState<'info' | 'action' | 'quotes'>('info');
   const [editing, setEditing] = useState(false);
+
+  // ── Quote history state ───────────────────────────────────────────
+  const [quoteData, setQuoteData]     = useState<any>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [expandedQuote, setExpandedQuote] = useState<string | null>(null);
+
+  const loadQuoteHistory = async () => {
+    if (!task.clientName || quoteData !== null) return;
+    setQuoteLoading(true);
+    try {
+      const res = await fetch(`/api/ai/quotation-history?customer=${encodeURIComponent(task.clientName)}`);
+      const data = await res.json();
+      setQuoteData(data);
+    } catch { setQuoteData({ ok: false, error: '加载失败，请重试' }); }
+    finally { setQuoteLoading(false); }
+  };
 
   // Edit form state — initialized from task on each edit open
   const [draft, setDraft] = useState<Partial<FollowUpTask>>({});
@@ -236,11 +252,15 @@ export default function QuickFollowUpPanel({
           {/* Tabs */}
           {!editing && (
             <div className="flex gap-1 mt-4 p-1 rounded-xl" style={{ background: CARD2 }}>
-              {(['info', 'action'] as const).map(t => (
-                <button key={t} onClick={() => setTab(t)}
+              {([
+                ['info',   '客户详情'],
+                ['action', '跟进记录'],
+                ['quotes', '历史报价'],
+              ] as const).map(([key, label]) => (
+                <button key={key} onClick={() => { setTab(key); if (key === 'quotes') loadQuoteHistory(); }}
                   className="flex-1 py-1.5 rounded-lg text-xs font-black transition-all"
-                  style={tab === t ? { background: GOLD, color: '#fff' } : { color: T3 }}>
-                  {t === 'info' ? '客户详情' : '跟进记录'}
+                  style={tab === key ? { background: GOLD, color: '#fff' } : { color: T3 }}>
+                  {label}
                 </button>
               ))}
             </div>
@@ -527,6 +547,109 @@ export default function QuickFollowUpPanel({
                       <span className="mt-0.5 block">{h.message}</span>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+          {/* ── QUOTES TAB ─── */}
+          {!editing && tab === 'quotes' && (
+            <div className="p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>
+                  {task.clientName} 的历史报价
+                </p>
+                <button onClick={() => { setQuoteData(null); loadQuoteHistory(); }}
+                  className="text-[10px] font-bold px-2 py-1 rounded-lg transition-colors"
+                  style={{ color: T3, background: CARD2 }}>
+                  刷新
+                </button>
+              </div>
+
+              {quoteLoading && (
+                <div className="flex items-center gap-2 text-xs font-bold py-4" style={{ color: T3 }}>
+                  <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                  正在查询历史报价…
+                </div>
+              )}
+
+              {!quoteLoading && quoteData && !quoteData.ok && (
+                <div className="px-3 py-2 rounded-lg text-xs font-bold"
+                  style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#FCA5A5' }}>
+                  {quoteData.error || '查询失败'}
+                </div>
+              )}
+
+              {!quoteLoading && quoteData?.ok && quoteData.total === 0 && (
+                <div className="text-xs font-medium py-4" style={{ color: T3 }}>
+                  未找到与「{task.clientName}」相关的报价记录。
+                </div>
+              )}
+
+              {!quoteLoading && quoteData?.ok && quoteData.total > 0 && (
+                <>
+                  <div className="text-xs font-bold" style={{ color: GOLD }}>
+                    共 {quoteData.total} 张 · 合计 AED {Number(quoteData.totalAmount).toLocaleString()}
+                  </div>
+                  <div className="space-y-2">
+                    {quoteData.quotes.map((q: any) => (
+                      <div key={q.id}
+                        className="rounded-xl overflow-hidden"
+                        style={{ border: `1px solid ${BORD}` }}>
+                        {/* Quote header row */}
+                        <button
+                          className="w-full px-4 py-3 flex items-center gap-2 text-left transition-colors hover:bg-white/5"
+                          style={{ background: CARD2 }}
+                          onClick={() => setExpandedQuote(expandedQuote === q.id ? null : q.id)}>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-black" style={{ color: T1 }}>{q.quoteNo}</span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded"
+                                style={{ background: 'rgba(203,168,92,0.12)', color: GOLD }}>
+                                {q.statusZh}
+                              </span>
+                            </div>
+                            <div className="text-[10px] mt-0.5" style={{ color: T3 }}>
+                              {q.quoteDate ? new Date(q.quoteDate).toLocaleDateString('zh-CN') : '—'}
+                              {q.projectName && ` · ${q.projectName}`}
+                            </div>
+                          </div>
+                          <span className="text-sm font-black shrink-0" style={{ color: GOLD }}>
+                            AED {Number(q.grandTotal).toLocaleString()}
+                          </span>
+                          {expandedQuote === q.id
+                            ? <ChevronUp className="w-3.5 h-3.5 shrink-0" style={{ color: T3 }} />
+                            : <ChevronDown className="w-3.5 h-3.5 shrink-0" style={{ color: T3 }} />}
+                        </button>
+
+                        {/* Items */}
+                        {expandedQuote === q.id && (
+                          <div className="px-4 py-3 space-y-1.5" style={{ background: BG }}>
+                            {q.items && q.items.length > 0 ? (
+                              q.items.map((it: any, j: number) => (
+                                <div key={j} className="text-xs font-medium" style={{ color: T2 }}>
+                                  <span className="font-black" style={{ color: T1 }}>{j + 1}. {it.item_name}</span>
+                                  {it.description && <span style={{ color: T3 }}> · {it.description}</span>}
+                                  <span style={{ color: T3 }}> · ×{it.qty} {it.unit}</span>
+                                  <span style={{ color: GOLD }}> @ AED {Number(it.selling_price).toLocaleString()}</span>
+                                  <span className="float-right font-black" style={{ color: T1 }}>
+                                    AED {Number(it.line_total).toLocaleString()}
+                                  </span>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-[10px] font-medium" style={{ color: T3 }}>该报价暂无产品明细</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {!quoteLoading && !quoteData && (
+                <div className="text-xs font-medium py-4" style={{ color: T3 }}>
+                  点击"历史报价"标签自动加载。
                 </div>
               )}
             </div>

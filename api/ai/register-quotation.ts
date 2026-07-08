@@ -113,14 +113,65 @@ export default async function handler(request: Request): Promise<Response> {
 
     const created = await res.json().catch(() => []);
     const savedRecord = Array.isArray(created) ? created[0] : created;
+    const recordId: string | null = savedRecord?.id || null;
+
+    // ── Write quotation_items if provided ────────────────────────────────────
+    let itemsWarning: string | null = null;
+    let itemsSaved = 0;
+    const rawItems: any[] = Array.isArray(body.items) ? body.items : [];
+    const validItems = rawItems.filter(it => it && (it.item_name || '').trim());
+
+    if (recordId && validItems.length > 0) {
+      const itemRows = validItems.map((it: any, i: number) => {
+        const qty   = Number(it.qty)   || 1;
+        const price = Number(it.selling_price) || 0;
+        const total = Number(it.line_total) || (qty * price);
+        return {
+          quotation_id:   recordId,
+          item_name:      (it.item_name || '').trim(),
+          description:    it.description || null,
+          qty,
+          unit:           it.unit || '件',
+          supplier_cost:  0,
+          selling_price:  price,
+          profit_amount:  0,
+          margin_percent: 0,
+          vat_amount:     0,
+          line_total:     total,
+          currency:       it.currency || 'AED',
+          item_notes:     it.item_notes || null,
+          sort_order:     i,
+        };
+      });
+
+      const itemsRes = await fetch(`${supabaseUrl}/rest/v1/quotation_items`, {
+        method: 'POST',
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify(itemRows),
+      });
+
+      if (!itemsRes.ok) {
+        const errText = await itemsRes.text().catch(() => '');
+        itemsWarning = `报价主记录已保存，但明细保存失败 (${itemsRes.status}): ${errText}`;
+      } else {
+        itemsSaved = itemRows.length;
+      }
+    }
 
     return json({
       ok: true,
-      id: savedRecord?.id || null,
+      id: recordId,
       quote_no: record.quote_no,
       customer_name: record.customer_name,
       grand_total: record.grand_total,
       quote_date: record.quote_date,
+      itemsSaved,
+      itemsWarning,
       savedRecord,
     });
   }
