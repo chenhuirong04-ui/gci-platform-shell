@@ -13,7 +13,7 @@ import { Attachment, BusinessType, FollowUpTask, Project } from '../types';
 import {
   Sparkles, UploadCloud, X, ImageIcon, FileText,
   Trash2, ChevronDown, ChevronUp, User, Globe, Phone, Mail,
-  CheckCircle2, AlertCircle, Edit2,
+  CheckCircle2, AlertCircle, Edit2, FileCheck,
 } from 'lucide-react';
 
 // ── Dark theme tokens ────────────────────────────────────────────────
@@ -111,6 +111,68 @@ const TYPE_LABEL: Record<string, string> = {
   TRADE: '贸易询盘', PROJECT: '项目推进', LOG_ONLY: '仅记录', INTERNAL: '内部任务',
 };
 
+// ── quotation detection ───────────────────────────────────────────────
+interface QuoteDraft {
+  customerName: string;
+  itemSummary: string;
+  grandTotal: number | null;
+  quoteDate: string;
+  quoteType: 'TRADE' | 'BOQ' | 'CUSTOM';
+  source: string;
+  isReady: boolean;
+}
+
+function detectQuotation(text: string, clientNameHint: string): QuoteDraft | null {
+  const hasKw = /报价|已报价|报给客户|发了报价|price|quote|quotation|offer|\bPI\b|proforma|proposal/i.test(text);
+  if (!hasKw) return null;
+
+  // AED amount — prefer explicit currency prefix
+  let grandTotal: number | null = null;
+  const aedExplicit = text.match(/(?:AED|DHS)\s*([\d,]+(?:\.\d+)?)/i);
+  if (aedExplicit) {
+    const v = parseFloat(aedExplicit[1].replace(/,/g, ''));
+    if (!isNaN(v) && v >= 10) grandTotal = v;
+  }
+  if (grandTotal === null) {
+    const fallback = text.match(/([\d,]+(?:\.\d+)?)\s*(?:AED|DHS|迪拉姆)/i);
+    if (fallback) {
+      const v = parseFloat(fallback[1].replace(/,/g, ''));
+      if (!isNaN(v) && v >= 10) grandTotal = v;
+    }
+  }
+
+  const customerName = clientNameHint && clientNameHint !== '待确认' ? clientNameHint : '待确认';
+
+  // Date
+  const today = new Date();
+  let quoteDate = today.toISOString().slice(0, 10);
+  const iso = text.match(/(\d{4}-\d{2}-\d{2})/);
+  if (iso) quoteDate = iso[1];
+  else if (/昨天|yesterday/i.test(text)) {
+    const y = new Date(); y.setDate(y.getDate() - 1); quoteDate = y.toISOString().slice(0, 10);
+  }
+
+  // Item summary
+  let itemSummary = '';
+  const prodMatch = text.match(/(?:报价|reported?|quote[sd]?|offer(?:ed)?)\s+(.{3,40}?)(?:\s+(?:AED|给|to|for|\d)|[，。,.]|$)/i);
+  if (prodMatch) itemSummary = prodMatch[1].trim();
+
+  let source = 'AI手动录入';
+  if (/whatsapp/i.test(text)) source = 'WhatsApp';
+  else if (/wechat|微信/i.test(text)) source = '微信';
+  else if (/email|邮件/i.test(text)) source = 'Email';
+  else if (/pdf/i.test(text)) source = 'PDF';
+
+  let quoteType: 'TRADE' | 'BOQ' | 'CUSTOM' = 'TRADE';
+  if (/BOQ|bill\s*of\s*quantity/i.test(text)) quoteType = 'BOQ';
+  else if (/custom|定制/i.test(text)) quoteType = 'CUSTOM';
+
+  return {
+    customerName, itemSummary, grandTotal, quoteDate, quoteType,
+    source, isReady: customerName !== '待确认' && grandTotal !== null,
+  };
+}
+
 interface Props {
   onAdd: (task: Partial<FollowUpTask>) => Promise<void>;
   isLoading: boolean;
@@ -130,6 +192,13 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
   const [saved, setSaved]       = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // quotation state
+  const [quoteDraft, setQuoteDraft]     = useState<QuoteDraft | null>(null);
+  const [registerQuote, setRegisterQuote] = useState(false);
+  const [quotePhase, setQuotePhase]     = useState<'idle'|'checking'|'dupWarn'|'saving'|'done'|'failed'|'skipped'>('idle');
+  const [dupRecords, setDupRecords]     = useState<any[]>([]);
+  const [quoteError, setQuoteError]     = useState('');
 
   const hasInput = rawText.trim().length > 0 || attachments.length > 0;
 
@@ -179,8 +248,62 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
         result.clientName = optional.clientName.trim();
         result.missingFields = result.missingFields.filter(f => f !== '客户名称');
       }
+      // detect quotation alongside followup
+      const clientHint = optional.clientName.trim() || result.clientName;
+      const qd = detectQuotation(text, clientHint);
+      setQuoteDraft(qd);
+      setRegisterQuote(qd?.isReady ?? false);
+      setQuotePhase('idle');
       setDraft(result); setAnalysing(false);
     }, 900);
+  };
+
+  // ── reset all state ───────────────────────────────────────────────
+  const resetAll = () => {
+    setSaved(false); setDraft(null); setRawText(''); setAttachments([]);
+    setOptional({ clientName:'', countryCity:'', phoneE164:'', whatsapp:'', email:'' });
+    setQuoteDraft(null); setRegisterQuote(false);
+    setQuotePhase('idle'); setDupRecords([]); setQuoteError('');
+  };
+
+  // ── quotation save flow ───────────────────────────────────────────
+  const doSaveQuote = async (qd: QuoteDraft) => {
+    setQuotePhase('saving');
+    try {
+      const res = await fetch('/api/ai/register-quotation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: qd.customerName,
+          project_name: qd.itemSummary || null,
+          grand_total: qd.grandTotal,
+          quote_date: qd.quoteDate,
+          quote_type: qd.quoteType,
+          salesperson: 'Chris',
+          status: 'GENERATED',
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) { setQuotePhase('done'); setTimeout(resetAll, 2500); }
+      else { setQuotePhase('failed'); setQuoteError(data.error || '保存失败'); setTimeout(resetAll, 3500); }
+    } catch {
+      setQuotePhase('failed'); setQuoteError('网络错误'); setTimeout(resetAll, 3500);
+    }
+  };
+
+  const startQuoteFlow = async (qd: QuoteDraft) => {
+    setQuotePhase('checking');
+    try {
+      const params = new URLSearchParams({
+        check: '1', customer: qd.customerName,
+        total: String(qd.grandTotal ?? 0), date: qd.quoteDate,
+      });
+      const res = await fetch(`/api/ai/register-quotation?${params}`);
+      const data = await res.json();
+      const dups: any[] = data.duplicates ?? [];
+      if (dups.length > 0) { setDupRecords(dups); setQuotePhase('dupWarn'); }
+      else await doSaveQuote(qd);
+    } catch { await doSaveQuote(qd); } // fail-open: skip dedup on error
   };
 
   // ── save ──────────────────────────────────────────────────────────
@@ -204,10 +327,12 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
     try {
       await onAdd(task);
       setSaved(true);
-      setTimeout(() => {
-        setSaved(false); setDraft(null); setRawText(''); setAttachments([]);
-        setOptional({ clientName:'', countryCity:'', phoneE164:'', whatsapp:'', email:'' });
-      }, 1500);
+      if (registerQuote && quoteDraft?.isReady) {
+        // kick off quote flow (keeps draft card visible until done)
+        startQuoteFlow(quoteDraft);
+      } else {
+        setTimeout(resetAll, 1500);
+      }
     } catch { setErrorMsg('保存失败，请重试'); }
   };
 
@@ -414,6 +539,87 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
               </div>
             )}
 
+            {/* Quotation block — shown when quotation keywords detected */}
+            {quoteDraft && (
+              <div style={{ borderTop: `1px solid ${BORDER}`, background: '#0B1926' }}>
+                <div className="px-5 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileCheck className="w-4 h-4" style={{ color: GOLD }} />
+                    <span className="text-xs font-black uppercase tracking-widest" style={{ color: GOLD }}>检测到报价内容</span>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={registerQuote}
+                      onChange={e => setRegisterQuote(e.target.checked)}
+                      disabled={saved}
+                      className="w-3.5 h-3.5 accent-amber-500"
+                    />
+                    <span className="text-xs font-bold" style={{ color: T2 }}>同时登记为历史报价</span>
+                  </label>
+                </div>
+                {registerQuote && (
+                  <div className="px-5 pb-3 grid grid-cols-2 gap-x-6 gap-y-1.5">
+                    {([
+                      ['客户', quoteDraft.customerName],
+                      ['金额', quoteDraft.grandTotal != null ? `AED ${quoteDraft.grandTotal.toLocaleString()}` : '⚠ 未检测到金额'],
+                      ['报价日期', quoteDraft.quoteDate],
+                      ['类型', quoteDraft.quoteType],
+                      ['来源', quoteDraft.source],
+                      ...(quoteDraft.itemSummary ? [['产品/项目', quoteDraft.itemSummary]] : []),
+                    ] as [string, string][]).map(([k, v]) => (
+                      <div key={k} className="flex items-start gap-2">
+                        <span className="text-[9px] font-black uppercase tracking-widest w-14 shrink-0 pt-0.5" style={{ color: T3 }}>{k}</span>
+                        <span className="text-xs font-bold" style={{ color: v.startsWith('⚠') ? '#F59E0B' : T1 }}>{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {registerQuote && !quoteDraft.isReady && (
+                  <div className="mx-5 mb-3 px-3 py-2 rounded-lg flex items-center gap-2 text-xs font-bold"
+                    style={{ background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)', color: '#FCD34D' }}>
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    {quoteDraft.customerName === '待确认' ? '缺少客户名称，' : ''}{quoteDraft.grandTotal == null ? '缺少金额，' : ''}无法登记报价。请先补充缺少信息。
+                  </div>
+                )}
+                {/* Dup warning */}
+                {quotePhase === 'dupWarn' && dupRecords.length > 0 && (
+                  <div className="mx-5 mb-3 p-3 rounded-xl space-y-2"
+                    style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.30)' }}>
+                    <p className="text-xs font-black" style={{ color: '#FCD34D' }}>⚠ 发现 {dupRecords.length} 条相似报价，确认是否仍然登记：</p>
+                    {dupRecords.slice(0, 2).map((r: any) => (
+                      <div key={r.id} className="text-[10px] font-bold" style={{ color: T2 }}>
+                        {r.quote_no} · {r.customer_name} · AED {Number(r.grand_total).toLocaleString()} · {r.quote_date}
+                      </div>
+                    ))}
+                    <div className="flex gap-2 mt-1">
+                      <button onClick={() => quoteDraft && doSaveQuote(quoteDraft)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-black"
+                        style={{ background: GOLD, color: '#000' }}>仍然登记</button>
+                      <button onClick={() => { setQuotePhase('skipped'); setTimeout(resetAll, 1500); }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold"
+                        style={{ background: 'rgba(255,255,255,0.07)', border: `1px solid ${BORDER}`, color: T2 }}>跳过</button>
+                    </div>
+                  </div>
+                )}
+                {/* Quote phase result */}
+                {quotePhase !== 'idle' && quotePhase !== 'dupWarn' && (
+                  <div className="mx-5 mb-3 px-3 py-2 rounded-lg flex items-center gap-2 text-xs font-bold"
+                    style={{
+                      background: quotePhase === 'done' ? 'rgba(5,150,105,0.12)' : quotePhase === 'failed' ? 'rgba(239,68,68,0.10)' : 'rgba(255,255,255,0.05)',
+                      border: `1px solid ${quotePhase === 'done' ? 'rgba(5,150,105,0.4)' : quotePhase === 'failed' ? 'rgba(239,68,68,0.3)' : BORDER}`,
+                      color: quotePhase === 'done' ? '#6EE7B7' : quotePhase === 'failed' ? '#FCA5A5' : T2,
+                    }}>
+                    {quotePhase === 'checking' && '🔍 检查重复中…'}
+                    {quotePhase === 'saving' && '💾 登记中…'}
+                    {quotePhase === 'done' && <><CheckCircle2 className="w-3 h-3 shrink-0" /> 历史报价已登记</>}
+                    {quotePhase === 'failed' && <><AlertCircle className="w-3 h-3 shrink-0" /> 登记失败：{quoteError}</>}
+                    {quotePhase === 'skipped' && '已跳过报价登记'}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Actions */}
             <div className="px-5 py-4 flex flex-wrap gap-3" style={{ background: CARD2, borderTop: `1px solid ${BORDER}` }}>
               <button onClick={handleSave} disabled={isLoading || saved}
@@ -423,13 +629,15 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                   ? <><CheckCircle2 className="w-4 h-4" /> 已保存</>
                   : isLoading ? '保存中…' : '保存为跟进记录'}
               </button>
-              <button onClick={() => setDraft(null)}
-                className="px-5 py-3 rounded-xl text-sm font-bold transition-colors"
+              <button onClick={() => { setDraft(null); setQuoteDraft(null); setRegisterQuote(false); setQuotePhase('idle'); }}
+                disabled={saved}
+                className="px-5 py-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-40"
                 style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORDER}`, color: T2 }}>
                 <Edit2 className="w-3.5 h-3.5 inline mr-1.5" />修改
               </button>
-              <button onClick={() => { setDraft(null); setRawText(''); setAttachments([]); }}
-                className="px-5 py-3 rounded-xl text-sm font-bold transition-colors"
+              <button onClick={() => { resetAll(); }}
+                disabled={saved}
+                className="px-5 py-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-40"
                 style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORDER}`, color: T3 }}>
                 取消
               </button>
