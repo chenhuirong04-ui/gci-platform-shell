@@ -415,8 +415,81 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
             </div>
           )}
 
+          {/* ── Receivables result panel ── */}
+          {intent.intentId === 'check_receivables' && state.resultData && state.resultData.ok && (
+            <div style={{ marginBottom: 12 }}>
+              {/* Summary bar */}
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 10 }}>
+                <div style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(224,132,106,0.08)', border: '1px solid rgba(224,132,106,0.2)' }}>
+                  <div style={{ fontSize: 10, color: MUTED, marginBottom: 2 }}>总未收款</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: '#E0846A' }}>
+                    AED {Number(state.resultData.totalOutstanding).toLocaleString()}
+                  </div>
+                </div>
+                <div style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <div style={{ fontSize: 10, color: MUTED, marginBottom: 2 }}>涉及客户</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: TEXT }}>{state.resultData.customerCount}</div>
+                </div>
+                <div style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <div style={{ fontSize: 10, color: MUTED, marginBottom: 2 }}>涉及订单</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: TEXT }}>{state.resultData.orderCount}</div>
+                </div>
+                {state.resultData.overdueCount > 0 && (
+                  <div style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(224,132,106,0.08)', border: '1px solid rgba(224,132,106,0.3)' }}>
+                    <div style={{ fontSize: 10, color: '#E0846A', marginBottom: 2 }}>已逾期客户</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: '#E0846A' }}>{state.resultData.overdueCount}</div>
+                  </div>
+                )}
+              </div>
+              {state.resultData.customerCount === 0 ? (
+                <div style={{ fontSize: 13, color: '#6FBF8E', padding: '10px 0' }}>✓ 暂无未收款记录。</div>
+              ) : (
+                <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {state.resultData.customers.map((c: any, i: number) => {
+                    const hasOverdue = c.orders.some((o: any) => o.overdue);
+                    return (
+                      <div key={i} style={{ padding: '8px 10px', borderRadius: 7, background: hasOverdue ? 'rgba(224,132,106,0.06)' : 'rgba(255,255,255,0.03)', border: `1px solid ${hasOverdue ? 'rgba(224,132,106,0.22)' : 'rgba(255,255,255,0.07)'}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: TEXT, flex: 1 }}>{c.customerName}</span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#E0846A' }}>
+                            AED {Number(c.totalOutstanding).toLocaleString()} 未收
+                          </span>
+                          {hasOverdue && <span style={{ fontSize: 10, color: '#E0846A', fontWeight: 700 }}>⚠ 逾期</span>}
+                        </div>
+                        <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>
+                          {c.orderCount} 张订单 · 已收 AED {Number(c.totalPaid).toLocaleString()} / 总计 AED {Number(c.totalGrandTotal).toLocaleString()}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div style={{ fontSize: 10, color: SUBTLE, marginTop: 8 }}>
+                数据来源：orders · {new Date(state.resultData.asOf).toLocaleString('zh-CN')}
+              </div>
+            </div>
+          )}
+
+          {/* ── Receivables loading ── */}
+          {intent.intentId === 'check_receivables' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在统计未收款数据…</div>
+          )}
+
+          {/* ── Receivables API error ── */}
+          {intent.intentId === 'check_receivables' && state.resultData && !state.resultData.ok && (
+            <div style={{ fontSize: 13, color: '#E0846A', marginBottom: 12, padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>应收 API 查询失败</div>
+              <div style={{ color: MUTED, fontSize: 12 }}>{state.resultData.error || '未知错误'}</div>
+              {state.resultData.detail && (
+                <div style={{ color: SUBTLE, fontSize: 11, marginTop: 4, fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                  {typeof state.resultData.detail === 'string' ? state.resultData.detail : JSON.stringify(state.resultData.detail)}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── Default: show intent name for non-result done states ── */}
-          {intent.intentId !== 'check_inventory' && intent.intentId !== 'check_quotation_followups' && intent.intentId !== 'check_quotation_history' && (
+          {intent.intentId !== 'check_inventory' && intent.intentId !== 'check_quotation_followups' && intent.intentId !== 'check_quotation_history' && intent.intentId !== 'check_receivables' && (
             <div style={{ fontSize: 14, color: TEXT, marginBottom: intent.approvalRequired ? 14 : 0 }}>
               {intent.intentNameZh}{intent.approvalRequired ? dict.ai.panel.readyLabel : ''}
             </div>
@@ -940,6 +1013,51 @@ export function AIPage() {
             .then(r => r.json())
             .then(data => setCmdState(prev => prev ? { ...prev, resultData: data } : prev))
             .catch(e => console.error('[AI] quotation history fetch failed', e));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Receivables / outstanding payment intent — hardcoded regex.
+    const RECEIVABLES_RE = /未收款|欠款|应收|还没付款|没有付款|unpaid|receivable|outstanding|谁欠|多少钱没收|还有多少.*没收/i;
+    if (RECEIVABLES_RE.test(t)) {
+      const receivablesMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'check_receivables',
+          intentNameZh: '未收款情况',
+          intentNameEn: 'Receivables Summary',
+          category: 'query',
+          triggerKeywordsZh: [],
+          triggerKeywordsEn: [],
+          targetTab: 'chat',
+          targetModule: 'Finance',
+          targetRoute: '/trade?tab=finance',
+          readSources: ['orders'],
+          writeTargets: [],
+          requiredFields: [],
+          approvalRequired: false,
+          resultPanel: null,
+          implementationStatus: 'real',
+          notConnectedMessage: '',
+          fallbackBehavior: '',
+        },
+        confidence: 1,
+        raw: raw.trim(),
+        detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: receivablesMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在连接订单数据库…', '正在统计未收款情况…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          const base = typeof window !== 'undefined' ? window.location.origin : '';
+          fetch(`${base}/api/ai/receivables-summary`)
+            .then(r => r.json())
+            .then(data => setCmdState(prev => prev ? { ...prev, resultData: data } : prev))
+            .catch(e => console.error('[AI] receivables fetch failed', e));
         },
       );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
