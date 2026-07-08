@@ -252,11 +252,12 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
   }
 
   // Overlay real counts on the statCardSpecs visual configs
+  // mod eyebrow is translated via dict.workspace.*
   const statCards = [
-    { ...statCardSpecs[0], val: stats.followUpsToday !== null ? String(stats.followUpsToday) : '--' },
-    { ...statCardSpecs[1], val: stats.pendingQuotes  !== null ? String(stats.pendingQuotes)  : '--' },
-    { ...statCardSpecs[2], val: stats.activeOrders   !== null ? String(stats.activeOrders)   : '--' },
-    { ...statCardSpecs[3], val: stats.inventoryAlerts !== null ? String(stats.inventoryAlerts) : '--' },
+    { ...statCardSpecs[0], val: stats.followUpsToday !== null ? String(stats.followUpsToday) : '--', mod: dict.workspace.modCrm },
+    { ...statCardSpecs[1], val: stats.pendingQuotes  !== null ? String(stats.pendingQuotes)  : '--', mod: dict.workspace.modQuotation },
+    { ...statCardSpecs[2], val: stats.activeOrders   !== null ? String(stats.activeOrders)   : '--', mod: dict.workspace.modTrade },
+    { ...statCardSpecs[3], val: stats.inventoryAlerts !== null ? String(stats.inventoryAlerts) : '--', mod: dict.workspace.modInventory },
   ];
 
   const alertsToShow = liveAlerts ?? [];
