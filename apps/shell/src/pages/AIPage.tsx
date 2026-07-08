@@ -175,6 +175,111 @@ function parseCreateDraft(raw: string): {
   };
 }
 
+// ── Quotation draft generation number ────────────────────────────────────────
+function genQuoteNo(): string {
+  const d = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  return `AI-${d}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+}
+
+// ── Parser for "register_existing_quotation" intent ───────────────────────────
+// Input examples:
+//   "登记一条报价：IFZA，咖啡机，AED 28,000，今天发给客户"
+//   "记录客户报价：Namas，湿巾，AED 12,500，已发 WhatsApp"
+function parseQuotationDraft(raw: string): {
+  customerName: string;
+  itemSummary: string;
+  grandTotal: number | null;
+  currency: string;
+  quoteDate: string;
+  quoteType: 'TRADE' | 'BOQ' | 'CUSTOM';
+  source: string;
+  notes: string;
+  phoneWa: string;
+  salesperson: string;
+  quoteNo: string;
+} {
+  const clean = raw.replace(/[？?。！!]/g, '').trim();
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Strip trigger prefix
+  const body = clean
+    .replace(/^(?:登记(?:一条)?报价|记录(?:客户)?报价|保存报价记录|已经报价|给客户报价|这个客户报价|register quotation|record quote|existing quotation)[：:\s]*/iu, '')
+    .trim();
+
+  // Split by Chinese / English comma or newline into parts
+  const parts = body.split(/[，,\n]+/).map(s => s.trim()).filter(Boolean);
+
+  // Part[0]: customer name (if no AED and not a date phrase)
+  const customerName = (() => {
+    const p0 = parts[0] || '';
+    if (/^AED/i.test(p0) || /今天|昨天|上午|下午|刚才/.test(p0)) return '';
+    return p0;
+  })();
+
+  // Find item summary: first non-customer, non-AED, non-date part
+  const itemSummary = (() => {
+    const start = customerName ? 1 : 0;
+    for (let i = start; i < parts.length; i++) {
+      const p = parts[i];
+      if (/AED|aed|\d{4,}/.test(p)) continue;
+      if (/今天|昨天|上午|下午|刚发|发给客户/.test(p)) continue;
+      if (/whatsapp|wechat|微信|pdf|excel|upload/i.test(p)) continue;
+      return p;
+    }
+    return '';
+  })();
+
+  // Find AED amount
+  const aedMatch = clean.match(/AED\s*([\d,]+(?:\.\d+)?)/i);
+  const grandTotal = aedMatch ? Number(aedMatch[1].replace(/,/g, '')) : null;
+
+  // Find date
+  const quoteDate = (() => {
+    if (/今天/.test(clean)) return today;
+    if (/昨天/.test(clean)) {
+      const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10);
+    }
+    const dateM = clean.match(/(\d{4}[-/]\d{1,2}[-/]\d{1,2})/);
+    return dateM ? dateM[1].replace(/\//g, '-') : today;
+  })();
+
+  // Source detection
+  const source = /whatsapp|wa\b/i.test(clean) ? 'WhatsApp'
+    : /wechat|微信/.test(clean) ? '微信'
+    : /excel|xlsx/i.test(clean) ? 'Excel'
+    : /pdf/i.test(clean) ? 'PDF'
+    : /upload|上传/.test(clean) ? 'Upload'
+    : 'AI 手动录入';
+
+  // Quote type
+  const quoteType = /BOQ|boq/.test(clean) ? 'BOQ'
+    : /CUSTOM|custom/i.test(clean) ? 'CUSTOM'
+    : 'TRADE';
+
+  // Phone/WA
+  const waM = clean.match(/(?:wa|whatsapp|wp|电话|phone)[:：\s]*(\+?[\d\s()-]{7,20})/i);
+
+  // Notes: everything after main fields that doesn't fit
+  const notes = (() => {
+    const nM = clean.match(/(?:备注|note[s]?)[:：\s]*(.+)/i);
+    return nM ? nM[1].trim() : '';
+  })();
+
+  return {
+    customerName,
+    itemSummary,
+    grandTotal,
+    currency: 'AED',
+    quoteDate,
+    quoteType,
+    source,
+    notes,
+    phoneWa: waM?.[1]?.trim() || '',
+    salesperson: 'Chris',
+    quoteNo: genQuoteNo(),
+  };
+}
+
 function CommandPanel({ state, onApprove, onEdit, onCancel }: {
   state: CmdState;
   onApprove: () => void;
@@ -189,6 +294,13 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
   const [writePhase, setWritePhase] = useState<'confirm' | 'sending' | 'done' | 'error'>('confirm');
   const [writeError, setWriteError] = useState<string | null>(null);
   const [writeResult, setWriteResult] = useState<any>(null);
+
+  // Local state for register_existing_quotation
+  const [regPhase, setRegPhase] = useState<'draft' | 'checking' | 'dupWarn' | 'saving' | 'saved' | 'followUpSaving' | 'followUpDone' | 'error'>('draft');
+  const [regDups, setRegDups] = useState<any[]>([]);
+  const [regError, setRegError] = useState<string | null>(null);
+  const [regSaved, setRegSaved] = useState<any>(null);
+  const [regFollowUp, setRegFollowUp] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
 
   const IMPL_STATUS_LABELS: Record<string, string> = {
     real: dict.ai.panel.implReal,
@@ -1250,8 +1362,216 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
             <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在解析客户信息…</div>
           )}
 
+          {/* ── Register existing quotation panel ── */}
+          {intent.intentId === 'register_existing_quotation' && state.resultData?.draft && (() => {
+            const draft = state.resultData.draft;
+            const base = typeof window !== 'undefined' ? window.location.origin : '';
+
+            const fieldRow = (label: string, value: string | number | null, highlight?: boolean) => (
+              <div style={{ display: 'flex', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 11, color: SUBTLE, width: 90, flexShrink: 0 }}>{label}</span>
+                <span style={{ fontSize: 13, color: highlight ? GOLD : TEXT, fontWeight: highlight ? 700 : 500 }}>
+                  {value !== null && value !== '' ? String(value) : <span style={{ color: SUBTLE, fontStyle: 'italic' }}>未识别</span>}
+                </span>
+              </div>
+            );
+
+            const doSave = () => {
+              setRegPhase('saving');
+              fetch(`${base}/api/ai/register-quotation`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  quote_no: draft.quoteNo,
+                  customer_name: draft.customerName,
+                  project_name: draft.itemSummary,
+                  grand_total: draft.grandTotal,
+                  status: 'GENERATED',
+                  quote_date: draft.quoteDate,
+                  salesperson: draft.salesperson,
+                  quote_type: draft.quoteType,
+                  phone_wa: draft.phoneWa,
+                }),
+              })
+                .then(r => r.json())
+                .then(res => {
+                  if (res.ok) { setRegSaved(res); setRegPhase('saved'); }
+                  else { setRegPhase('error'); setRegError(res.error || '保存失败'); }
+                })
+                .catch(e => { setRegPhase('error'); setRegError(String(e)); });
+            };
+
+            const doCheck = () => {
+              setRegPhase('checking');
+              fetch(`${base}/api/ai/register-quotation?check=1&customer=${encodeURIComponent(draft.customerName)}&total=${draft.grandTotal || 0}&date=${draft.quoteDate}`)
+                .then(r => r.json())
+                .then(res => {
+                  if (res.duplicates && res.duplicates.length > 0) {
+                    setRegDups(res.duplicates);
+                    setRegPhase('dupWarn');
+                  } else {
+                    doSave();
+                  }
+                })
+                .catch(() => doSave()); // fail-open: skip check, proceed to save
+            };
+
+            const doFollowUp = () => {
+              setRegFollowUp('saving');
+              // Find the customer in CRM localStorage
+              const tasks = (() => { try { return JSON.parse(localStorage.getItem('ICARE_HISTORY_V1') || '[]'); } catch { return []; } })();
+              const nameLower = (draft.customerName || '').toLowerCase();
+              const task = tasks.find((t: any) => {
+                const tl = (t.clientName || '').toLowerCase();
+                return tl.includes(nameLower) || nameLower.includes(tl);
+              });
+              if (!task?.leadId) {
+                setRegFollowUp('error');
+                return;
+              }
+              fetch(`${base}/api/crm/notion-update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  action: 'update_status',
+                  leadId: task.leadId,
+                  tradeStatus: '已报价待确认',
+                }),
+              })
+                .then(r => r.json())
+                .then(res => setRegFollowUp(res.ok !== false ? 'done' : 'error'))
+                .catch(() => setRegFollowUp('error'));
+            };
+
+            return (
+              <div style={{ marginBottom: 12 }}>
+                {/* ── Draft card ── */}
+                {(regPhase === 'draft' || regPhase === 'checking' || regPhase === 'dupWarn') && (
+                  <div style={{ marginBottom: 12, padding: '14px 16px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div style={{ fontSize: 10, color: GOLD, fontWeight: 700, letterSpacing: '0.1em', marginBottom: 10 }}>报价草稿</div>
+                    {fieldRow('客户', draft.customerName, true)}
+                    {fieldRow('产品/项目', draft.itemSummary)}
+                    {fieldRow('金额', draft.grandTotal !== null ? `AED ${Number(draft.grandTotal).toLocaleString()}` : null, true)}
+                    {fieldRow('报价日期', draft.quoteDate)}
+                    {fieldRow('报价编号', draft.quoteNo)}
+                    {fieldRow('类型', draft.quoteType)}
+                    {fieldRow('来源', draft.source)}
+                    {fieldRow('负责人', draft.salesperson)}
+                    {draft.notes && fieldRow('备注', draft.notes)}
+                  </div>
+                )}
+
+                {/* Draft: action buttons */}
+                {regPhase === 'draft' && (
+                  <>
+                    {(!draft.customerName || draft.grandTotal === null) && (
+                      <div style={{ fontSize: 11, color: '#D4A843', marginBottom: 8, padding: '6px 10px', background: 'rgba(212,168,67,0.06)', border: '1px solid rgba(212,168,67,0.2)', borderRadius: 7 }}>
+                        ⚠️ {!draft.customerName ? '未识别客户名称' : '未识别金额'}，请在确认前检查。
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={doCheck}
+                        style={{ flex: 1, padding: '10px', borderRadius: 9, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: NAVY, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        确认保存
+                      </button>
+                      <button
+                        onClick={() => setCmdState(null)}
+                        style={{ padding: '10px 16px', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: MUTED, fontSize: 13, cursor: 'pointer' }}
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {/* Checking */}
+                {regPhase === 'checking' && (
+                  <div style={{ fontSize: 13, color: MUTED }}>正在检查重复记录…</div>
+                )}
+
+                {/* Dup warning */}
+                {regPhase === 'dupWarn' && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 13, color: '#D4A843', fontWeight: 600, marginBottom: 8 }}>⚠️ 可能已有相似报价记录</div>
+                    {regDups.slice(0, 3).map((d: any, i: number) => (
+                      <div key={i} style={{ fontSize: 11, color: MUTED, padding: '5px 10px', marginBottom: 4, background: 'rgba(212,168,67,0.06)', borderRadius: 7, border: '1px solid rgba(212,168,67,0.18)' }}>
+                        {d.quote_no} · {d.customer_name} · AED {Number(d.grand_total).toLocaleString()} · {d.quote_date}
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      <button onClick={doSave} style={{ flex: 1, padding: '9px', borderRadius: 9, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: NAVY, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                        仍然保存
+                      </button>
+                      <button onClick={() => setCmdState(null)} style={{ padding: '9px 14px', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: MUTED, fontSize: 13, cursor: 'pointer' }}>
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Saving */}
+                {regPhase === 'saving' && (
+                  <div style={{ fontSize: 13, color: MUTED }}>正在写入报价记录…</div>
+                )}
+
+                {/* Saved success */}
+                {regPhase === 'saved' && regSaved && (
+                  <div>
+                    <div style={{ padding: '12px 14px', background: 'rgba(111,191,142,0.07)', border: '1px solid rgba(111,191,142,0.25)', borderRadius: 8, marginBottom: 10 }}>
+                      <div style={{ fontSize: 13, color: '#6FBF8E', fontWeight: 600, marginBottom: 4 }}>✅ 报价记录已保存</div>
+                      <div style={{ fontSize: 12, color: MUTED }}>{regSaved.quote_no} · {regSaved.customer_name} · AED {Number(regSaved.grand_total).toLocaleString()}</div>
+                    </div>
+
+                    {/* Follow-up prompt */}
+                    {regFollowUp === 'idle' && (
+                      <div style={{ padding: '10px 12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8 }}>
+                        <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>是否同时更新跟进状态为「已报价待确认」？</div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={doFollowUp} style={{ flex: 1, padding: '8px', borderRadius: 8, background: 'rgba(203,168,92,0.15)', border: `1px solid ${GOLD}`, color: GOLD, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                            同步跟进状态
+                          </button>
+                          <button onClick={() => setRegFollowUp('done')} style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: MUTED, fontSize: 12, cursor: 'pointer' }}>
+                            跳过
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {regFollowUp === 'saving' && (
+                      <div style={{ fontSize: 12, color: MUTED, padding: '8px 0' }}>正在更新跟进状态…</div>
+                    )}
+                    {regFollowUp === 'done' && (
+                      <div style={{ fontSize: 12, color: '#6FBF8E', padding: '8px 10px', borderRadius: 7, background: 'rgba(111,191,142,0.06)', border: '1px solid rgba(111,191,142,0.2)' }}>
+                        ✅ 跟进状态已更新为「已报价待确认」
+                      </div>
+                    )}
+                    {regFollowUp === 'error' && (
+                      <div style={{ fontSize: 12, color: '#D4A843', padding: '8px 10px', borderRadius: 7, background: 'rgba(212,168,67,0.06)', border: '1px solid rgba(212,168,67,0.2)' }}>
+                        ⚠️ 未在跟进列表找到该客户，请前往 CRM 手动更新状态。
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Error */}
+                {regPhase === 'error' && (
+                  <div style={{ padding: '12px 14px', background: 'rgba(224,132,106,0.07)', border: '1px solid rgba(224,132,106,0.25)', borderRadius: 8 }}>
+                    <div style={{ fontSize: 13, color: '#E0846A', fontWeight: 600, marginBottom: 4 }}>保存失败</div>
+                    <div style={{ fontSize: 12, color: MUTED }}>{regError || '未知错误，请稍后重试。'}</div>
+                  </div>
+                )}
+
+                {/* Field gap notice */}
+                <div style={{ fontSize: 10, color: SUBTLE, marginTop: 10 }}>
+                  ℹ️ quotation_records 暂无 source / notes 字段，来源和备注仅显示在草稿，不写入数据库。
+                </div>
+              </div>
+            );
+          })()}
+
           {/* ── Default: show intent name for non-result done states ── */}
-          {intent.intentId !== 'check_inventory' && intent.intentId !== 'check_quotation_followups' && intent.intentId !== 'check_quotation_history' && intent.intentId !== 'check_receivables' && intent.intentId !== 'check_consignment' && intent.intentId !== 'check_sales' && intent.intentId !== 'generate_daily_brief' && intent.intentId !== 'customer_overview' && intent.intentId !== 'update_followup_status' && intent.intentId !== 'create_customer_from_ai' && (
+          {intent.intentId !== 'check_inventory' && intent.intentId !== 'check_quotation_followups' && intent.intentId !== 'check_quotation_history' && intent.intentId !== 'check_receivables' && intent.intentId !== 'check_consignment' && intent.intentId !== 'check_sales' && intent.intentId !== 'generate_daily_brief' && intent.intentId !== 'customer_overview' && intent.intentId !== 'update_followup_status' && intent.intentId !== 'create_customer_from_ai' && intent.intentId !== 'register_existing_quotation' && (
             <div style={{ fontSize: 14, color: TEXT, marginBottom: intent.approvalRequired ? 14 : 0 }}>
               {intent.intentNameZh}{intent.approvalRequired ? dict.ai.panel.readyLabel : ''}
             </div>
@@ -1962,6 +2282,51 @@ export function AIPage() {
             .then(r => r.json())
             .then(data => setCmdState(prev => prev ? { ...prev, resultData: data } : prev))
             .catch(e => console.error('[AI] daily brief fetch failed', e));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Register existing quotation — must come before CUSTOMER_360_RE and INVENTORY_RE
+    const REGISTER_QUOTE_RE = /登记(?:一条)?报价|记录(?:客户)?报价|保存报价记录|已经报价|给客户报价|这个客户报价|register quotation|record quote|existing quotation|上传(?:报价单|这个报价)|帮我登记到报价/i;
+    if (REGISTER_QUOTE_RE.test(t)) {
+      const draft = parseQuotationDraft(raw.trim());
+      const regMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'register_existing_quotation',
+          intentNameZh: '登记报价记录',
+          intentNameEn: 'Register Quotation',
+          category: 'action',
+          triggerKeywordsZh: [],
+          triggerKeywordsEn: [],
+          targetTab: 'chat',
+          targetModule: 'Quotation',
+          targetRoute: '/quotation',
+          readSources: ['quotation_records'],
+          writeTargets: ['quotation_records'],
+          requiredFields: [],
+          approvalRequired: false,
+          resultPanel: null,
+          implementationStatus: 'real',
+          notConnectedMessage: '',
+          fallbackBehavior: '',
+        },
+        confidence: 1,
+        raw: raw.trim(),
+        detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: regMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在解析报价信息…', '正在生成报价草稿…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? {
+            ...prev,
+            phase: 'done',
+            resultData: { type: 'register_existing_quotation', draft },
+          } : prev);
         },
       );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
