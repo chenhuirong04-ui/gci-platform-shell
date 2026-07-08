@@ -73,6 +73,40 @@ function extractCustomerName(raw: string): string | null {
   return null;
 }
 
+// ── Product name extraction for product overview queries ──────────────────────
+// Extracts a specific product name from natural language input, e.g.:
+// "Coffee table 单价是多少" → "Coffee table"
+// "查 心相印湿巾 的历史报价" → "心相印湿巾"
+// "这个产品多少钱" → null (product not specified, user must clarify)
+function extractProductName(raw: string): string | null {
+  const s = raw.replace(/[？?。！!，,]/g, '').trim();
+
+  // Pattern 1: <product> + price / stock / history suffix
+  let m = s.match(/^(.+?)\s*(?:单价|价格|多少钱|以前报|报过多少|历史单价|历史报价|以前报价|报过价|还有多少库存|还有多少|库存和价格|建议报价|成本价|售价)/u);
+  if (m?.[1]) {
+    const name = m[1]
+      .replace(/^(?:查一下|查看|查询|查|看|帮我|请|帮|你帮我)\s*/u, '')
+      .replace(/\s*的\s*$/, '')
+      .trim();
+    if (name.length >= 2 && name.length <= 40 && !/^(?:以前|之前|现在|最近|历史|单价|价格|多少|这个|产品)$/.test(name)) {
+      return name;
+    }
+  }
+
+  // Pattern 2: 查/看 <product> 的 历史报价/单价/价格/库存
+  m = s.match(/(?:查一下|查看|查询|查|看)\s+(.+?)\s*(?:的)?(?:历史报价|单价|价格|库存|多少钱)/u);
+  if (m?.[1]) {
+    const name = m[1].replace(/^[帮我请一下\s]+/u, '').trim();
+    if (name.length >= 2 && name.length <= 40) return name;
+  }
+
+  // Pattern 3: <product> 这个产品 (e.g. "Coffee table 这个产品多少钱")
+  m = s.match(/^(.+?)\s*这个产品/u);
+  if (m?.[1] && m[1].trim().length >= 2) return m[1].trim();
+
+  return null;
+}
+
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const GOLD = '#CBA85C';
 const GOLD_L = '#E2C988';
@@ -664,6 +698,184 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
               <div style={{ color: MUTED, fontSize: 12 }}>{state.resultData.error || '未知错误'}</div>
             </div>
           )}
+
+          {/* ── Product overview loading ── */}
+          {intent.intentId === 'product_overview' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查询产品信息…</div>
+          )}
+
+          {/* ── Product overview API error ── */}
+          {intent.intentId === 'product_overview' && state.resultData && !state.resultData.ok && (
+            <div style={{ fontSize: 13, color: '#E0846A', marginBottom: 12, padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>产品查询失败</div>
+              <div style={{ color: MUTED, fontSize: 12 }}>{state.resultData.error || '未知错误'}</div>
+            </div>
+          )}
+
+          {/* ── Product overview result panel ── */}
+          {intent.intentId === 'product_overview' && state.resultData && state.resultData.ok && (() => {
+            const d = state.resultData;
+            const CARD_BG  = 'rgba(255,255,255,0.03)';
+            const CARD_BDR = '1px solid rgba(255,255,255,0.07)';
+            const WARN_BG  = 'rgba(224,132,106,0.06)';
+            const WARN_BDR = '1px solid rgba(224,132,106,0.2)';
+            const GOLD_BDR = `1px solid rgba(203,168,92,0.25)`;
+            const GREEN    = '#6FBF8E';
+            return (
+              <div style={{ marginBottom: 12 }}>
+                {/* Search header */}
+                <div style={{ fontSize: 12, color: MUTED, marginBottom: 10 }}>
+                  关键词：<span style={{ color: GOLD, fontWeight: 700 }}>「{d.productKeyword}」</span>
+                </div>
+
+                {/* Project query warning */}
+                {d.isProjectQuery && (
+                  <div style={{ padding: '8px 12px', background: WARN_BG, border: WARN_BDR, borderRadius: 8, fontSize: 12, color: '#E0846A', marginBottom: 10 }}>
+                    ⚠ {d.projectQueryNote}
+                  </div>
+                )}
+
+                {/* Section A: 产品主库 */}
+                <div style={{ padding: '10px 12px', background: CARD_BG, border: GOLD_BDR, borderRadius: 9, marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 6, letterSpacing: '0.04em' }}>产品主库 / PRODUCT MASTER</div>
+                  {!d.productMaster.found ? (
+                    <div style={{ fontSize: 12, color: MUTED }}>未在产品主库找到「{d.productKeyword}」的匹配记录。</div>
+                  ) : (
+                    d.productMaster.items.map((pm: any, i: number) => (
+                      <div key={i} style={{ marginBottom: i < d.productMaster.items.length - 1 ? 10 : 0, paddingBottom: i < d.productMaster.items.length - 1 ? 10 : 0, borderBottom: i < d.productMaster.items.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'baseline' }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{pm.productName}</span>
+                          {pm.productNameEn && pm.productNameEn !== pm.productName && <span style={{ fontSize: 11, color: MUTED }}>{pm.productNameEn}</span>}
+                        </div>
+                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 5, fontSize: 11 }}>
+                          {pm.sku && <span style={{ color: MUTED }}>SKU: <span style={{ color: TEXT }}>{pm.sku}</span></span>}
+                          {pm.category && <span style={{ color: MUTED }}>类别: <span style={{ color: TEXT }}>{pm.category}</span></span>}
+                          {pm.brand && <span style={{ color: MUTED }}>品牌: <span style={{ color: TEXT }}>{pm.brand}</span></span>}
+                          {pm.sellingUnit && <span style={{ color: MUTED }}>单位: <span style={{ color: TEXT }}>{pm.sellingUnit}</span></span>}
+                          {pm.stockStatus && <span style={{ color: MUTED }}>状态: <span style={{ color: TEXT }}>{pm.stockStatus}</span></span>}
+                        </div>
+                        <div style={{ display: 'flex', gap: 16, marginTop: 7, flexWrap: 'wrap' }}>
+                          {pm.targetWholesale != null && (
+                            <div style={{ padding: '5px 10px', borderRadius: 6, background: 'rgba(203,168,92,0.08)', border: GOLD_BDR }}>
+                              <div style={{ fontSize: 9, color: MUTED, marginBottom: 1 }}>建议批发价</div>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: GOLD }}>AED {Number(pm.targetWholesale).toLocaleString()}</div>
+                            </div>
+                          )}
+                          {pm.costPriceAED != null && (
+                            <div style={{ padding: '5px 10px', borderRadius: 6, background: CARD_BG, border: CARD_BDR }}>
+                              <div style={{ fontSize: 9, color: MUTED, marginBottom: 1 }}>成本价（内部）</div>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: TEXT }}>AED {Number(pm.costPriceAED).toLocaleString()}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Section B: 库存 (qty only) */}
+                <div style={{ padding: '10px 12px', background: CARD_BG, border: CARD_BDR, borderRadius: 9, marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 6, letterSpacing: '0.04em' }}>库存数量 / INVENTORY</div>
+                  {!d.inventory.found ? (
+                    <div style={{ fontSize: 12, color: MUTED }}>库存表中未找到匹配记录。</div>
+                  ) : (
+                    d.inventory.items.map((inv: any, i: number) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0', fontSize: 12 }}>
+                        <span style={{ flex: 1, color: TEXT }}>{inv.nameEN}</span>
+                        <span style={{ color: MUTED }}>{inv.warehouse}</span>
+                        <span style={{ fontWeight: 700, color: inv.outOfStock ? '#E0846A' : inv.lowStock ? '#D4AF37' : GREEN }}>
+                          {inv.currentQty != null ? `${inv.currentQty} ${inv.unit}` : '—'}
+                        </span>
+                        {inv.outOfStock && <span style={{ fontSize: 10, color: '#E0846A', fontWeight: 700 }}>缺货</span>}
+                        {inv.lowStock && !inv.outOfStock && <span style={{ fontSize: 10, color: '#D4AF37', fontWeight: 700 }}>低库存</span>}
+                      </div>
+                    ))
+                  )}
+                  <div style={{ fontSize: 10, color: SUBTLE, marginTop: 4 }}>库存仅显示数量。价格请参考产品主库或历史报价。</div>
+                </div>
+
+                {/* Section C: 寄售库存 */}
+                {d.consignment.found && (
+                  <div style={{ padding: '10px 12px', background: CARD_BG, border: CARD_BDR, borderRadius: 9, marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 6, letterSpacing: '0.04em' }}>寄售库存 / CONSIGNMENT</div>
+                    {d.consignment.items.map((cs: any, i: number) => (
+                      <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'baseline', padding: '3px 0', fontSize: 12, flexWrap: 'wrap' }}>
+                        <span style={{ color: TEXT, fontWeight: 600 }}>{cs.customerName || '—'}</span>
+                        {cs.soNo && <span style={{ color: MUTED }}>SO: {cs.soNo}</span>}
+                        <span style={{ color: MUTED }}>剩余: <span style={{ color: TEXT, fontWeight: 700 }}>{cs.remainingQty != null ? cs.remainingQty : '—'}</span></span>
+                        {cs.unitPrice != null && (
+                          <span style={{ color: MUTED }}>批次价: <span style={{ color: GOLD }}>{cs.unitPrice} AED</span></span>
+                        )}
+                      </div>
+                    ))}
+                    <div style={{ fontSize: 10, color: SUBTLE, marginTop: 4 }}>寄售批次价格 ≠ 产品主库标准售价</div>
+                  </div>
+                )}
+
+                {/* Section D: 历史报价 */}
+                <div style={{ padding: '10px 12px', background: CARD_BG, border: CARD_BDR, borderRadius: 9, marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 6, letterSpacing: '0.04em' }}>历史报价 / QUOTATION HISTORY</div>
+                  {!d.quotationHistory.found ? (
+                    <div style={{ fontSize: 12, color: MUTED }}>暂无历史报价记录。</div>
+                  ) : (
+                    <>
+                      {/* Price summary */}
+                      {d.quotationHistory.priceSummary && (() => {
+                        const ps = d.quotationHistory.priceSummary;
+                        return (
+                          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+                            <div style={{ padding: '5px 10px', borderRadius: 6, background: 'rgba(203,168,92,0.08)', border: GOLD_BDR, textAlign: 'center' }}>
+                              <div style={{ fontSize: 9, color: MUTED, marginBottom: 1 }}>最近报价</div>
+                              <div style={{ fontSize: 14, fontWeight: 700, color: GOLD }}>AED {Number(ps.latestPrice).toLocaleString()}</div>
+                            </div>
+                            <div style={{ padding: '5px 10px', borderRadius: 6, background: CARD_BG, border: CARD_BDR, textAlign: 'center' }}>
+                              <div style={{ fontSize: 9, color: MUTED, marginBottom: 1 }}>最低 / 最高</div>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: TEXT }}>
+                                {Number(ps.minPrice).toLocaleString()} – {Number(ps.maxPrice).toLocaleString()}
+                              </div>
+                            </div>
+                            <div style={{ padding: '5px 10px', borderRadius: 6, background: CARD_BG, border: CARD_BDR, textAlign: 'center' }}>
+                              <div style={{ fontSize: 9, color: MUTED, marginBottom: 1 }}>均价 / 次数</div>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: TEXT }}>
+                                {Number(ps.avgPrice).toLocaleString()} · {ps.quoteCount}次
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                      {/* Individual rows */}
+                      <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+                        {d.quotationHistory.items.slice(0, 20).map((it: any, i: number) => (
+                          <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'baseline', padding: '3px 0', fontSize: 11, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                            <span style={{ flex: '0 0 70px', color: MUTED, whiteSpace: 'nowrap' }}>
+                              {it.quote_date ? it.quote_date.slice(0, 10) : '—'}
+                            </span>
+                            <span style={{ flex: 1, color: TEXT, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {it.customer_name || '—'}
+                            </span>
+                            <span style={{ color: MUTED, whiteSpace: 'nowrap' }}>×{it.qty} {it.unit}</span>
+                            <span style={{ color: GOLD, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                              AED {Number(it.selling_price).toLocaleString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Warnings */}
+                {d.warnings && d.warnings.length > 0 && (
+                  <div style={{ fontSize: 10, color: SUBTLE, padding: '6px 0' }}>
+                    ⚠ {d.warnings.join(' · ')}
+                  </div>
+                )}
+                <div style={{ fontSize: 10, color: SUBTLE, marginTop: 4 }}>
+                  价格仅供参考，最终报价需人工确认 · {new Date(d.asOf).toLocaleString('zh-CN')}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ── Receivables result panel ── */}
           {intent.intentId === 'check_receivables' && state.resultData && state.resultData.ok && (
@@ -1966,6 +2178,58 @@ export function AIPage() {
       setInvoiceMode(true);
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
       return;
+    }
+
+    // Product overview intent — shows price (PRODUCT_MASTER) + stock qty + consignment + quotation history.
+    // Must come BEFORE INVENTORY_RE to intercept specific product+price queries (e.g. "Coffee table 还有多少库存").
+    // Falls through when: (a) no product name extracted, or (b) a customer name is detected instead.
+    const PRODUCT_OVERVIEW_RE = /单价|价格|多少钱|成本价|售价|报过多少|以前报|历史单价|建议报价|还有多少库存|库存和价格|历史报价|以前报价|报价记录|product price|price history|item price|product overview|这个产品/i;
+    if (PRODUCT_OVERVIEW_RE.test(t)) {
+      const customer = extractCustomerName(raw.trim());
+      const product  = extractProductName(raw.trim());
+      if (product && !customer) {
+        const overviewMatch: AIIntentMatch = {
+          intent: {
+            intentId: 'product_overview',
+            intentNameZh: '产品查询',
+            intentNameEn: 'Product Overview',
+            category: 'query',
+            triggerKeywordsZh: [],
+            triggerKeywordsEn: [],
+            targetTab: 'chat',
+            targetModule: 'Trade',
+            targetRoute: '/trade',
+            readSources: ['PRODUCT_MASTER', 'INVENTORY_DB', 'consignment_stock', 'quotation_items'],
+            writeTargets: [],
+            requiredFields: [],
+            approvalRequired: false,
+            resultPanel: null,
+            implementationStatus: 'real',
+            notConnectedMessage: '',
+            fallbackBehavior: '',
+          },
+          confidence: 1,
+          raw: raw.trim(),
+          detectedMissingFields: [],
+        };
+        setTab('chat');
+        setCmdState({ raw: raw.trim(), match: overviewMatch, phase: 'processing', step: 0 });
+        runner.run(
+          ['正在识别产品…', '正在查询产品主库和价格…', '正在检索库存与历史报价…'],
+          (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+          () => {
+            setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+            const base = typeof window !== 'undefined' ? window.location.origin : '';
+            fetch(`${base}/api/ai/product-overview?product=${encodeURIComponent(product)}`)
+              .then(r => r.json())
+              .then(data => setCmdState(prev => prev ? { ...prev, resultData: data } : prev))
+              .catch(e => console.error('[AI] product overview fetch failed', e));
+          },
+        );
+        setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+        return;
+      }
+      // No product name or customer query detected — fall through to INVENTORY_RE / QUOTATION_HISTORY_RE
     }
 
     // Inventory intent — hardcoded regex, bypass scoring system entirely.

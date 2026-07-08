@@ -175,8 +175,8 @@ export const AI_CAPABILITY_MAP: AIIntent[] = [
     intentNameZh: '查询库存',
     intentNameEn: 'Check Inventory',
     category: 'query',
-    triggerKeywordsZh: ['查库存', '库存够不够', '哪些库存不足', '库存预警', '库存情况', '库存查询', '还有多少货'],
-    triggerKeywordsEn: ['inventory', 'stock level', 'stock check', 'check stock', 'inventory alert'],
+    triggerKeywordsZh: ['库存', '查库存', '库存够不够', '哪些库存不足', '库存预警', '库存情况', '库存查询', '还有多少', '剩多少', '有没有货', '是否有货', '能不能出货', '可用库存', '缺货', '低库存', '有货吗', '有多少货', '还有货'],
+    triggerKeywordsEn: ['inventory', 'stock', 'stock level', 'stock check', 'check stock', 'inventory alert', 'available stock', 'low stock', 'out of stock'],
     targetTab: 'chat',
     targetModule: 'Inventory',
     targetRoute: '/trade?tab=inventory',
@@ -188,6 +188,27 @@ export const AI_CAPABILITY_MAP: AIIntent[] = [
     implementationStatus: 'real',
     notConnectedMessage: '',
     fallbackBehavior: '直接显示库存汇总，低库存产品置顶标红。',
+  },
+
+  // ── 6b. Product Overview (price + stock + consignment + quotation history) ──
+  {
+    intentId: 'product_overview',
+    intentNameZh: '产品查询',
+    intentNameEn: 'Product Overview',
+    category: 'query',
+    triggerKeywordsZh: ['单价是多少', '以前报多少', '报过多少钱', '历史单价', '产品价格', '库存和价格', '现在多少钱', '这个产品', '建议报价', '成本价', '售价多少'],
+    triggerKeywordsEn: ['product price', 'price history', 'item price', 'product overview', 'unit price', 'how much is'],
+    targetTab: 'chat',
+    targetModule: 'Trade',
+    targetRoute: '/trade',
+    readSources: ['PRODUCT_MASTER (Notion)', 'INVENTORY_DB (Notion)', 'consignment_stock (Supabase)', 'quotation_items + quotation_records (Supabase)'],
+    writeTargets: [],
+    requiredFields: [],
+    approvalRequired: false,
+    resultPanel: null,
+    implementationStatus: 'real',
+    notConnectedMessage: '',
+    fallbackBehavior: '显示产品主库价格 + 库存数量 + 寄售批次 + 历史报价区间。价格仅供参考，最终报价需人工确认。',
   },
 
   // ── 7. Generate Daily Brief ────────────────────────────────────────────────
