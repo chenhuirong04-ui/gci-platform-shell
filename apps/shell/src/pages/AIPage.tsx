@@ -488,8 +488,76 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
             </div>
           )}
 
+          {/* ── Consignment result panel ── */}
+          {intent.intentId === 'check_consignment' && state.resultData && state.resultData.ok && (
+            <div style={{ marginBottom: 12 }}>
+              {/* Summary bar */}
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+                {state.resultData.unsettledCount > 0 && (
+                  <div style={{ padding: '7px 12px', borderRadius: 8, background: 'rgba(224,132,106,0.08)', border: '1px solid rgba(224,132,106,0.2)' }}>
+                    <div style={{ fontSize: 10, color: MUTED, marginBottom: 1 }}>未结算</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#E0846A' }}>{state.resultData.unsettledCount} 条</div>
+                  </div>
+                )}
+                {state.resultData.partialCount > 0 && (
+                  <div style={{ padding: '7px 12px', borderRadius: 8, background: 'rgba(212,168,67,0.08)', border: '1px solid rgba(212,168,67,0.2)' }}>
+                    <div style={{ fontSize: 10, color: MUTED, marginBottom: 1 }}>部分结算</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#D4A843' }}>{state.resultData.partialCount} 条</div>
+                  </div>
+                )}
+                <div style={{ padding: '7px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <div style={{ fontSize: 10, color: MUTED, marginBottom: 1 }}>剩余库存</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: TEXT }}>{state.resultData.totalRemaining} 件</div>
+                </div>
+                <div style={{ padding: '7px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <div style={{ fontSize: 10, color: MUTED, marginBottom: 1 }}>已售数量</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#6FBF8E' }}>{state.resultData.totalSold} 件</div>
+                </div>
+              </div>
+              {state.resultData.total === 0 ? (
+                <div style={{ fontSize: 13, color: '#6FBF8E', padding: '10px 0' }}>✓ 暂无寄售记录。</div>
+              ) : (
+                <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {state.resultData.records.map((r: any, i: number) => (
+                    <div key={i} style={{ padding: '8px 10px', borderRadius: 7, background: r.settlementStatus === 'UNSETTLED' ? 'rgba(224,132,106,0.05)' : r.settlementStatus === 'PARTIAL' ? 'rgba(212,168,67,0.05)' : 'rgba(255,255,255,0.03)', border: `1px solid ${r.settlementStatus === 'UNSETTLED' ? 'rgba(224,132,106,0.2)' : r.settlementStatus === 'PARTIAL' ? 'rgba(212,168,67,0.2)' : 'rgba(255,255,255,0.07)'}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: TEXT, flex: 1 }}>{r.customerName}</span>
+                        <span style={{ fontSize: 11, color: MUTED }}>{r.productName}</span>
+                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 6, background: r.settlementStatus === 'UNSETTLED' ? 'rgba(224,132,106,0.12)' : r.settlementStatus === 'PARTIAL' ? 'rgba(212,168,67,0.12)' : 'rgba(111,191,142,0.12)', color: r.settlementStatus === 'UNSETTLED' ? '#E0846A' : r.settlementStatus === 'PARTIAL' ? '#D4A843' : '#6FBF8E' }}>
+                          {r.settlementZh}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 11, color: MUTED, marginTop: 3, display: 'flex', gap: 10 }}>
+                        <span>寄售 {r.consignedQty}</span>
+                        <span>已售 {r.soldQty}</span>
+                        <span style={{ color: r.remainingQty > 0 ? GOLD : MUTED }}>剩余 {r.remainingQty}</span>
+                        {r.soNo !== '—' && <span>SO: {r.soNo}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ fontSize: 10, color: SUBTLE, marginTop: 8 }}>
+                数据来源：consignment_stock · {new Date(state.resultData.asOf).toLocaleString('zh-CN')}
+              </div>
+            </div>
+          )}
+
+          {/* ── Consignment loading ── */}
+          {intent.intentId === 'check_consignment' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查询寄售情况…</div>
+          )}
+
+          {/* ── Consignment API error ── */}
+          {intent.intentId === 'check_consignment' && state.resultData && !state.resultData.ok && (
+            <div style={{ fontSize: 13, color: '#E0846A', marginBottom: 12, padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>寄售 API 查询失败</div>
+              <div style={{ color: MUTED, fontSize: 12 }}>{state.resultData.error || '未知错误'}</div>
+            </div>
+          )}
+
           {/* ── Default: show intent name for non-result done states ── */}
-          {intent.intentId !== 'check_inventory' && intent.intentId !== 'check_quotation_followups' && intent.intentId !== 'check_quotation_history' && intent.intentId !== 'check_receivables' && (
+          {intent.intentId !== 'check_inventory' && intent.intentId !== 'check_quotation_followups' && intent.intentId !== 'check_quotation_history' && intent.intentId !== 'check_receivables' && intent.intentId !== 'check_consignment' && (
             <div style={{ fontSize: 14, color: TEXT, marginBottom: intent.approvalRequired ? 14 : 0 }}>
               {intent.intentNameZh}{intent.approvalRequired ? dict.ai.panel.readyLabel : ''}
             </div>
@@ -1058,6 +1126,55 @@ export function AIPage() {
             .then(r => r.json())
             .then(data => setCmdState(prev => prev ? { ...prev, resultData: data } : prev))
             .catch(e => console.error('[AI] receivables fetch failed', e));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Consignment intent — hardcoded regex.
+    const CONSIGNMENT_RE = /寄售|consignment|未结算|结算情况|寄售库存|寄售货|寄售结算/i;
+    if (CONSIGNMENT_RE.test(t)) {
+      const consignmentMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'check_consignment',
+          intentNameZh: '寄售情况',
+          intentNameEn: 'Consignment Summary',
+          category: 'query',
+          triggerKeywordsZh: [],
+          triggerKeywordsEn: [],
+          targetTab: 'chat',
+          targetModule: 'Warehouse',
+          targetRoute: '/trade?tab=inventory',
+          readSources: ['consignment_stock'],
+          writeTargets: [],
+          requiredFields: [],
+          approvalRequired: false,
+          resultPanel: null,
+          implementationStatus: 'real',
+          notConnectedMessage: '',
+          fallbackBehavior: '',
+        },
+        confidence: 1,
+        raw: raw.trim(),
+        detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: consignmentMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在连接寄售数据库…', '正在检查寄售结算情况…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          const base = typeof window !== 'undefined' ? window.location.origin : '';
+          // Try to extract customer from raw input for consignment queries like "IFZA 有寄售货吗"
+          const custM = raw.match(/^(.{2,20}?)(?:有寄售|的寄售|寄售情况)/u);
+          const custKw = custM?.[1]?.replace(/[？?。！!，,\s]/g, '').trim() || '';
+          const qs = custKw ? `?customer=${encodeURIComponent(custKw)}` : '';
+          fetch(`${base}/api/ai/consignment-summary${qs}`)
+            .then(r => r.json())
+            .then(data => setCmdState(prev => prev ? { ...prev, resultData: data } : prev))
+            .catch(e => console.error('[AI] consignment fetch failed', e));
         },
       );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
