@@ -78,8 +78,10 @@ export default async function handler(request: Request): Promise<Response> {
   const reqUrl   = new URL(request.url);
   const customer = reqUrl.searchParams.get('customer')?.trim().toLowerCase() || '';
 
-  // Fetch all active orders — JSONB payload fields cannot be filtered server-side via PostgREST
-  // without special indexes, so we pull all active rows and filter in memory.
+  // TECH DEBT (V1): orders uses JSONB payload — cannot filter server-side via PostgREST without
+  // special indexes. Pulling all active rows and filtering in memory (≤1000 rows).
+  // Future optimization: mirror customerName + outstandingAmount as top-level columns for
+  // server-side filtering, or migrate orders to a flat schema.
   const queryUrl = `${supabaseUrl}/rest/v1/orders`
     + `?select=id,created_at,state,payload`
     + `&state=eq.active`

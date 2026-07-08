@@ -708,11 +708,17 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                   <span>数据来源：{d.source}</span>
                   <span>{new Date(d.asOf).toLocaleString('zh-CN')}</span>
                 </div>
-                {d.crmNote && (
-                  <div style={{ fontSize: 10, color: SUBTLE, marginTop: 4, padding: '6px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: 6, lineHeight: 1.5 }}>
-                    ⚠ {d.crmNote}
+                {/* CRM partial banner — always shown for daily brief */}
+                <div style={{ marginTop: 10, padding: '8px 12px', background: 'rgba(143,166,212,0.06)', border: '1px solid rgba(143,166,212,0.2)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>⚠</span>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#8FA6D4', marginBottom: 2 }}>CRM 跟进数据未包含</div>
+                    <div style={{ fontSize: 11, color: MUTED, lineHeight: 1.6 }}>
+                      CRM 跟进记录来自前端 Notion sync / localStorage，后端简报暂未合并此部分。
+                      如需查看今日跟进，请前往 <span style={{ color: '#8FA6D4' }}>CRM 模块</span> 或 <span style={{ color: '#8FA6D4' }}>今日工作台</span>。
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
             );
           })()}
@@ -794,11 +800,24 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                 <div style={{ fontSize: 10, color: SUBTLE, marginTop: 8 }}>
                   数据来源：{d.source} · {new Date(d.asOf).toLocaleString('zh-CN')}
                 </div>
-                {d.crmNote && (
-                  <div style={{ fontSize: 10, color: SUBTLE, marginTop: 4, padding: '5px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: 6 }}>
-                    ⚠ {d.crmNote}
+                {/* Alias info — show if multiple aliases were used */}
+                {d.aliasesUsed && (
+                  <div style={{ fontSize: 10, color: SUBTLE, marginTop: 6, padding: '5px 8px', background: 'rgba(203,168,92,0.04)', border: '1px solid rgba(203,168,92,0.12)', borderRadius: 6 }}>
+                    🔗 别名搜索已启用：{d.aliases?.join(' / ')}
                   </div>
                 )}
+
+                {/* CRM partial banner — always shown for customer 360 */}
+                <div style={{ marginTop: 8, padding: '8px 12px', background: 'rgba(143,166,212,0.06)', border: '1px solid rgba(143,166,212,0.2)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>⚠</span>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#8FA6D4', marginBottom: 2 }}>CRM 跟进记录未包含</div>
+                    <div style={{ fontSize: 11, color: MUTED, lineHeight: 1.6 }}>
+                      CRM 跟进记录来自前端 Notion sync / localStorage，后端无法读取。
+                      如需查看该客户最近跟进，请前往 <span style={{ color: '#8FA6D4' }}>CRM 模块</span>。
+                    </div>
+                  </div>
+                </div>
               </div>
             );
           })()}
@@ -1587,8 +1606,46 @@ export function AIPage() {
       return;
     }
 
-    // All other commands — use central router
-    const match = detectAIIntent(raw.trim());
+    // ── Business Intent Guard ─────────────────────────────────────────────────
+    // If input contains business keywords but slipped past all hardcoded routes,
+    // intercept before the generic scorer returns "通用查询".
+    // Generic Query is only allowed for pure small talk (greetings, meta-questions).
+    const BUSINESS_GUARD_RE = /客户|报价|库存|寄售|销售|应收|未收款|发票|订单|付款|跟进|简报|老板简报|历史报价|欠款|结算|出货|备货/;
+    const routerMatch = detectAIIntent(raw.trim());
+    if (routerMatch.intent.intentId === 'generic_query' && BUSINESS_GUARD_RE.test(t)) {
+      const guardMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'business_guard',
+          intentNameZh: '业务查询 — 需要补充',
+          intentNameEn: 'Business Query — Needs Clarification',
+          category: 'query',
+          triggerKeywordsZh: [],
+          triggerKeywordsEn: [],
+          targetTab: 'chat',
+          targetModule: 'AI Chat',
+          targetRoute: '',
+          readSources: [],
+          writeTargets: [],
+          requiredFields: [],
+          approvalRequired: false,
+          resultPanel: null,
+          implementationStatus: 'partial',
+          notConnectedMessage:
+            '我识别到这是业务查询，但还需要补充查询对象或时间范围。\n\n可以这样问：\n• 查 IFZA 的历史报价\n• 哪些报价没有回复？\n• 本月销售情况\n• 谁还没付款？\n• 哪些寄售还没结算？\n• 生成今日简报',
+          fallbackBehavior: '',
+        },
+        confidence: 0,
+        raw: raw.trim(),
+        detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: guardMatch, phase: 'not_connected', step: 0 });
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // All other commands — use router result (pure small talk reaches here)
+    const match = routerMatch;
     const { intent } = match;
 
     setTab(intent.targetTab as TabKey);

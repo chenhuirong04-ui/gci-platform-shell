@@ -1,9 +1,14 @@
 // /api/ai/customer-360
-// Cross-table customer overview using customerName fuzzy match.
+// Cross-table customer overview using customerName fuzzy match + alias expansion.
 // WARNING: No unified customer_id — matches by name substring (case-insensitive).
-// May miss records if spelling differs across tables.
+// Alias map in ./_customerAliases.ts handles known spelling variants (e.g. IFZA / IFZA FZ-LLC).
 // Tables: quotation_records (flat), orders (payload), consignment_stock (payload), invoice_drafts (flat)
+//
+// TECH DEBT: orders + consignment_stock use JSONB payload — filtered in memory (max 500 rows each).
+// Future: mirror customerName as a top-level column for server-side filtering.
 export const config = { runtime: 'edge' };
+
+import { expandAliases } from './_customerAliases';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -49,33 +54,53 @@ export default async function handler(request: Request): Promise<Response> {
   const customer = reqUrl.searchParams.get('customer')?.trim() || '';
   if (!customer) return json({ ok: false, error: 'customer 参数必填，例如 ?customer=IFZA' }, 400);
 
-  const kw = customer.toLowerCase();
+  // Expand to all known aliases (e.g. "IFZA" → ["IFZA", "IFZA FZCO", "IFZA FZ-LLC", "DSO IFZA"])
+  const aliases    = expandAliases(customer);
+  const aliasesStr = aliases.join(', ');
 
-  // Parallel queries — all tables, then filter in memory by customer name substring
+  // For flat tables (quotation_records, invoice_drafts): use PostgREST OR filter with ilike
+  // Builds: or=(customer_name.ilike.*IFZA*,customer_name.ilike.*IFZA FZCO*)
+  function buildOrIlike(col: string, terms: string[]): string {
+    const parts = terms.map(t => `${col}.ilike.*${encodeURIComponent(t)}*`).join(',');
+    return `or=(${parts})`;
+  }
+
+  // For JSONB payload tables: filter in memory against all aliases (case-insensitive)
+  function matchesAnyAlias(name: string): boolean {
+    const n = name.toLowerCase();
+    return aliases.some(a => n.includes(a.toLowerCase()) || a.toLowerCase().includes(n));
+  }
+
+  const orQuot    = buildOrIlike('customer_name', aliases);
+  const orInvoice = buildOrIlike('customer_name', aliases);
+
+  // Parallel queries
   const [quotRows, orderRows, stockRows, invoiceRows] = await Promise.all([
     sbGet(supabaseUrl, key,
-      `quotation_records?select=id,quote_no,customer_name,project_name,grand_total,status,created_at,quote_date,salesperson,quote_type&customer_name=ilike.*${encodeURIComponent(customer)}*&order=created_at.desc&limit=50`),
+      `quotation_records?select=id,quote_no,customer_name,project_name,grand_total,status,created_at,quote_date,salesperson,quote_type&${orQuot}&order=created_at.desc&limit=50`),
 
+    // TECH DEBT: orders uses JSONB payload — cannot filter server-side, filtered in memory (≤500 rows)
     sbGet(supabaseUrl, key,
       `orders?select=id,created_at,state,payload&state=eq.active&order=created_at.desc&limit=500`),
 
+    // TECH DEBT: consignment_stock uses JSONB payload — filtered in memory (≤500 rows)
     sbGet(supabaseUrl, key,
       `consignment_stock?select=id,state,payload&state=eq.active&limit=500`),
 
     sbGet(supabaseUrl, key,
-      `invoice_drafts?select=id,invoice_no,customer_name,total,status,invoice_date,due_date&customer_name=ilike.*${encodeURIComponent(customer)}*&order=created_at.desc&limit=50`),
+      `invoice_drafts?select=id,invoice_no,customer_name,total,status,invoice_date,due_date&${orInvoice}&order=created_at.desc&limit=50`),
   ]);
 
-  // Filter orders and stock in memory (no ilike on JSONB payload)
+  // Filter JSONB payload tables in memory using alias expansion
   const matchedOrders = orderRows
     .map(r => r.payload)
     .filter(Boolean)
-    .filter(p => (p.customerName || '').toLowerCase().includes(kw));
+    .filter(p => matchesAnyAlias(p.customerName || ''));
 
   const matchedStock = stockRows
     .map(r => r.payload)
     .filter(Boolean)
-    .filter(p => (p.customerName || '').toLowerCase().includes(kw));
+    .filter(p => matchesAnyAlias(p.customerName || ''));
 
   // ── Quotation history ─────────────────────────────────────────────────────
   const quotes = quotRows.map(q => ({
@@ -146,10 +171,16 @@ export default async function handler(request: Request): Promise<Response> {
   if (suggestions.length === 0)
     suggestions.push('暂无紧急事项，保持正常跟进节奏');
 
+  const aliasNote = aliases.length > 1
+    ? `已展开别名搜索：${aliasesStr}。当前按名称/别名模糊匹配，可能因拼写不一致遗漏记录。`
+    : '当前按客户名称模糊匹配，可能因拼写不一致遗漏记录。如有别名请联系技术添加至 customerAliases.ts。';
+
   return json({
     ok:           true,
     customerQuery: customer,
-    matchWarning: '当前按客户名称模糊匹配，可能因拼写不一致遗漏记录。',
+    aliases,
+    aliasesUsed:  aliases.length > 1,
+    matchWarning: aliasNote,
     summary: {
       quoteCount:        quotes.length,
       totalQuoteAmt,

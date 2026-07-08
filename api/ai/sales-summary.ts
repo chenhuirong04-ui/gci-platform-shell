@@ -75,6 +75,8 @@ export default async function handler(request: Request): Promise<Response> {
   const period   = reqUrl.searchParams.get('period')?.toLowerCase() || 'month';
   const customer = reqUrl.searchParams.get('customer')?.trim().toLowerCase() || '';
 
+  // TECH DEBT (V1): orders uses JSONB payload — period and status filtering done in memory (≤1000 rows).
+  // Future: mirror createdAt + status + grandTotal as top-level columns for server-side filtering.
   const queryUrl = `${supabaseUrl}/rest/v1/orders`
     + `?select=id,created_at,state,payload`
     + `&state=eq.active`
