@@ -111,6 +111,70 @@ const IMPL_STATUS_COLORS: Record<string, string> = {
   real: '#6FBF8E', partial: GOLD, mock: '#D4A843', missing: '#E0846A',
 };
 
+// ── CRM AI helpers ────────────────────────────────────────────────────────────
+function resolveStatusAlias(text: string): string | null {
+  if (/合同待签|等客户签合同|待签合同|签合同|待签约/i.test(text)) return '合同待签';
+  if (/暂缓|暂不跟进|先不跟进|关闭本次跟进|归档本次跟进/i.test(text)) return '暂缓';
+  if (/恢复跟进|继续跟进|重新跟进/i.test(text)) return '跟进中';
+  if (/已报价待确认|等客户确认报价|报价待确认/i.test(text)) return '已报价待确认';
+  if (/已成交|成交了/i.test(text)) return '已成交';
+  if (/执行中|开始执行/i.test(text)) return '执行中';
+  if (/归档/i.test(text)) return '已归档';
+  return null;
+}
+
+function extractUpdateIntent(raw: string): { customerName: string; newStatus: string | null } {
+  const clean = raw.trim();
+  // "把 KHALED 更新到/改成 合同待签"
+  const m1 = clean.match(/把\s+(.+?)\s+(?:更新到|更新为|改成|设置为|变成)\s*(.+)/u);
+  if (m1) return { customerName: m1[1].trim(), newStatus: resolveStatusAlias(m1[2]) };
+  // "KHALED 改成/更新到 暂缓"
+  const m2 = clean.match(/^([A-Za-z一-龥][^\s,，。]{1,30}?)\s+(?:改成|更新到|更新为|设置为|变成)\s*(.+)/u);
+  if (m2) return { customerName: m2[1].trim(), newStatus: resolveStatusAlias(m2[2]) };
+  // "更新 KHALED 状态 合同待签"
+  const m3 = clean.match(/更新\s+(.+?)\s+(?:状态|到|为)\s*(.+)/u);
+  if (m3) return { customerName: m3[1].trim(), newStatus: resolveStatusAlias(m3[2]) };
+  return { customerName: '', newStatus: resolveStatusAlias(clean) };
+}
+
+function parseCreateDraft(raw: string): {
+  clientName: string; businessType: 'TRADE' | 'PROJECT';
+  city: string; phone: string; whatsapp: string; email: string;
+  lastContext: string; owner: string; nextFollowUpAt: string;
+} {
+  const clean = raw.trim();
+  // Extract name after trigger keyword
+  const nameM = clean.match(/(?:新增客户|增加客户|录入客户|新客户|create customer|add customer|new lead)[:：\s]+([A-Za-z一-龥][^\s,，。\n:：]{1,40})/iu);
+  const clientName = nameM?.[1]?.trim() || '';
+
+  const phoneM = clean.match(/(?:电话|phone|tel|手机)[:：\s]*(\+?[\d\s()-]{7,20})/i);
+  const waM = clean.match(/(?:wa|whatsapp|wechat|微信|wp)[:：\s]*(\+?[\d\s()-]{7,20})/i);
+  const emailM = clean.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  const cityM = clean.match(/(?:迪拜|dubai|中国|上海|北京|广州|深圳|沙特|利雅得|阿布扎比|sharjah|sharjah|ajman)/i);
+
+  const isProject = /villa|fitout|装修|工程|项目|interior|FF&E|酒店|别墅/i.test(clean);
+  const businessType: 'TRADE' | 'PROJECT' = isProject ? 'PROJECT' : 'TRADE';
+
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const nextFollowUpAt = tomorrow.toISOString().slice(0, 10);
+
+  // Context: everything after the name
+  const afterName = nameM ? clean.slice((nameM.index ?? 0) + nameM[0].length).replace(/[,，。！!]/g, ' ').trim() : '';
+
+  return {
+    clientName,
+    businessType,
+    city: cityM?.[0]?.trim() || '',
+    phone: phoneM?.[1]?.trim() || '',
+    whatsapp: waM?.[1]?.trim() || '',
+    email: emailM?.[0]?.trim() || '',
+    lastContext: afterName.slice(0, 200),
+    owner: 'Chris',
+    nextFollowUpAt,
+  };
+}
+
 function CommandPanel({ state, onApprove, onEdit, onCancel }: {
   state: CmdState;
   onApprove: () => void;
@@ -120,6 +184,11 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
   const { dict } = useI18n();
   const { raw, match, phase, step } = state;
   const { intent, confidence } = match;
+
+  // Local state for write-back intents (update_followup_status, create_customer_from_ai)
+  const [writePhase, setWritePhase] = useState<'confirm' | 'sending' | 'done' | 'error'>('confirm');
+  const [writeError, setWriteError] = useState<string | null>(null);
+  const [writeResult, setWriteResult] = useState<any>(null);
 
   const IMPL_STATUS_LABELS: Record<string, string> = {
     real: dict.ai.panel.implReal,
@@ -933,8 +1002,207 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
             </div>
           )}
 
+          {/* ── Update follow-up status panel ── */}
+          {intent.intentId === 'update_followup_status' && state.resultData && (() => {
+            const d = state.resultData;
+            if (d.notFound) {
+              return (
+                <div style={{ marginBottom: 12, padding: '12px 14px', background: 'rgba(224,132,106,0.07)', border: '1px solid rgba(224,132,106,0.25)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, color: '#E0846A', fontWeight: 600, marginBottom: 4 }}>未找到客户</div>
+                  <div style={{ fontSize: 12, color: MUTED }}>在 CRM 本地记录中未找到「{d.customerName}」，请检查拼写或先前往 CRM 模块同步 Notion 数据。</div>
+                </div>
+              );
+            }
+            if (!d.newStatus) {
+              return (
+                <div style={{ marginBottom: 12, padding: '12px 14px', background: 'rgba(224,132,106,0.07)', border: '1px solid rgba(224,132,106,0.25)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, color: '#E0846A', fontWeight: 600, marginBottom: 4 }}>无法识别目标状态</div>
+                  <div style={{ fontSize: 12, color: MUTED }}>请在指令中指定目标状态，例如：「把 KHALED 更新到合同待签」</div>
+                </div>
+              );
+            }
+            if (writePhase === 'done' && writeResult) {
+              return (
+                <div style={{ marginBottom: 12, padding: '12px 14px', background: 'rgba(111,191,142,0.07)', border: '1px solid rgba(111,191,142,0.25)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, color: '#6FBF8E', fontWeight: 600, marginBottom: 4 }}>✓ 状态已更新</div>
+                  <div style={{ fontSize: 12, color: MUTED }}>{d.customerName} → {d.newStatus}（已写回 Notion）</div>
+                </div>
+              );
+            }
+            if (writePhase === 'error') {
+              return (
+                <div style={{ marginBottom: 12, padding: '12px 14px', background: 'rgba(224,132,106,0.07)', border: '1px solid rgba(224,132,106,0.25)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, color: '#E0846A', fontWeight: 600, marginBottom: 4 }}>写回失败</div>
+                  <div style={{ fontSize: 12, color: MUTED }}>{writeError || '未知错误，请前往 CRM 手动更新。'}</div>
+                </div>
+              );
+            }
+            // confirm phase
+            const task = d.matchedTask;
+            const CLOSED_ON_WRITE = ['暂缓', '已归档', '已成交', '已关闭'];
+            const willArchive = CLOSED_ON_WRITE.includes(d.newStatus);
+            return (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: TEXT, marginBottom: 6 }}>{d.customerName}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, marginBottom: task ? 6 : 0 }}>
+                    <span style={{ padding: '2px 8px', borderRadius: 5, background: 'rgba(255,255,255,0.06)', color: MUTED }}>{d.currentStatus || '未知'}</span>
+                    <span style={{ color: SUBTLE }}>→</span>
+                    <span style={{ padding: '2px 8px', borderRadius: 5, background: willArchive ? 'rgba(224,132,106,0.12)' : 'rgba(111,191,142,0.12)', color: willArchive ? '#E0846A' : '#6FBF8E', fontWeight: 700 }}>{d.newStatus}</span>
+                  </div>
+                  {willArchive && (
+                    <div style={{ fontSize: 10, color: '#E0846A', marginTop: 4 }}>⚠ 此状态会将客户标记为归档，从跟进列表中移除。</div>
+                  )}
+                  {d.newStatus === '合同待签' && (
+                    <div style={{ fontSize: 10, color: '#6FBF8E', marginTop: 4 }}>✓ 合同待签 = 活跃跟进，不会归档。</div>
+                  )}
+                  {task && (
+                    <div style={{ fontSize: 10, color: SUBTLE, marginTop: 4 }}>
+                      Notion 页面：{task.leadId ? task.leadId.slice(0, 8) + '…' : '未知'}
+                      {task.owner && ` · 负责人：${task.owner}`}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    disabled={writePhase === 'sending'}
+                    onClick={() => {
+                      if (!task?.leadId) {
+                        setWritePhase('error');
+                        setWriteError('该客户无有效 Notion pageId，无法写回。请前往 CRM 模块手动更新。');
+                        return;
+                      }
+                      setWritePhase('sending');
+                      const base = typeof window !== 'undefined' ? window.location.origin : '';
+                      fetch(`${base}/api/crm/notion-update`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ pageId: task.leadId, action: 'update_status', tradeStatus: d.newStatus }),
+                      })
+                        .then(r => r.json())
+                        .then(res => {
+                          if (res.ok) { setWritePhase('done'); setWriteResult(res); }
+                          else { setWritePhase('error'); setWriteError(res.error || '写回失败'); }
+                        })
+                        .catch(e => { setWritePhase('error'); setWriteError(String(e)); });
+                    }}
+                    style={{ flex: 1, padding: '10px', borderRadius: 9, background: writePhase === 'sending' ? 'rgba(111,191,142,0.2)' : `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: writePhase === 'sending' ? '#6FBF8E' : NAVY, fontSize: 14, fontWeight: 700, cursor: writePhase === 'sending' ? 'not-allowed' : 'pointer' }}
+                  >
+                    {writePhase === 'sending' ? '写回中…' : '确认更新'}
+                  </button>
+                  <button onClick={onCancel} style={{ padding: '10px 18px', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>取消</button>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ── Update status loading ── */}
+          {intent.intentId === 'update_followup_status' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查找客户记录…</div>
+          )}
+
+          {/* ── Create customer panel ── */}
+          {intent.intentId === 'create_customer_from_ai' && state.resultData && (() => {
+            const d = state.resultData;
+            const draft = d.draft;
+            if (!draft.clientName) {
+              return (
+                <div style={{ marginBottom: 12, padding: '12px 14px', background: 'rgba(224,132,106,0.07)', border: '1px solid rgba(224,132,106,0.25)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, color: '#E0846A', fontWeight: 600, marginBottom: 4 }}>未能解析客户姓名</div>
+                  <div style={{ fontSize: 12, color: MUTED }}>请使用格式：「新增客户：姓名，联系方式，简要需求」</div>
+                </div>
+              );
+            }
+            if (writePhase === 'done' && writeResult) {
+              return (
+                <div style={{ marginBottom: 12, padding: '12px 14px', background: 'rgba(111,191,142,0.07)', border: '1px solid rgba(111,191,142,0.25)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, color: '#6FBF8E', fontWeight: 600, marginBottom: 6 }}>✓ 客户已创建</div>
+                  {writeResult.sbNumber && (
+                    <div style={{ fontSize: 12, color: MUTED, marginBottom: 2 }}>SB 编号：<span style={{ color: GOLD, fontWeight: 700 }}>{writeResult.sbNumber}</span></div>
+                  )}
+                  <div style={{ fontSize: 12, color: MUTED }}>已写入 Notion {draft.businessType === 'TRADE' ? 'SB Pool + Follow-up Log' : 'Follow-up Log'}</div>
+                </div>
+              );
+            }
+            if (writePhase === 'error') {
+              return (
+                <div style={{ marginBottom: 12, padding: '12px 14px', background: 'rgba(224,132,106,0.07)', border: '1px solid rgba(224,132,106,0.25)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, color: '#E0846A', fontWeight: 600, marginBottom: 4 }}>创建失败</div>
+                  <div style={{ fontSize: 12, color: MUTED }}>{writeError || '未知错误，请前往 CRM 模块手动录入。'}</div>
+                </div>
+              );
+            }
+            const typeColor = draft.businessType === 'PROJECT' ? '#8FA6D4' : GOLD;
+            return (
+              <div style={{ marginBottom: 12 }}>
+                {d.dupCheck?.hasDup && (
+                  <div style={{ padding: '8px 12px', background: 'rgba(224,132,106,0.07)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8, marginBottom: 8, fontSize: 12, color: '#E0846A' }}>
+                    ⚠ CRM 中已有近似记录「{d.dupCheck.dupName}」，请确认是否为新客户。
+                  </div>
+                )}
+                <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: TEXT }}>{draft.clientName}</span>
+                    <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 5, background: `${typeColor}22`, color: typeColor, fontWeight: 700 }}>{draft.businessType}</span>
+                  </div>
+                  {[
+                    draft.city && ['城市', draft.city],
+                    draft.phone && ['电话', draft.phone],
+                    draft.whatsapp && ['WhatsApp', draft.whatsapp],
+                    draft.email && ['Email', draft.email],
+                    draft.lastContext && ['需求备注', draft.lastContext],
+                    ['负责人', draft.owner],
+                    ['下次跟进', draft.nextFollowUpAt],
+                    ['初始状态', '新询盘'],
+                  ].filter(Boolean).map(([label, value]: any, i: number) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12 }}>
+                      <span style={{ color: SUBTLE, minWidth: 70 }}>{label}</span>
+                      <span style={{ color: TEXT }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 11, color: SUBTLE, marginBottom: 8 }}>
+                  写入目标：Notion {draft.businessType === 'TRADE' ? 'SB Pool + Follow-up Log' : 'Follow-up Log'}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    disabled={writePhase === 'sending'}
+                    onClick={() => {
+                      setWritePhase('sending');
+                      const base = typeof window !== 'undefined' ? window.location.origin : '';
+                      const endpoint = draft.businessType === 'TRADE' ? '/api/crm/notion-write-lead' : '/api/crm/notion-create';
+                      const payload = draft.businessType === 'TRADE'
+                        ? { clientName: draft.clientName, phone: draft.phone, whatsapp: draft.whatsapp, email: draft.email, countryCity: draft.city, lastContext: draft.lastContext, owner: draft.owner, nextFollowUpAt: draft.nextFollowUpAt, source: 'AI录入' }
+                        : { clientName: draft.clientName, followUpNotes: draft.lastContext, followUpMethod: 'WhatsApp', nextFollowUpAt: draft.nextFollowUpAt, owner: draft.owner, source: 'AI录入' };
+                      fetch(`${base}${endpoint}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                      })
+                        .then(r => r.json())
+                        .then(res => {
+                          if (res.ok || res.sbNumber || res.pageId) { setWritePhase('done'); setWriteResult(res); }
+                          else { setWritePhase('error'); setWriteError(res.error || '创建失败'); }
+                        })
+                        .catch(e => { setWritePhase('error'); setWriteError(String(e)); });
+                    }}
+                    style={{ flex: 1, padding: '10px', borderRadius: 9, background: writePhase === 'sending' ? 'rgba(111,191,142,0.2)' : `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: writePhase === 'sending' ? '#6FBF8E' : NAVY, fontSize: 14, fontWeight: 700, cursor: writePhase === 'sending' ? 'not-allowed' : 'pointer' }}
+                  >
+                    {writePhase === 'sending' ? '创建中…' : '确认创建客户'}
+                  </button>
+                  <button onClick={onCancel} style={{ padding: '10px 18px', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>取消</button>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ── Create customer loading ── */}
+          {intent.intentId === 'create_customer_from_ai' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在解析客户信息…</div>
+          )}
+
           {/* ── Default: show intent name for non-result done states ── */}
-          {intent.intentId !== 'check_inventory' && intent.intentId !== 'check_quotation_followups' && intent.intentId !== 'check_quotation_history' && intent.intentId !== 'check_receivables' && intent.intentId !== 'check_consignment' && intent.intentId !== 'check_sales' && intent.intentId !== 'generate_daily_brief' && intent.intentId !== 'customer_overview' && (
+          {intent.intentId !== 'check_inventory' && intent.intentId !== 'check_quotation_followups' && intent.intentId !== 'check_quotation_history' && intent.intentId !== 'check_receivables' && intent.intentId !== 'check_consignment' && intent.intentId !== 'check_sales' && intent.intentId !== 'generate_daily_brief' && intent.intentId !== 'customer_overview' && intent.intentId !== 'update_followup_status' && intent.intentId !== 'create_customer_from_ai' && (
             <div style={{ fontSize: 14, color: TEXT, marginBottom: intent.approvalRequired ? 14 : 0 }}>
               {intent.intentNameZh}{intent.approvalRequired ? dict.ai.panel.readyLabel : ''}
             </div>
@@ -1643,6 +1911,118 @@ export function AIPage() {
             .then(r => r.json())
             .then(data => setCmdState(prev => prev ? { ...prev, resultData: data } : prev))
             .catch(e => console.error('[AI] daily brief fetch failed', e));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Update follow-up status intent — must come before CUSTOMER_360_RE
+    const UPDATE_STATUS_RE = /更新状态|改成|更新到|设置为|变成|待签合同|合同待签|等客户签合同|待签约|恢复跟进|关闭本次跟进|把.+(?:更新|改|变|设置)/i;
+    if (UPDATE_STATUS_RE.test(t)) {
+      const { customerName, newStatus } = extractUpdateIntent(raw.trim());
+      const crmTasks = readCRMTasks();
+      const nameLower = customerName.toLowerCase();
+      const matchedTask = nameLower
+        ? crmTasks.find(task =>
+            task.clientName.toLowerCase().includes(nameLower) ||
+            nameLower.includes(task.clientName.toLowerCase().trim())
+          ) || null
+        : null;
+      const notFound = !!customerName && !matchedTask;
+      const updateMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'update_followup_status',
+          intentNameZh: '更新跟进状态',
+          intentNameEn: 'Update Follow-up Status',
+          category: 'action',
+          triggerKeywordsZh: [],
+          triggerKeywordsEn: [],
+          targetTab: 'chat',
+          targetModule: 'CRM',
+          targetRoute: '/crm',
+          readSources: ['ICARE_HISTORY_V1'],
+          writeTargets: ['notion_followup_log'],
+          requiredFields: [],
+          approvalRequired: false,
+          resultPanel: null,
+          implementationStatus: 'real',
+          notConnectedMessage: '',
+          fallbackBehavior: '',
+        },
+        confidence: 1,
+        raw: raw.trim(),
+        detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: updateMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在查找客户记录…', '正在准备状态更新…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? {
+            ...prev,
+            phase: 'done',
+            resultData: { type: 'update_followup_status', customerName, newStatus, matchedTask, currentStatus: matchedTask?.tradeStatus || null, notFound },
+          } : prev);
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Create customer intent — must come before CUSTOMER_360_RE
+    const CREATE_CUSTOMER_RE = /新增客户|增加客户|录入客户|保存客户信息|新客户.*[:：]|create customer|add customer|new lead/i;
+    if (CREATE_CUSTOMER_RE.test(t)) {
+      const draft = parseCreateDraft(raw.trim());
+      // De-dup check against localStorage
+      const crmTasks = readCRMTasks();
+      const nameLower = draft.clientName.toLowerCase();
+      const dup = nameLower
+        ? crmTasks.find(task => {
+            const tl = task.clientName.toLowerCase();
+            return tl.includes(nameLower) || nameLower.includes(tl);
+          }) || null
+        : null;
+      const createMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'create_customer_from_ai',
+          intentNameZh: '录入新客户',
+          intentNameEn: 'Create Customer',
+          category: 'action',
+          triggerKeywordsZh: [],
+          triggerKeywordsEn: [],
+          targetTab: 'chat',
+          targetModule: 'CRM',
+          targetRoute: '/crm',
+          readSources: ['ICARE_HISTORY_V1'],
+          writeTargets: ['notion_sb_pool', 'notion_followup_log'],
+          requiredFields: [],
+          approvalRequired: false,
+          resultPanel: null,
+          implementationStatus: 'real',
+          notConnectedMessage: '',
+          fallbackBehavior: '',
+        },
+        confidence: 1,
+        raw: raw.trim(),
+        detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: createMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在解析客户信息…', '正在检查重复记录…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? {
+            ...prev,
+            phase: 'done',
+            resultData: {
+              type: 'create_customer_from_ai',
+              draft,
+              dupCheck: { hasDup: !!dup, dupName: dup?.clientName || null },
+            },
+          } : prev);
         },
       );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);

@@ -15,12 +15,12 @@ function json(body: unknown, status = 200) {
   });
 }
 
-type Action = 'close_followup' | 'restore_followup';
+type Action = 'close_followup' | 'restore_followup' | 'update_status';
 
 interface UpdatePayload {
   pageId: string;          // Notion page ID of the Follow-up Log record
   action: Action;
-  tradeStatus?: string;    // defaults to '暂缓' for close / '跟进中' for restore
+  tradeStatus?: string;    // defaults to '暂缓' for close / '跟进中' for restore; required for update_status
 }
 
 export default async function handler(request: Request): Promise<Response> {
@@ -48,14 +48,20 @@ export default async function handler(request: Request): Promise<Response> {
     return json({ error: 'pageId is a local-only ID — no Notion page exists for this record' }, 422);
   }
 
-  if (action !== 'close_followup' && action !== 'restore_followup') {
-    return json({ error: `Unknown action: ${action}. Supported: close_followup, restore_followup.` }, 400);
+  if (action !== 'close_followup' && action !== 'restore_followup' && action !== 'update_status') {
+    return json({ error: `Unknown action: ${action}. Supported: close_followup, restore_followup, update_status.` }, 400);
   }
 
   // Determine what to write to 行动状态
   let statusToWrite: string;
   if (action === 'restore_followup') {
     statusToWrite = '跟进中';
+  } else if (action === 'update_status') {
+    // Caller supplies target status directly; validate it's non-empty
+    if (!tradeStatus || typeof tradeStatus !== 'string') {
+      return json({ error: 'tradeStatus is required for update_status action' }, 400);
+    }
+    statusToWrite = tradeStatus;
   } else {
     // close_followup: only allow known closed statuses
     const ALLOWED_CLOSED = ['暂缓', '已归档', '已成交', '已关闭'];
