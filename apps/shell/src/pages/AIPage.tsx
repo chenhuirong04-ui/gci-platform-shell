@@ -290,99 +290,116 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
             {intent.approvalRequired ? dict.ai.panel.waitingApproval : dict.ai.panel.done}
           </div>
 
-          {/* ── Inventory API error ── */}
-          {intent.intentId === 'check_inventory' && state.resultData && !state.resultData.ok && (
-            <div style={{ fontSize: 13, color: '#E0846A', marginBottom: 12, padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>库存 API 查询失败</div>
-              <div style={{ color: MUTED, fontSize: 12 }}>{state.resultData.error || '未知错误'}</div>
-              {state.resultData.detail && (
-                <div style={{ color: SUBTLE, fontSize: 11, marginTop: 4, fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                  {typeof state.resultData.detail === 'string' ? state.resultData.detail : JSON.stringify(state.resultData.detail)}
-                </div>
-              )}
-            </div>
-          )}
+          {/* ── Inventory result panel (combined: warehouse + consignment) ── */}
+          {intent.intentId === 'check_inventory' && state.resultData && state.resultData.ok && (() => {
+            const wh = state.resultData.warehouse;
+            const cs = state.resultData.consignment;
+            const productFilter = state.resultData.productFilter;
+            const inlineRowStyle = (alertType: string) => ({
+              display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7,
+              background: alertType === 'outOfStock' ? 'rgba(224,132,106,0.08)' : alertType === 'anomaly' ? 'rgba(143,166,212,0.05)' : alertType === 'lowStock' ? 'rgba(212,168,67,0.07)' : 'rgba(255,255,255,0.02)',
+              border: `1px solid ${alertType === 'outOfStock' ? 'rgba(224,132,106,0.28)' : alertType === 'anomaly' ? 'rgba(143,166,212,0.2)' : alertType === 'lowStock' ? 'rgba(212,168,67,0.25)' : 'rgba(255,255,255,0.07)'}`,
+            });
+            const qtyColor = (t: string) => t === 'outOfStock' ? '#E0846A' : t === 'anomaly' ? '#8FA6D4' : t === 'lowStock' ? '#D4A843' : '#6FBF8E';
+            const inlineBadge = (t: string) => t === 'outOfStock'
+              ? <span style={{ fontSize: 9, color: '#E0846A', fontWeight: 700, background: 'rgba(224,132,106,0.15)', padding: '1px 5px', borderRadius: 4 }}>缺货</span>
+              : t === 'anomaly'
+              ? <span style={{ fontSize: 9, color: '#8FA6D4', fontWeight: 700, background: 'rgba(143,166,212,0.12)', padding: '1px 5px', borderRadius: 4 }}>异常</span>
+              : t === 'lowStock'
+              ? <span style={{ fontSize: 9, color: '#D4A843', fontWeight: 700, background: 'rgba(212,168,67,0.12)', padding: '1px 5px', borderRadius: 4 }}>低库存</span>
+              : null;
+            return (
+              <div style={{ marginBottom: 12 }}>
+                {productFilter && (
+                  <div style={{ fontSize: 11, color: GOLD, marginBottom: 8 }}>筛选：「{productFilter}」</div>
+                )}
 
-          {/* ── Inventory result panel ── */}
-          {intent.intentId === 'check_inventory' && state.resultData && state.resultData.ok && (
-            <div style={{ marginBottom: 12 }}>
-              {state.resultData.productFilter && (
-                <div style={{ fontSize: 11, color: GOLD, marginBottom: 6 }}>
-                  筛选：「{state.resultData.productFilter}」
-                </div>
-              )}
-              {state.resultData.total === 0 ? (
-                <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 0' }}>
-                  未找到与「{state.resultData.productFilter || '所查产品'}」相关的库存记录。
-                </div>
-              ) : (
-                <>
-                  {/* Summary bar */}
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-                    <div style={{ padding: '6px 12px', borderRadius: 7, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: MUTED }}>
-                      共 <span style={{ color: TEXT, fontWeight: 700 }}>{state.resultData.total}</span> 种产品
+                {/* Warehouse (Notion) section */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 10, color: GOLD, fontWeight: 700, letterSpacing: '0.1em', marginBottom: 6 }}>
+                    库存表 · Notion INVENTORY_DB
+                  </div>
+                  {!wh.ok ? (
+                    <div style={{ fontSize: 12, color: '#E0846A', padding: '8px 10px', borderRadius: 7, background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)' }}>
+                      {wh.error || '库存表读取失败'}
                     </div>
-                    {state.resultData.outOfStockCount > 0 && (
-                      <div style={{ padding: '6px 12px', borderRadius: 7, background: 'rgba(224,132,106,0.1)', border: '1px solid rgba(224,132,106,0.3)', fontSize: 11, color: '#E0846A', fontWeight: 700 }}>
-                        🔴 缺货 {state.resultData.outOfStockCount} 种
+                  ) : wh.totalRows === 0 ? (
+                    <div style={{ fontSize: 12, color: MUTED }}>无匹配产品记录。</div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                        <span style={{ fontSize: 11, color: MUTED }}>共 <strong style={{ color: TEXT }}>{wh.totalRows}</strong> 件</span>
+                        {wh.outOfStockCount > 0 && <span style={{ fontSize: 11, color: '#E0846A', fontWeight: 700 }}>🔴 缺货 {wh.outOfStockCount}</span>}
+                        {wh.lowStockCount > 0   && <span style={{ fontSize: 11, color: '#D4A843', fontWeight: 700 }}>🟡 低库存 {wh.lowStockCount}</span>}
+                        {wh.anomalyCount > 0    && <span style={{ fontSize: 11, color: '#8FA6D4', fontWeight: 700 }}>⚪ 异常 {wh.anomalyCount}</span>}
                       </div>
-                    )}
-                    {state.resultData.lowStockCount > 0 && (
-                      <div style={{ padding: '6px 12px', borderRadius: 7, background: 'rgba(212,168,67,0.1)', border: '1px solid rgba(212,168,67,0.3)', fontSize: 11, color: '#D4A843', fontWeight: 700 }}>
-                        🟡 低库存 {state.resultData.lowStockCount} 种（≤{state.resultData.lowStockThreshold}件）
+                      <div style={{ maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {(wh.alertItems?.length > 0 ? wh.alertItems : wh.alertItems ?? []).map((item: any, i: number) => (
+                          <div key={i} style={inlineRowStyle(item.alertType)}>
+                            <span style={{ flex: 1, fontSize: 13, color: TEXT, fontWeight: 600 }}>{item.productName}</span>
+                            <span style={{ fontSize: 12, color: MUTED }}>{item.category || ''}</span>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: qtyColor(item.alertType) }}>
+                              {item.currentQty === null ? '—' : `剩 ${item.currentQty}`}
+                            </span>
+                            {inlineBadge(item.alertType)}
+                          </div>
+                        ))}
+                        {wh.alertItems?.length === 0 && !productFilter && (
+                          <div style={{ fontSize: 12, color: '#6FBF8E', padding: '6px 0' }}>✅ 库存表无预警</div>
+                        )}
                       </div>
-                    )}
-                    {state.resultData.anomalyCount > 0 && (
-                      <div style={{ padding: '6px 12px', borderRadius: 7, background: 'rgba(143,166,212,0.08)', border: '1px solid rgba(143,166,212,0.25)', fontSize: 11, color: '#8FA6D4', fontWeight: 700 }}>
-                        ⚪ 数据异常 {state.resultData.anomalyCount} 种
-                      </div>
-                    )}
-                  </div>
+                    </>
+                  )}
+                </div>
 
-                  <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {state.resultData.products.map((p: any, i: number) => {
-                      const bg = p.outOfStock
-                        ? 'rgba(224,132,106,0.08)' : p.anomaly
-                        ? 'rgba(143,166,212,0.05)' : p.lowStock
-                        ? 'rgba(212,168,67,0.07)' : 'rgba(255,255,255,0.02)';
-                      const bdr = p.outOfStock
-                        ? 'rgba(224,132,106,0.28)' : p.anomaly
-                        ? 'rgba(143,166,212,0.2)' : p.lowStock
-                        ? 'rgba(212,168,67,0.25)' : 'rgba(255,255,255,0.07)';
-                      const qtyColor = p.outOfStock ? '#E0846A' : p.anomaly ? '#8FA6D4' : p.lowStock ? '#D4A843' : '#6FBF8E';
-                      const badge = p.outOfStock
-                        ? <span style={{ fontSize: 9, color: '#E0846A', fontWeight: 700, background: 'rgba(224,132,106,0.15)', padding: '1px 5px', borderRadius: 4 }}>缺货</span>
-                        : p.anomaly
-                        ? <span style={{ fontSize: 9, color: '#8FA6D4', fontWeight: 700, background: 'rgba(143,166,212,0.12)', padding: '1px 5px', borderRadius: 4 }}>数据异常</span>
-                        : p.lowStock
-                        ? <span style={{ fontSize: 9, color: '#D4A843', fontWeight: 700, background: 'rgba(212,168,67,0.12)', padding: '1px 5px', borderRadius: 4 }}>低库存</span>
-                        : null;
-                      return (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7, background: bg, border: `1px solid ${bdr}` }}>
-                          <span style={{ flex: 1, fontSize: 13, color: TEXT, fontWeight: 600 }}>{p.productName}</span>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: qtyColor, minWidth: 60, textAlign: 'right' }}>
-                            {p.anomaly ? '—' : `剩 ${p.totalRemaining} 件`}
-                          </span>
-                          <span style={{ fontSize: 10, color: MUTED, whiteSpace: 'nowrap' }}>
-                            已售 {p.totalSold} / 寄 {p.totalConsigned}
-                          </span>
-                          {badge}
-                        </div>
-                      );
-                    })}
+                {/* Consignment (Supabase) section */}
+                <div>
+                  <div style={{ fontSize: 10, color: GOLD, fontWeight: 700, letterSpacing: '0.1em', marginBottom: 6 }}>
+                    寄售库存 · consignment_stock
                   </div>
-                </>
-              )}
-              <div style={{ fontSize: 10, color: MUTED, marginTop: 8 }}>
-                数据来源：consignment_stock · {new Date(state.resultData.asOf).toLocaleString('zh-CN')}
+                  {!cs.ok ? (
+                    <div style={{ fontSize: 12, color: '#E0846A', padding: '8px 10px', borderRadius: 7, background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)' }}>
+                      {cs.error || '寄售库存读取失败'}
+                    </div>
+                  ) : cs.total === 0 ? (
+                    <div style={{ fontSize: 12, color: MUTED }}>无匹配寄售记录。</div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                        <span style={{ fontSize: 11, color: MUTED }}>共 <strong style={{ color: TEXT }}>{cs.total}</strong> 种产品</span>
+                        {cs.outOfStockCount > 0 && <span style={{ fontSize: 11, color: '#E0846A', fontWeight: 700 }}>🔴 缺货 {cs.outOfStockCount}</span>}
+                        {cs.lowStockCount > 0   && <span style={{ fontSize: 11, color: '#D4A843', fontWeight: 700 }}>🟡 低库存 {cs.lowStockCount}</span>}
+                        {cs.anomalyCount > 0    && <span style={{ fontSize: 11, color: '#8FA6D4', fontWeight: 700 }}>⚪ 异常 {cs.anomalyCount}</span>}
+                      </div>
+                      <div style={{ maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {(cs.alertRows ?? []).map((r: any, i: number) => {
+                          const t = r.rowAlertType || (r.remainingQty === null ? 'anomaly' : r.remainingQty <= 0 ? 'outOfStock' : 'lowStock');
+                          return (
+                            <div key={i} style={inlineRowStyle(t)}>
+                              <span style={{ flex: 1, fontSize: 13, color: TEXT, fontWeight: 600 }}>{r.productName}</span>
+                              <span style={{ fontSize: 11, color: MUTED }}>{r.customerName || ''}</span>
+                              <span style={{ fontSize: 13, fontWeight: 700, color: qtyColor(t) }}>
+                                {r.remainingQty === null ? '—' : `剩 ${r.remainingQty}`}
+                              </span>
+                              {inlineBadge(t)}
+                            </div>
+                          );
+                        })}
+                        {cs.alertRows?.length === 0 && (
+                          <div style={{ fontSize: 12, color: '#6FBF8E', padding: '6px 0' }}>✅ 寄售库存无预警</div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ── Inventory loading (resultData not yet returned) ── */}
           {intent.intentId === 'check_inventory' && !state.resultData && (
             <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>
-              正在查询库存数据…
+              正在查询库存数据（库存表 + 寄售库存）…
             </div>
           )}
 
@@ -1653,16 +1670,18 @@ export function AIPage() {
           setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
           const base = typeof window !== 'undefined' ? window.location.origin : '';
           const qs = product ? `?product=${encodeURIComponent(product)}` : '';
-          const url = `${base}/api/trade/check-inventory${qs}`;
-          console.log('[AI] fetching inventory:', url);
-          fetch(url)
-            .then(r => r.json())
-            .then(data => {
-              console.log('[AI] inventory API response:', JSON.stringify(data));
-              // Store result regardless of ok — frontend shows error detail if ok=false
-              setCmdState(prev => prev ? { ...prev, resultData: data } : prev);
-            })
-            .catch(e => console.error('[AI] inventory fetch failed', e));
+          Promise.allSettled([
+            fetch(`${base}/api/ai/inventory-table-alerts${qs}`).then(r => r.json()),
+            fetch(`${base}/api/trade/check-inventory${qs}`).then(r => r.json()),
+          ]).then(([whRes, csRes]) => {
+            const combined = {
+              ok: true,
+              warehouse: whRes.status === 'fulfilled' ? whRes.value : { ok: false, error: '库存表读取失败' },
+              consignment: csRes.status === 'fulfilled' ? csRes.value : { ok: false, error: '寄售库存读取失败' },
+              productFilter: product || null,
+            };
+            setCmdState(prev => prev ? { ...prev, resultData: combined } : prev);
+          }).catch(e => console.error('[AI] inventory fetch failed', e));
         },
       );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
@@ -2173,17 +2192,23 @@ export function AIPage() {
         (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
         ()  => {
           setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
-          // For check_inventory, fetch real data after animation completes
+          // For check_inventory, fetch both warehouse + consignment after animation completes
           if (intent.intentId === 'check_inventory') {
             const base = typeof window !== 'undefined' ? window.location.origin : '';
             const product = extractInventoryProduct(raw.trim());
             const qs = product ? `?product=${encodeURIComponent(product)}` : '';
-            fetch(`${base}/api/trade/check-inventory${qs}`)
-              .then(r => r.json())
-              .then(data => {
-                if (data.ok) setCmdState(prev => prev ? { ...prev, resultData: data } : prev);
-              })
-              .catch(e => console.error('[check_inventory] fetch failed', e));
+            Promise.allSettled([
+              fetch(`${base}/api/ai/inventory-table-alerts${qs}`).then(r => r.json()),
+              fetch(`${base}/api/trade/check-inventory${qs}`).then(r => r.json()),
+            ]).then(([whRes, csRes]) => {
+              const combined = {
+                ok: true,
+                warehouse: whRes.status === 'fulfilled' ? whRes.value : { ok: false, error: '库存表读取失败' },
+                consignment: csRes.status === 'fulfilled' ? csRes.value : { ok: false, error: '寄售库存读取失败' },
+                productFilter: product || null,
+              };
+              setCmdState(prev => prev ? { ...prev, resultData: combined } : prev);
+            }).catch(e => console.error('[check_inventory] fetch failed', e));
           }
           // For check_quotation_followups, fetch real data after animation completes
           if (intent.intentId === 'check_quotation_followups') {

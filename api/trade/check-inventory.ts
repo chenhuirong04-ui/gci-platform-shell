@@ -150,32 +150,63 @@ export default async function handler(request: Request): Promise<Response> {
     return a.totalRemaining - b.totalRemaining;
   });
 
-  const outOfStockCount = products.filter(p => p.outOfStock).length;
-  const lowStockCount   = products.filter(p => p.lowStock).length;
-  const anomalyCount    = products.filter(p => p.anomaly).length;
+  // ── Row-level classification (excludes SETTLED rows) ──────────────────────
+  // Product-level aggregation (products[]) is kept for reference but counts
+  // now reflect individual rows so that a single 0-qty row correctly shows as 缺货.
+  const settledRows  = rows.filter(r => (r.settlementStatus || '').toUpperCase() === 'SETTLED');
+  const activeRows   = rows.filter(r => (r.settlementStatus || '').toUpperCase() !== 'SETTLED');
+  const settledRowsExcluded = settledRows.length;
+
+  const zeroRemainingRows = rows.filter(r => {
+    const q = Number(r.remainingQty);
+    return r.remainingQty != null && !isNaN(q) && q <= 0;
+  }).length;
+
+  function classifyRow(r: StockRow): 'outOfStock' | 'lowStock' | 'anomaly' | 'normal' {
+    const raw = r.remainingQty;
+    const q   = Number(raw);
+    if (raw === null || raw === undefined || isNaN(q)) return 'anomaly';
+    if (q <= 0) return 'outOfStock';
+    if (q <= LOW_STOCK_THRESHOLD) return 'lowStock';
+    return 'normal';
+  }
+
+  const classifiedActive = activeRows.map(r => ({ ...r, rowAlertType: classifyRow(r) }));
+  const alertRowsAll = classifiedActive.filter(r => r.rowAlertType !== 'normal');
+
+  const outOfStockCount = alertRowsAll.filter(r => r.rowAlertType === 'outOfStock').length;
+  const lowStockCount   = alertRowsAll.filter(r => r.rowAlertType === 'lowStock').length;
+  const anomalyCount    = alertRowsAll.filter(r => r.rowAlertType === 'anomaly').length;
   const alertCount = outOfStockCount + lowStockCount + anomalyCount;
 
-  // Build per-row detail for alert products (for Drawer display)
-  const alertProductNames = new Set(
-    products.filter(p => p.outOfStock || p.lowStock || p.anomaly).map(p => p.productName)
-  );
-  const alertRows = rows
-    .filter(r => alertProductNames.has((r.productName || '').trim()))
-    .map(r => ({
-      productName:      (r.productName || '').trim(),
-      customerName:     r.customerName || '',
-      soNo:             r.soNo || '',
-      consignedQty:     Number(r.consignedQty) || 0,
-      soldQty:          Number(r.soldQty)      || 0,
-      remainingQty:     r.remainingQty != null && !isNaN(Number(r.remainingQty)) ? Number(r.remainingQty) : null,
-      settlementStatus: r.settlementStatus || '',
-      unitPrice:        r.unitPrice ? Number(r.unitPrice) : null,
-    }));
+  // Sort alertRows: outOfStock first, then anomaly, then lowStock
+  alertRowsAll.sort((a, b) => {
+    const rank = (t: string) => t === 'outOfStock' ? 0 : t === 'anomaly' ? 1 : 2;
+    return rank(a.rowAlertType) - rank(b.rowAlertType);
+  });
+
+  const alertRows = alertRowsAll.map(r => ({
+    productName:      (r.productName || '').trim(),
+    customerName:     r.customerName || '',
+    soNo:             r.soNo || '',
+    consignedQty:     Number(r.consignedQty) || 0,
+    soldQty:          Number(r.soldQty)      || 0,
+    remainingQty:     r.remainingQty != null && !isNaN(Number(r.remainingQty)) ? Number(r.remainingQty) : null,
+    settlementStatus: r.settlementStatus || '',
+    unitPrice:        r.unitPrice ? Number(r.unitPrice) : null,
+    rowAlertType:     r.rowAlertType,
+  }));
 
   return json({
     ok: true,
+    source: 'supabase',
+    sourceTable: 'consignment_stock',
+    stockScope: 'consignment_only',
     total: products.length,
     rawRowCount: dbRows.length,
+    activeRowCount: activeRows.length,
+    settledRowsExcluded,
+    zeroRemainingRows,
     alertCount,
     outOfStockCount,
     lowStockCount,

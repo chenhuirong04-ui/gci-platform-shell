@@ -233,18 +233,18 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
     setStats(s);
     setLiveAlerts(loadLiveAlerts(lang));
 
-    // Fetch real inventory alert count from API (缺货 + 低库存 + 数据异常)
+    // Fetch combined inventory alert count: warehouse (Notion) + consignment (Supabase)
     const base = typeof window !== 'undefined' ? window.location.origin : '';
-    fetch(`${base}/api/trade/check-inventory`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.ok) {
-          setStats(prev => ({ ...prev, inventoryAlerts: data.alertCount ?? data.lowStockCount ?? 0 }));
-        }
-      })
-      .catch(() => {
-        // Silent fail — card shows '--' if API unavailable
-      });
+    Promise.allSettled([
+      fetch(`${base}/api/ai/inventory-table-alerts`).then(r => r.json()),
+      fetch(`${base}/api/trade/check-inventory`).then(r => r.json()),
+    ]).then(([whResult, csResult]) => {
+      const whCount = whResult.status === 'fulfilled' && whResult.value.ok ? (whResult.value.alertCount ?? 0) : 0;
+      const csCount = csResult.status === 'fulfilled' && csResult.value.ok ? (csResult.value.alertCount ?? 0) : 0;
+      setStats(prev => ({ ...prev, inventoryAlerts: whCount + csCount }));
+    }).catch(() => {
+      // Silent fail — card shows '--' if APIs unavailable
+    });
   }, [lang]);
 
   // Dynamic summary line based on real counts
