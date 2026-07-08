@@ -730,8 +730,94 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
             </div>
           )}
 
+          {/* ── Customer 360 result panel ── */}
+          {intent.intentId === 'customer_overview' && state.resultData && state.resultData.ok && (() => {
+            const d = state.resultData;
+            const s = d.summary;
+            return (
+              <div style={{ marginBottom: 12 }}>
+                {/* Match warning */}
+                <div style={{ fontSize: 10, color: SUBTLE, marginBottom: 8, padding: '5px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: 6 }}>
+                  ⚠ {d.matchWarning}
+                </div>
+
+                {/* Customer header */}
+                <div style={{ fontSize: 16, fontWeight: 700, color: GOLD, marginBottom: 10 }}>
+                  {d.customerQuery}
+                </div>
+
+                {/* KPI grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6, marginBottom: 12 }}>
+                  {[
+                    { label: '历史报价', value: `${s.quoteCount} 张`, sub: `AED ${Number(s.totalQuoteAmt).toLocaleString()}`, color: GOLD },
+                    { label: '待回复', value: `${s.pendingQuoteCount} 张`, sub: '未回复报价', color: s.pendingQuoteCount > 0 ? '#D4A843' : MUTED },
+                    { label: '订单记录', value: `${s.orderCount} 张`, sub: `AED ${Number(s.totalOrderAmt).toLocaleString()}`, color: TEXT },
+                    { label: '未收款', value: `AED ${Number(s.totalOutstanding).toLocaleString()}`, sub: '', color: s.totalOutstanding > 0 ? '#E0846A' : '#6FBF8E' },
+                    { label: '寄售记录', value: `${s.consignmentCount} 条`, sub: `${s.unsettledCount} 未结算`, color: '#8FA6D4' },
+                    { label: '发票', value: `${s.invoiceCount} 张`, sub: '', color: TEXT },
+                  ].map((k, i) => (
+                    <div key={i} style={{ padding: '8px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                      <div style={{ fontSize: 10, color: MUTED, marginBottom: 2 }}>{k.label}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: k.color }}>{k.value}</div>
+                      {k.sub && <div style={{ fontSize: 10, color: SUBTLE }}>{k.sub}</div>}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Suggestions */}
+                {d.suggestions.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: GOLD, marginBottom: 5, letterSpacing: '0.06em' }}>建议下一步</div>
+                    {d.suggestions.map((sg: string, i: number) => (
+                      <div key={i} style={{ display: 'flex', gap: 7, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12, color: TEXT }}>
+                        <span style={{ color: GOLD, flexShrink: 0 }}>→</span>{sg}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Recent quotes */}
+                {d.quotes.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, color: MUTED, marginBottom: 5 }}>历史报价（最近 {Math.min(d.quotes.length, 5)} 条）</div>
+                    {d.quotes.slice(0, 5).map((q: any, i: number) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <span style={{ fontSize: 11, color: SUBTLE, minWidth: 80 }}>{q.quoteNo}</span>
+                        <span style={{ fontSize: 12, color: TEXT, flex: 1 }}>{q.projectName || '—'}</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: GOLD }}>AED {Number(q.grandTotal).toLocaleString()}</span>
+                        <span style={{ fontSize: 10, color: q.status === 'GENERATED' ? '#D4A843' : q.status === 'SENT_TO_TRADE' ? '#6FBF8E' : SUBTLE }}>{q.statusZh}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ fontSize: 10, color: SUBTLE, marginTop: 8 }}>
+                  数据来源：{d.source} · {new Date(d.asOf).toLocaleString('zh-CN')}
+                </div>
+                {d.crmNote && (
+                  <div style={{ fontSize: 10, color: SUBTLE, marginTop: 4, padding: '5px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: 6 }}>
+                    ⚠ {d.crmNote}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* ── Customer 360 loading ── */}
+          {intent.intentId === 'customer_overview' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在跨表查询客户数据…</div>
+          )}
+
+          {/* ── Customer 360 API error ── */}
+          {intent.intentId === 'customer_overview' && state.resultData && !state.resultData.ok && (
+            <div style={{ fontSize: 13, color: '#E0846A', marginBottom: 12, padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>客户总览查询失败</div>
+              <div style={{ color: MUTED, fontSize: 12 }}>{state.resultData.error || '未知错误'}</div>
+            </div>
+          )}
+
           {/* ── Default: show intent name for non-result done states ── */}
-          {intent.intentId !== 'check_inventory' && intent.intentId !== 'check_quotation_followups' && intent.intentId !== 'check_quotation_history' && intent.intentId !== 'check_receivables' && intent.intentId !== 'check_consignment' && intent.intentId !== 'check_sales' && intent.intentId !== 'generate_daily_brief' && (
+          {intent.intentId !== 'check_inventory' && intent.intentId !== 'check_quotation_followups' && intent.intentId !== 'check_quotation_history' && intent.intentId !== 'check_receivables' && intent.intentId !== 'check_consignment' && intent.intentId !== 'check_sales' && intent.intentId !== 'generate_daily_brief' && intent.intentId !== 'customer_overview' && (
             <div style={{ fontSize: 14, color: TEXT, marginBottom: intent.approvalRequired ? 14 : 0 }}>
               {intent.intentNameZh}{intent.approvalRequired ? dict.ai.panel.readyLabel : ''}
             </div>
@@ -1440,6 +1526,61 @@ export function AIPage() {
             .then(r => r.json())
             .then(data => setCmdState(prev => prev ? { ...prev, resultData: data } : prev))
             .catch(e => console.error('[AI] daily brief fetch failed', e));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Customer 360 intent — hardcoded regex.
+    const CUSTOMER_360_RE = /客户情况|现在是什么情况|上次跟进|客户总览|customer overview|客户.*查询|查.*客户/i;
+    if (CUSTOMER_360_RE.test(t)) {
+      // Extract customer name: "IFZA 现在是什么情况" → "IFZA"
+      const custM = raw.trim().match(/^(.{2,30}?)(?:现在是什么情况|的情况|上次跟进|的客户|客户情况|总览)/u)
+        || raw.trim().match(/查\s*(.{2,30}?)\s*(?:客户|情况)/u);
+      const custKw = custM?.[1]?.replace(/[？?。！!，,\s查看帮我请一下]/g, '').trim() || '';
+      const c360Match: AIIntentMatch = {
+        intent: {
+          intentId: 'customer_overview',
+          intentNameZh: '客户总览',
+          intentNameEn: 'Customer 360',
+          category: 'query',
+          triggerKeywordsZh: [],
+          triggerKeywordsEn: [],
+          targetTab: 'chat',
+          targetModule: 'CRM',
+          targetRoute: '/crm',
+          readSources: ['quotation_records', 'orders', 'consignment_stock', 'invoice_drafts'],
+          writeTargets: [],
+          requiredFields: [],
+          approvalRequired: false,
+          resultPanel: null,
+          implementationStatus: custKw ? 'real' : 'partial',
+          notConnectedMessage: custKw ? '' : '请在指令中指定客户名称，例如：「IFZA 现在是什么情况？」',
+          fallbackBehavior: '',
+        },
+        confidence: 1,
+        raw: raw.trim(),
+        detectedMissingFields: custKw ? [] : ['customerName'],
+      };
+      if (!custKw) {
+        setTab('chat');
+        setCmdState({ raw: raw.trim(), match: c360Match, phase: 'not_connected', step: 0 });
+        setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+        return;
+      }
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: c360Match, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在跨表查询客户数据…', '正在汇总报价 / 订单 / 寄售 / 发票…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          const base = typeof window !== 'undefined' ? window.location.origin : '';
+          fetch(`${base}/api/ai/customer-360?customer=${encodeURIComponent(custKw)}`)
+            .then(r => r.json())
+            .then(data => setCmdState(prev => prev ? { ...prev, resultData: data } : prev))
+            .catch(e => console.error('[AI] customer 360 fetch failed', e));
         },
       );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
