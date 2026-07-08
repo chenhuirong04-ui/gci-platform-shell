@@ -237,7 +237,144 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
   const [lineItems, setLineItems]   = useState<LineItem[]>([]);
   const [showItems, setShowItems]   = useState(false);
 
+  // xlsx parse state
+  const [parsedFromFile, setParsedFromFile] = useState(false);
+  const [xlsxStatus, setXlsxStatus] = useState<'idle'|'parsing'|'done'|'error'>('idle');
+  const [xlsxMsg, setXlsxMsg]       = useState('');
+
   const hasInput = rawText.trim().length > 0 || attachments.length > 0;
+
+  // ── Excel / CSV file parser (frontend-only, no API key) ──────────
+  const parseExcelFile = async (file: File) => {
+    setXlsxStatus('parsing');
+    setXlsxMsg('');
+    try {
+      const XLSX = await import('xlsx');
+      const ab = await file.arrayBuffer();
+      const wb = XLSX.read(new Uint8Array(ab), { type: 'array' });
+
+      // Pick sheet with most data rows (skip obvious summary sheets)
+      const SKIP = ['summary','total','totals','总表','汇总','合计','总计'];
+      const candidates = wb.SheetNames.filter(
+        n => !SKIP.some(k => n.toLowerCase().includes(k))
+      );
+      const sheets = candidates.length > 0 ? candidates : wb.SheetNames;
+      let bestSheet = sheets[0];
+      let maxRows = 0;
+      for (const sn of sheets) {
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1 }) as any[][];
+        const count = rows.filter(r => r.some((c: any) => c != null && String(c).trim() !== '')).length;
+        if (count > maxRows) { maxRows = count; bestSheet = sn; }
+      }
+
+      const raw: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[bestSheet], { header: 1 });
+      if (!raw || raw.length < 2) throw new Error('表格为空或只有一行数据');
+
+      // Column keyword detection (Chinese + English)
+      const KW = {
+        item:  ['产品名称','品名','产品','名称','货物名称','工程项目','分项','项目名称','furniture item','item','product','description'],
+        spec:  ['规格','规格型号','尺寸','描述','spec','specification','size','dimension'],
+        qty:   ['数量','数','qty','quantity'],
+        unit:  ['单位','unit'],
+        price: ['单价','单价(aed)','单价aed','价格','目标价','报价单价','unit price','price','target price'],
+        total: ['合计','行合计','行小计','小计','金额','总价','total','amount','subtotal','line total'],
+        notes: ['备注','说明','remark','remarks','notes','note','交期','交货期'],
+      };
+
+      // Find header row (first 20 rows, highest keyword score)
+      let headerIdx = 0, bestScore = 0;
+      for (let i = 0; i < Math.min(raw.length, 20); i++) {
+        const row = (raw[i] || []).map((c: any) => String(c ?? '').toLowerCase().trim());
+        let score = 0;
+        if (row.some((c: string) => KW.item.some(k => c === k || (c.length > 1 && c.includes(k))))) score += 4;
+        if (row.some((c: string) => KW.qty.some(k => c === k || (c.length > 1 && c.includes(k))))) score += 2;
+        if (row.some((c: string) => KW.price.some(k => c === k || (c.length > 1 && c.includes(k))))) score += 2;
+        if (row.some((c: string) => KW.total.some(k => c === k || (c.length > 1 && c.includes(k))))) score += 1;
+        if (score > bestScore) { bestScore = score; headerIdx = i; }
+      }
+
+      const headers = (raw[headerIdx] || []).map((c: any) => String(c ?? '').toLowerCase().trim());
+      const findCol = (kws: string[]) =>
+        headers.findIndex((h: string) => kws.some(k => h === k || (h.length > 1 && h.includes(k))));
+
+      const COL = {
+        item:  findCol(KW.item),
+        spec:  findCol(KW.spec),
+        qty:   findCol(KW.qty),
+        unit:  findCol(KW.unit),
+        price: findCol(KW.price),
+        total: findCol(KW.total),
+        notes: findCol(KW.notes),
+      };
+
+      if (COL.item === -1) {
+        const detected = headers.filter(Boolean).slice(0, 8).join('、');
+        throw new Error(`未找到产品名称列。检测到的列：${detected || '(空)'}`);
+      }
+
+      const items: LineItem[] = [];
+      let sumTotal = 0;
+      let detectedGrandTotal: number | null = null;
+
+      for (let i = headerIdx + 1; i < raw.length; i++) {
+        const row = raw[i] || [];
+        const name = String(row[COL.item] ?? '').trim();
+        if (!name) continue;
+        // Skip grand-total summary rows
+        if (/^(合计|小计|总计|grand total|total|subtotal|sum)\s*[:：]?\s*$/i.test(name)) {
+          if (COL.total !== -1 && row[COL.total] != null) {
+            const t = parseFloat(String(row[COL.total]).replace(/,/g, ''));
+            if (!isNaN(t) && t > 0) detectedGrandTotal = t;
+          }
+          continue;
+        }
+
+        const qty   = COL.qty   !== -1 ? parseFloat(String(row[COL.qty]   ?? '').replace(/,/g, '')) : NaN;
+        const price = COL.price !== -1 ? parseFloat(String(row[COL.price] ?? '').replace(/,/g, '')) : NaN;
+        const rawTot = COL.total !== -1 ? parseFloat(String(row[COL.total] ?? '').replace(/,/g, '')) : NaN;
+        const lineTotal = !isNaN(rawTot) ? rawTot : (!isNaN(qty) && !isNaN(price) ? qty * price : NaN);
+        if (!isNaN(lineTotal) && lineTotal > 0) sumTotal += lineTotal;
+
+        items.push({
+          id: `LI_${Date.now()}_${i}`,
+          item_name:     name,
+          description:   COL.spec  !== -1 ? String(row[COL.spec]  ?? '').trim() : '',
+          qty:           !isNaN(qty)   ? qty   : '',
+          unit:          COL.unit  !== -1 ? String(row[COL.unit] ?? '件').trim() || '件' : '件',
+          selling_price: !isNaN(price) ? price : '',
+          line_total:    !isNaN(lineTotal) ? lineTotal : '',
+          item_notes:    COL.notes !== -1 ? String(row[COL.notes] ?? '').trim() : '',
+        });
+      }
+
+      if (items.length === 0) throw new Error('未能识别任何产品行，请检查文件格式（需含产品名称列）');
+
+      const grandTotal = detectedGrandTotal ?? (sumTotal > 0 ? sumTotal : null);
+      const clientHint = optional.clientName.trim();
+
+      setLineItems(items);
+      setShowItems(true);
+      setQuoteDraft({
+        customerName: clientHint || '待确认',
+        itemSummary:  file.name.replace(/\.\w+$/, ''),
+        grandTotal,
+        quoteDate:    new Date().toISOString().slice(0, 10),
+        quoteType:    'TRADE',
+        source:       'Excel',
+        isReady:      grandTotal != null && !!clientHint,
+      });
+      setRegisterQuote(grandTotal != null && !!clientHint);
+      setParsedFromFile(true);
+      setXlsxStatus('done');
+      setXlsxMsg(
+        `已解析 ${items.length} 行产品明细` +
+        (grandTotal ? `，合计 AED ${grandTotal.toLocaleString()}` : '（未检测到总额，请手动填写）')
+      );
+    } catch (err: any) {
+      setXlsxStatus('error');
+      setXlsxMsg(`Excel 解析失败：${err?.message || '未知错误'}`);
+    }
+  };
 
   // ── file handling ─────────────────────────────────────────────────
   const handleFiles = async (files: FileList | File[]) => {
@@ -252,6 +389,10 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
         name: f.name, type: f.type, data: base64,
         size: f.size, uploadedAt: new Date().toISOString(), isAnalyzed: false,
       });
+      // Auto-parse Excel / CSV files
+      if (/\.(xlsx|xls|csv)$/i.test(f.name)) {
+        parseExcelFile(f);
+      }
     }
     setAttachments(p => [...p, ...next]);
   };
@@ -285,11 +426,20 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
         result.clientName = optional.clientName.trim();
         result.missingFields = result.missingFields.filter(f => f !== '客户名称');
       }
-      // detect quotation alongside followup
-      const clientHint = optional.clientName.trim() || result.clientName;
-      const qd = detectQuotation(text, clientHint);
-      setQuoteDraft(qd);
-      setRegisterQuote(qd?.isReady ?? false);
+      // detect quotation alongside followup — preserve Excel-parsed quoteDraft
+      if (!parsedFromFile) {
+        const clientHint = optional.clientName.trim() || result.clientName;
+        const qd = detectQuotation(text, clientHint);
+        setQuoteDraft(qd);
+        setRegisterQuote(qd?.isReady ?? false);
+      } else {
+        // update customerName if optional field is now filled
+        const cn = optional.clientName.trim();
+        if (cn) {
+          setQuoteDraft(p => p ? { ...p, customerName: cn, isReady: p.grandTotal != null } : null);
+          setRegisterQuote(true);
+        }
+      }
       setQuotePhase('idle');
       setDraft(result); setAnalysing(false);
     }, 900);
@@ -303,6 +453,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
     setQuotePhase('idle'); setDupRecords([]); setQuoteError('');
     setIsEditing(false); setDraftEdit(null);
     setLineItems([]); setShowItems(false);
+    setParsedFromFile(false); setXlsxStatus('idle'); setXlsxMsg('');
   };
 
   // ── line item helpers ─────────────────────────────────────────────
@@ -512,6 +663,33 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
           </div>
         )}
 
+        {/* Excel parse status banner */}
+        {xlsxStatus !== 'idle' && (
+          <div className="flex items-center gap-2 text-xs font-bold rounded-xl px-4 py-2.5"
+            style={{
+              background: xlsxStatus === 'parsing' ? 'rgba(255,255,255,0.04)'
+                : xlsxStatus === 'done'   ? 'rgba(5,150,105,0.08)'
+                : 'rgba(239,68,68,0.08)',
+              border: `1px solid ${
+                xlsxStatus === 'parsing' ? BORDER
+                : xlsxStatus === 'done'  ? 'rgba(5,150,105,0.3)'
+                : 'rgba(239,68,68,0.25)'
+              }`,
+              color: xlsxStatus === 'parsing' ? T2
+                : xlsxStatus === 'done' ? '#6EE7B7'
+                : '#FCA5A5',
+            }}>
+            {xlsxStatus === 'parsing' ? (
+              <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin shrink-0" />
+            ) : xlsxStatus === 'done' ? (
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+            ) : (
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+            )}
+            {xlsxStatus === 'parsing' ? '正在解析 Excel 报价单…' : xlsxMsg}
+          </div>
+        )}
+
         {/* Optional fields toggle */}
         <button type="button" onClick={() => setShowOptional(v => !v)}
           className="flex items-center gap-2 text-xs font-bold transition-colors"
@@ -552,6 +730,39 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
           <div className="flex items-center gap-2 text-sm font-bold rounded-xl px-4 py-2.5"
             style={{ color: '#FCA5A5', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)' }}>
             <AlertCircle className="w-4 h-4 shrink-0" /> {errorMsg}
+          </div>
+        )}
+
+        {/* Excel parse preview — shown before analyse */}
+        {!draft && parsedFromFile && lineItems.length > 0 && (
+          <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${GOLD}40`, background: CARD2 }}>
+            <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: `1px solid ${BORDER}` }}>
+              <FileCheck className="w-4 h-4" style={{ color: GOLD }} />
+              <span className="text-sm font-black" style={{ color: GOLD_L }}>Excel 报价预览</span>
+              <span className="text-[10px] font-bold ml-auto px-2 py-0.5 rounded-lg"
+                style={{ background: 'rgba(184,150,12,0.15)', color: GOLD }}>
+                {lineItems.length} 行{quoteDraft?.grandTotal ? ` · AED ${quoteDraft.grandTotal.toLocaleString()}` : ''}
+              </span>
+            </div>
+            <div className="px-5 py-3 space-y-1.5 max-h-44 overflow-y-auto">
+              {lineItems.slice(0, 6).map((li, i) => (
+                <div key={li.id} className="flex items-baseline gap-2 text-xs">
+                  <span className="font-black shrink-0 w-4 text-right" style={{ color: T3 }}>{i + 1}.</span>
+                  <span className="font-bold flex-1 truncate" style={{ color: T1 }}>{li.item_name}</span>
+                  {li.description && <span className="truncate max-w-[120px]" style={{ color: T3 }}>{li.description}</span>}
+                  {li.qty !== '' && <span className="shrink-0" style={{ color: T2 }}>× {li.qty}</span>}
+                  {li.selling_price !== '' && (
+                    <span className="shrink-0" style={{ color: GOLD }}>AED {Number(li.selling_price).toLocaleString()}</span>
+                  )}
+                </div>
+              ))}
+              {lineItems.length > 6 && (
+                <div className="text-[10px] pt-1" style={{ color: T3 }}>…还有 {lineItems.length - 6} 行</div>
+              )}
+            </div>
+            <div className="px-5 py-2.5 text-[11px] font-medium" style={{ color: T3, borderTop: `1px solid ${BORDER}` }}>
+              确认内容后，补充客户名称（可选），再点击下方按钮生成跟进记录。
+            </div>
           </div>
         )}
 
@@ -635,13 +846,21 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
 
                 {registerQuote && (
                   <div className="px-5 pb-3 space-y-2">
-                    {/* OCR notice when files attached */}
+                    {/* File attachment notice */}
                     {attachments.length > 0 && (
-                      <div className="px-3 py-2 rounded-lg flex items-start gap-2 text-xs font-bold"
-                        style={{ background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.25)', color: '#A5B4FC' }}>
-                        <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
-                        当前附件尚未自动识别（暂无 OCR），请粘贴报价文字或在下方手动补充金额。
-                      </div>
+                      parsedFromFile && lineItems.length > 0 ? (
+                        <div className="px-3 py-2 rounded-lg flex items-start gap-2 text-xs font-bold"
+                          style={{ background: 'rgba(5,150,105,0.08)', border: '1px solid rgba(5,150,105,0.3)', color: '#6EE7B7' }}>
+                          <CheckCircle2 className="w-3 h-3 shrink-0 mt-0.5" />
+                          已从 Excel 自动解析 {lineItems.length} 行明细，可在下方核对或编辑。
+                        </div>
+                      ) : (
+                        <div className="px-3 py-2 rounded-lg flex items-start gap-2 text-xs font-bold"
+                          style={{ background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.25)', color: '#A5B4FC' }}>
+                          <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
+                          当前附件尚未自动识别（暂无 OCR），请粘贴报价文字或在下方手动补充金额。
+                        </div>
+                      )
                     )}
 
                     {/* Field display */}
