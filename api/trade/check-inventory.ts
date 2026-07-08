@@ -153,8 +153,24 @@ export default async function handler(request: Request): Promise<Response> {
   const outOfStockCount = products.filter(p => p.outOfStock).length;
   const lowStockCount   = products.filter(p => p.lowStock).length;
   const anomalyCount    = products.filter(p => p.anomaly).length;
-  // Total alert count for home page stat card
   const alertCount = outOfStockCount + lowStockCount + anomalyCount;
+
+  // Build per-row detail for alert products (for Drawer display)
+  const alertProductNames = new Set(
+    products.filter(p => p.outOfStock || p.lowStock || p.anomaly).map(p => p.productName)
+  );
+  const alertRows = rows
+    .filter(r => alertProductNames.has((r.productName || '').trim()))
+    .map(r => ({
+      productName:      (r.productName || '').trim(),
+      customerName:     r.customerName || '',
+      soNo:             r.soNo || '',
+      consignedQty:     Number(r.consignedQty) || 0,
+      soldQty:          Number(r.soldQty)      || 0,
+      remainingQty:     r.remainingQty != null && !isNaN(Number(r.remainingQty)) ? Number(r.remainingQty) : null,
+      settlementStatus: r.settlementStatus || '',
+      unitPrice:        r.unitPrice ? Number(r.unitPrice) : null,
+    }));
 
   return json({
     ok: true,
@@ -166,6 +182,7 @@ export default async function handler(request: Request): Promise<Response> {
     anomalyCount,
     lowStockThreshold: LOW_STOCK_THRESHOLD,
     products,
+    alertRows,
     productFilter: productFilter || null,
     asOf: new Date().toISOString(),
   });

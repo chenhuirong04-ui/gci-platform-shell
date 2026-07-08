@@ -4,6 +4,7 @@ import { StatCard, AlertRow, QuickActionCard, colors } from '@gci/design-system'
 import { useI18n } from '@gci/i18n';
 import { statCardSpecs } from '../data/mock';
 import { AIWorkspace } from '../components/AIWorkspace';
+import { InventoryAlertDrawer } from '../components/InventoryAlertDrawer';
 
 // ─── localStorage helpers (same keys the Trade + CRM modules use) ──────────
 function safeLocalGet<T = any>(key: string): T[] {
@@ -225,6 +226,7 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
   }>({ followUpsToday: null, pendingQuotes: null, activeOrders: null, inventoryAlerts: null });
 
   const [liveAlerts, setLiveAlerts] = useState<LiveAlert[] | null>(null);
+  const [inventoryDrawerOpen, setInventoryDrawerOpen] = useState(false);
 
   useEffect(() => {
     const s = loadHomeStats();
@@ -300,10 +302,19 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
           <StatCard
             key={i}
             data={{ ...f, label: dict.facts[f.labelKey] }}
-            onClick={() => onFlash(dict.toast.enterModule(f.mod))}
+            onClick={
+              f.labelKey === 'inventoryAlerts'
+                ? () => setInventoryDrawerOpen(true)
+                : () => onFlash(dict.toast.enterModule(f.mod))
+            }
           />
         ))}
       </div>
+
+      {/* Inventory alert drawer */}
+      {inventoryDrawerOpen && (
+        <InventoryAlertDrawer onClose={() => setInventoryDrawerOpen(false)} />
+      )}
 
       {/* PRIORITY ALERTS */}
       <SectionHeader
