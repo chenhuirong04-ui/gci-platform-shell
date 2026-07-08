@@ -556,8 +556,82 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
             </div>
           )}
 
+          {/* ── Sales result panel ── */}
+          {intent.intentId === 'check_sales' && state.resultData && state.resultData.ok && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>
+                {state.resultData.periodZh}销售 · {state.resultData.orderCount} 张订单
+              </div>
+              {/* KPI bar */}
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+                <div style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(111,191,142,0.08)', border: '1px solid rgba(111,191,142,0.2)' }}>
+                  <div style={{ fontSize: 10, color: MUTED, marginBottom: 1 }}>总销售额</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: '#6FBF8E' }}>
+                    AED {Number(state.resultData.totalGrandTotal).toLocaleString()}
+                  </div>
+                </div>
+                <div style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(203,168,92,0.08)', border: '1px solid rgba(203,168,92,0.2)' }}>
+                  <div style={{ fontSize: 10, color: MUTED, marginBottom: 1 }}>已收款</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: GOLD }}>
+                    AED {Number(state.resultData.totalPaid).toLocaleString()}
+                  </div>
+                </div>
+                {state.resultData.totalOutstanding > 0 && (
+                  <div style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(224,132,106,0.08)', border: '1px solid rgba(224,132,106,0.2)' }}>
+                    <div style={{ fontSize: 10, color: MUTED, marginBottom: 1 }}>未收</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: '#E0846A' }}>
+                      AED {Number(state.resultData.totalOutstanding).toLocaleString()}
+                    </div>
+                  </div>
+                )}
+                <div style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <div style={{ fontSize: 10, color: MUTED, marginBottom: 1 }}>回款率</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: TEXT }}>{state.resultData.collectionRate}%</div>
+                </div>
+              </div>
+              {/* Top customers */}
+              {state.resultData.orderCount === 0 ? (
+                <div style={{ fontSize: 13, color: MUTED, padding: '10px 0' }}>
+                  {state.resultData.periodZh}暂无成交订单。
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 11, color: MUTED, marginBottom: 6 }}>成交客户（按金额排序）</div>
+                  <div style={{ maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {state.resultData.topCustomers.map((c: any, i: number) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                        <span style={{ fontSize: 11, color: SUBTLE, minWidth: 16, textAlign: 'right' }}>#{i + 1}</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: TEXT, flex: 1 }}>{c.customerName}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#6FBF8E' }}>
+                          AED {Number(c.grandTotal).toLocaleString()}
+                        </span>
+                        <span style={{ fontSize: 10, color: MUTED }}>{c.orderCount} 单</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+              <div style={{ fontSize: 10, color: SUBTLE, marginTop: 8 }}>
+                数据来源：orders · {new Date(state.resultData.asOf).toLocaleString('zh-CN')}
+              </div>
+            </div>
+          )}
+
+          {/* ── Sales loading ── */}
+          {intent.intentId === 'check_sales' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在统计销售数据…</div>
+          )}
+
+          {/* ── Sales API error ── */}
+          {intent.intentId === 'check_sales' && state.resultData && !state.resultData.ok && (
+            <div style={{ fontSize: 13, color: '#E0846A', marginBottom: 12, padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>销售 API 查询失败</div>
+              <div style={{ color: MUTED, fontSize: 12 }}>{state.resultData.error || '未知错误'}</div>
+            </div>
+          )}
+
           {/* ── Default: show intent name for non-result done states ── */}
-          {intent.intentId !== 'check_inventory' && intent.intentId !== 'check_quotation_followups' && intent.intentId !== 'check_quotation_history' && intent.intentId !== 'check_receivables' && intent.intentId !== 'check_consignment' && (
+          {intent.intentId !== 'check_inventory' && intent.intentId !== 'check_quotation_followups' && intent.intentId !== 'check_quotation_history' && intent.intentId !== 'check_receivables' && intent.intentId !== 'check_consignment' && intent.intentId !== 'check_sales' && (
             <div style={{ fontSize: 14, color: TEXT, marginBottom: intent.approvalRequired ? 14 : 0 }}>
               {intent.intentNameZh}{intent.approvalRequired ? dict.ai.panel.readyLabel : ''}
             </div>
@@ -1175,6 +1249,52 @@ export function AIPage() {
             .then(r => r.json())
             .then(data => setCmdState(prev => prev ? { ...prev, resultData: data } : prev))
             .catch(e => console.error('[AI] consignment fetch failed', e));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Sales intent — hardcoded regex.
+    const SALES_RE = /销售|成交|订单金额|卖了多少|revenue|sales|本月.*卖|今天.*卖|哪些客户.*成交|成交.*客户/i;
+    if (SALES_RE.test(t)) {
+      const period = /今天|today/i.test(t) ? 'today' : /本周|this week/i.test(t) ? 'week' : 'month';
+      const salesMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'check_sales',
+          intentNameZh: '销售情况',
+          intentNameEn: 'Sales Summary',
+          category: 'query',
+          triggerKeywordsZh: [],
+          triggerKeywordsEn: [],
+          targetTab: 'chat',
+          targetModule: 'Trade',
+          targetRoute: '/trade',
+          readSources: ['orders'],
+          writeTargets: [],
+          requiredFields: [],
+          approvalRequired: false,
+          resultPanel: null,
+          implementationStatus: 'real',
+          notConnectedMessage: '',
+          fallbackBehavior: '',
+        },
+        confidence: 1,
+        raw: raw.trim(),
+        detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: salesMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在连接订单数据库…', '正在统计销售数据…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          const base = typeof window !== 'undefined' ? window.location.origin : '';
+          fetch(`${base}/api/ai/sales-summary?period=${period}`)
+            .then(r => r.json())
+            .then(data => setCmdState(prev => prev ? { ...prev, resultData: data } : prev))
+            .catch(e => console.error('[AI] sales fetch failed', e));
         },
       );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
