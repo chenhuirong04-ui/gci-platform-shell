@@ -247,7 +247,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
   // ── Excel / CSV file parser (frontend-only, no API key) ──────────
   const parseExcelFile = async (file: File) => {
     setXlsxStatus('parsing');
-    setXlsxMsg('');
+    setXlsxMsg('正在解析 Excel 报价单…');
     try {
       const XLSX = await import('xlsx');
       const ab = await file.arrayBuffer();
@@ -376,6 +376,71 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
     }
   };
 
+  // ── AI file parser — PDF / image via Edge Function ───────────────
+  const parseFileWithAI = async (mimeType: string, dataURL: string, fileName: string) => {
+    setXlsxStatus('parsing');
+    setXlsxMsg('正在用 AI 识别报价内容（PDF / 图片）…');
+    try {
+      const res = await fetch('/api/ai/parse-quotation-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mimeType, data: dataURL, fileName }),
+      });
+      const data = await res.json();
+
+      if (!data.ok || !Array.isArray(data.items) || data.items.length === 0) {
+        setXlsxStatus('error');
+        setXlsxMsg(data.error || '文件已收到，但未能识别出产品明细，请手动录入报价明细。');
+        return;
+      }
+
+      const items: LineItem[] = data.items.map((it: any, i: number) => ({
+        id:            `LI_${Date.now()}_${i}`,
+        item_name:     it.item_name     || '',
+        description:   it.description   || '',
+        qty:           it.qty           != null ? it.qty           : '',
+        unit:          it.unit          || '件',
+        selling_price: it.selling_price != null ? it.selling_price : '',
+        line_total:    it.line_total    != null ? it.line_total    : '',
+        item_notes:    it.item_notes    || '',
+      }));
+
+      const apiTotal     = data.grandTotal != null ? Number(data.grandTotal) : 0;
+      const computedTotal = items.reduce((s, li) => s + (Number(li.line_total) || 0), 0);
+      const grandTotal   = apiTotal > 0 ? apiTotal : (computedTotal > 0 ? computedTotal : null);
+      const clientHint   = optional.clientName.trim();
+      const customerName = data.customerName || clientHint || '待确认';
+
+      setLineItems(items);
+      setShowItems(true);
+      setQuoteDraft({
+        customerName,
+        itemSummary: fileName.replace(/\.\w+$/, ''),
+        grandTotal:  grandTotal ?? null,
+        quoteDate:   new Date().toISOString().slice(0, 10),
+        quoteType:   'TRADE',
+        source:      mimeType === 'application/pdf' ? 'PDF' : 'Image',
+        isReady:     grandTotal != null && customerName !== '待确认',
+      });
+      setRegisterQuote(grandTotal != null && customerName !== '待确认');
+      setParsedFromFile(true);
+
+      const confNote = data.confidence === 'high' ? '识别度高'
+        : data.confidence === 'low' ? '识别度较低，请核对每行数据'
+        : '请核对关键数值';
+      const warnNote = data.warnings?.length > 0 ? ` — ⚠ ${data.warnings[0]}` : '';
+      setXlsxStatus('done');
+      setXlsxMsg(
+        `AI 已识别 ${items.length} 行产品明细` +
+        (grandTotal ? `，合计 AED ${Number(grandTotal).toLocaleString()}` : '（未检测到总额，请手动填写）') +
+        ` · ${confNote}${warnNote}`
+      );
+    } catch {
+      setXlsxStatus('error');
+      setXlsxMsg('网络错误，无法连接 AI 服务，请手动录入明细。');
+    }
+  };
+
   // ── file handling ─────────────────────────────────────────────────
   const handleFiles = async (files: FileList | File[]) => {
     const arr = Array.from(files);
@@ -389,9 +454,11 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
         name: f.name, type: f.type, data: base64,
         size: f.size, uploadedAt: new Date().toISOString(), isAnalyzed: false,
       });
-      // Auto-parse Excel / CSV files
+      // Auto-parse by file type
       if (/\.(xlsx|xls|csv)$/i.test(f.name)) {
         parseExcelFile(f);
+      } else if (f.type === 'application/pdf' || f.type.startsWith('image/')) {
+        parseFileWithAI(f.type, base64, f.name);
       }
     }
     setAttachments(p => [...p, ...next]);
@@ -686,7 +753,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
             ) : (
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             )}
-            {xlsxStatus === 'parsing' ? '正在解析 Excel 报价单…' : xlsxMsg}
+            {xlsxMsg}
           </div>
         )}
 
@@ -738,7 +805,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
           <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${GOLD}40`, background: CARD2 }}>
             <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: `1px solid ${BORDER}` }}>
               <FileCheck className="w-4 h-4" style={{ color: GOLD }} />
-              <span className="text-sm font-black" style={{ color: GOLD_L }}>Excel 报价预览</span>
+              <span className="text-sm font-black" style={{ color: GOLD_L }}>文件报价预览</span>
               <span className="text-[10px] font-bold ml-auto px-2 py-0.5 rounded-lg"
                 style={{ background: 'rgba(184,150,12,0.15)', color: GOLD }}>
                 {lineItems.length} 行{quoteDraft?.grandTotal ? ` · AED ${quoteDraft.grandTotal.toLocaleString()}` : ''}
@@ -852,7 +919,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                         <div className="px-3 py-2 rounded-lg flex items-start gap-2 text-xs font-bold"
                           style={{ background: 'rgba(5,150,105,0.08)', border: '1px solid rgba(5,150,105,0.3)', color: '#6EE7B7' }}>
                           <CheckCircle2 className="w-3 h-3 shrink-0 mt-0.5" />
-                          已从 Excel 自动解析 {lineItems.length} 行明细，可在下方核对或编辑。
+                          已自动识别 {lineItems.length} 行产品明细，请在下方核对数据后保存。
                         </div>
                       ) : (
                         <div className="px-3 py-2 rounded-lg flex items-start gap-2 text-xs font-bold"
