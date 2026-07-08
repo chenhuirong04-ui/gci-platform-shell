@@ -13,6 +13,7 @@ export type BusinessType = 'TRADE' | 'PROJECT' | 'LOG_ONLY';
 // 需求整理中    → Block 1: 今日必须推进
 // 待报价        → Block 3: 等供应商报价/确认
 // 已报价待确认  → Block 2: 等待客户审批; if overdue → Block 1
+// 合同待签      → Block 2: 等待客户签合同; ACTIVE follow-up, NOT archived/closed
 // 执行中        → 项目进展 tab only (not in ActionCenter)
 // 已成交        → done/closed
 // 暂缓          → paused; visible in kanban only, excluded from all Action blocks
@@ -20,7 +21,7 @@ export type BusinessType = 'TRADE' | 'PROJECT' | 'LOG_ONLY';
 //
 // If Notion 行动状态 is empty → display "待人工确认", no auto-classification
 export type TradeStatus =
-  | '新询盘' | '需求整理中' | '待报价' | '已报价待确认' | '执行中' | '已成交' | '暂缓' | '已归档'
+  | '新询盘' | '需求整理中' | '待报价' | '已报价待确认' | '合同待签' | '执行中' | '已成交' | '暂缓' | '已归档'
   | '待人工确认'
   // legacy values kept for stored-data compatibility (do not use in new records)
   | '已报价' | '等待确认'

@@ -152,6 +152,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
               { label: '跟进中',   statuses: ['跟进中','Following'],                                       color: GOLD },
               { label: '报价阶段', statuses: ['寻价中','已报价','Sourcing','Quoted','已发客户','Sent'],     color: '#B69BD0' },
               { label: '谈判确认', statuses: ['谈判中','已确认','Confirmed'],                              color: '#D9B45A' },
+              { label: '合同待签', statuses: ['合同待签'],                                                 color: '#B084C9' },
               { label: '已成交',   statuses: ['已成交','已转订单','Converted'],                            color: '#6FBF8E' },
             ];
             const counts = stages.map(s => activeTasks.filter(t => s.statuses.includes(t.tradeStatus)).length);

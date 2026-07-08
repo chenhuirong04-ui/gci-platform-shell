@@ -136,21 +136,34 @@ function buildUrgent(tasks: FollowUpTask[]): ActionItem[] {
     });
 }
 
-// ── Block 2: 等待客户审批/确认 ────────────────────────────────────────────────
-// Rule: tradeStatus === '已报价待确认' (not yet escalated to urgent)
+// ── Block 2: 等待客户审批/确认 + 合同待签 ───────────────────────────────────
+// Rules: tradeStatus === '已报价待确认' (not yet escalated to urgent)
+//        OR tradeStatus === '合同待签' — client confirmed, waiting for signed contract
 
 function buildWaitingClient(tasks: FollowUpTask[], urgentIds: Set<string>): ActionItem[] {
+  const CONTRACT_PENDING = '合同待签';
   return tasks
-    .filter(t => t.status === 'todo' && t.tradeStatus === QUOTED_WAITING && !urgentIds.has(t.id))
+    .filter(t =>
+      t.status === 'todo' &&
+      !urgentIds.has(t.id) &&
+      (t.tradeStatus === QUOTED_WAITING || t.tradeStatus === CONTRACT_PENDING)
+    )
     .map(t => {
       const od = calcDaysOverdue(t.nextFollowUpAt);
+      const isContract = t.tradeStatus === CONTRACT_PENDING;
       return {
         id: t.id, clientName: t.clientName,
-        problem: od > 0 ? `等待客户/业主确认，已等 ${od} 天` : '等待客户/业主确认',
-        suggestion: od >= 5 ? '立即跟进，询问审批进展，提供补充资料支持'
-          : od >= 2 ? '主动催促，提供进一步支持或备选方案'
-          : '保持跟进，等待客户内部决策',
-        matchReason: `状态: 已报价待确认${od > 0 ? ` · 已等${od}天` : ''}`,
+        problem: isContract
+          ? (od > 0 ? `合同待签，已等 ${od} 天，需催促客户签约` : '客户确认合作，等待签署合同')
+          : (od > 0 ? `等待客户/业主确认，已等 ${od} 天` : '等待客户/业主确认'),
+        suggestion: isContract
+          ? (od >= 5 ? '立即跟进，确认合同状态，必要时发提醒或推动签约会议'
+            : od >= 2 ? '主动催促，询问合同审批进度，提供任何所需文件'
+            : '保持跟进，确认客户是否已收到合同并开始审核')
+          : (od >= 5 ? '立即跟进，询问审批进展，提供补充资料支持'
+            : od >= 2 ? '主动催促，提供进一步支持或备选方案'
+            : '保持跟进，等待客户内部决策'),
+        matchReason: `状态: ${t.tradeStatus}${od > 0 ? ` · 已等${od}天` : ''}`,
         daysOverdue: Math.max(0, od), tradeStatus: t.tradeStatus, task: t, source: 'task' as const,
       };
     })
@@ -914,7 +927,7 @@ export default function ActionCenter({ tasks, projects, followupTasks, pausedTas
   const MODAL_CONFIGS: Record<BlockKey, ModalConfig> = {
     urgent:   { key: 'urgent',   status: 'urgent',          icon: <AlertTriangle className="w-3.5 h-3.5" />, title: '今日必须推进',         badge: <RuleEngineBadge /> },
     supplier: { key: 'supplier', status: 'waitingSupplier', icon: <PackageSearch className="w-3.5 h-3.5" />, title: '待报价 · 等供应商回价', badge: <RuleEngineBadge /> },
-    client:   { key: 'client',   status: 'waitingClient',   icon: <Clock className="w-3.5 h-3.5" />,         title: '已报价待确认',         badge: <RuleEngineBadge /> },
+    client:   { key: 'client',   status: 'waitingClient',   icon: <Clock className="w-3.5 h-3.5" />,         title: '待确认 · 合同待签',    badge: <RuleEngineBadge /> },
     paused:   { key: 'paused',   status: 'paused',          icon: <PauseCircle className="w-3.5 h-3.5" />,   title: '暂缓中',               badge: <RuleEngineBadge /> },
     others:   { key: 'others',   status: 'otherInquiry',    icon: <Sparkles className="w-3.5 h-3.5" />,      title: '新询盘 · 其他',        badge: <RuleEngineBadge /> },
     ai:       { key: 'ai',       status: 'ai',              icon: <Bot className="w-3.5 h-3.5" />,           title: 'OpenAI 智能建议' },
@@ -936,7 +949,7 @@ export default function ActionCenter({ tasks, projects, followupTasks, pausedTas
           )}
           {expanded === 'client' && (
             waitingClient.length === 0
-              ? <p className="text-sm text-slate-400 font-bold text-center py-8">暂无等待客户回复的报价</p>
+              ? <p className="text-sm text-slate-400 font-bold text-center py-8">暂无待确认报价或合同待签记录</p>
               : waitingClient.map(item => (
                   <ActionCard key={item.id} item={item} status="waitingClient" onWA={setWaItem} onOpen={handleOpen} />
                 ))
@@ -1042,10 +1055,10 @@ export default function ActionCenter({ tasks, projects, followupTasks, pausedTas
           onExpand={() => setExpanded('supplier')}
         />
 
-        {/* Card 3 — 已报价待确认 */}
+        {/* Card 3 — 已报价待确认 / 合同待签 */}
         <SummaryCard
           status="waitingClient" icon={<Clock className="w-3.5 h-3.5" />}
-          title="已报价待确认" count={waitingClient.length}
+          title="待确认 · 合同待签" count={waitingClient.length}
           badge={<RuleEngineBadge />}
           previewLines={clientLines} emptyText="暂无等待客户确认的报价"
           onExpand={() => setExpanded('client')}

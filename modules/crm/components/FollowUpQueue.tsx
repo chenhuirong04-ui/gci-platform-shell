@@ -28,7 +28,7 @@ interface FollowUpQueueProps {
 }
 
 const TRADE_STATUSES: TradeStatus[] = [
-  '新询盘','需求整理中','待报价','已报价待确认',
+  '新询盘','需求整理中','待报价','已报价待确认','合同待签',
   '执行中','已成交','暂缓','已归档',
 ];
 
@@ -41,7 +41,7 @@ function applyFilter(tasks: FollowUpTask[], chip: FilterChip): FollowUpTask[] {
     case '今日重点': return tasks.filter(t => t.status === 'todo' && (t.nextFollowUpAt||'').slice(0,10) <= today);
     case '高优先级': return tasks.filter(t => t.status === 'todo' && t.priority === 'A');
     case '待报价':   return tasks.filter(t => t.tradeStatus === '待报价');
-    case '等待回复': return tasks.filter(t => t.tradeStatus === '已报价待确认');
+    case '等待回复': return tasks.filter(t => t.tradeStatus === '已报价待确认' || t.tradeStatus === '合同待签');
     case '内部任务': return tasks.filter(t => t.businessType === 'LOG_ONLY' || !(t.clientName||'').trim() || (t.clientName||'') === '未知客户');
     case '已完成':   return tasks.filter(t => t.status === 'completed');
     default:         return tasks.filter(t => t.status !== 'deleted' && t.status !== 'archived');
@@ -88,6 +88,7 @@ function aiReason(task: FollowUpTask): string {
   if (task.priority === 'A') return '高优先级，建议今天跟进';
   if (task.tradeStatus === '待报价') return '客户待报价，需尽快回复';
   if (task.tradeStatus === '已报价待确认') return '报价已发出，等待客户确认';
+  if (task.tradeStatus === '合同待签') return '客户确认合作，催促签署合同';
   return '按计划跟进';
 }
 

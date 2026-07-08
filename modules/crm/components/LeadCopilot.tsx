@@ -57,6 +57,7 @@ function detectStage(status: string): { stage: string; detail: string } {
     '谈判中':   { stage: '谈判阶段', detail: '价格/条款协商中' },
     '已确认':   { stage: '确认阶段', detail: '等待正式下单或合同' },
     'Confirmed': { stage: '确认阶段', detail: '等待正式下单或合同' },
+    '合同待签':  { stage: '合同阶段', detail: '客户确认合作，等待签署合同' },
     '已成交':   { stage: '执行阶段', detail: '项目/订单已成交' },
     '已转订单':  { stage: '执行阶段', detail: '已转入订单执行' },
     'Converted': { stage: '执行阶段', detail: '已转入订单执行' },
@@ -101,6 +102,8 @@ function computeRisk(
   daysSinceUpdate: number,
   daysOverdue: number
 ): { risk: 'low' | 'medium' | 'high'; reason: string } {
+  if (task.tradeStatus === '合同待签' && daysOverdue > 5)
+    return { risk: 'high', reason: '合同已等超过 5 天未签署，存在客户反悔或流失风险' };
   if (['已报价', 'Quoted', '已发客户', 'Sent'].includes(task.tradeStatus) && daysOverdue > 7)
     return { risk: 'high', reason: '报价发出后客户超过 7 天未回复，存在流失风险' };
   if (daysSinceUpdate > 14)
@@ -136,6 +139,10 @@ function suggestNextAction(
     return '推进价格/条款谈判，准备最终确认文件';
   if (['已确认', 'Confirmed'].includes(s))
     return '催促客户正式下单或签署合同，确认付款方式';
+  if (s === '合同待签')
+    return daysOverdue > 3
+      ? '合同迟迟未签，今日必须催促，确认是否有阻碍因素'
+      : '跟进合同签署进度，询问是否需要任何补充文件';
   if (daysSinceUpdate > 14)
     return '超长时间未联系，建议电话或 WhatsApp 重新激活联系';
   if (task.priority === 'A')

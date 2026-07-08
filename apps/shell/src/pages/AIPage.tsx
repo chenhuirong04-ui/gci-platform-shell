@@ -7,6 +7,7 @@ import { InvoiceAssistantPanel } from '../components/invoice/InvoiceAssistantPan
 import { BillingProfileDraftPanel } from '../components/invoice/BillingProfileDraftPanel';
 import { detectAIIntent, getIntentSteps } from '../ai/aiRouter';
 import type { AIIntentMatch } from '../ai/aiRouter';
+import { readCRMTasks, getCRMBriefStats, getCRMCustomerData } from '../lib/crmLocalStore';
 
 // ── Product name extraction for inventory queries ─────────────────────────────
 // Extracts a product keyword from natural language input, e.g.:
@@ -708,17 +709,65 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                   <span>数据来源：{d.source}</span>
                   <span>{new Date(d.asOf).toLocaleString('zh-CN')}</span>
                 </div>
-                {/* CRM partial banner — always shown for daily brief */}
-                <div style={{ marginTop: 10, padding: '8px 12px', background: 'rgba(143,166,212,0.06)', border: '1px solid rgba(143,166,212,0.2)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>⚠</span>
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#8FA6D4', marginBottom: 2 }}>CRM 跟进数据未包含</div>
-                    <div style={{ fontSize: 11, color: MUTED, lineHeight: 1.6 }}>
-                      CRM 跟进记录来自前端 Notion sync / localStorage，后端简报暂未合并此部分。
-                      如需查看今日跟进，请前往 <span style={{ color: '#8FA6D4' }}>CRM 模块</span> 或 <span style={{ color: '#8FA6D4' }}>今日工作台</span>。
+                {/* CRM section — read from localStorage (Notion sync cache) */}
+                {(() => {
+                  const crmStats = getCRMBriefStats(readCRMTasks());
+                  if (!crmStats.hasData) {
+                    return (
+                      <div style={{ marginTop: 10, padding: '8px 12px', background: 'rgba(143,166,212,0.06)', border: '1px solid rgba(143,166,212,0.2)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                        <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>⚠</span>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: '#8FA6D4', marginBottom: 2 }}>CRM 跟进数据暂未加载</div>
+                          <div style={{ fontSize: 11, color: MUTED, lineHeight: 1.6 }}>
+                            请先前往 <span style={{ color: '#8FA6D4' }}>CRM 模块</span> 同步 Notion 数据，之后简报将自动合并跟进记录。
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  const PRIO_COLOR: Record<string, string> = { A: '#E0846A', B: '#D4A843', C: MUTED };
+                  return (
+                    <div style={{ marginTop: 10, padding: '10px 14px', background: 'rgba(91,163,201,0.06)', border: '1px solid rgba(91,163,201,0.22)', borderRadius: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#5BA3C9' }}>CRM 跟进（已从本地 Notion Sync 合并）</span>
+                        <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 10, background: 'rgba(91,163,201,0.12)', color: '#5BA3C9', fontFamily: 'monospace' }}>localStorage</span>
+                      </div>
+                      {/* Stats chips */}
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                        <div style={{ padding: '5px 10px', borderRadius: 7, background: 'rgba(91,163,201,0.08)', border: '1px solid rgba(91,163,201,0.18)' }}>
+                          <div style={{ fontSize: 9, color: MUTED, marginBottom: 1 }}>今日应跟进</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: '#5BA3C9' }}>{crmStats.todayCount} 个</div>
+                        </div>
+                        {crmStats.overdueCount > 0 && (
+                          <div style={{ padding: '5px 10px', borderRadius: 7, background: 'rgba(224,132,106,0.08)', border: '1px solid rgba(224,132,106,0.2)' }}>
+                            <div style={{ fontSize: 9, color: MUTED, marginBottom: 1 }}>已超期</div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: '#E0846A' }}>{crmStats.overdueCount} 个</div>
+                          </div>
+                        )}
+                        {crmStats.highPriorityCount > 0 && (
+                          <div style={{ padding: '5px 10px', borderRadius: 7, background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.15)' }}>
+                            <div style={{ fontSize: 9, color: MUTED, marginBottom: 1 }}>A 级客户</div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: '#E0846A' }}>{crmStats.highPriorityCount} 个</div>
+                          </div>
+                        )}
+                      </div>
+                      {/* Top follow-up items */}
+                      {crmStats.topItems.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          {crmStats.topItems.map((item, i) => (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 6, background: item.isOverdue ? 'rgba(224,132,106,0.07)' : 'rgba(255,255,255,0.025)', border: `1px solid ${item.isOverdue ? 'rgba(224,132,106,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
+                              <span style={{ fontSize: 9, fontWeight: 700, color: PRIO_COLOR[item.priority] || MUTED, minWidth: 12 }}>{item.priority}</span>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: TEXT, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.clientName}</span>
+                              <span style={{ fontSize: 10, color: MUTED, whiteSpace: 'nowrap' }}>{item.tradeStatus}</span>
+                              {item.owner && <span style={{ fontSize: 10, color: SUBTLE, whiteSpace: 'nowrap' }}>{item.owner}</span>}
+                              {item.isOverdue && <span style={{ fontSize: 9, color: '#E0846A', fontWeight: 700, whiteSpace: 'nowrap' }}>超期 {item.daysOverdue}天</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
             );
           })()}
@@ -807,17 +856,66 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                   </div>
                 )}
 
-                {/* CRM partial banner — always shown for customer 360 */}
-                <div style={{ marginTop: 8, padding: '8px 12px', background: 'rgba(143,166,212,0.06)', border: '1px solid rgba(143,166,212,0.2)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>⚠</span>
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#8FA6D4', marginBottom: 2 }}>CRM 跟进记录未包含</div>
-                    <div style={{ fontSize: 11, color: MUTED, lineHeight: 1.6 }}>
-                      CRM 跟进记录来自前端 Notion sync / localStorage，后端无法读取。
-                      如需查看该客户最近跟进，请前往 <span style={{ color: '#8FA6D4' }}>CRM 模块</span>。
+                {/* CRM section — read from localStorage and match by customer + aliases */}
+                {(() => {
+                  const allTasks = readCRMTasks();
+                  const crmMatch = getCRMCustomerData(allTasks, d.customerQuery, d.aliases || []);
+                  if (!crmMatch.hasData) {
+                    return (
+                      <div style={{ marginTop: 8, padding: '8px 12px', background: 'rgba(143,166,212,0.06)', border: '1px solid rgba(143,166,212,0.2)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                        <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>⚠</span>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: '#8FA6D4', marginBottom: 2 }}>CRM 数据暂未加载</div>
+                          <div style={{ fontSize: 11, color: MUTED, lineHeight: 1.6 }}>
+                            请先前往 <span style={{ color: '#8FA6D4' }}>CRM 模块</span> 同步 Notion 数据后查看。
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (crmMatch.totalCount === 0) {
+                    return (
+                      <div style={{ marginTop: 8, padding: '8px 12px', background: 'rgba(143,166,212,0.04)', border: '1px solid rgba(143,166,212,0.15)', borderRadius: 8 }}>
+                        <div style={{ fontSize: 11, color: MUTED }}>
+                          未在 CRM 跟进记录中找到「{d.customerQuery}」。如有拼写不同，请手动前往 CRM 模块搜索。
+                        </div>
+                      </div>
+                    );
+                  }
+                  const latest = crmMatch.latestTask!;
+                  const PRIO_COLOR: Record<string, string> = { A: '#E0846A', B: '#D4A843', C: MUTED };
+                  return (
+                    <div style={{ marginTop: 8, padding: '10px 14px', background: 'rgba(91,163,201,0.06)', border: '1px solid rgba(91,163,201,0.22)', borderRadius: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#5BA3C9' }}>CRM 跟进（本地 Notion Sync）</span>
+                        <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 10, background: 'rgba(91,163,201,0.12)', color: '#5BA3C9', fontFamily: 'monospace' }}>
+                          {crmMatch.totalCount} 条记录 · {crmMatch.activeCount} 活跃
+                        </span>
+                      </div>
+                      {/* Latest record */}
+                      <div style={{ padding: '8px 10px', borderRadius: 7, background: latest.isOverdue ? 'rgba(224,132,106,0.07)' : 'rgba(255,255,255,0.025)', border: `1px solid ${latest.isOverdue ? 'rgba(224,132,106,0.2)' : 'rgba(255,255,255,0.07)'}`, marginBottom: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <span style={{ fontSize: 9, fontWeight: 700, color: PRIO_COLOR[latest.priority] || MUTED }}>{latest.priority}级</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: TEXT, flex: 1 }}>{latest.clientName}</span>
+                          <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 6, background: 'rgba(91,163,201,0.1)', color: '#5BA3C9' }}>{latest.tradeStatus}</span>
+                          {latest.isOverdue && <span style={{ fontSize: 9, color: '#E0846A', fontWeight: 700 }}>超期 {latest.daysOverdue}天</span>}
+                        </div>
+                        {latest.goal && <div style={{ fontSize: 11, color: MUTED, marginBottom: 2 }}>目标：{latest.goal}</div>}
+                        {latest.lastContext && <div style={{ fontSize: 11, color: MUTED, marginBottom: 2 }}>上次：{latest.lastContext}</div>}
+                        <div style={{ display: 'flex', gap: 10, fontSize: 10, color: SUBTLE }}>
+                          {latest.nextFollowUpAt && <span>下次跟进：{latest.nextFollowUpAt.slice(0, 10)}</span>}
+                          {latest.owner && <span>负责人：{latest.owner}</span>}
+                        </div>
+                      </div>
+                      {/* Older records summary */}
+                      {crmMatch.matchedTasks.length > 1 && (
+                        <div style={{ fontSize: 10, color: SUBTLE }}>
+                          另有 {crmMatch.matchedTasks.length - 1} 条历史记录 · 状态：{[...new Set(crmMatch.matchedTasks.slice(1).map(t => t.tradeStatus))].join(' / ')}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
             );
           })()}

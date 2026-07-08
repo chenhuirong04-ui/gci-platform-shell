@@ -314,6 +314,7 @@ export default async function handler(request: Request): Promise<Response> {
     // ── Compute today's follow-up count HERE — before orphan records are added ──
     // This is the authoritative todayFollowupCount that the UI stat card must display.
     const todayISO = new Date().toISOString().slice(0, 10);
+    // '合同待签' is intentionally excluded from this list — it is active follow-up.
     const EXCLUDED_STATUSES = ['暂缓', '已成交', '已归档', '执行中'];
     const latestFollowupByBusinessIdCount = latestByBizId.size;
     const todayFollowupEntries = Array.from(latestByBizId.values()).filter(entry =>
@@ -356,7 +357,9 @@ export default async function handler(request: Request): Promise<Response> {
 
       // Derive status from tradeStatus so that Notion-closed records don't
       // reappear as active after the next sync overwrites localStorage.
-      // '暂缓' / '已归档' / '已成交' in Notion → archived locally.
+      // '暂缓' / '已归档' / '已成交' / '已关闭' in Notion → archived locally.
+      // NOTE: '合同待签' is intentionally NOT in this list — it is an ACTIVE follow-up
+      //       status (client confirmed, contract pending). Must remain todo, never archived.
       const CLOSED_TRADE_STATUSES = ['暂缓', '已归档', '已成交', '已关闭'];
       const derivedStatus: 'todo' | 'archived' =
         CLOSED_TRADE_STATUSES.includes(finalTradeStatus) ? 'archived' : 'todo';
