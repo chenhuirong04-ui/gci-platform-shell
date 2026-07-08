@@ -44,14 +44,8 @@ function loadHomeStats() {
     o?.status && o.status !== 'PAID' && o.status !== 'VOIDED'
   ).length;
 
-  // Inventory: consignment_stock items with qty <= reorder (simple proxy)
-  const stock: any[] = safeLocalGet('consignment_stock');
-  const inventoryAlerts = stock.filter(s => {
-    const qty = Number(s?.qty ?? s?.quantity ?? 0);
-    return qty === 0;
-  }).length;
-
-  return { followUpsToday, pendingQuotes, activeOrders, inventoryAlerts };
+  // Inventory: returned separately via API fetch (see useEffect below)
+  return { followUpsToday, pendingQuotes, activeOrders, inventoryAlerts: null };
 }
 
 // ─── Priority alerts from real data ────────────────────────────────────────
@@ -236,6 +230,19 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
     const s = loadHomeStats();
     setStats(s);
     setLiveAlerts(loadLiveAlerts(lang));
+
+    // Fetch real inventory alert count from API (缺货 + 低库存 + 数据异常)
+    const base = typeof window !== 'undefined' ? window.location.origin : '';
+    fetch(`${base}/api/trade/check-inventory`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          setStats(prev => ({ ...prev, inventoryAlerts: data.alertCount ?? data.lowStockCount ?? 0 }));
+        }
+      })
+      .catch(() => {
+        // Silent fail — card shows '--' if API unavailable
+      });
   }, [lang]);
 
   // Dynamic summary line based on real counts

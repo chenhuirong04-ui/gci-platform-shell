@@ -317,27 +317,59 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                 </div>
               ) : (
                 <>
-                  <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>
-                    共 {state.resultData.total} 种产品
+                  {/* Summary bar */}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                    <div style={{ padding: '6px 12px', borderRadius: 7, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: MUTED }}>
+                      共 <span style={{ color: TEXT, fontWeight: 700 }}>{state.resultData.total}</span> 种产品
+                    </div>
+                    {state.resultData.outOfStockCount > 0 && (
+                      <div style={{ padding: '6px 12px', borderRadius: 7, background: 'rgba(224,132,106,0.1)', border: '1px solid rgba(224,132,106,0.3)', fontSize: 11, color: '#E0846A', fontWeight: 700 }}>
+                        🔴 缺货 {state.resultData.outOfStockCount} 种
+                      </div>
+                    )}
                     {state.resultData.lowStockCount > 0 && (
-                      <span style={{ marginLeft: 10, color: '#E0846A', fontWeight: 700 }}>
-                        ⚠ {state.resultData.lowStockCount} 种库存偏低（≤5件）
-                      </span>
+                      <div style={{ padding: '6px 12px', borderRadius: 7, background: 'rgba(212,168,67,0.1)', border: '1px solid rgba(212,168,67,0.3)', fontSize: 11, color: '#D4A843', fontWeight: 700 }}>
+                        🟡 低库存 {state.resultData.lowStockCount} 种（≤{state.resultData.lowStockThreshold}件）
+                      </div>
+                    )}
+                    {state.resultData.anomalyCount > 0 && (
+                      <div style={{ padding: '6px 12px', borderRadius: 7, background: 'rgba(143,166,212,0.08)', border: '1px solid rgba(143,166,212,0.25)', fontSize: 11, color: '#8FA6D4', fontWeight: 700 }}>
+                        ⚪ 数据异常 {state.resultData.anomalyCount} 种
+                      </div>
                     )}
                   </div>
-                  <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {state.resultData.products.map((p: any, i: number) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7, background: p.lowStock ? 'rgba(224,132,106,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${p.lowStock ? 'rgba(224,132,106,0.25)' : 'rgba(255,255,255,0.07)'}` }}>
-                        <span style={{ flex: 1, fontSize: 13, color: TEXT, fontWeight: 600 }}>{p.productName}</span>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: p.lowStock ? '#E0846A' : '#6FBF8E', minWidth: 60, textAlign: 'right' }}>
-                          剩 {p.totalRemaining} 件
-                        </span>
-                        <span style={{ fontSize: 10, color: MUTED, minWidth: 70, textAlign: 'right' }}>
-                          已售 {p.totalSold} / 寄售 {p.totalConsigned}
-                        </span>
-                        {p.lowStock && <span style={{ fontSize: 10, color: '#E0846A', fontWeight: 700 }}>库存偏低</span>}
-                      </div>
-                    ))}
+
+                  <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {state.resultData.products.map((p: any, i: number) => {
+                      const bg = p.outOfStock
+                        ? 'rgba(224,132,106,0.08)' : p.anomaly
+                        ? 'rgba(143,166,212,0.05)' : p.lowStock
+                        ? 'rgba(212,168,67,0.07)' : 'rgba(255,255,255,0.02)';
+                      const bdr = p.outOfStock
+                        ? 'rgba(224,132,106,0.28)' : p.anomaly
+                        ? 'rgba(143,166,212,0.2)' : p.lowStock
+                        ? 'rgba(212,168,67,0.25)' : 'rgba(255,255,255,0.07)';
+                      const qtyColor = p.outOfStock ? '#E0846A' : p.anomaly ? '#8FA6D4' : p.lowStock ? '#D4A843' : '#6FBF8E';
+                      const badge = p.outOfStock
+                        ? <span style={{ fontSize: 9, color: '#E0846A', fontWeight: 700, background: 'rgba(224,132,106,0.15)', padding: '1px 5px', borderRadius: 4 }}>缺货</span>
+                        : p.anomaly
+                        ? <span style={{ fontSize: 9, color: '#8FA6D4', fontWeight: 700, background: 'rgba(143,166,212,0.12)', padding: '1px 5px', borderRadius: 4 }}>数据异常</span>
+                        : p.lowStock
+                        ? <span style={{ fontSize: 9, color: '#D4A843', fontWeight: 700, background: 'rgba(212,168,67,0.12)', padding: '1px 5px', borderRadius: 4 }}>低库存</span>
+                        : null;
+                      return (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7, background: bg, border: `1px solid ${bdr}` }}>
+                          <span style={{ flex: 1, fontSize: 13, color: TEXT, fontWeight: 600 }}>{p.productName}</span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: qtyColor, minWidth: 60, textAlign: 'right' }}>
+                            {p.anomaly ? '—' : `剩 ${p.totalRemaining} 件`}
+                          </span>
+                          <span style={{ fontSize: 10, color: MUTED, whiteSpace: 'nowrap' }}>
+                            已售 {p.totalSold} / 寄 {p.totalConsigned}
+                          </span>
+                          {badge}
+                        </div>
+                      );
+                    })}
                   </div>
                 </>
               )}

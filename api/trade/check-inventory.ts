@@ -47,9 +47,11 @@ interface ProductSummary {
   customers: string[];
   soNos: string[];
   lowStock: boolean;
+  outOfStock: boolean;   // remainingQty <= 0
+  anomaly: boolean;      // remainingQty missing or NaN across all rows for this product
 }
 
-const LOW_STOCK_THRESHOLD = 5;
+export const LOW_STOCK_THRESHOLD = 5;
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
@@ -96,7 +98,8 @@ export default async function handler(request: Request): Promise<Response> {
     });
 
   // Aggregate by productName
-  const map = new Map<string, ProductSummary>();
+  // Track whether each product has any row with a valid remainingQty
+  const map = new Map<string, ProductSummary & { _hasValidQty: boolean }>();
   for (const row of rows) {
     const name = (row.productName || '').trim();
     if (!name) continue;
@@ -109,12 +112,20 @@ export default async function handler(request: Request): Promise<Response> {
         customers: [],
         soNos: [],
         lowStock: false,
+        outOfStock: false,
+        anomaly: false,
+        _hasValidQty: false,
       });
     }
     const entry = map.get(name)!;
+    const rawQty = row.remainingQty;
+    const parsedQty = Number(rawQty);
+    if (rawQty !== null && rawQty !== undefined && !isNaN(parsedQty)) {
+      entry._hasValidQty = true;
+      entry.totalRemaining += parsedQty;
+    }
     entry.totalConsigned += Number(row.consignedQty) || 0;
     entry.totalSold     += Number(row.soldQty)      || 0;
-    entry.totalRemaining += Number(row.remainingQty) || 0;
     if (row.customerName && !entry.customers.includes(row.customerName)) {
       entry.customers.push(row.customerName);
     }
@@ -123,21 +134,37 @@ export default async function handler(request: Request): Promise<Response> {
     }
   }
 
-  const products = Array.from(map.values()).map(p => ({
+  const products = Array.from(map.values()).map(({ _hasValidQty, ...p }) => ({
     ...p,
-    lowStock: p.totalRemaining <= LOW_STOCK_THRESHOLD,
+    anomaly: !_hasValidQty,
+    outOfStock: _hasValidQty && p.totalRemaining <= 0,
+    lowStock: _hasValidQty && p.totalRemaining > 0 && p.totalRemaining <= LOW_STOCK_THRESHOLD,
   }));
 
+  // Sort: out-of-stock first, then low-stock, then anomaly, then normal (by remaining asc)
   products.sort((a, b) => {
-    if (a.lowStock !== b.lowStock) return a.lowStock ? -1 : 1;
+    const rank = (p: typeof products[0]) =>
+      p.outOfStock ? 0 : p.anomaly ? 1 : p.lowStock ? 2 : 3;
+    const ra = rank(a), rb = rank(b);
+    if (ra !== rb) return ra - rb;
     return a.totalRemaining - b.totalRemaining;
   });
+
+  const outOfStockCount = products.filter(p => p.outOfStock).length;
+  const lowStockCount   = products.filter(p => p.lowStock).length;
+  const anomalyCount    = products.filter(p => p.anomaly).length;
+  // Total alert count for home page stat card
+  const alertCount = outOfStockCount + lowStockCount + anomalyCount;
 
   return json({
     ok: true,
     total: products.length,
     rawRowCount: dbRows.length,
-    lowStockCount: products.filter(p => p.lowStock).length,
+    alertCount,
+    outOfStockCount,
+    lowStockCount,
+    anomalyCount,
+    lowStockThreshold: LOW_STOCK_THRESHOLD,
     products,
     productFilter: productFilter || null,
     asOf: new Date().toISOString(),
