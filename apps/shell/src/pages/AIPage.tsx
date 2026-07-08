@@ -630,8 +630,108 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
             </div>
           )}
 
+          {/* ── Daily brief result panel ── */}
+          {intent.intentId === 'generate_daily_brief' && state.resultData && state.resultData.ok && (() => {
+            const d = state.resultData;
+            return (
+              <div style={{ marginBottom: 12 }}>
+                {/* Date + summary */}
+                <div style={{ fontSize: 11, color: SUBTLE, marginBottom: 6 }}>{d.date}</div>
+                <div style={{ fontSize: 13, color: TEXT, marginBottom: 14, padding: '10px 14px', background: 'rgba(203,168,92,0.06)', border: '1px solid rgba(203,168,92,0.15)', borderRadius: 8, lineHeight: 1.7 }}>
+                  {d.summary}
+                </div>
+
+                {/* Priorities */}
+                {d.priorities.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: GOLD, marginBottom: 6, letterSpacing: '0.06em' }}>TODAY'S PRIORITIES</div>
+                    {d.priorities.map((p: string, i: number) => (
+                      <div key={i} style={{ display: 'flex', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <span style={{ color: GOLD, fontSize: 12, flexShrink: 0, marginTop: 1 }}>→</span>
+                        <span style={{ fontSize: 13, color: TEXT }}>{p}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Risks */}
+                {d.risks.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#E0846A', marginBottom: 6, letterSpacing: '0.06em' }}>RISK ALERTS</div>
+                    {d.risks.map((r: string, i: number) => (
+                      <div key={i} style={{ display: 'flex', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <span style={{ color: '#E0846A', fontSize: 12, flexShrink: 0, marginTop: 1 }}>⚠</span>
+                        <span style={{ fontSize: 13, color: TEXT }}>{r}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* KPI grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, marginBottom: 12 }}>
+                  <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(111,191,142,0.06)', border: '1px solid rgba(111,191,142,0.15)' }}>
+                    <div style={{ fontSize: 10, color: MUTED, marginBottom: 2 }}>本月销售额</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#6FBF8E' }}>AED {Number(d.sales.monthlyTotal).toLocaleString()}</div>
+                    <div style={{ fontSize: 10, color: SUBTLE, marginTop: 2 }}>{d.sales.monthlyCount} 张订单 · 今日 AED {Number(d.sales.todayTotal).toLocaleString()}</div>
+                  </div>
+                  <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.15)' }}>
+                    <div style={{ fontSize: 10, color: MUTED, marginBottom: 2 }}>待收款合计</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#E0846A' }}>AED {Number(d.receivables.totalOutstanding).toLocaleString()}</div>
+                    <div style={{ fontSize: 10, color: SUBTLE, marginTop: 2 }}>{d.receivables.unpaidOrderCount} 张订单</div>
+                  </div>
+                  <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(203,168,92,0.06)', border: '1px solid rgba(203,168,92,0.15)' }}>
+                    <div style={{ fontSize: 10, color: MUTED, marginBottom: 2 }}>待回复报价</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: GOLD }}>{d.quotations.pendingCount} 张</div>
+                    <div style={{ fontSize: 10, color: SUBTLE, marginTop: 2 }}>{d.quotations.overdueCount > 0 ? `其中 ${d.quotations.overdueCount} 张已超期` : '无超期'}</div>
+                  </div>
+                  <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(143,166,212,0.06)', border: '1px solid rgba(143,166,212,0.15)' }}>
+                    <div style={{ fontSize: 10, color: MUTED, marginBottom: 2 }}>寄售待结算</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#8FA6D4' }}>{d.consignment.unsettledCount} 条</div>
+                    <div style={{ fontSize: 10, color: SUBTLE, marginTop: 2 }}>剩余库存 {d.consignment.totalRemaining} 件</div>
+                  </div>
+                </div>
+
+                {/* Top receivables */}
+                {d.receivables.topCustomers.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, color: MUTED, marginBottom: 5 }}>欠款最多客户</div>
+                    {d.receivables.topCustomers.map((c: any, i: number) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <span style={{ fontSize: 12, color: TEXT }}>{c.customerName}</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: '#E0846A' }}>AED {Number(c.outstanding).toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ fontSize: 10, color: SUBTLE, marginTop: 8, display: 'flex', justifyContent: 'space-between' }}>
+                  <span>数据来源：{d.source}</span>
+                  <span>{new Date(d.asOf).toLocaleString('zh-CN')}</span>
+                </div>
+                {d.crmNote && (
+                  <div style={{ fontSize: 10, color: SUBTLE, marginTop: 4, padding: '6px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: 6, lineHeight: 1.5 }}>
+                    ⚠ {d.crmNote}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* ── Daily brief loading ── */}
+          {intent.intentId === 'generate_daily_brief' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在并行查询业务数据，生成简报中…</div>
+          )}
+
+          {/* ── Daily brief API error ── */}
+          {intent.intentId === 'generate_daily_brief' && state.resultData && !state.resultData.ok && (
+            <div style={{ fontSize: 13, color: '#E0846A', marginBottom: 12, padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>简报生成失败</div>
+              <div style={{ color: MUTED, fontSize: 12 }}>{state.resultData.error || '未知错误'}</div>
+            </div>
+          )}
+
           {/* ── Default: show intent name for non-result done states ── */}
-          {intent.intentId !== 'check_inventory' && intent.intentId !== 'check_quotation_followups' && intent.intentId !== 'check_quotation_history' && intent.intentId !== 'check_receivables' && intent.intentId !== 'check_consignment' && intent.intentId !== 'check_sales' && (
+          {intent.intentId !== 'check_inventory' && intent.intentId !== 'check_quotation_followups' && intent.intentId !== 'check_quotation_history' && intent.intentId !== 'check_receivables' && intent.intentId !== 'check_consignment' && intent.intentId !== 'check_sales' && intent.intentId !== 'generate_daily_brief' && (
             <div style={{ fontSize: 14, color: TEXT, marginBottom: intent.approvalRequired ? 14 : 0 }}>
               {intent.intentNameZh}{intent.approvalRequired ? dict.ai.panel.readyLabel : ''}
             </div>
@@ -1295,6 +1395,51 @@ export function AIPage() {
             .then(r => r.json())
             .then(data => setCmdState(prev => prev ? { ...prev, resultData: data } : prev))
             .catch(e => console.error('[AI] sales fetch failed', e));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Daily brief intent — hardcoded regex.
+    const DAILY_BRIEF_RE = /今日简报|老板简报|今天重点|今天风险|经营简报|daily brief|生成简报|今天.*情况|今天有什么/i;
+    if (DAILY_BRIEF_RE.test(t)) {
+      const briefMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'generate_daily_brief',
+          intentNameZh: '今日经营简报',
+          intentNameEn: 'Daily Business Brief',
+          category: 'query',
+          triggerKeywordsZh: [],
+          triggerKeywordsEn: [],
+          targetTab: 'chat',
+          targetModule: 'AI Daily',
+          targetRoute: '/ai?tab=daily',
+          readSources: ['quotation_records', 'orders', 'consignment_stock', 'invoice_drafts'],
+          writeTargets: [],
+          requiredFields: [],
+          approvalRequired: false,
+          resultPanel: null,
+          implementationStatus: 'real',
+          notConnectedMessage: '',
+          fallbackBehavior: '',
+        },
+        confidence: 1,
+        raw: raw.trim(),
+        detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: briefMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在并行查询业务数据…', '正在汇总报价 / 应收 / 寄售 / 销售…', '正在生成今日简报…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          const base = typeof window !== 'undefined' ? window.location.origin : '';
+          fetch(`${base}/api/ai/daily-brief`)
+            .then(r => r.json())
+            .then(data => setCmdState(prev => prev ? { ...prev, resultData: data } : prev))
+            .catch(e => console.error('[AI] daily brief fetch failed', e));
         },
       );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
