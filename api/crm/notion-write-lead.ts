@@ -191,13 +191,12 @@ export default async function handler(request: Request): Promise<Response> {
   if (payload.lastContext) contextParts.push(payload.lastContext);
   const enrichedContext = contextParts.join('\n').slice(0, 2000);
 
+  // Only include fields that are safe (title + rich_text). Select fields like
+  // 需求等级/下一步动作/来源 are skipped — their exact option names vary per DB
+  // and a mismatch causes a 400 that blocks the whole write.
   const sbProperties: Record<string, any> = {
     '客户名称': { title: [{ type: 'text', text: { content: payload.clientName.trim() } }] },
     '客户ID':   { rich_text: [{ type: 'text', text: { content: newSBId } }] },
-    '当前状态': { select: { name: payload.tradeStatus || '新询价' } },
-    '需求等级': { select: { name: 'B — 正常询价' } },
-    '下一步动作': { select: { name: '二次跟进' } },
-    '来源':     { select: { name: mapSource(payload.source || payload.followUpMethod) } },
   };
   if (payload.phone || payload.whatsapp) {
     sbProperties['电话/WhatsApp'] = { phone_number: (payload.whatsapp || payload.phone || '').trim() };
@@ -209,24 +208,36 @@ export default async function handler(request: Request): Promise<Response> {
     sbProperties['下次跟进日期'] = { date: { start: followUpDate } };
   }
 
-  console.log(`[notion-write-lead] Step 1: writing ${newSBId} to SB Pool...`);
-  const sbRes = await fetch('https://api.notion.com/v1/pages', {
-    method: 'POST',
-    headers: notionHeaders(token),
-    body: JSON.stringify({ parent: { database_id: sbDbId }, properties: sbProperties }),
-  });
+  // Step 1 is NON-FATAL: if SB Pool write fails we log it and continue to Step 2
+  // so the customer always lands in Follow-up Log and the CRM can sync it back.
+  let sbPageId: string | null = null;
+  let sbWriteError: string | null = null;
 
-  if (!sbRes.ok) {
-    const sbErr = await sbRes.json().catch(() => ({}));
-    console.error('[notion-write-lead] Step 1 FAILED — SB Pool write error:', sbRes.status, JSON.stringify(sbErr).slice(0, 500));
-    return json({ error: `SB Pool write failed (${sbRes.status})`, detail: sbErr, step: 1 }, sbRes.status);
+  console.log(`[notion-write-lead] Step 1: writing ${newSBId} to SB Pool...`);
+  try {
+    const sbRes = await fetch('https://api.notion.com/v1/pages', {
+      method: 'POST',
+      headers: notionHeaders(token),
+      body: JSON.stringify({ parent: { database_id: sbDbId }, properties: sbProperties }),
+    });
+    if (sbRes.ok) {
+      const sbPage = await sbRes.json() as any;
+      sbPageId = sbPage.id;
+      console.log(`[notion-write-lead] Step 1 OK — SB Pool pageId: ${sbPage.id}`);
+    } else {
+      const sbErr = await sbRes.json().catch(() => ({}));
+      sbWriteError = `SB Pool ${sbRes.status}: ${JSON.stringify(sbErr).slice(0, 200)}`;
+      console.error('[notion-write-lead] Step 1 FAILED (non-fatal, continuing to Follow-up Log):', sbWriteError);
+    }
+  } catch (e: any) {
+    sbWriteError = `SB Pool exception: ${e?.message}`;
+    console.error('[notion-write-lead] Step 1 exception (non-fatal):', sbWriteError);
   }
 
-  const sbPage = await sbRes.json() as any;
-  console.log(`[notion-write-lead] Step 1 OK — SB Pool pageId: ${sbPage.id}`);
-
-  // ── Step 2: Write to Follow-up Log ──────────────────────────────────────────
-  const followupTitle = `${newSBId} | ${payload.clientName.trim()}`;
+  // ── Step 2: Write to Follow-up Log (always runs, even if Step 1 failed) ────
+  const followupTitle = sbPageId
+    ? `${newSBId} | ${payload.clientName.trim()}`
+    : payload.clientName.trim();
   const bizTypeLabel = payload.businessType === 'PROJECT' ? '项目型' : '贸易型';
 
   // Build Follow-up Notes: rich context for anyone reading
@@ -276,24 +287,25 @@ export default async function handler(request: Request): Promise<Response> {
     const followupErr = await followupRes.json().catch(() => ({}));
     console.error('[notion-write-lead] Step 2 FAILED — Follow-up Log write error:',
       followupRes.status, JSON.stringify(followupErr).slice(0, 500));
-    // SB Pool was already written — return partial failure with sbId so caller knows
     return json({
       error: `Follow-up Log write failed (${followupRes.status})`,
       detail: followupErr,
       step: 2,
-      sbId: newSBId,
-      sbPageId: sbPage.id,
+      sbId: sbPageId ? newSBId : null,
+      sbPageId,
+      sbWarning: sbWriteError,
     }, followupRes.status);
   }
 
   const followupPage = await followupRes.json() as any;
   console.log(`[notion-write-lead] Step 2 OK — Follow-up Log pageId: ${followupPage.id}`);
-  console.log(`[notion-write-lead] SUCCESS — created ${newSBId} | ${payload.clientName.trim()}`);
+  console.log(`[notion-write-lead] SUCCESS — ${payload.clientName.trim()}${sbPageId ? ` · ${newSBId}` : ' (SB Pool skipped)'}`);
 
   return json({
     ok: true,
-    sbId: newSBId,
-    sbPageId: sbPage.id,
+    sbId: sbPageId ? newSBId : null,
+    sbPageId,
     followupPageId: followupPage.id,
+    sbWarning: sbWriteError,   // null if SB Pool also succeeded
   });
 }
