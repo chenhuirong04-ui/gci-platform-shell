@@ -491,7 +491,8 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
     };
 
     setTasks(prev => [baseTask, ...prev]);
-    setSelectedTask(baseTask);
+    // Do NOT auto-open the follow-up panel after creation — the intake panel
+    // shows its own success state; opening QuickFollowUpPanel here confuses users.
 
     // ── Write to Notion Follow-up Log ──────────────────────────────────────
     ;(async () => {
