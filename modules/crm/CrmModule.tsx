@@ -501,18 +501,31 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
           : formData.email ? '邮件'
           : 'WhatsApp';
 
+        // Extract contact person from lastContext if mentioned
+        const contactPersonMatch = lastContext.match(/联系人[：:\s]+([A-Za-z一-龥]{1,20})/);
+        const contactPerson = contactPersonMatch?.[1]?.trim() || '';
+
+        // Collect Drive URLs from attachments that were already uploaded
+        const driveUrls = (formData.attachments || [])
+          .filter((a: any) => a.driveUrl)
+          .map((a: any) => ({ name: a.name || '', url: a.driveUrl }));
+
         const notionPayload = {
           clientName,
-          phone:        formData.phoneE164 || '',
-          whatsapp:     formData.whatsapp  || '',
-          email:        formData.email     || '',
-          countryCity:  formData.countryCity || '',
+          phone:          formData.phoneE164 || '',
+          whatsapp:       formData.whatsapp  || '',
+          email:          formData.email     || '',
+          countryCity:    formData.countryCity || '',
+          contactPerson,
           lastContext,
           goal,
           nextFollowUpAt: (formData.nextFollowUpAt || nowISO).slice(0, 10),
           followUpMethod,
-          owner: 'Chris',
-          source: followUpMethod,
+          owner:          'Chris',
+          source:         followUpMethod,
+          categories:     (formData as any).categories || '',
+          driveUrls:      driveUrls.length > 0 ? driveUrls : undefined,
+          businessType,
         };
 
         const base = typeof window !== 'undefined' ? window.location.origin : '';
@@ -534,15 +547,22 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
               t.id === baseTask.id ? { ...t, leadId: notionPageId } : t
             ));
           }
+          // Backfill sbId / customerCode if returned
+          if (result.sbId) {
+            setTasks(prev => prev.map(t =>
+              t.id === baseTask.id ? { ...t, customerCode: result.sbId, notionSbPageId: result.sbPageId } : t
+            ));
+          }
           showToast(`✓ 已同步到 Notion${result.sbId ? ' · ' + result.sbId : ''}`, 'success');
           syncFromNotion().catch((e: any) => console.warn('[LeadSubmit] sync after write failed', e));
         } else {
           console.error('[LeadSubmit] Notion write failed', result);
-          showToast(`已保存到本地，Notion 同步失败（${res.status}）— 请检查网络或联系管理员`, 'error');
+          const detail = result?.error || result?.detail?.message || res.status;
+          showToast(`⚠️ 已保存本地，Notion 同步失败（${detail}）`, 'error');
         }
       } catch (e: any) {
         console.error('[LeadSubmit] error writing to Notion', e?.message);
-        showToast('已保存到本地，Notion 连接失败 — 数据未同步到云端', 'error');
+        showToast('⚠️ 已保存本地，Notion 连接失败，请检查网络', 'error');
       }
     })();
     // ──────────────────────────────────────────────────────────────────────

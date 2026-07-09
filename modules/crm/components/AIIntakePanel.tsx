@@ -295,13 +295,16 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
   const [detectedFileType, setDetectedFileType] = useState<FileIntent>('followup_context');
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'idle'|'syncing'|'ok'|'warn'>('idle');
   const [cloudSyncMsg, setCloudSyncMsg] = useState('');
+  // Per-step save status (shown after save)
+  const [saveSteps, setSaveSteps] = useState<Array<{label: string; status: 'pending'|'ok'|'fail'|'skip'; detail?: string}>>([]);
 
   const hasInput = rawText.trim().length > 0 || attachments.length > 0;
 
   // ── Excel / CSV file parser (frontend-only, no API key) ──────────
-  const parseExcelFile = async (file: File) => {
+  const parseExcelFile = async (file: File, intent?: FileIntent) => {
     setXlsxStatus('parsing');
     setXlsxMsg('正在解析 Excel 报价单…');
+    const isCrmCtx = intent === 'customer_quote_record' || intent === 'boq' || intent === 'customer_inquiry';
     try {
       const XLSX = await import('xlsx');
       const ab = await file.arrayBuffer();
@@ -330,48 +333,84 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
           .replace(/[ 　​-‍﻿­]/g, '')
           .trim();
 
-      // Column keyword detection (simplified + traditional Chinese + English)
+      // Column keyword detection — includes CRM furniture/BOQ variants
+      // nkw: normalize a keyword the same way normHeader normalizes headers
+      const nkw = (s: string) => s.toLowerCase().replace(/\s/g, '').trim();
+
       const KW = {
-        item:  ['产品名称','品名','产品','名称','名稱','货物名称','貨物名稱','工程项目','分项','项目名称','furniture item','item','product','description'],
-        spec:  ['规格','規格','规格型号','尺寸','描述','spec','specification','size','dimension'],
+        item:  ['产品名称','品名','产品','名称','名稱','货物名称','貨物名稱','工程项目','分项','项目名称',
+                 'furniture item','item','product','description','家具名称','品类','物品名称'],
+        sku:   ['型号','货号','sku','编号','产品编号','model','货品编号'],
+        spec:  ['规格','規格','规格型号','尺寸','尺寸/mm','尺寸mm','描述','spec','specification','size','dimension'],
+        material: ['材质说明','材质','材料','材質','material','finish'],
+        room:  ['摆放空间','空间','区域','房间','room','area','location'],
         qty:   ['数量','數量','数','qty','quantity'],
         unit:  ['单位','單位','unit'],
         price: ['单价','單價','单价(aed)','单价aed','价格','目标价','报价单价','unit price','price','target price'],
         total: ['合计','合計','行合计','行小计','小计','金额','總價','总价','total','amount','subtotal','line total'],
         notes: ['备注','備注','说明','remark','remarks','notes','note','交期','交货期'],
+        refImg:['参考图片','图片','图','image','photo'],
       };
+
+      const matchesKW = (h: string, kws: string[]) =>
+        kws.some(k => { const nk = nkw(k); return h === nk || (h.length > 0 && h.includes(nk)); });
 
       // Find header row (first 20 rows, highest keyword score)
       let headerIdx = 0, bestScore = 0;
       for (let i = 0; i < Math.min(raw.length, 20); i++) {
         const row = (raw[i] || []).map((c: any) => normHeader(String(c ?? '')));
         let score = 0;
-        if (row.some((c: string) => KW.item.some(k => c === k || (c.length > 1 && c.includes(k))))) score += 4;
-        if (row.some((c: string) => KW.qty.some(k => c === k || (c.length > 1 && c.includes(k))))) score += 2;
-        if (row.some((c: string) => KW.price.some(k => c === k || (c.length > 1 && c.includes(k))))) score += 2;
-        if (row.some((c: string) => KW.total.some(k => c === k || (c.length > 1 && c.includes(k))))) score += 1;
+        if (row.some(h => matchesKW(h, KW.item))) score += 4;
+        if (row.some(h => matchesKW(h, KW.qty)))  score += 2;
+        if (row.some(h => matchesKW(h, KW.price))) score += 2;
+        if (row.some(h => matchesKW(h, KW.total))) score += 1;
+        if (isCrmCtx) {
+          if (row.some(h => matchesKW(h, KW.sku)))      score += 2;
+          if (row.some(h => matchesKW(h, KW.room)))     score += 2;
+          if (row.some(h => matchesKW(h, KW.material))) score += 1;
+          if (row.some(h => matchesKW(h, KW.spec)))     score += 1;
+        }
         if (score > bestScore) { bestScore = score; headerIdx = i; }
       }
 
       const headers = (raw[headerIdx] || []).map((c: any) => normHeader(String(c ?? '')));
       const findCol = (kws: string[]) =>
-        headers.findIndex((h: string) => kws.some(k => h === k || (h.length > 1 && h.includes(k))));
+        headers.findIndex((h: string) => matchesKW(h, kws));
 
       const COL = {
-        item:  findCol(KW.item),
-        spec:  findCol(KW.spec),
-        qty:   findCol(KW.qty),
-        unit:  findCol(KW.unit),
-        price: findCol(KW.price),
-        total: findCol(KW.total),
-        notes: findCol(KW.notes),
+        item:     findCol(KW.item),
+        sku:      findCol(KW.sku),
+        spec:     findCol(KW.spec),
+        material: findCol(KW.material),
+        room:     findCol(KW.room),
+        qty:      findCol(KW.qty),
+        unit:     findCol(KW.unit),
+        price:    findCol(KW.price),
+        total:    findCol(KW.total),
+        notes:    findCol(KW.notes),
+        refImg:   findCol(KW.refImg),
       };
+
+      // CRM fallback: if item col not found, pick first column with mostly text (non-numeric) values
+      if (COL.item === -1 && isCrmCtx) {
+        const dataRows = raw.slice(headerIdx + 1, headerIdx + 11);
+        const skipCols = new Set([COL.qty, COL.unit, COL.price, COL.total, COL.refImg].filter(c => c !== -1));
+        for (let ci = 0; ci < (raw[headerIdx] || []).length; ci++) {
+          if (skipCols.has(ci)) continue;
+          const vals = dataRows.map(r => String(r?.[ci] ?? '').trim()).filter(Boolean);
+          const textCount = vals.filter(v => isNaN(Number(v)) && !/^=/.test(v)).length;
+          if (textCount >= Math.min(3, Math.max(1, dataRows.length - 2))) { COL.item = ci; break; }
+        }
+      }
 
       if (COL.item === -1) {
         const detected = headers.filter(Boolean).slice(0, 8).join('、');
-        // Non-blocking: file saved as attachment, user can still create lead
         setXlsxStatus('warn');
-        setXlsxMsg(`文件已保存为附件，未能自动识别产品列（检测到：${detected || '(空)'}）。点击下方按钮继续整理客户线索。`);
+        if (isCrmCtx) {
+          setXlsxMsg('已识别为客户报价留底，文件已保存。产品明细暂未完全结构化，可继续保存客户记录；如需生成明细报价，可稍后进入报价/BOQ模块整理。');
+        } else {
+          setXlsxMsg(`文件已保存为附件，未能自动识别产品列（检测到：${detected || '(空)'}）。点击下方按钮继续整理客户线索。`);
+        }
         return;
       }
 
@@ -407,19 +446,36 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
         const lineTotal = !isNaN(rawTot) ? rawTot : (!isNaN(qty) && !isNaN(price) ? qty * price : NaN);
         if (!isNaN(lineTotal) && lineTotal > 0) sumTotal += lineTotal;
 
+        // Build description: prefer spec; fallback to material; suffix with sku if present
+        const specVal     = COL.spec     !== -1 ? String(row[COL.spec]     ?? '').trim() : '';
+        const materialVal = COL.material !== -1 ? String(row[COL.material] ?? '').trim() : '';
+        const skuVal      = COL.sku      !== -1 ? String(row[COL.sku]      ?? '').trim() : '';
+        const roomVal     = COL.room     !== -1 ? String(row[COL.room]     ?? '').trim() : '';
+        const descParts   = [specVal || materialVal, skuVal ? `[${skuVal}]` : ''].filter(Boolean);
+        // Build notes: existing notes + room label
+        const baseNotes  = COL.notes !== -1 ? String(row[COL.notes] ?? '').trim() : '';
+        const notesParts = [roomVal ? `空间：${roomVal}` : '', baseNotes].filter(Boolean);
+
         items.push({
           id: `LI_${Date.now()}_${i}`,
           item_name:     name,
-          description:   COL.spec  !== -1 ? String(row[COL.spec]  ?? '').trim() : '',
+          description:   descParts.join(' '),
           qty:           !isNaN(qty)   ? qty   : '',
           unit:          COL.unit  !== -1 ? String(row[COL.unit] ?? '件').trim() || '件' : '件',
           selling_price: !isNaN(price) ? price : '',
           line_total:    !isNaN(lineTotal) ? lineTotal : '',
-          item_notes:    COL.notes !== -1 ? String(row[COL.notes] ?? '').trim() : '',
+          item_notes:    notesParts.join(' | '),
         });
       }
 
-      if (items.length === 0) throw new Error('未能识别任何产品行，请检查文件格式（需含产品名称列）');
+      if (items.length === 0) {
+        if (isCrmCtx) {
+          setXlsxStatus('warn');
+          setXlsxMsg('已识别为客户报价留底，文件已保存。产品明细暂未完全结构化，可继续保存客户记录；如需生成明细报价，可稍后进入报价/BOQ模块整理。');
+          return;
+        }
+        throw new Error('未能识别任何产品行，请检查文件格式（需含产品名称列）');
+      }
 
       const grandTotal = detectedGrandTotal ?? (sumTotal > 0 ? sumTotal : null);
       const clientHint = optional.clientName.trim();
@@ -543,7 +599,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       // customer_quote_record: try parsing for record keeping, but won't trigger supplier quote flow
       // supplier_quote / customer_inquiry / boq: full parse + optional quote registration
       if (/\.(xlsx|xls|csv)$/i.test(f.name)) {
-        parseExcelFile(f);
+        parseExcelFile(f, intent);
       } else if (f.type === 'application/pdf' || f.type.startsWith('image/')) {
         parseFileWithAI(f.type, base64, f.name);
       }
@@ -629,6 +685,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
     setParsedFromFile(false); setXlsxStatus('idle'); setXlsxMsg('');
     setDetectedFileType('followup_context');
     setCloudSyncStatus('idle'); setCloudSyncMsg('');
+    setSaveSteps([]);
   };
 
   // ── line item helpers ─────────────────────────────────────────────
@@ -742,14 +799,34 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       categories: detectedFileType !== 'followup_context' ? detectedFileType : undefined,
     };
     try {
+      // Init step tracker before onAdd so user can see progress
+      const isCrmRecord = detectedFileType === 'customer_quote_record';
+      const hasAtts = attachments.some(a => a.data);
+      setSaveSteps([
+        { label: '本地保存', status: 'pending' },
+        { label: `Notion ${draft.type === 'PROJECT' ? '项目客户库' : '小客户池'} + 跟进记录`, status: 'pending' },
+        ...(isCrmRecord && hasAtts ? [{ label: 'Google Drive 附件', status: 'pending' as const }] : []),
+        ...(isCrmRecord ? [{ label: 'Supabase 报价留底', status: 'pending' as const }] : []),
+      ]);
+
       const savedTask = await onAdd(task) as any;
       const savedTaskId: string = savedTask?.id || task.contactKey || `CRM_${Date.now()}`;
       setSaved(true);
+      setSaveSteps(s => s.map(st => st.label === '本地保存' ? { ...st, status: 'ok' } : st));
+      // Notion write is async inside onAdd/CrmModule — we flag it as pending until toast comes
+      // (CrmModule shows toast; we optimistically mark ok after a short delay if no error toast seen)
+      setTimeout(() => {
+        setSaveSteps(s => s.map(st =>
+          st.label.startsWith('Notion') && st.status === 'pending'
+            ? { ...st, status: 'ok' }
+            : st
+        ));
+      }, 5000);
 
-      if (detectedFileType === 'customer_quote_record') {
+      if (isCrmRecord) {
         setCloudSyncStatus('syncing');
 
-        // Step 1: Upload attachments to Google Drive
+        // Step A: Upload attachments to Google Drive
         let uploadedAttachments = attachments;
         let driveFailedCount = 0;
         const hasUnuploaded = attachments.some(a => a.data && !a.driveUrl);
@@ -760,27 +837,32 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
               attachments,
               { businessType: draft.type, clientName: clientName || draft.clientName }
             );
-            // Merge driveUrls back (keep base64 data for Notion/CRM)
             uploadedAttachments = attachments.map((orig, i) => {
               const up = driveResult[i];
               return up?.driveUrl ? { ...orig, driveUrl: up.driveUrl } : orig;
             });
             driveFailedCount = failedCount;
+            setSaveSteps(s => s.map(st => st.label === 'Google Drive 附件'
+              ? { ...st, status: failedCount === 0 ? 'ok' : 'fail',
+                  detail: failedCount > 0 ? `${driveResult.length - failedCount}/${driveResult.length} 上传成功` : undefined }
+              : st));
           } catch {
             driveFailedCount = attachments.length;
+            setSaveSteps(s => s.map(st => st.label === 'Google Drive 附件'
+              ? { ...st, status: 'fail', detail: '上传异常' } : st));
           }
+        } else {
+          setSaveSteps(s => s.map(st => st.label === 'Google Drive 附件'
+            ? { ...st, status: 'skip', detail: '无新附件' } : st));
         }
 
-        // Step 2: Build attachment list with URLs
+        // Step B: Build attachment list with URLs
         const attWithUrls = uploadedAttachments.map(a => ({
-          name: a.name,
-          url:  a.driveUrl || '',
-          mimeType: a.type,
-          size: a.size,
+          name: a.name, url: a.driveUrl || '', mimeType: a.type, size: a.size,
         }));
         const uploadedCount = attWithUrls.filter(a => a.url).length;
 
-        // Step 3: Write to quotation_records (Supabase, server-side, all devices)
+        // Step C: Write to quotation_records (Supabase)
         setCloudSyncMsg('正在写入云端报价留底记录…');
         const cloudPayload = {
           customer_name:        clientName || draft.clientName,
@@ -811,34 +893,28 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
           });
           const data = await res.json().catch(() => ({}));
           if (data.ok) {
+            setSaveSteps(s => s.map(st => st.label === 'Supabase 报价留底' ? { ...st, status: 'ok' } : st));
             if (driveFailedCount > 0 && uploadedCount === 0) {
               setCloudSyncStatus('warn');
-              setCloudSyncMsg(
-                `报价留底记录已保存到云端，但附件上传 Drive 失败，国内同事暂时无法打开原文件。请检查 VITE_DRIVE_UPLOAD_URL 是否已在 Vercel 配置。`
-              );
-            } else if (driveFailedCount > 0) {
-              setCloudSyncStatus('ok');
-              setCloudSyncMsg(
-                `报价留底已上传云端。${uploadedCount} 个附件已上传 Drive，${driveFailedCount} 个失败。`
-              );
+              setCloudSyncMsg('报价留底已写入云端，但 Drive 上传失败，附件暂时无法共享。');
             } else if (uploadedCount > 0) {
               setCloudSyncStatus('ok');
-              setCloudSyncMsg(
-                `报价留底已上传云端，附件已存入 Google Drive。国内同事和 AI 均可查询和打开文件。`
-              );
+              setCloudSyncMsg(`报价留底 + ${uploadedCount} 个 Drive 附件已保存。国内同事和 AI 均可查询。`);
             } else {
               setCloudSyncStatus('ok');
-              setCloudSyncMsg('报价留底已写入云端，所有同事和 AI 均可查询。附件文件名已记录。');
+              setCloudSyncMsg('报价留底已写入云端，所有同事和 AI 均可查询。');
             }
           } else {
+            setSaveSteps(s => s.map(st => st.label === 'Supabase 报价留底' ? { ...st, status: 'fail', detail: data.error } : st));
             setCloudSyncStatus('warn');
             setCloudSyncMsg('本地已保存，但云端报价留底写入失败，国内同事暂时看不到。');
           }
         } catch {
+          setSaveSteps(s => s.map(st => st.label === 'Supabase 报价留底' ? { ...st, status: 'fail', detail: '网络错误' } : st));
           setCloudSyncStatus('warn');
           setCloudSyncMsg('本地已保存，但云端上传失败（网络错误），国内同事暂时看不到。');
         }
-        setTimeout(resetAll, 4000);
+        setTimeout(resetAll, 5000);
       } else if (registerQuote && quoteDraft?.isReady) {
         startQuoteFlow(quoteDraft);
       } else {
@@ -1117,10 +1193,29 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
 
             {/* Rows */}
             <div style={{ background: CARD2 }}>
+              {/* 客户类型选择 — 贸易客户写小客户池(SBxxx)，项目客户写项目客户库(PRJxxx) */}
+              <div className="flex items-center px-5 py-2.5 gap-3" style={{ borderBottom: `1px solid ${BORDER}` }}>
+                <span className="text-[10px] font-black uppercase tracking-widest w-16 shrink-0" style={{ color: T3 }}>类型</span>
+                <div className="flex gap-2">
+                  {(['TRADE', 'PROJECT'] as const).map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setDraft(d => d ? { ...d, type: t } : d)}
+                      style={{
+                        padding: '2px 10px', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                        border: `1px solid ${draft.type === t ? GOLD : BORDER}`,
+                        background: draft.type === t ? 'rgba(184,150,12,0.15)' : 'transparent',
+                        color: draft.type === t ? GOLD_L : T2, cursor: 'pointer',
+                      }}
+                    >
+                      {t === 'TRADE' ? '贸易询盘 (SB)' : '项目客户 (PRJ)'}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {([
                 ['标题', draft.title],
                 ['客户', draft.clientName],
-                ['类型', TYPE_LABEL[draft.type] ?? draft.type],
                 ...(attachments.length > 0 && detectedFileType !== 'followup_context'
                   ? [['附件类型', FILE_INTENT_LABEL[detectedFileType]]] : []),
                 ['来源', draft.source],
@@ -1489,7 +1584,26 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
             )}
 
             {/* Actions */}
-            {/* Cloud sync banner — only for customer_quote_record */}
+            {/* Per-step save status */}
+            {saveSteps.length > 0 && (
+              <div className="px-5 py-2 flex flex-col gap-1" style={{ borderTop: `1px solid ${BORDER}`, background: 'rgba(0,0,0,0.15)' }}>
+                {saveSteps.map(st => (
+                  <div key={st.label} className="flex items-center gap-2 text-[11px]">
+                    <span style={{ width: 14, textAlign: 'center', flexShrink: 0 }}>
+                      {st.status === 'pending' ? <span style={{ color: T3 }}>…</span>
+                        : st.status === 'ok'   ? <span style={{ color: '#6EE7B7' }}>✓</span>
+                        : st.status === 'fail' ? <span style={{ color: '#F87171' }}>✗</span>
+                        : <span style={{ color: T3 }}>–</span>}
+                    </span>
+                    <span style={{ color: st.status === 'ok' ? '#6EE7B7' : st.status === 'fail' ? '#F87171' : T2 }}>
+                      {st.label}
+                    </span>
+                    {st.detail && <span style={{ color: T3 }}>({st.detail})</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Cloud sync banner — customer_quote_record Drive/Supabase status */}
             {cloudSyncStatus !== 'idle' && (
               <div className="px-5 py-2.5 flex items-center gap-2 text-xs font-bold"
                 style={{

@@ -24,12 +24,16 @@ export interface WriteLeadPayload {
   whatsapp?: string;
   email?: string;
   countryCity?: string;
-  lastContext?: string;   // → notes + Follow-up Notes
-  goal?: string;          // → 下次行动内容
-  nextFollowUpAt?: string; // YYYY-MM-DD
+  contactPerson?: string;   // 联系人姓名
+  lastContext?: string;     // → notes + Follow-up Notes
+  goal?: string;            // → 下次行动内容
+  nextFollowUpAt?: string;  // YYYY-MM-DD
   followUpMethod?: string;
   owner?: string;
-  source?: string;        // WhatsApp | FB | 展厅 | 其他
+  source?: string;          // WhatsApp | FB | 展厅 | 其他
+  categories?: string;      // customer_quote_record | customer_inquiry | boq | supplier_quote
+  driveUrls?: Array<{ name: string; url: string }>; // uploaded Drive file links
+  businessType?: string;    // TRADE | PROJECT
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -173,6 +177,19 @@ export default async function handler(request: Request): Promise<Response> {
   console.log(`[notion-write-lead] SB Pool max=${maxFromPool}, FollowupLog max=${maxFromFollowup} → newId=${newSBId}`);
 
   // ── Step 1: Write to 小B/C客户池 ────────────────────────────────────────────
+  // Build enriched context note: prepend contact person + location + categories
+  const contextParts: string[] = [];
+  if (payload.contactPerson) contextParts.push(`联系人：${payload.contactPerson}`);
+  if (payload.countryCity)   contextParts.push(`地区：${payload.countryCity}`);
+  if (payload.categories === 'customer_quote_record') contextParts.push('【客户报价留底】');
+  else if (payload.categories === 'customer_inquiry') contextParts.push('【客户询价清单】');
+  else if (payload.categories === 'boq')              contextParts.push('【BOQ/工程清单】');
+  if (payload.driveUrls?.length) {
+    payload.driveUrls.forEach(f => f.url && contextParts.push(`附件：${f.name} → ${f.url}`));
+  }
+  if (payload.lastContext) contextParts.push(payload.lastContext);
+  const enrichedContext = contextParts.join('\n').slice(0, 2000);
+
   const sbProperties: Record<string, any> = {
     '客户名称': { title: [{ type: 'text', text: { content: payload.clientName.trim() } }] },
     '客户ID':   { rich_text: [{ type: 'text', text: { content: newSBId } }] },
@@ -184,8 +201,8 @@ export default async function handler(request: Request): Promise<Response> {
   if (payload.phone || payload.whatsapp) {
     sbProperties['电话/WhatsApp'] = { phone_number: (payload.whatsapp || payload.phone || '').trim() };
   }
-  if (payload.lastContext) {
-    sbProperties['最后沟通内容'] = { rich_text: [{ type: 'text', text: { content: payload.lastContext.slice(0, 2000) } }] };
+  if (enrichedContext) {
+    sbProperties['最后沟通内容'] = { rich_text: [{ type: 'text', text: { content: enrichedContext } }] };
   }
   if (followUpDate) {
     sbProperties['下次跟进日期'] = { date: { start: followUpDate } };
@@ -209,21 +226,33 @@ export default async function handler(request: Request): Promise<Response> {
 
   // ── Step 2: Write to Follow-up Log ──────────────────────────────────────────
   const followupTitle = `${newSBId} | ${payload.clientName.trim()}`;
-  const notes = [
-    payload.source ? `[来源: ${payload.source}]` : '',
-    payload.lastContext || '',
-  ].filter(Boolean).join('\n').slice(0, 2000);
+  const bizTypeLabel = payload.businessType === 'PROJECT' ? '项目型' : '贸易型';
+
+  // Build Follow-up Notes: rich context for anyone reading
+  const noteParts: string[] = [];
+  if (payload.source)        noteParts.push(`[来源: ${payload.source}]`);
+  if (payload.contactPerson) noteParts.push(`联系人：${payload.contactPerson}`);
+  if (payload.countryCity)   noteParts.push(`地区：${payload.countryCity}`);
+  if (payload.categories === 'customer_quote_record') noteParts.push('【客户报价留底】');
+  else if (payload.categories === 'customer_inquiry') noteParts.push('【客户询价清单】');
+  else if (payload.categories === 'boq')              noteParts.push('【BOQ/工程清单】');
+  if (payload.driveUrls?.length) {
+    payload.driveUrls.forEach(f => f.url && noteParts.push(`附件：${f.name} → ${f.url}`));
+  }
+  if (payload.lastContext) noteParts.push(payload.lastContext);
+  const followupNotes = noteParts.join('\n').slice(0, 2000);
 
   const followupProperties: Record<string, any> = {
     'Customer（客户）': { title: [{ type: 'text', text: { content: followupTitle } }] },
     '行动状态':  { select: { name: '新询盘' } },
-    '业务类型':  { select: { name: '贸易型' } },
+    '业务类型':  { select: { name: bizTypeLabel } },
     'Follow-up Date（跟进日期）':  { date: { start: today } },
     'Next Follow-up（下次跟进）':  { date: { start: followUpDate } },
     'Follow-up Method（跟进方式）': { select: { name: mapMethod(payload.followUpMethod) } },
   };
-  if (notes) {
-    followupProperties['Follow-up Notes（跟进内容'] = { rich_text: [{ type: 'text', text: { content: notes } }] };
+  if (followupNotes) {
+    // ⚠️ Field name must match Notion DB exactly (includes full-width brackets)
+    followupProperties['Follow-up Notes（跟进内容）'] = { rich_text: [{ type: 'text', text: { content: followupNotes } }] };
   }
   if (payload.goal) {
     followupProperties['下次行动内容'] = { rich_text: [{ type: 'text', text: { content: payload.goal.slice(0, 2000) } }] };
