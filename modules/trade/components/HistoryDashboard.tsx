@@ -847,10 +847,24 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
   const handleVoidOrder = async (orderId: string) => {
     if (!window.confirm(`确认作废订单 ${orderId}？\n作废后不计入统计，但保留记录。`)) return;
+    const targetOrder = (orders || []).find(o => o.id === orderId);
     const updated = (orders || []).map(o =>
       o.id === orderId ? { ...o, status: 'VOIDED' as any } : o
     );
     await persistence.updateOrders(updated);
+
+    // If this was a Consignment order, mark its consignment_stock entries as cancelled
+    if ((targetOrder as any)?.transactionMode === 'Consignment') {
+      try {
+        const stockItems = await persistence.getConsignmentStock(orderId);
+        for (const item of stockItems) {
+          await persistence.updateConsignmentStock({ ...item, state: 'cancelled' } as any);
+        }
+      } catch (e) {
+        console.warn('[VoidOrder] Failed to cancel consignment_stock for', orderId, e);
+      }
+    }
+
     await loadLocalData();
     setSelectedOrder(null);
     alert(`✅ 订单 ${orderId} 已作废`);
