@@ -95,10 +95,15 @@ function buildOrderReceivables(dbRows: any[], now: number) {
 }
 
 // ── B. Consignment receivables ───────────────────────────────────────────────
+// Caliber: consignedQty × taxInclusiveUnitPrice (or unitPrice×1.05) − receivedAmount
+// Matches ConsignmentManager page "待结算金额" exactly.
+// settlementStatus=SETTLED records are excluded (already settled).
 
 const SETTLE_ZH: Record<string, string> = {
   UNSETTLED: '未结算', PARTIAL: '部分结算', SETTLED: '已结算',
 };
+
+const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 function buildConsignmentReceivables(dbRows: any[]) {
   const payloads = dbRows.map(r => r.payload).filter(Boolean);
@@ -106,28 +111,42 @@ function buildConsignmentReceivables(dbRows: any[]) {
   const rows = payloads.filter(p => p.settlementStatus !== 'SETTLED');
 
   const records = rows.map(p => {
-    const soldQty       = Number(p.soldQty)        || 0;
-    const unitPrice     = Number(p.unitPrice)       || 0;
-    const receivedAmt   = Number(p.receivedAmount)  || 0;
-    const soldAmount    = soldQty * unitPrice;
-    const outstanding   = Math.max(0, soldAmount - receivedAmt);
+    const consignedQty  = Number(p.consignedQty)           || 0;
+    const unitPrice     = Number(p.unitPrice)               || 0;
+    const receivedAmt   = Number(p.receivedAmount)          || 0;
+    const vatIncluded   = Boolean(p.vatIncluded);
+
+    // Tax-inclusive unit price: use stored field if present, else unitPrice × 1.05
+    const inclUnitPrice = p.taxInclusiveUnitPrice != null
+      ? Number(p.taxInclusiveUnitPrice)
+      : r2(unitPrice * 1.05);
+
+    // Gross batch value: use stored amount when vatIncluded, else compute from consignedQty
+    const grossValue = vatIncluded && p.amount != null
+      ? Number(p.amount)
+      : r2(consignedQty * inclUnitPrice);
+
+    const outstanding = Math.max(0, r2(grossValue - receivedAmt));
+
     return {
       soNo:             p.soNo || '—',
       customerName:     (p.customerName || '—').trim(),
       productName:      p.productName  || '—',
-      consignedQty:     Number(p.consignedQty)  || 0,
-      soldQty,
-      remainingQty:     Number(p.remainingQty)   || 0,
+      consignedQty,
+      soldQty:          Number(p.soldQty)       || 0,
+      remainingQty:     Number(p.remainingQty)  || 0,
       unitPrice,
-      soldAmount,
+      inclUnitPrice,
+      grossValue,
       receivedAmount:   receivedAmt,
       outstanding,
       settlementStatus: p.settlementStatus || 'UNSETTLED',
       settlementZh:     SETTLE_ZH[p.settlementStatus] || p.settlementStatus,
     };
-  }).sort((a, b) => b.outstanding - a.outstanding);
+  }).filter(r => r.outstanding > 0 || r.settlementStatus !== 'SETTLED')
+    .sort((a, b) => b.outstanding - a.outstanding);
 
-  const customerNames  = new Set(records.map(r => r.customerName));
+  const customerNames    = new Set(records.map(r => r.customerName));
   const totalOutstanding = records.reduce((s, r) => s + r.outstanding, 0);
 
   return {
@@ -135,7 +154,7 @@ function buildConsignmentReceivables(dbRows: any[]) {
     customerCount: customerNames.size,
     soCount:       records.length,
     records,
-    note: 'soldQty × unitPrice − receivedAmount，settlementStatus ≠ SETTLED。寄售批次价格仅为该批次价，不等于产品主库标准价。',
+    note: '按寄售管理页面口径：consignedQty × 含税单价 − receivedAmount，settlementStatus ≠ SETTLED。代表已发给客户尚未结算完成的寄售货值。',
   };
 }
 

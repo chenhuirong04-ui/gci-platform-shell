@@ -936,7 +936,7 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                     <div style={{ fontSize: 9, color: SUBTLE, marginTop: 3 }}>来源：orders</div>
                   </div>
                   <div style={CARD_S}>
-                    <div style={{ fontSize: 9, color: MUTED, marginBottom: 3, letterSpacing: '0.05em' }}>寄售应收</div>
+                    <div style={{ fontSize: 9, color: MUTED, marginBottom: 3, letterSpacing: '0.05em' }}>寄售待结算货值</div>
                     <div style={{ fontSize: 15, fontWeight: 700, color: CR && CR.total > 0 ? GOLD : TEXT }}>AED {CR ? Number(CR.total).toLocaleString() : '—'}</div>
                     {CR && <div style={{ fontSize: 10, color: MUTED, marginTop: 2 }}>{CR.customerCount} 客户 · {CR.soCount} SO</div>}
                     <div style={{ fontSize: 9, color: SUBTLE, marginTop: 3 }}>来源：consignment_stock</div>
@@ -978,9 +978,9 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                   {OR && <div style={{ fontSize: 9, color: SUBTLE, marginTop: 6 }}>{OR.note}</div>}
                 </div>
 
-                {/* Section B: 寄售应收 */}
+                {/* Section B: 寄售待结算货值 */}
                 <div style={SEC}>
-                  <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 6, letterSpacing: '0.04em' }}>寄售应收 / CONSIGNMENT RECEIVABLES</div>
+                  <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 6, letterSpacing: '0.04em' }}>寄售待结算货值 / CONSIGNMENT PENDING</div>
                   {!CR ? (
                     <div style={{ fontSize: 12, color: MUTED }}>查询失败</div>
                   ) : CR.soCount === 0 ? (
@@ -997,7 +997,8 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                             <span style={{ fontSize: 12, fontWeight: 700, color: GOLD, whiteSpace: 'nowrap' }}>AED {Number(r.outstanding).toLocaleString()}</span>
                           </div>
                           <div style={{ fontSize: 10, color: MUTED, marginTop: 1 }}>
-                            SO {r.soNo} · {r.productName} · 已售 {r.soldQty} × {r.unitPrice} AED
+                            SO {r.soNo} · {r.productName} · 发货 {r.consignedQty} 件 · 含税单价 AED {Number(r.inclUnitPrice).toFixed(2)}
+                            · 已售 {r.soldQty} 件 · 剩余 {r.remainingQty} 件
                             {r.receivedAmount > 0 ? ` · 已收 AED ${Number(r.receivedAmount).toLocaleString()}` : ''}
                           </div>
                         </div>
@@ -1005,6 +1006,9 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                     </div>
                   )}
                   {CR && <div style={{ fontSize: 9, color: SUBTLE, marginTop: 6 }}>{CR.note}</div>}
+                  <div style={{ fontSize: 9, color: SUBTLE, marginTop: 4, fontStyle: 'italic' }}>
+                    ℹ 该金额按寄售批次货值统计，与"已售数量应收"不同；如需查看已售数量，请进入寄售管理模块。
+                  </div>
                 </div>
 
                 {/* Section C: 发票应收 */}
