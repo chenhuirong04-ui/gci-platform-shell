@@ -292,6 +292,8 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
   const [xlsxStatus, setXlsxStatus] = useState<'idle'|'parsing'|'done'|'error'|'warn'>('idle');
   const [xlsxMsg, setXlsxMsg]       = useState('');
   const [detectedFileType, setDetectedFileType] = useState<FileIntent>('followup_context');
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'idle'|'syncing'|'ok'|'warn'>('idle');
+  const [cloudSyncMsg, setCloudSyncMsg] = useState('');
 
   const hasInput = rawText.trim().length > 0 || attachments.length > 0;
 
@@ -625,6 +627,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
     setLineItems([]); setShowItems(false);
     setParsedFromFile(false); setXlsxStatus('idle'); setXlsxMsg('');
     setDetectedFileType('followup_context');
+    setCloudSyncStatus('idle'); setCloudSyncMsg('');
   };
 
   // ── line item helpers ─────────────────────────────────────────────
@@ -738,10 +741,60 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       categories: detectedFileType !== 'followup_context' ? detectedFileType : undefined,
     };
     try {
-      await onAdd(task);
+      const savedTask = await onAdd(task) as any;
+      const savedTaskId: string = savedTask?.id || task.contactKey || `CRM_${Date.now()}`;
       setSaved(true);
-      if (registerQuote && quoteDraft?.isReady) {
-        // kick off quote flow (keeps draft card visible until done)
+
+      if (detectedFileType === 'customer_quote_record') {
+        // 云端留底：写入 quotation_records（所有同事和 AI 可查）
+        setCloudSyncStatus('syncing');
+        setCloudSyncMsg('正在写入云端报价留底…');
+        const attNames = attachments.map(a => a.name).filter(Boolean);
+        const cloudPayload = {
+          customer_name:        clientName || draft.clientName,
+          project_name:         draft.title || null,
+          grand_total:          quoteDraft?.grandTotal ?? 0,
+          status:               'CRM_留底',
+          quote_type:           'CRM_RECORD',
+          quote_date:           draft.dueDate || new Date().toISOString().slice(0, 10),
+          salesperson:          draft.assignedTo === '本人' ? 'Chris' : draft.assignedTo,
+          phone_wa:             optional.whatsapp || optional.phoneE164 || null,
+          source_task_id:       savedTaskId,
+          crm_attachment_names: attNames,
+          crm_notes:            draft.nextAction,
+          items:                lineItems.filter(li => li.item_name.trim()).map(li => ({
+            item_name:     li.item_name,
+            description:   li.description,
+            qty:           Number(li.qty) || 1,
+            unit:          li.unit,
+            selling_price: Number(li.selling_price) || 0,
+            line_total:    Number(li.line_total) || 0,
+          })),
+        };
+        try {
+          const res = await fetch('/api/ai/register-quotation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(cloudPayload),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (data.ok) {
+            setCloudSyncStatus('ok');
+            setCloudSyncMsg(
+              attNames.length > 0
+                ? `报价留底已上传云端（${attNames.join('、')}）。附件文件名已记录，国内同事可在 AI 查询历史报价时查到。`
+                : '报价留底已写入云端，所有同事和 AI 均可查询。'
+            );
+          } else {
+            setCloudSyncStatus('warn');
+            setCloudSyncMsg('本地已保存，但云端报价留底上传失败，国内同事暂时看不到。');
+          }
+        } catch {
+          setCloudSyncStatus('warn');
+          setCloudSyncMsg('本地已保存，但云端上传失败（网络错误），国内同事暂时看不到。');
+        }
+        setTimeout(resetAll, 3500);
+      } else if (registerQuote && quoteDraft?.isReady) {
         startQuoteFlow(quoteDraft);
       } else {
         setTimeout(resetAll, 1500);
@@ -1391,6 +1444,28 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
             )}
 
             {/* Actions */}
+            {/* Cloud sync banner — only for customer_quote_record */}
+            {cloudSyncStatus !== 'idle' && (
+              <div className="px-5 py-2.5 flex items-center gap-2 text-xs font-bold"
+                style={{
+                  borderTop: `1px solid ${BORDER}`,
+                  background: cloudSyncStatus === 'ok' ? 'rgba(5,150,105,0.07)'
+                    : cloudSyncStatus === 'warn' ? 'rgba(245,158,11,0.07)'
+                    : 'rgba(99,102,241,0.07)',
+                  color: cloudSyncStatus === 'ok' ? '#6EE7B7'
+                    : cloudSyncStatus === 'warn' ? '#FCD34D'
+                    : '#A5B4FC',
+                }}>
+                {cloudSyncStatus === 'syncing' ? (
+                  <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin shrink-0" />
+                ) : cloudSyncStatus === 'ok' ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                )}
+                <span>{cloudSyncMsg}</span>
+              </div>
+            )}
             <div className="px-5 py-4 flex flex-wrap gap-3" style={{ background: CARD2, borderTop: `1px solid ${BORDER}` }}>
               <button onClick={handleSave} disabled={isLoading || saved || isEditing}
                 className="flex-1 min-w-[120px] py-3 rounded-xl text-sm font-black text-white transition-all active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"

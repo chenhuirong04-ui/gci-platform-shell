@@ -85,7 +85,7 @@ export default async function handler(request: Request): Promise<Response> {
   const normalizedCustomer = rawCustomer ? cleanCustomer(rawCustomer) : '';
   const searchTerms        = normalizedCustomer ? generateSearchTerms(normalizedCustomer) : [];
 
-  const selectCols = 'id,quote_no,customer_name,project_name,grand_total,status,created_at,quote_date,salesperson,quote_type,margin_percent,vat_amount,selling_total,archivedAt,hiddenFromDefault,archiveReason';
+  const selectCols = 'id,quote_no,customer_name,project_name,grand_total,status,created_at,quote_date,salesperson,quote_type,phone_wa,margin_percent,vat_amount,selling_total,archivedAt,hiddenFromDefault,archiveReason';
 
   // When a product keyword is provided, we first find quotation_items matching
   // the product, then filter records to only those containing that item.
@@ -217,26 +217,38 @@ export default async function handler(request: Request): Promise<Response> {
 
   const quotes = rows.map(q => {
     const isArchived = !!(q.archivedAt || q.hiddenFromDefault);
+    const isCrmRecord = q.quote_type === 'CRM_RECORD';
+    // Extract sourceTaskId from phone_wa (format: 'CRM_TASK:{id}')
+    const sourceTaskId = isCrmRecord && q.phone_wa?.startsWith('CRM_TASK:')
+      ? q.phone_wa.replace('CRM_TASK:', '')
+      : null;
     return {
       id:           q.id,
+      source:       isCrmRecord ? 'crm_customer_quote_record' : 'quotation_records',
       quoteNo:      q.quote_no      || '—',
       customerName: q.customer_name || '—',
       projectName:  q.project_name  || '',
-      grandTotal:   Number(q.grand_total)  || 0,
+      grandTotal:   isCrmRecord && Number(q.grand_total) === 0 ? null : (Number(q.grand_total) || 0),
       sellingTotal: Number(q.selling_total) || 0,
       vatAmount:    Number(q.vat_amount)   || 0,
       margin:       Number(q.margin_percent) || 0,
       currency:     'AED',
       status:       q.status || 'DRAFT',
-      statusZh:     STATUS_ZH[q.status] || q.status,
+      statusZh:     isCrmRecord ? '客户报价留底' : (STATUS_ZH[q.status] || q.status),
       quoteType:    q.quote_type || 'CUSTOM',
       salesperson:  q.salesperson || '',
       quoteDate:    q.quote_date || q.created_at || '',
       createdAt:    q.created_at || '',
-      items:        itemsMap[q.id]?.valid       || [],
+      items:        isCrmRecord ? [] : (itemsMap[q.id]?.valid || []),
       hiddenInvalidItemsCount: itemsMap[q.id]?.hiddenCount || 0,
       isArchived,
       archiveReason: q.archiveReason || null,
+      // CRM留底专用
+      ...(isCrmRecord ? {
+        amountStatus:  Number(q.grand_total) > 0 ? 'structured' : 'not_structured',
+        sourceTaskId,
+        attachmentNote: q.project_name || null,
+      } : {}),
     };
   });
 

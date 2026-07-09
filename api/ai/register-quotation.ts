@@ -75,22 +75,49 @@ export default async function handler(request: Request): Promise<Response> {
       return json({ ok: false, error: 'Invalid JSON body' }, 400);
     }
 
-    const { quote_no, customer_name, project_name, grand_total, status, quote_date, salesperson, quote_type, phone_wa } = body;
+    const {
+      quote_no, customer_name, project_name, grand_total, status,
+      quote_date, salesperson, quote_type, phone_wa,
+      // CRM留底专用字段
+      source_task_id, crm_attachment_names, crm_notes,
+    } = body;
 
     if (!customer_name) return json({ ok: false, error: 'customer_name is required' }, 400);
-    if (!grand_total && grand_total !== 0) return json({ ok: false, error: 'grand_total is required' }, 400);
+    const isCrmRecord = quote_type === 'CRM_RECORD';
+    // CRM留底允许 grand_total 为 null（未结构化报价单）
+    if (!isCrmRecord && !grand_total && grand_total !== 0)
+      return json({ ok: false, error: 'grand_total is required' }, 400);
 
     const now = new Date().toISOString();
+
+    // CRM留底：project_name 用于存附件名 + 摘要
+    let projectNameVal: string | null = (project_name || '').trim() || null;
+    if (isCrmRecord && crm_attachment_names) {
+      const attStr = Array.isArray(crm_attachment_names)
+        ? crm_attachment_names.join(', ')
+        : String(crm_attachment_names);
+      projectNameVal = `[留底] ${attStr}`.slice(0, 500);
+    }
+    if (isCrmRecord && crm_notes && !projectNameVal) {
+      projectNameVal = `[留底] ${crm_notes}`.slice(0, 500);
+    }
+
+    // CRM留底：phone_wa 存 sourceTaskId 以便反查
+    let phoneWaVal: string | null = phone_wa || null;
+    if (isCrmRecord && source_task_id) {
+      phoneWaVal = `CRM_TASK:${source_task_id}`;
+    }
+
     const record = {
-      quote_no:      quote_no || `AI-${now.slice(0,10).replace(/-/g,'')}-${Math.random().toString(36).slice(2,6).toUpperCase()}`,
+      quote_no:      quote_no || `CRM-${now.slice(0,10).replace(/-/g,'')}-${Math.random().toString(36).slice(2,6).toUpperCase()}`,
       customer_name: customer_name.trim(),
-      project_name:  (project_name || '').trim() || null,
-      grand_total:   Number(grand_total) || 0,
-      status:        status || 'GENERATED',
+      project_name:  projectNameVal,
+      grand_total:   isCrmRecord ? (Number(grand_total) || 0) : (Number(grand_total) || 0),
+      status:        status || (isCrmRecord ? 'CRM_留底' : 'GENERATED'),
       quote_date:    quote_date || now.split('T')[0],
       salesperson:   salesperson || 'Chris',
       quote_type:    quote_type || 'TRADE',
-      phone_wa:      phone_wa || null,
+      phone_wa:      phoneWaVal,
       created_at:    now,
       updated_at:    now,
     };
