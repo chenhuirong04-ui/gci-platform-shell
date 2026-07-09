@@ -41,6 +41,7 @@ function isInternalTask(text: string): boolean {
 interface FollowUpDraft {
   title: string;
   clientName: string;
+  contactPerson: string;
   type: BusinessType | 'INTERNAL';
   source: string;
   priority: 'High' | 'Medium' | 'Low';
@@ -72,22 +73,58 @@ function analyseInput(text: string, hasFiles: boolean): FollowUpDraft {
   if (/urgent|紧急|asap|今天|立刻/i.test(text)) priority = 'High';
   else if (/low|不急|慢慢|暂时/i.test(text)) priority = 'Low';
 
-  let clientName = '待确认';
-  // Priority 1: explicit new-customer Chinese/English patterns
-  const custMatch =
-    text.match(/(?:新增|录入|添加|创建)\s*客户\s+([A-Za-z0-9一-鿿]{1,20})/i) ||
-    text.match(/(?:新增|录入|添加|创建)\s+([A-Za-z0-9一-鿿]{1,20})\s*(?:这个)?客户/i) ||
-    text.match(/把\s+([A-Za-z0-9一-鿿]{1,20})\s*加入(?:客户池|客户)?/i) ||
-    text.match(/(?:add|create|new)\s+customer\s+([A-Za-z0-9]{1,20})/i) ||
-    text.match(/客户\s+([A-Za-z0-9一-鿿]{1,20})(?:\s|，|,|$)/i) ||
-    text.match(/([A-Za-z0-9一-鿿]{1,20})\s*这个客户/i);
-  if (custMatch) {
-    clientName = custMatch[1].trim();
-  } else {
-    // Fallback: formal company name ending in LLC/FZCO/Ltd etc.
-    const co = text.match(/([A-Z][A-Za-z&\s]{2,30}(?:LLC|FZCO|Ltd|Co|Corp|Group|Trading|Co\.|Ltd\.|Inc|FZE|EST|Establishment))/);
-    if (co) clientName = co[1].trim();
+  // ── Extract contact person (联系人) first, before clientName, so we don't confuse the two ──
+  let contactPerson = '';
+  const cpMatch = text.match(/联系人[：:\s]+([A-Za-z一-鿿]{1,25})/i);
+  if (cpMatch) contactPerson = cpMatch[1].trim();
+
+  // ── Extract client name ──────────────────────────────────────────────────────
+  // Strip 联系人 clause before matching to avoid picking up the contact name as client
+  const textForClient = contactPerson
+    ? text.replace(/联系人[：:\s]+[A-Za-z一-鿿]{1,25}/gi, '')
+    : text;
+
+  let clientName = '';
+  let clientConfidence: 'high' | 'medium' | 'low' = 'low';
+
+  // Priority 1 — explicit "new customer" intent (high confidence, no "待确认" needed)
+  const highMatch =
+    // 新增/录入/添加/创建/增加 + optional "一个贸易" etc + 客户 + optional separator + name
+    textForClient.match(/(?:新增|录入|添加|创建|增加)\s*(?:一个?|一位|个|位)?\s*(?:贸易|项目|新|小)?\s*客户\s*[,，:：\s]*([A-Za-z0-9一-鿿]{1,25})/i) ||
+    // name + 这个客户
+    textForClient.match(/([A-Za-z0-9一-鿿]{1,20})\s*(?:这个|这位|该)\s*客户/i) ||
+    // 把 name 加入客户池
+    textForClient.match(/把\s*([A-Za-z0-9一-鿿]{1,20})\s*加入(?:客户池|客户库|客户)?/i) ||
+    // add/create/new customer name
+    textForClient.match(/(?:add|create|new)\s+(?:customer|client|trade|project)\s+([A-Za-z0-9]{1,20})/i) ||
+    // 新客户 name
+    textForClient.match(/新客户\s*[,，:：\s]*([A-Za-z0-9一-鿿]{1,25})/i);
+
+  if (highMatch) {
+    clientName = highMatch[1].trim();
+    clientConfidence = 'high';
   }
+
+  // Priority 2 — implied patterns (medium confidence, show "（待确认）")
+  if (!clientName) {
+    const medMatch =
+      // 客户 name
+      textForClient.match(/客户\s+([A-Za-z0-9一-鿿]{1,20})(?:\s|，|,|$)/i) ||
+      // name 问/要/发/找/说 (name before action verb at sentence start)
+      textForClient.match(/^([A-Z][A-Za-z0-9]{1,14}|[一-鿿]{2,8})\s+(?:问|要|发|找|说|在询|来询|询价|下单|需要)/i);
+    if (medMatch) {
+      clientName = medMatch[1].trim() + '（待确认）';
+      clientConfidence = 'medium';
+    }
+  }
+
+  // Priority 3 — formal company name with legal suffix
+  if (!clientName) {
+    const co = textForClient.match(/([A-Z][A-Za-z&\s]{2,30}(?:LLC|FZCO|Ltd|Co|Corp|Group|Trading|Co\.|Ltd\.|Inc|FZE|EST|Establishment))/);
+    if (co) { clientName = co[1].trim(); clientConfidence = 'high'; }
+  }
+
+  const displayClientName = clientName || '待确认';
 
   let nextAction = '确认需求并回复';
   if (/confirm|确认/i.test(text)) nextAction = '确认相关信息并回复';
@@ -107,15 +144,20 @@ function analyseInput(text: string, hasFiles: boolean): FollowUpDraft {
 
   const missingFields: string[] = [];
   if (!internal) {
-    if (clientName === '待确认') missingFields.push('客户名称');
-    missingFields.push('联系方式');
+    // Only flag missing if truly no name found at all
+    if (!clientName) missingFields.push('客户名称');
+    // Always remind about contact info unless already present
+    if (!text.match(/\+?\d[\d\s\-]{7,}/)) missingFields.push('联系方式');
   }
 
   const tom = new Date();
   tom.setDate(tom.getDate() + 1);
 
   return {
-    title, clientName, type, source, priority, assignedTo,
+    title,
+    clientName: displayClientName,
+    contactPerson,
+    type, source, priority, assignedTo,
     nextAction, dueDate: tom.toISOString().slice(0, 10),
     notes: text.slice(0, 300), missingFields,
   };
@@ -780,7 +822,9 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
     if (!draft) return;
     setErrorMsg('');
     const isInternal = draft.type === 'INTERNAL';
-    const clientName = optional.clientName || (isInternal ? '' : (draft.clientName === '待确认' ? '未知客户' : draft.clientName));
+    // Strip "（待确认）" suffix before saving — it's a display hint, not real data
+    const rawClientName = optional.clientName || (isInternal ? '' : draft.clientName.replace(/（待确认）$/, '').trim());
+    const clientName = rawClientName || (isInternal ? '' : '未知客户');
     const contactKey = (optional.whatsapp || optional.phoneE164 || optional.email || '').replace(/[\s+]/g,'').toLowerCase();
     // Build lastContext: include quote record status if applicable
     let lastContextNote = draft.notes;
@@ -806,6 +850,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       attachments, inquirySummary: draft.title,
       categories: detectedFileType !== 'followup_context' ? detectedFileType : undefined,
       tradeStatus: tradeStatus as any,
+      contactPerson: draft.contactPerson || undefined,
     };
     try {
       // Init step tracker before onAdd so user can see progress
@@ -1251,6 +1296,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
               {([
                 ['标题', draft.title],
                 ['客户', draft.clientName],
+                ...(draft.contactPerson ? [['联系人', draft.contactPerson]] : [['联系人', '待补充']]),
                 ...(attachments.length > 0 && detectedFileType !== 'followup_context'
                   ? [['附件类型', FILE_INTENT_LABEL[detectedFileType]]] : []),
                 ['来源', draft.source],
