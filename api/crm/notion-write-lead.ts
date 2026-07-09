@@ -34,6 +34,7 @@ export interface WriteLeadPayload {
   categories?: string;      // customer_quote_record | customer_inquiry | boq | supplier_quote
   driveUrls?: Array<{ name: string; url: string }>; // uploaded Drive file links
   businessType?: string;    // TRADE | PROJECT
+  tradeStatus?: string;     // 行动状态: 新询盘 | 待报价 | 已报价 | 等待客户回复 | 待签合同 | 已成交 | 已完成 | 暂缓
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -193,7 +194,7 @@ export default async function handler(request: Request): Promise<Response> {
   const sbProperties: Record<string, any> = {
     '客户名称': { title: [{ type: 'text', text: { content: payload.clientName.trim() } }] },
     '客户ID':   { rich_text: [{ type: 'text', text: { content: newSBId } }] },
-    '当前状态': { select: { name: '新询价' } },
+    '当前状态': { select: { name: payload.tradeStatus || '新询价' } },
     '需求等级': { select: { name: 'B — 正常询价' } },
     '下一步动作': { select: { name: '二次跟进' } },
     '来源':     { select: { name: mapSource(payload.source || payload.followUpMethod) } },
@@ -242,9 +243,12 @@ export default async function handler(request: Request): Promise<Response> {
   if (payload.lastContext) noteParts.push(payload.lastContext);
   const followupNotes = noteParts.join('\n').slice(0, 2000);
 
+  // Map user-selected status; fallback 新询盘 for TRADE
+  const statusLabel = payload.tradeStatus || '新询盘';
+
   const followupProperties: Record<string, any> = {
     'Customer（客户）': { title: [{ type: 'text', text: { content: followupTitle } }] },
-    '行动状态':  { select: { name: '新询盘' } },
+    '行动状态':  { select: { name: statusLabel } },
     '业务类型':  { select: { name: bizTypeLabel } },
     'Follow-up Date（跟进日期）':  { date: { start: today } },
     'Next Follow-up（下次跟进）':  { date: { start: followUpDate } },

@@ -510,7 +510,10 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
           .filter((a: any) => a.driveUrl)
           .map((a: any) => ({ name: a.name || '', url: a.driveUrl }));
 
-        const notionPayload = {
+        // tradeStatus from task (set by AIIntakePanel type selector)
+        const tradeStatus = (formData as any).tradeStatus || (businessType === 'TRADE' ? '新询盘' : '新建');
+
+        const basePayload = {
           clientName,
           phone:          formData.phoneE164 || '',
           whatsapp:       formData.whatsapp  || '',
@@ -526,12 +529,31 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
           categories:     (formData as any).categories || '',
           driveUrls:      driveUrls.length > 0 ? driveUrls : undefined,
           businessType,
+          tradeStatus,
         };
 
         const base = typeof window !== 'undefined' ? window.location.origin : '';
-        // TRADE → notion-write-lead (SB Pool first, then Follow-up Log)
+        // TRADE → notion-write-lead (贸易客户池 SBxxx + Follow-up Log)
+        // PROJECT → notion-write-project (项目客户表 + Follow-up Log)
         // Others → notion-create (Follow-up Log only)
-        const endpoint = businessType === 'TRADE' ? '/api/crm/notion-write-lead' : '/api/crm/notion-create';
+        let endpoint: string;
+        if (businessType === 'TRADE') {
+          endpoint = '/api/crm/notion-write-lead';
+        } else if (businessType === 'PROJECT') {
+          endpoint = '/api/crm/notion-write-project';
+        } else {
+          endpoint = '/api/crm/notion-create';
+        }
+
+        // notion-create uses slightly different field names
+        const notionPayload = businessType === 'LOG_ONLY' ? {
+          ...basePayload,
+          tradeStatus,
+          followUpNotes: lastContext,
+          nextAction: goal,
+          followUpDate: new Date().toISOString().slice(0, 10),
+        } : basePayload;
+
         const res = await fetch(`${base}${endpoint}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -540,24 +562,33 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
         const result = await res.json();
 
         if (res.ok) {
-          // Backfill the real Notion pageId so future archive/restore calls work
-          const notionPageId = result.followUpLogPageId || result.followupPageId || result.pageId;
+          // Backfill Notion page IDs so future archive/restore calls work
+          const notionPageId = result.followupPageId || result.followUpLogPageId || result.pageId;
           if (notionPageId) {
             setTasks(prev => prev.map(t =>
               t.id === baseTask.id ? { ...t, leadId: notionPageId } : t
             ));
           }
-          // Backfill sbId / customerCode if returned
+          // Backfill customer code
           if (result.sbId) {
             setTasks(prev => prev.map(t =>
-              t.id === baseTask.id ? { ...t, customerCode: result.sbId, notionSbPageId: result.sbPageId } : t
+              t.id === baseTask.id
+                ? { ...t, customerCode: result.sbId, notionSbPageId: result.sbPageId }
+                : t
             ));
           }
-          showToast(`✓ 已同步到 Notion${result.sbId ? ' · ' + result.sbId : ''}`, 'success');
+          if (result.projectPageId) {
+            setTasks(prev => prev.map(t =>
+              t.id === baseTask.id ? { ...t, notionProjectPageId: result.projectPageId } : t
+            ));
+          }
+          const codeLabel = result.sbId ? ` · ${result.sbId}` : '';
+          const dbLabel = businessType === 'TRADE' ? '贸易客户池' : businessType === 'PROJECT' ? '项目客户表' : 'Follow-up Log';
+          showToast(`✓ 已同步到 Notion ${dbLabel}${codeLabel}`, 'success');
           syncFromNotion().catch((e: any) => console.warn('[LeadSubmit] sync after write failed', e));
         } else {
           console.error('[LeadSubmit] Notion write failed', result);
-          const detail = result?.error || result?.detail?.message || res.status;
+          const detail = result?.error || result?.detail?.message || String(res.status);
           showToast(`⚠️ 已保存本地，Notion 同步失败（${detail}）`, 'error');
         }
       } catch (e: any) {

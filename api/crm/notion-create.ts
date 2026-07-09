@@ -25,6 +25,10 @@ export interface NotionCreatePayload {
   followUpMethod?: string;     // → Follow-up Method (select)
   owner?: string;              // → Follow-up Owner (select)
   source?: string;             // appended to followUpNotes as [来源: xxx]
+  contactPerson?: string;
+  countryCity?: string;
+  categories?: string;
+  driveUrls?: Array<{ name: string; url: string }>;
 }
 
 // Exact field names from Follow-up Log跟进记录 database (full-width brackets)
@@ -65,10 +69,17 @@ export default async function handler(request: Request): Promise<Response> {
   const today    = new Date().toISOString().slice(0, 10);
   const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 
-  const notes = [
-    payload.source ? `[来源: ${payload.source}]` : '',
-    payload.followUpNotes || '',
-  ].filter(Boolean).join('\n').slice(0, 2000);
+  const noteParts: string[] = [];
+  if (payload.source)        noteParts.push(`[来源: ${payload.source}]`);
+  if (payload.contactPerson) noteParts.push(`联系人：${payload.contactPerson}`);
+  if (payload.countryCity)   noteParts.push(`地区：${payload.countryCity}`);
+  if (payload.categories === 'customer_quote_record') noteParts.push('【客户报价留底】');
+  else if (payload.categories === 'boq')              noteParts.push('【BOQ/工程清单】');
+  if (payload.driveUrls?.length) {
+    payload.driveUrls.forEach((f: any) => f.url && noteParts.push(`附件：${f.name} → ${f.url}`));
+  }
+  if (payload.followUpNotes) noteParts.push(payload.followUpNotes);
+  const notes = noteParts.join('\n').slice(0, 2000);
 
   // Build properties using exact Notion field names (full-width brackets)
   const properties: Record<string, any> = {
@@ -80,7 +91,7 @@ export default async function handler(request: Request): Promise<Response> {
     'Follow-up Method（跟进方式）': { select: { name: mapMethod(payload.followUpMethod) } },
   };
   if (notes)
-    properties['Follow-up Notes（跟进内容'] = { rich_text: [{ type: 'text', text: { content: notes } }] };
+    properties['Follow-up Notes（跟进内容）'] = { rich_text: [{ type: 'text', text: { content: notes } }] };
   if (payload.nextAction)
     properties['下次行动内容'] = { rich_text: [{ type: 'text', text: { content: payload.nextAction.slice(0, 2000) } }] };
   if (payload.owner)

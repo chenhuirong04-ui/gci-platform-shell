@@ -297,6 +297,8 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
   const [cloudSyncMsg, setCloudSyncMsg] = useState('');
   // Per-step save status (shown after save)
   const [saveSteps, setSaveSteps] = useState<Array<{label: string; status: 'pending'|'ok'|'fail'|'skip'; detail?: string}>>([]);
+  // 行动状态 — user editable, defaults by file intent
+  const [tradeStatus, setTradeStatus] = useState<string>('新询盘');
 
   const hasInput = rawText.trim().length > 0 || attachments.length > 0;
 
@@ -640,7 +642,13 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       const finalIntent = attachments.length > 0
         ? detectFileIntent(attachments[0].name, rawText)
         : detectedFileType;
-      if (attachments.length > 0 && finalIntent !== detectedFileType) setDetectedFileType(finalIntent);
+      if (attachments.length > 0 && finalIntent !== detectedFileType) {
+        setDetectedFileType(finalIntent);
+        // Auto-set 行动状态 default based on file intent
+        if (finalIntent === 'customer_quote_record') setTradeStatus('已报价');
+        else if (finalIntent === 'customer_inquiry')  setTradeStatus('待报价');
+        else if (finalIntent === 'boq')               setTradeStatus('待报价');
+      }
 
       // Set nextAction based on file intent
       if (attachments.length > 0 && !result.nextAction.includes('报价')) {
@@ -685,7 +693,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
     setParsedFromFile(false); setXlsxStatus('idle'); setXlsxMsg('');
     setDetectedFileType('followup_context');
     setCloudSyncStatus('idle'); setCloudSyncMsg('');
-    setSaveSteps([]);
+    setSaveSteps([]); setTradeStatus('新询盘');
   };
 
   // ── line item helpers ─────────────────────────────────────────────
@@ -797,6 +805,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       nextFollowUpAt: draft.dueDate + 'T09:00:00.000Z',
       attachments, inquirySummary: draft.title,
       categories: detectedFileType !== 'followup_context' ? detectedFileType : undefined,
+      tradeStatus: tradeStatus as any,
     };
     try {
       // Init step tracker before onAdd so user can see progress
@@ -1193,25 +1202,51 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
 
             {/* Rows */}
             <div style={{ background: CARD2 }}>
-              {/* 客户类型选择 — 贸易客户写小客户池(SBxxx)，项目客户写项目客户库(PRJxxx) */}
+              {/* 客户归类 — 贸易客户 → 贸易客户池(SBxxx)，项目客户 → 项目客户表 */}
               <div className="flex items-center px-5 py-2.5 gap-3" style={{ borderBottom: `1px solid ${BORDER}` }}>
-                <span className="text-[10px] font-black uppercase tracking-widest w-16 shrink-0" style={{ color: T3 }}>类型</span>
+                <span className="text-[10px] font-black uppercase tracking-widest w-16 shrink-0" style={{ color: T3 }}>客户归类</span>
                 <div className="flex gap-2">
-                  {(['TRADE', 'PROJECT'] as const).map(t => (
+                  {([
+                    { val: 'TRADE',   zh: '贸易客户', en: 'Trade Customer',   hint: '→ 贸易客户池 SBxxx' },
+                    { val: 'PROJECT', zh: '项目客户', en: 'Project Customer', hint: '→ 项目客户表' },
+                  ] as const).map(({ val, zh, hint }) => (
                     <button
-                      key={t}
-                      onClick={() => setDraft(d => d ? { ...d, type: t } : d)}
+                      key={val}
+                      onClick={() => setDraft(d => d ? { ...d, type: val } : d)}
+                      title={hint}
                       style={{
-                        padding: '2px 10px', borderRadius: 6, fontSize: 12, fontWeight: 700,
-                        border: `1px solid ${draft.type === t ? GOLD : BORDER}`,
-                        background: draft.type === t ? 'rgba(184,150,12,0.15)' : 'transparent',
-                        color: draft.type === t ? GOLD_L : T2, cursor: 'pointer',
+                        padding: '3px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                        border: `1px solid ${draft.type === val ? GOLD : BORDER}`,
+                        background: draft.type === val ? 'rgba(184,150,12,0.15)' : 'transparent',
+                        color: draft.type === val ? GOLD_L : T2, cursor: 'pointer',
                       }}
                     >
-                      {t === 'TRADE' ? '贸易询盘 (SB)' : '项目客户 (PRJ)'}
+                      {zh}
                     </button>
                   ))}
                 </div>
+                <span className="text-[10px]" style={{ color: T3 }}>
+                  {draft.type === 'TRADE' ? '→ 贸易客户池 (SBxxx)' : '→ 项目客户表'}
+                </span>
+              </div>
+
+              {/* 行动状态 — 同步到 Notion Follow-up Log */}
+              <div className="flex items-center px-5 py-2.5 gap-3" style={{ borderBottom: `1px solid ${BORDER}` }}>
+                <span className="text-[10px] font-black uppercase tracking-widest w-16 shrink-0" style={{ color: T3 }}>行动状态</span>
+                <select
+                  value={tradeStatus}
+                  onChange={e => setTradeStatus(e.target.value)}
+                  style={{
+                    background: CARD, border: `1px solid ${BORDER}`, borderRadius: 6,
+                    color: T1, fontSize: 12, fontWeight: 700, padding: '3px 8px', cursor: 'pointer',
+                  }}
+                >
+                  {[
+                    '新询盘', '待报价', '已报价', '等待客户回复',
+                    '待签合同', '已成交', '已完成', '暂缓',
+                  ].map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <span className="text-[10px]" style={{ color: T3 }}>同步到 Notion</span>
               </div>
               {([
                 ['标题', draft.title],
