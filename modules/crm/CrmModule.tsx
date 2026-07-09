@@ -280,7 +280,9 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
    */
   const normalizedTasks = useMemo((): FollowUpTask[] => {
     const nonDeleted = tasks.filter(t => t.status !== 'deleted');
-    // Dedup by businessId, keeping the record with the latest nextFollowUpAt
+    // Dedup by businessId || leadId || id.
+    // Conflict resolution: prefer the record with the latest updatedAt (local edits win over
+    // stale Notion snapshots). Fall back to nextFollowUpAt if both updatedAt are equal/missing.
     const map = new Map<string, FollowUpTask>();
     for (const t of nonDeleted) {
       const key = (t as any).businessId || t.leadId || t.id;
@@ -288,7 +290,9 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
         map.set(key, t);
       } else {
         const existing = map.get(key)!;
-        if ((t.nextFollowUpAt || '') > (existing.nextFollowUpAt || '')) {
+        const tUp = t.updatedAt || t.createdAt || '';
+        const exUp = existing.updatedAt || existing.createdAt || '';
+        if (tUp > exUp) {
           map.set(key, t);
         }
       }
@@ -1086,7 +1090,13 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
           onViewFull={() => setActiveTab('project')}
           onArchiveTask={archiveTask}
           onUpdateTask={(updated: any) => {
-            setTasks(v => v.map(t => (t.id === updated.id ? updated : t)));
+            console.log('[CrmModule.onUpdateTask dashboard] id=', updated.id, 'leadId=', updated.leadId, 'nextFollowUpAt=', updated.nextFollowUpAt, 'status=', updated.status);
+            setTasks(v => {
+              const next = v.map(t => (t.id === updated.id ? updated : t));
+              const found = next.some(t => t.id === updated.id);
+              if (!found) console.error('[CrmModule.onUpdateTask] WARN: id not found in tasks array — task may not persist!', updated.id);
+              return next;
+            });
             setSelectedTask(updated);
             showToast('记录已更新', 'success');
           }}

@@ -18,6 +18,7 @@ import {
   Paperclip, FileText, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { getTaskBusinessId } from '../utils/businessId';
+import { isLikelyNotionPageId } from '../utils/notionId';
 
 // ── Dark theme tokens
 const BG    = '#0A1628';
@@ -130,8 +131,11 @@ export default function QuickFollowUpPanel({
 
   // Edit form state — initialized from task on each edit open
   const [draft, setDraft] = useState<Partial<FollowUpTask>>({});
+  type NotionSync = 'idle' | 'syncing' | 'ok' | 'warn' | 'no_id';
+  const [notionSync, setNotionSync] = useState<NotionSync>('idle');
 
   const openEdit = () => {
+    setNotionSync('idle');
     setDraft({
       clientName:    task.clientName,
       countryCity:   task.countryCity,
@@ -139,7 +143,8 @@ export default function QuickFollowUpPanel({
       businessType:  task.businessType,
       goal:          task.goal,
       lastContext:   task.lastContext,
-      nextFollowUpAt: task.nextFollowUpAt?.slice(0, 10),
+      // Keep full ISO string — date input displays slice(0,10), but we preserve precision here
+      nextFollowUpAt: task.nextFollowUpAt,
       phoneE164:     task.phoneE164,
       whatsapp:      task.whatsapp,
       email:         task.email,
@@ -147,18 +152,71 @@ export default function QuickFollowUpPanel({
     setEditing(true);
   };
 
-  const cancelEdit = () => { setEditing(false); setDraft({}); };
+  const cancelEdit = () => { setEditing(false); setDraft({}); setNotionSync('idle'); };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!onUpdateTask) { setEditing(false); return; }
+
+    // Normalize nextFollowUpAt: if user changed it via date input (YYYY-MM-DD only), append time
+    const rawNfa = draft.nextFollowUpAt ?? task.nextFollowUpAt;
+    const normalizedNfa = rawNfa && /^\d{4}-\d{2}-\d{2}$/.test(rawNfa)
+      ? rawNfa + 'T00:00:00.000Z'
+      : rawNfa;
+
+    // Always spread full original task first, then edited fields on top
     const updated: FollowUpTask = {
       ...task,
       ...draft,
+      nextFollowUpAt: normalizedNfa ?? task.nextFollowUpAt,
       updatedAt: new Date().toISOString(),
     };
+
+    console.log('[QuickFollowUpPanel.saveEdit] task.id=', task.id,
+      'task.leadId=', task.leadId,
+      'task.notionFollowupPageId=', (task as any).notionFollowupPageId,
+      'draft=', draft,
+      'updated.nextFollowUpAt=', updated.nextFollowUpAt,
+      'updated.status=', updated.status,
+    );
+
     onUpdateTask(updated);
     setEditing(false);
     setDraft({});
+
+    // ── Notion sync ─────────────────────────────────────────────────
+    const notionPageId = (task as any).notionFollowupPageId || task.leadId;
+    if (!isLikelyNotionPageId(notionPageId)) {
+      console.log('[QuickFollowUpPanel] No valid Notion page ID — local-only save. pageId=', notionPageId);
+      setNotionSync('no_id');
+      return;
+    }
+
+    setNotionSync('syncing');
+    try {
+      const res = await fetch('/api/crm/notion-update-followup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pageId: notionPageId,
+          nextFollowUpAt: updated.nextFollowUpAt,
+          lastNote: updated.lastContext,
+          inquirySummary: updated.goal,
+          owner: updated.owner,
+          status: updated.status,
+          businessType: updated.businessType,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      console.log('[QuickFollowUpPanel] Notion sync result:', data);
+      if (data.ok) {
+        setNotionSync('ok');
+      } else {
+        setNotionSync('warn');
+      }
+    } catch (err) {
+      console.error('[QuickFollowUpPanel] Notion sync failed:', err);
+      setNotionSync('warn');
+    }
   };
 
   const set = (k: keyof FollowUpTask, v: string) =>
@@ -282,7 +340,7 @@ export default function QuickFollowUpPanel({
             <div className="p-5 space-y-4">
               {/* Notice */}
               <div className="p-3 rounded-xl text-xs font-medium" style={{ background: CARD2, color: T2, border: `1px solid ${BORD}` }}>
-                ⚠️ 修改保存到本地 + Supabase 快照。仅"关闭本次跟进"会同步到 Notion。
+                ✎ 修改将同步本地 + Notion Follow-up Log（如有已连接页面）
               </div>
 
               {/* Customer name */}
@@ -332,6 +390,9 @@ export default function QuickFollowUpPanel({
                 <input type="date" value={(draft.nextFollowUpAt || '').slice(0, 10)}
                   onChange={e => set('nextFollowUpAt', e.target.value)}
                   style={inputStyle} />
+                <div style={{ fontSize: '10px', color: '#4A6080', marginTop: '3px' }}>
+                  修改日期后将自动保留时区信息
+                </div>
               </div>
 
               {/* Contact info */}
@@ -369,6 +430,22 @@ export default function QuickFollowUpPanel({
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ── Notion sync status banner ─── */}
+          {!editing && notionSync !== 'idle' && (
+            <div className="mx-5 mt-3 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-2"
+              style={
+                notionSync === 'ok'     ? { background: 'rgba(16,185,129,0.1)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.2)' }
+                : notionSync === 'syncing' ? { background: 'rgba(184,150,12,0.1)', color: '#B8960C', border: '1px solid rgba(184,150,12,0.2)' }
+                : notionSync === 'no_id' ? { background: 'rgba(100,116,139,0.1)', color: '#7A9CC5', border: '1px solid rgba(100,116,139,0.2)' }
+                : { background: 'rgba(239,68,68,0.08)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.15)' }
+              }>
+              {notionSync === 'ok'      && '✓ Notion 已同步'}
+              {notionSync === 'syncing' && '⏳ 正在同步 Notion…'}
+              {notionSync === 'no_id'   && '本地已保存 · 无 Notion 连接（本地客户）'}
+              {notionSync === 'warn'    && '⚠️ 本地已保存，Notion 同步失败，请检查连接'}
             </div>
           )}
 
@@ -471,9 +548,9 @@ export default function QuickFollowUpPanel({
                 </div>
               )}
 
-              {task.leadId && !/^(LEAD_|HIST_)/i.test(task.leadId) && (
+              {isLikelyNotionPageId((task as any).notionFollowupPageId || task.leadId) && (
                 <div className="mt-3 text-[9px] font-bold" style={{ color: T3 }}>
-                  Notion 已连接 · 关闭跟进可同步
+                  Notion 已连接 · 编辑和关闭跟进均可同步
                 </div>
               )}
             </div>

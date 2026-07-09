@@ -123,6 +123,9 @@ export interface FollowUpTask {
   // 'contact_only'  = 孤儿记录（仅在 Projects/SB 档案中，无 Follow-up Log 条目），
   //                   nextFollowUpAt 默认设为今天，不得计入今日待跟进
   notionSource?: 'followup' | 'contact_only';
+  // Notion Follow-up Log 页面 ID — 独立于 leadId，专用于 Notion 回写
+  // 编辑时优先用此字段，通过 isLikelyNotionPageId() 校验后再调用 API
+  notionFollowupPageId?: string;
 }
 
 export interface AIInsights {
