@@ -682,7 +682,69 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
               ) : (
                 <div style={{ maxHeight: 400, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {state.resultData.quotes.map((q: any, i: number) => {
-                    // Filter out image-formula and all-zero invalid items
+                    // CRM customer_quote_record — different display
+                    if (q.source === 'crm_customer_quote_record') {
+                      const attFiles: any[] = q.attachments || [];
+                      return (
+                        <div key={i} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.18)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                            <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 6, background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#A5B4FC', fontWeight: 700 }}>
+                              📋 CRM 客户报价留底
+                            </span>
+                            {q.isArchived && (
+                              <span style={{ fontSize: 10, color: '#D4A843', padding: '1px 6px', borderRadius: 5, background: 'rgba(203,168,92,0.08)', border: '1px solid rgba(203,168,92,0.2)' }}>
+                                已归档
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: TEXT, flex: 1 }}>{q.customerName}</span>
+                            <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 6, background: 'rgba(99,102,241,0.10)', color: '#A5B4FC' }}>
+                              {q.statusZh}
+                            </span>
+                          </div>
+                          {q.projectName && (
+                            <div style={{ fontSize: 11, color: MUTED, marginBottom: 3 }}>{q.projectName}</div>
+                          )}
+                          <div style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>
+                            {q.quoteDate ? new Date(q.quoteDate).toLocaleDateString('zh-CN') : '—'}
+                            {q.salesperson && <span style={{ marginLeft: 10 }}>{q.salesperson}</span>}
+                            {q.tradeStatus && <span style={{ marginLeft: 10, color: '#A5B4FC' }}>{q.tradeStatus}</span>}
+                          </div>
+                          {/* 金额未结构化提示 */}
+                          <div style={{ fontSize: 11, color: '#D4A843', padding: '4px 8px', borderRadius: 5, background: 'rgba(203,168,92,0.06)', border: '1px solid rgba(203,168,92,0.15)', marginBottom: 4 }}>
+                            💡 已留底，但金额尚未结构化。可打开附件查看原报价单。
+                          </div>
+                          {/* Next action */}
+                          {q.nextAction && (
+                            <div style={{ fontSize: 11, color: TEXT, marginBottom: 3 }}>
+                              <span style={{ color: MUTED }}>下一步：</span>{q.nextAction}
+                            </div>
+                          )}
+                          {/* Attachment list */}
+                          {attFiles.length > 0 && (
+                            <div style={{ marginTop: 4, paddingTop: 5, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                              <div style={{ fontSize: 10, color: MUTED, marginBottom: 3 }}>报价文件：</div>
+                              {attFiles.map((att: any, j: number) => (
+                                <div key={j} style={{ fontSize: 11, color: '#A5B4FC', padding: '1px 0' }}>
+                                  📎 {att.name || att.filename || `附件 ${j + 1}`}
+                                  {att.driveUrl && (
+                                    <a href={att.driveUrl} target="_blank" rel="noreferrer"
+                                      style={{ marginLeft: 8, color: GOLD, fontSize: 10 }}>
+                                      [Drive 链接]
+                                    </a>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {attFiles.length === 0 && (
+                            <div style={{ fontSize: 10, color: SUBTLE, marginTop: 2 }}>该报价留底暂无附件文件</div>
+                          )}
+                        </div>
+                      );
+                    }
+                    // Standard quotation_records display
                     const validItems = (q.items || []).filter((it: any) => {
                       const name = (it.item_name || '').trim();
                       if (/^=DISPIMG/i.test(name) || /^=IMAGE/i.test(name)) return false;
@@ -742,8 +804,11 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                   })}
                 </div>
               )}
-              <div style={{ fontSize: 10, color: SUBTLE, marginTop: 8 }}>
-                数据来源：quotation_records · {new Date(state.resultData.asOf).toLocaleString('zh-CN')}
+              <div style={{ fontSize: 10, color: SUBTLE, marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <span>数据来源：quotation_records · {new Date(state.resultData.asOf).toLocaleString('zh-CN')}</span>
+                {state.resultData.hasCrmRecords && (
+                  <span style={{ color: '#A5B4FC' }}>+ CRM 留底 {state.resultData.crmQuoteCount} 条</span>
+                )}
               </div>
             </div>
           )}
@@ -2500,7 +2565,7 @@ export function AIPage() {
 
     // Quotation history intent — hardcoded regex.
     // Must come AFTER quotation followup check (followup is more specific).
-    const QUOTATION_HISTORY_RE = /历史报价|以前报价|之前报价|报价记录|报过什么价|报过价|上次.*报价|上次报|最近.*报价|quotation history|past quote/i;
+    const QUOTATION_HISTORY_RE = /历史报价|以前报价|之前报价|报价记录|报价留底|客户报价|报过什么价|报过价|上次.*报价|上次报|最近.*报价|quotation history|past quote|quote record/i;
     if (QUOTATION_HISTORY_RE.test(t)) {
       const customer = extractCustomerName(raw.trim());
       const product  = extractProductName(raw.trim());
@@ -2540,9 +2605,88 @@ export function AIPage() {
           if (customer) params.set('customer', customer);
           if (product)  params.set('product',  product);
           const qs = params.toString() ? `?${params.toString()}` : '';
+          // Helper: read CRM customer_quote_record tasks from localStorage
+          const readCrmQuoteRecords = (customerQ: string, productQ: string) => {
+            try {
+              const tasks: any[] = JSON.parse(localStorage.getItem('ICARE_HISTORY_V1') || '[]');
+              const cqLower = customerQ.trim().toLowerCase();
+              const pqLower = productQ.trim().toLowerCase();
+              return tasks
+                .filter(t => {
+                  // Must be a customer_quote_record
+                  const isCqr = t.categories === 'customer_quote_record'
+                    || (t.lastContext || '').includes('[客户报价留底]')
+                    || (t.lastContext || '').includes('[customer_quote_record]');
+                  if (!isCqr) return false;
+                  // DO NOT include supplier_quote
+                  if (t.categories === 'supplier_quote') return false;
+                  // Customer filter
+                  if (cqLower) {
+                    const haystack = [t.clientName, t.inquirySummary, t.lastContext, t.goal]
+                      .join(' ').toLowerCase();
+                    if (!haystack.includes(cqLower)) return false;
+                  }
+                  // Product filter
+                  if (pqLower) {
+                    const pHaystack = [t.goal, t.lastContext, t.inquirySummary,
+                      ...(t.attachments || []).map((a: any) => a.name)]
+                      .join(' ').toLowerCase();
+                    if (!pHaystack.includes(pqLower)) return false;
+                  }
+                  return true;
+                })
+                .map(t => ({
+                  id:           t.id,
+                  source:       'crm_customer_quote_record',
+                  customerName: t.clientName || '—',
+                  projectName:  t.inquirySummary || '',
+                  quoteNo:      '—',
+                  grandTotal:   null,
+                  sellingTotal: null,
+                  vatAmount:    null,
+                  margin:       null,
+                  currency:     'AED',
+                  status:       'CRM_留底',
+                  statusZh:     '报价留底',
+                  quoteType:    'CRM',
+                  salesperson:  t.owner || '',
+                  quoteDate:    t.createdAt || '',
+                  createdAt:    t.createdAt || '',
+                  updatedAt:    t.updatedAt || '',
+                  items:        [],
+                  hiddenInvalidItemsCount: 0,
+                  isArchived:   t.status === 'archived',
+                  archiveReason: null,
+                  amountStatus: 'not_structured',
+                  // CRM-specific fields
+                  nextAction:           t.goal || '',
+                  lastContext:          t.lastContext || '',
+                  attachments:          t.attachments || [],
+                  categories:           t.categories || '',
+                  notionFollowupPageId: t.notionFollowupPageId || '',
+                  tradeStatus:          t.tradeStatus || '',
+                }));
+            } catch { return []; }
+          };
+
           fetch(`${base}/api/ai/quotation-history${qs}`)
             .then(r => r.json())
-            .then(data => setCmdState(prev => prev ? { ...prev, resultData: data } : prev))
+            .then(data => {
+              // Merge CRM customer_quote_records into results
+              const crmRecords = readCrmQuoteRecords(customer || '', product || '');
+              if (crmRecords.length > 0) {
+                const merged = {
+                  ...data,
+                  quotes: [...(data.quotes || []), ...crmRecords],
+                  total: (data.total || 0) + crmRecords.length,
+                  crmQuoteCount: crmRecords.length,
+                  hasCrmRecords: true,
+                };
+                setCmdState(prev => prev ? { ...prev, resultData: merged } : prev);
+              } else {
+                setCmdState(prev => prev ? { ...prev, resultData: data } : prev);
+              }
+            })
             .catch(e => console.error('[AI] quotation history fetch failed', e));
         },
       );
