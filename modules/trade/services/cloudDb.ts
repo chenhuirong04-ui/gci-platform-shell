@@ -98,16 +98,36 @@ function buildFilters(params: AnyRow = {}) {
 }
 
 /**
+ * Generate a deterministic UUID from a business ID string.
+ * Same input → same UUID → on_conflict=id correctly triggers UPDATE instead of INSERT.
+ * Uses two independent djb2-variant hashes for 64 bits of entropy.
+ */
+function stableUuid(seed: string): string {
+  let a = 0x9e3779b9 >>> 0;
+  let b = 0x6c62272e >>> 0;
+  for (let i = 0; i < seed.length; i++) {
+    const c = seed.charCodeAt(i);
+    a = (Math.imul(a ^ c, 0x45d9f3b) >>> 0) ^ (a >>> 16);
+    b = (Math.imul(b ^ c, 0x119de1f3) >>> 0) ^ (b >>> 13);
+  }
+  const p = (a.toString(16).padStart(8, '0') + b.toString(16).padStart(8, '0')).padEnd(32, '0');
+  // UUID format 8-4-4-4-12, force version=4 and variant=8
+  return `${p.slice(0,8)}-${p.slice(8,12)}-4${p.slice(13,16)}-8${p.slice(17,20)}-${p.slice(20,32)}`;
+}
+
+/**
  * Wrap any business row into the fixed schema:
  * { id, created_at, updated_at, state, payload }
  *
- * CRITICAL:
- * - id is uuid in DB, so we NEVER forward business `r.id` into `id`.
- * - business id/doc no should stay in payload.
+ * id is derived deterministically from the business id (r.id / r.soNo / r.doc_no).
+ * This ensures upsert with on_conflict=id correctly UPDATE existing rows
+ * instead of always INSERTing new ones.
  */
 function wrapRow(r: AnyRow) {
-  // ✅ DO NOT send `id` at all (let DB default uuid_generate_v4() fill it)
-  const id = undefined;
+  // Derive a stable UUID from the business key so on_conflict=id deduplicates correctly.
+  // Priority: payload.id (SO-xxx / PAY-xxx / DOC-xxx) → payload.soNo → undefined (new row)
+  const businessKey = (r.id || r.soNo || r.doc_no) as string | undefined;
+  const id = businessKey ? stableUuid(businessKey) : undefined;
 
   const created_at = r.created_at ?? new Date().toISOString();
   const updated_at = r.updated_at ?? new Date().toISOString();
