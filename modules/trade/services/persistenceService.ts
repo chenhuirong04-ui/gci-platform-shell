@@ -45,6 +45,8 @@ const normalizeCloudRow = (row: any) => {
   return {
     ...payload,
     id: businessId,
+    // Preserve row-level state so cancelled/archived records can be filtered out
+    state: row?.state ?? 'active',
 
     // Keep both snake_case and camelCase so old UI code won't break
     created_at,
@@ -310,7 +312,9 @@ export const persistence = {
     // Hydrate first: pulls Supabase → localStorage on first load (cloud wins on conflict)
     await ensureHydration();
     const all: ConsignmentStockRecord[] = getLocal('consignment_stock');
-    return soNo ? all.filter((r) => r.soNo === soNo) : all;
+    // Only return active records — cancelled/archived state must not appear in UI or AI queries
+    const active = all.filter((r: any) => !r.state || r.state === 'active');
+    return soNo ? active.filter((r) => r.soNo === soNo) : active;
   },
 
   async saveConsignmentStockItems(soNo: string, items: ConsignmentStockRecord[]): Promise<void> {
