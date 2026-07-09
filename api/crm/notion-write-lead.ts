@@ -34,7 +34,7 @@ export interface WriteLeadPayload {
   categories?: string;      // customer_quote_record | customer_inquiry | boq | supplier_quote
   driveUrls?: Array<{ name: string; url: string }>; // uploaded Drive file links
   businessType?: string;    // TRADE | PROJECT
-  tradeStatus?: string;     // 行动状态: 新询盘 | 待报价 | 已报价 | 等待客户回复 | 待签合同 | 已成交 | 已完成 | 暂缓
+  tradeStatus?: string;     // 行动状态: 新询盘 | 需求整理中 | 待报价 | 已报价待确认 | 合同待签 | 执行中 | 暂缓
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -107,6 +107,30 @@ function formatSBId(n: number): string {
 }
 
 // Map source string to SB Pool 来源 select option
+// Map any legacy / UI status value to the exact Notion 行动状态 select option.
+// Notion real options (confirmed 2026-07-09):
+//   合同待签 | 新询盘 | 需求整理中 | 待报价 | 已报价待确认 | 执行中 | 暂缓
+function mapTradeStatus(status?: string): string {
+  if (!status) return '新询盘';
+  const MAP: Record<string, string> = {
+    '新询盘':     '新询盘',
+    '需求整理中': '需求整理中',
+    '待报价':     '待报价',
+    '已报价待确认': '已报价待确认',
+    '合同待签':   '合同待签',
+    '执行中':     '执行中',
+    '暂缓':       '暂缓',
+    // Legacy values → nearest Notion equivalent
+    '已报价':       '已报价待确认',
+    '等待客户回复': '已报价待确认',
+    '待签合同':     '合同待签',
+    '已成交':       '执行中',
+    '已完成':       '暂缓',
+    '新建':         '新询盘',
+  };
+  return MAP[status] ?? '新询盘';
+}
+
 function mapSource(source?: string): string {
   if (!source) return '其他';
   const s = source.toLowerCase();
@@ -254,8 +278,8 @@ export default async function handler(request: Request): Promise<Response> {
   if (payload.lastContext) noteParts.push(payload.lastContext);
   const followupNotes = noteParts.join('\n').slice(0, 2000);
 
-  // Map user-selected status; fallback 新询盘 for TRADE
-  const statusLabel = payload.tradeStatus || '新询盘';
+  // Map user-selected status (incl. legacy values) → exact Notion select option
+  const statusLabel = mapTradeStatus(payload.tradeStatus);
 
   const followupProperties: Record<string, any> = {
     'Customer（客户）': { title: [{ type: 'text', text: { content: followupTitle } }] },

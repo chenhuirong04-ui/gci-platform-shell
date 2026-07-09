@@ -687,9 +687,9 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       if (attachments.length > 0 && finalIntent !== detectedFileType) {
         setDetectedFileType(finalIntent);
         // Auto-set 行动状态 default based on file intent
-        if (finalIntent === 'customer_quote_record') setTradeStatus('已报价');
+        if (finalIntent === 'customer_quote_record') setTradeStatus('已报价待确认');
         else if (finalIntent === 'customer_inquiry')  setTradeStatus('待报价');
-        else if (finalIntent === 'boq')               setTradeStatus('待报价');
+        else if (finalIntent === 'boq')               setTradeStatus('需求整理中');
       }
 
       // Set nextAction based on file intent
@@ -1287,8 +1287,8 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                   }}
                 >
                   {[
-                    '新询盘', '待报价', '已报价', '等待客户回复',
-                    '待签合同', '已成交', '已完成', '暂缓',
+                    '新询盘', '需求整理中', '待报价', '已报价待确认',
+                    '合同待签', '执行中', '暂缓',
                   ].map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
                 <span className="text-[10px]" style={{ color: T3 }}>同步到 Notion</span>

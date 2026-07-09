@@ -17,16 +17,30 @@ function json(body: unknown, status = 200) {
 }
 
 // Map local status → Notion 行动状态 select value
+// Notion real options (confirmed 2026-07-09):
+//   合同待签 | 新询盘 | 需求整理中 | 待报价 | 已报价待确认 | 执行中 | 暂缓
+const VALID_STATUS_SET = new Set([
+  '合同待签', '新询盘', '需求整理中', '待报价', '已报价待确认', '执行中', '暂缓',
+]);
+const LEGACY_STATUS_MAP: Record<string, string> = {
+  '已报价':       '已报价待确认',
+  '等待客户回复': '已报价待确认',
+  '待签合同':     '合同待签',
+  '已成交':       '执行中',
+  '已完成':       '暂缓',
+  '新建':         '新询盘',
+  // English / internal names
+  'pending':      '新询盘',
+  'todo':         '新询盘',
+  'in_progress':  '执行中',
+  'completed':    '暂缓',
+  'paused':       '暂缓',
+  'archived':     '暂缓',
+};
 function mapStatus(status?: string): string | null {
   if (!status) return null;
-  const s = status.toLowerCase();
-  if (s === 'pending' || s === 'todo' || s === 'in_progress') return '跟进中';
-  if (s === 'completed') return '完成';
-  if (s === 'paused') return '暂缓';
-  if (s === 'archived') return '已归档';
-  // Accept Chinese values passthrough
-  if (['跟进中','完成','暂缓','已归档','新询盘','进行中'].includes(status)) return status;
-  return null;
+  if (VALID_STATUS_SET.has(status)) return status;
+  return LEGACY_STATUS_MAP[status] ?? LEGACY_STATUS_MAP[status.toLowerCase()] ?? null;
 }
 
 // Map local businessType → Notion 业务类型 select value

@@ -55,15 +55,28 @@ function mapMethod(method?: string): string {
   return 'whatsapp';
 }
 
-// Map UI action status to Notion 行动状态 select value
+// Map UI action status to Notion 行动状态 select value.
+// Notion real options (confirmed 2026-07-09):
+//   合同待签 | 新询盘 | 需求整理中 | 待报价 | 已报价待确认 | 执行中 | 暂缓
 function mapTradeStatus(status?: string): string {
-  if (!status) return '新建';
+  if (!status) return '新询盘';
   const MAP: Record<string, string> = {
-    '新询盘': '新询盘', '待报价': '待报价', '已报价': '已报价',
-    '等待客户回复': '等待客户回复', '待签合同': '待签合同', '合同待签': '合同待签',
-    '已成交': '已成交', '已完成': '已完成', '暂缓': '暂缓', '新建': '新建',
+    '新询盘':       '新询盘',
+    '需求整理中':   '需求整理中',
+    '待报价':       '待报价',
+    '已报价待确认': '已报价待确认',
+    '合同待签':     '合同待签',
+    '执行中':       '执行中',
+    '暂缓':         '暂缓',
+    // Legacy values → nearest Notion equivalent
+    '已报价':       '已报价待确认',
+    '等待客户回复': '已报价待确认',
+    '待签合同':     '合同待签',
+    '已成交':       '执行中',
+    '已完成':       '暂缓',
+    '新建':         '新询盘',
   };
-  return MAP[status] || status;
+  return MAP[status] ?? '新询盘';
 }
 
 export default async function handler(request: Request): Promise<Response> {
