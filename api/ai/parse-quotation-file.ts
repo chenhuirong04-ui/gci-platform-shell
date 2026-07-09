@@ -106,9 +106,14 @@ export default async function handler(request: Request): Promise<Response> {
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text().catch(() => '');
+      // 503 / 502 / 429 / 500 = service temporarily down — return soft unavailable signal
+      const isTransient = geminiRes.status >= 500 || geminiRes.status === 429;
       return json({
         ok: false,
-        error: `Gemini API 返回错误 ${geminiRes.status}`,
+        visionUnavailable: isTransient,
+        error: isTransient
+          ? '截图识别服务暂时不可用，请稍后重试或手动补充信息。'
+          : `图片识别失败 (${geminiRes.status})，请手动录入明细。`,
         detail: errText.slice(0, 400),
       });
     }

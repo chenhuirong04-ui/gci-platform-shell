@@ -239,7 +239,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
 
   // xlsx parse state
   const [parsedFromFile, setParsedFromFile] = useState(false);
-  const [xlsxStatus, setXlsxStatus] = useState<'idle'|'parsing'|'done'|'error'>('idle');
+  const [xlsxStatus, setXlsxStatus] = useState<'idle'|'parsing'|'done'|'error'|'warn'>('idle');
   const [xlsxMsg, setXlsxMsg]       = useState('');
 
   const hasInput = rawText.trim().length > 0 || attachments.length > 0;
@@ -398,8 +398,18 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       const data = await res.json();
 
       if (!data.ok || !Array.isArray(data.items) || data.items.length === 0) {
-        setXlsxStatus('error');
-        setXlsxMsg(data.error || '文件已收到，但未能识别出产品明细，请手动录入报价明细。');
+        if (data.visionUnavailable) {
+          // Gemini 503 / 502 / overload — soft warning, do not block the flow
+          setXlsxStatus('warn');
+          setXlsxMsg(
+            rawText.trim()
+              ? '截图识别暂时失败，已根据文字内容生成草稿。直接点击下方按钮继续。'
+              : '截图识别服务暂时不可用。请在上方输入框补充关键信息，再点击「让 AI 整理成跟进记录」。'
+          );
+        } else {
+          setXlsxStatus('error');
+          setXlsxMsg(data.error || '文件已收到，但未能识别出产品明细，请手动录入报价明细。');
+        }
         return;
       }
 
@@ -745,14 +755,17 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
             style={{
               background: xlsxStatus === 'parsing' ? 'rgba(255,255,255,0.04)'
                 : xlsxStatus === 'done'   ? 'rgba(5,150,105,0.08)'
+                : xlsxStatus === 'warn'   ? 'rgba(245,158,11,0.08)'
                 : 'rgba(239,68,68,0.08)',
               border: `1px solid ${
                 xlsxStatus === 'parsing' ? BORDER
                 : xlsxStatus === 'done'  ? 'rgba(5,150,105,0.3)'
+                : xlsxStatus === 'warn'  ? 'rgba(245,158,11,0.35)'
                 : 'rgba(239,68,68,0.25)'
               }`,
               color: xlsxStatus === 'parsing' ? T2
                 : xlsxStatus === 'done' ? '#6EE7B7'
+                : xlsxStatus === 'warn' ? '#FCD34D'
                 : '#FCA5A5',
             }}>
             {xlsxStatus === 'parsing' ? (
