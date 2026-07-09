@@ -29,7 +29,7 @@ export default async function handler(request: Request): Promise<Response> {
   // Fetch all pending invoices (not paid, not cancelled, not issued)
   const statusFilter = PENDING_STATUSES.map(s => `status.eq.${s}`).join(',');
   const res = await fetch(
-    `${url}/rest/v1/invoice_drafts?select=id,status,customer_name,grand_total,currency,created_at,invoice_no&or=(${statusFilter})&order=created_at.asc`,
+    `${url}/rest/v1/invoice_drafts?select=id,status,customer_name,total,currency,created_at,invoice_no&or=(${statusFilter})&order=created_at.asc`,
     {
       headers: {
         apikey: key,
@@ -55,7 +55,7 @@ export default async function handler(request: Request): Promise<Response> {
     id: r.id,
     invoiceNo: r.invoice_no || '—',
     customerName: r.customer_name || r.customerName || '—',
-    grandTotal: r.grand_total ?? r.grandTotal ?? 0,
+    grandTotal: r.total ?? 0,
     currency: r.currency || 'AED',
     status: r.status,
     createdAt: r.created_at || r.createdAt,

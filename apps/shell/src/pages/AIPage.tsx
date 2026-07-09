@@ -912,64 +912,149 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
             );
           })()}
 
-          {/* ── Receivables result panel ── */}
-          {intent.intentId === 'check_receivables' && state.resultData && state.resultData.ok && (
-            <div style={{ marginBottom: 12 }}>
-              {/* Summary bar */}
-              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 10 }}>
-                <div style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(224,132,106,0.08)', border: '1px solid rgba(224,132,106,0.2)' }}>
-                  <div style={{ fontSize: 10, color: MUTED, marginBottom: 2 }}>总未收款</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: '#E0846A' }}>
-                    AED {Number(state.resultData.totalOutstanding).toLocaleString()}
+          {/* ── Receivables result panel (v2 — three views) ── */}
+          {intent.intentId === 'check_receivables' && state.resultData && state.resultData.ok && (() => {
+            const d  = state.resultData;
+            const OR = d.orderReceivables;
+            const CR = d.consignmentReceivables;
+            const IR = d.invoiceReceivables;
+            const RD = '#E0846A';
+            const GN = '#6FBF8E';
+            const CARD_S = { padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', flex: '1 1 0', minWidth: 110 } as const;
+            const SEC  = { padding: '10px 12px', borderRadius: 9, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', marginBottom: 8 } as const;
+            return (
+              <div style={{ marginBottom: 12 }}>
+                {/* Title */}
+                <div style={{ fontSize: 12, color: MUTED, marginBottom: 8, fontWeight: 600 }}>应收款总览 / Receivables Overview</div>
+
+                {/* Three summary cards */}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                  <div style={{ ...CARD_S, background: OR ? 'rgba(224,132,106,0.07)' : CARD_S.background, border: OR ? '1px solid rgba(224,132,106,0.22)' : CARD_S.border }}>
+                    <div style={{ fontSize: 9, color: MUTED, marginBottom: 3, letterSpacing: '0.05em' }}>订单应收</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: RD }}>AED {OR ? Number(OR.total).toLocaleString() : '—'}</div>
+                    {OR && <div style={{ fontSize: 10, color: MUTED, marginTop: 2 }}>{OR.customerCount} 客户 · {OR.orderCount} 单{OR.overdueCount > 0 ? ` · ${OR.overdueCount} 逾期` : ''}</div>}
+                    <div style={{ fontSize: 9, color: SUBTLE, marginTop: 3 }}>来源：orders</div>
+                  </div>
+                  <div style={CARD_S}>
+                    <div style={{ fontSize: 9, color: MUTED, marginBottom: 3, letterSpacing: '0.05em' }}>寄售应收</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: CR && CR.total > 0 ? GOLD : TEXT }}>AED {CR ? Number(CR.total).toLocaleString() : '—'}</div>
+                    {CR && <div style={{ fontSize: 10, color: MUTED, marginTop: 2 }}>{CR.customerCount} 客户 · {CR.soCount} SO</div>}
+                    <div style={{ fontSize: 9, color: SUBTLE, marginTop: 3 }}>来源：consignment_stock</div>
+                  </div>
+                  <div style={CARD_S}>
+                    <div style={{ fontSize: 9, color: MUTED, marginBottom: 3, letterSpacing: '0.05em' }}>发票应收</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: IR && IR.total > 0 ? '#5BA3C9' : TEXT }}>AED {IR ? Number(IR.total).toLocaleString() : '—'}</div>
+                    {IR && <div style={{ fontSize: 10, color: MUTED, marginTop: 2 }}>{IR.customerCount} 客户 · {IR.invoiceCount} 张{IR.overdueCount > 0 ? ` · ${IR.overdueCount} 逾期` : ''}</div>}
+                    <div style={{ fontSize: 9, color: SUBTLE, marginTop: 3 }}>来源：invoice_drafts</div>
                   </div>
                 </div>
-                <div style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                  <div style={{ fontSize: 10, color: MUTED, marginBottom: 2 }}>涉及客户</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: TEXT }}>{state.resultData.customerCount}</div>
+
+                {/* Section A: 订单应收 */}
+                <div style={SEC}>
+                  <div style={{ fontSize: 11, color: RD, fontWeight: 700, marginBottom: 6, letterSpacing: '0.04em' }}>订单应收 / ORDER RECEIVABLES</div>
+                  {!OR ? (
+                    <div style={{ fontSize: 12, color: MUTED }}>查询失败</div>
+                  ) : OR.customerCount === 0 ? (
+                    <div style={{ fontSize: 12, color: GN }}>✓ 暂无普通订单未收款。</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 220, overflowY: 'auto' }}>
+                      {OR.customers.map((c: any, i: number) => {
+                        const hasOverdue = c.orders.some((o: any) => o.overdue);
+                        return (
+                          <div key={i} style={{ padding: '6px 8px', borderRadius: 6, background: hasOverdue ? 'rgba(224,132,106,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${hasOverdue ? 'rgba(224,132,106,0.2)' : 'rgba(255,255,255,0.05)'}` }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: TEXT, flex: 1 }}>{c.customerName}</span>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: RD, whiteSpace: 'nowrap' }}>AED {Number(c.totalOutstanding).toLocaleString()}</span>
+                              {hasOverdue && <span style={{ fontSize: 9, color: RD, fontWeight: 700 }}>⚠ 逾期</span>}
+                            </div>
+                            <div style={{ fontSize: 10, color: MUTED, marginTop: 1 }}>
+                              {c.orderCount} 张订单 · 已收 AED {Number(c.totalPaid).toLocaleString()} / 总 AED {Number(c.totalGrandTotal).toLocaleString()}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {OR && <div style={{ fontSize: 9, color: SUBTLE, marginTop: 6 }}>{OR.note}</div>}
                 </div>
-                <div style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                  <div style={{ fontSize: 10, color: MUTED, marginBottom: 2 }}>涉及订单</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: TEXT }}>{state.resultData.orderCount}</div>
-                </div>
-                {state.resultData.overdueCount > 0 && (
-                  <div style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(224,132,106,0.08)', border: '1px solid rgba(224,132,106,0.3)' }}>
-                    <div style={{ fontSize: 10, color: '#E0846A', marginBottom: 2 }}>已逾期客户</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: '#E0846A' }}>{state.resultData.overdueCount}</div>
-                  </div>
-                )}
-              </div>
-              {state.resultData.customerCount === 0 ? (
-                <div style={{ fontSize: 13, color: '#6FBF8E', padding: '10px 0' }}>✓ 暂无未收款记录。</div>
-              ) : (
-                <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {state.resultData.customers.map((c: any, i: number) => {
-                    const hasOverdue = c.orders.some((o: any) => o.overdue);
-                    return (
-                      <div key={i} style={{ padding: '8px 10px', borderRadius: 7, background: hasOverdue ? 'rgba(224,132,106,0.06)' : 'rgba(255,255,255,0.03)', border: `1px solid ${hasOverdue ? 'rgba(224,132,106,0.22)' : 'rgba(255,255,255,0.07)'}` }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: TEXT, flex: 1 }}>{c.customerName}</span>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: '#E0846A' }}>
-                            AED {Number(c.totalOutstanding).toLocaleString()} 未收
-                          </span>
-                          {hasOverdue && <span style={{ fontSize: 10, color: '#E0846A', fontWeight: 700 }}>⚠ 逾期</span>}
+
+                {/* Section B: 寄售应收 */}
+                <div style={SEC}>
+                  <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 6, letterSpacing: '0.04em' }}>寄售应收 / CONSIGNMENT RECEIVABLES</div>
+                  {!CR ? (
+                    <div style={{ fontSize: 12, color: MUTED }}>查询失败</div>
+                  ) : CR.soCount === 0 ? (
+                    <div style={{ fontSize: 12, color: GN }}>✓ 暂无未结算寄售记录。</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
+                      {CR.records.map((r: any, i: number) => (
+                        <div key={i} style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: TEXT, flex: 1 }}>{r.customerName}</span>
+                            <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 4, background: r.settlementStatus === 'PARTIAL' ? 'rgba(203,168,92,0.12)' : 'rgba(224,132,106,0.08)', color: r.settlementStatus === 'PARTIAL' ? GOLD : RD }}>
+                              {r.settlementZh}
+                            </span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: GOLD, whiteSpace: 'nowrap' }}>AED {Number(r.outstanding).toLocaleString()}</span>
+                          </div>
+                          <div style={{ fontSize: 10, color: MUTED, marginTop: 1 }}>
+                            SO {r.soNo} · {r.productName} · 已售 {r.soldQty} × {r.unitPrice} AED
+                            {r.receivedAmount > 0 ? ` · 已收 AED ${Number(r.receivedAmount).toLocaleString()}` : ''}
+                          </div>
                         </div>
-                        <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>
-                          {c.orderCount} 张订单 · 已收 AED {Number(c.totalPaid).toLocaleString()} / 总计 AED {Number(c.totalGrandTotal).toLocaleString()}
-                        </div>
-                      </div>
-                    );
-                  })}
+                      ))}
+                    </div>
+                  )}
+                  {CR && <div style={{ fontSize: 9, color: SUBTLE, marginTop: 6 }}>{CR.note}</div>}
                 </div>
-              )}
-              <div style={{ fontSize: 10, color: SUBTLE, marginTop: 8 }}>
-                数据来源：orders · {new Date(state.resultData.asOf).toLocaleString('zh-CN')}
+
+                {/* Section C: 发票应收 */}
+                <div style={SEC}>
+                  <div style={{ fontSize: 11, color: '#5BA3C9', fontWeight: 700, marginBottom: 6, letterSpacing: '0.04em' }}>发票应收 / INVOICE RECEIVABLES</div>
+                  {!IR ? (
+                    <div style={{ fontSize: 12, color: MUTED }}>查询失败</div>
+                  ) : IR.invoiceCount === 0 ? (
+                    <div style={{ fontSize: 12, color: GN }}>✓ 暂无 issued / approved 未收款发票。</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
+                      {IR.invoices.map((inv: any, i: number) => (
+                        <div key={i} style={{ padding: '6px 8px', borderRadius: 6, background: inv.overdue ? 'rgba(224,132,106,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${inv.overdue ? 'rgba(224,132,106,0.18)' : 'rgba(255,255,255,0.05)'}` }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: TEXT, flex: 1 }}>{inv.customerName}</span>
+                            <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 4, background: inv.status === 'issued' ? 'rgba(91,163,201,0.12)' : 'rgba(111,191,142,0.1)', color: inv.status === 'issued' ? '#5BA3C9' : GN }}>
+                              {inv.statusZh}
+                            </span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#5BA3C9', whiteSpace: 'nowrap' }}>AED {Number(inv.total).toLocaleString()}</span>
+                            {inv.overdue && <span style={{ fontSize: 9, color: RD, fontWeight: 700 }}>⚠ 逾期</span>}
+                          </div>
+                          <div style={{ fontSize: 10, color: MUTED, marginTop: 1 }}>
+                            {inv.invoiceNo}{inv.dueDate ? ` · 到期 ${inv.dueDate.slice(0, 10)}` : ''}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {IR && IR.pendingApprovalCount > 0 && (
+                    <div style={{ fontSize: 10, color: MUTED, marginTop: 6, padding: '4px 6px', background: 'rgba(212,168,67,0.06)', borderRadius: 5 }}>
+                      另有 {IR.pendingApprovalCount} 张待审批发票（AED {Number(IR.pendingApprovalAmount).toLocaleString()}），不计入正式应收。
+                    </div>
+                  )}
+                  {IR && <div style={{ fontSize: 9, color: SUBTLE, marginTop: 4 }}>{IR.note}</div>}
+                </div>
+
+                {/* Overlap warning */}
+                <div style={{ fontSize: 10, color: SUBTLE, padding: '6px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: 6, marginBottom: 4 }}>
+                  ⚠ 三个口径来源不同，可能存在重叠，仅作经营提醒，不作为财务最终对账依据。
+                </div>
+                <div style={{ fontSize: 10, color: SUBTLE }}>
+                  {new Date(d.asOf).toLocaleString('zh-CN')}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ── Receivables loading ── */}
           {intent.intentId === 'check_receivables' && !state.resultData && (
-            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在统计未收款数据…</div>
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查询订单 / 寄售 / 发票应收…</div>
           )}
 
           {/* ── Receivables API error ── */}
@@ -2427,8 +2512,8 @@ export function AIPage() {
       const receivablesMatch: AIIntentMatch = {
         intent: {
           intentId: 'check_receivables',
-          intentNameZh: '未收款情况',
-          intentNameEn: 'Receivables Summary',
+          intentNameZh: '应收款总览',
+          intentNameEn: 'Receivables Overview',
           category: 'query',
           triggerKeywordsZh: [],
           triggerKeywordsEn: [],
@@ -2451,7 +2536,7 @@ export function AIPage() {
       setTab('chat');
       setCmdState({ raw: raw.trim(), match: receivablesMatch, phase: 'processing', step: 0 });
       runner.run(
-        ['正在识别指令…', '正在连接订单数据库…', '正在统计未收款情况…'],
+        ['正在识别指令…', '正在查询三个应收口径…', '正在汇总订单 / 寄售 / 发票应收…'],
         (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
         () => {
           setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
