@@ -315,7 +315,10 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
 
       if (COL.item === -1) {
         const detected = headers.filter(Boolean).slice(0, 8).join('、');
-        throw new Error(`未找到产品名称列。检测到的列：${detected || '(空)'}`);
+        // Non-blocking: file saved as attachment, user can still create lead
+        setXlsxStatus('warn');
+        setXlsxMsg(`文件已保存为附件，未能自动识别产品列（检测到：${detected || '(空)'}）。点击下方按钮继续整理客户线索。`);
+        return;
       }
 
       const items: LineItem[] = [];
@@ -386,8 +389,9 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
         (grandTotal ? `，合计 AED ${grandTotal.toLocaleString()}` : '（未检测到总额，请手动填写）')
       );
     } catch (err: any) {
-      setXlsxStatus('error');
-      setXlsxMsg(`Excel 解析失败：${err?.message || '未知错误'}`);
+      // Non-blocking: keep attachment, warn only
+      setXlsxStatus('warn');
+      setXlsxMsg(`文件已保存为附件（解析提示：${err?.message || '未知错误'}）。点击下方按钮继续整理客户线索。`);
     }
   };
 
@@ -517,6 +521,13 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       if (optional.clientName.trim()) {
         result.clientName = optional.clientName.trim();
         result.missingFields = result.missingFields.filter(f => f !== '客户名称');
+      }
+      // If file upload failed/warned but file name looks like BOQ/quotation, hint nextAction
+      if (xlsxStatus === 'warn' && !parsedFromFile && attachments.length > 0) {
+        const hasQuoteFile = attachments.some(a =>
+          /清单|报价|boq|quotation|quote|pi|offer|furniture|家具|产品|明细/i.test(a.name)
+        );
+        if (hasQuoteFile) result.nextAction = '整理报价文件并生成报价';
       }
       // detect quotation alongside followup — preserve Excel-parsed quoteDraft
       if (!parsedFromFile) {
