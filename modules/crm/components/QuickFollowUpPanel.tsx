@@ -624,19 +624,32 @@ export default function QuickFollowUpPanel({
                         {/* Items */}
                         {expandedQuote === q.id && (
                           <div className="px-4 py-3 space-y-1.5" style={{ background: BG }}>
-                            {q.items && q.items.length > 0 ? (
-                              q.items.map((it: any, j: number) => (
-                                <div key={j} className="text-xs font-medium" style={{ color: T2 }}>
-                                  <span className="font-black" style={{ color: T1 }}>{j + 1}. {it.item_name}</span>
-                                  {it.description && <span style={{ color: T3 }}> · {it.description}</span>}
-                                  <span style={{ color: T3 }}> · ×{it.qty} {it.unit}</span>
-                                  <span style={{ color: GOLD }}> @ AED {Number(it.selling_price).toLocaleString()}</span>
-                                  <span className="float-right font-black" style={{ color: T1 }}>
-                                    AED {Number(it.line_total).toLocaleString()}
-                                  </span>
-                                </div>
-                              ))
-                            ) : (
+                            {q.items && q.items.length > 0 ? (() => {
+                              const validItems = q.items.filter((it: any) => {
+                                const n = (it.item_name || '').trim();
+                                if (/^=DISPIMG/i.test(n) || /^=IMAGE/i.test(n)) return false;
+                                if (!n && !(it.description || '').trim()) return false;
+                                return true;
+                              });
+                              const hiddenCnt = q.items.length - validItems.length;
+                              return (
+                                <>
+                                  {validItems.map((it: any, j: number) => (
+                                    <div key={j} className="text-xs font-medium" style={{ color: T2 }}>
+                                      <span className="font-black" style={{ color: T1 }}>{j + 1}. {it.item_name}</span>
+                                      {it.description && <span style={{ color: T3 }}> · {it.description}</span>}
+                                      <span style={{ color: T3 }}> · ×{it.qty} {it.unit}</span>
+                                      <span style={{ color: GOLD }}> @ AED {Number(it.selling_price).toLocaleString()}</span>
+                                      <span className="float-right font-black" style={{ color: T1 }}>
+                                        AED {Number(it.line_total).toLocaleString()}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  {validItems.length === 0 && <div className="text-[10px] font-medium" style={{ color: T3 }}>该报价暂无有效产品明细</div>}
+                                  {hiddenCnt > 0 && <div className="text-[10px] font-medium mt-1" style={{ color: T3 }}>已隐藏 {hiddenCnt} 条图片 / 无效明细行</div>}
+                                </>
+                              );
+                            })() : (
                               <div className="text-[10px] font-medium" style={{ color: T3 }}>该报价暂无产品明细</div>
                             )}
                           </div>

@@ -49,24 +49,31 @@ function extractInventoryProduct(raw: string): string | null {
 function extractCustomerName(raw: string): string | null {
   const s = raw.replace(/[？?。！!，,]/g, '').trim();
 
+  // Strip trailing Chinese particles / noise from an extracted name
+  const clean = (c: string) =>
+    c
+      .replace(/\s*(?:的|这个客户|这个|客户)\s*$/, '')
+      .replace(/^[帮我请一下\s]+/, '')
+      .trim();
+
   // Pattern: 查/看 <customer> 的历史报价
-  let m = s.match(/(?:查|看)(?:一下|查看|查询)?\s*(.+?)\s*(?:的)?(?:历史报价|以前报价|之前报价|报价记录)/u);
+  let m = s.match(/(?:查|看)(?:一下|查看|查询)?\s*(.+?)\s*(?:的\s*)?(?:历史报价|以前报价|之前报价|报价记录)/u);
   if (m?.[1]) {
-    const c = m[1].replace(/^[帮我请一下\s]+/, '').trim();
+    const c = clean(m[1]);
     if (c.length >= 2 && c.length <= 30) return c;
   }
 
-  // Pattern: <customer> 以前/之前报价/报过
-  m = s.match(/^(.+?)\s*(?:以前|之前|上次|历史)(?:报过|报价|的报价)/u);
+  // Pattern: <customer> 以前/之前报价/报过  (add optional 的 before time words)
+  m = s.match(/^(.+?)\s*(?:的\s*)?(?:以前|之前|上次|历史)(?:报过|报价|的报价)/u);
   if (m?.[1]) {
-    const c = m[1].replace(/^[帮我请一下\s]+/, '').trim();
+    const c = clean(m[1]);
     if (c.length >= 2 && c.length <= 30) return c;
   }
 
   // Pattern: <customer> 报过什么价
   m = s.match(/^(.+?)\s*报过什么价/u);
   if (m?.[1]) {
-    const c = m[1].trim();
+    const c = clean(m[1]);
     if (c.length >= 2 && c.length <= 30) return c;
   }
 
@@ -611,9 +618,15 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
           {/* ── Quotation history result panel ── */}
           {intent.intentId === 'check_quotation_history' && state.resultData && state.resultData.ok && (
             <div style={{ marginBottom: 12 }}>
+              {/* Alias match notice */}
+              {state.resultData.matchedBy && state.resultData.matchedBy !== state.resultData.customerFilter && (
+                <div style={{ fontSize: 11, color: MUTED, marginBottom: 6, padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 6 }}>
+                  已使用别名匹配：{state.resultData.matchedBy}
+                </div>
+              )}
               <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>
-                {state.resultData.customerFilter
-                  ? <>客户「{state.resultData.customerFilter}」共 {state.resultData.total} 条报价记录</>
+                {state.resultData.normalizedCustomer
+                  ? <>客户「{state.resultData.normalizedCustomer}」共 {state.resultData.total} 条报价记录</>
                   : <>最近 {state.resultData.total} 条报价记录</>
                 }
                 {state.resultData.total > 0 && (
@@ -634,13 +647,29 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
               )}
               {state.resultData.total === 0 ? (
                 <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 0' }}>
-                  {state.resultData.customerFilter
-                    ? `未找到与「${state.resultData.customerFilter}」相关的报价记录。`
-                    : '暂无报价记录。'}
+                  <div style={{ marginBottom: 6 }}>未找到该客户的报价记录。</div>
+                  {state.resultData.searchTerms?.length > 0 && (
+                    <div style={{ fontSize: 11, color: MUTED }}>
+                      <div style={{ marginBottom: 3 }}>已尝试搜索：</div>
+                      {(state.resultData.searchTerms as string[]).map((t: string, i: number) => (
+                        <div key={i} style={{ paddingLeft: 8 }}>· {t}</div>
+                      ))}
+                      <div style={{ marginTop: 6, color: SUBTLE }}>请检查客户名称在报价记录中的写法是否不同。</div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div style={{ maxHeight: 400, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {state.resultData.quotes.map((q: any, i: number) => (
+                  {state.resultData.quotes.map((q: any, i: number) => {
+                    // Filter out image-formula and all-zero invalid items
+                    const validItems = (q.items || []).filter((it: any) => {
+                      const name = (it.item_name || '').trim();
+                      if (/^=DISPIMG/i.test(name) || /^=IMAGE/i.test(name)) return false;
+                      if (!name && !(it.description || '').trim()) return false;
+                      return true;
+                    });
+                    const hiddenCount = (q.items || []).length - validItems.length;
+                    return (
                     <div key={i} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                         <span style={{ fontSize: 13, fontWeight: 700, color: TEXT, flex: 1 }}>{q.customerName}</span>
@@ -651,16 +680,16 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                           {q.statusZh}
                         </span>
                       </div>
-                      <div style={{ display: 'flex', gap: 12, fontSize: 11, color: MUTED, marginBottom: q.items?.length ? 6 : 0 }}>
+                      <div style={{ display: 'flex', gap: 12, fontSize: 11, color: MUTED, marginBottom: validItems.length ? 6 : 0 }}>
                         <span>{q.quoteNo}</span>
                         {q.projectName && <span>{q.projectName}</span>}
                         <span>{q.quoteDate ? new Date(q.quoteDate).toLocaleDateString('zh-CN') : '—'}</span>
                         {q.salesperson && <span>{q.salesperson}</span>}
                       </div>
-                      {/* Line items */}
-                      {q.items && q.items.length > 0 && (
+                      {/* Line items (invalid rows filtered) */}
+                      {validItems.length > 0 && (
                         <div style={{ marginTop: 4, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                          {q.items.map((it: any, j: number) => (
+                          {validItems.map((it: any, j: number) => (
                             <div key={j} style={{ display: 'flex', alignItems: 'baseline', gap: 6, fontSize: 11, color: MUTED, padding: '2px 0' }}>
                               <span style={{ fontWeight: 700, color: TEXT, minWidth: 0, flex: '0 1 auto' }}>{j + 1}. {it.item_name}</span>
                               {it.description && <span style={{ color: SUBTLE }}>｜{it.description}</span>}
@@ -673,11 +702,17 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                           ))}
                         </div>
                       )}
-                      {q.items && q.items.length === 0 && (
+                      {(q.items || []).length === 0 && (
                         <div style={{ fontSize: 10, color: SUBTLE, marginTop: 2 }}>该报价暂无产品明细</div>
                       )}
+                      {hiddenCount > 0 && (
+                        <div style={{ fontSize: 10, color: SUBTLE, marginTop: 4 }}>
+                          已隐藏 {hiddenCount} 条图片 / 无效明细行
+                        </div>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
               <div style={{ fontSize: 10, color: SUBTLE, marginTop: 8 }}>

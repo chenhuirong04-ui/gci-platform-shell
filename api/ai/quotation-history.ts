@@ -1,6 +1,7 @@
 // /api/ai/quotation-history
 // Reads quotation_records (flat schema, no payload wrapper).
-// Supports ?customer= fuzzy filter. Default: latest 20 records across all statuses.
+// Supports ?customer= fuzzy filter with company-suffix alias generation.
+// Default: latest 20 records across all statuses.
 export const config = { runtime: 'edge' };
 
 const CORS = {
@@ -16,12 +17,58 @@ function json(body: unknown, status = 200) {
   });
 }
 
-// quotation_records status labels (zh)
 const STATUS_ZH: Record<string, string> = {
   DRAFT:         '草稿',
   GENERATED:     '已发出 / 待回复',
   SENT_TO_TRADE: '已转 Trade PI',
 };
+
+// Strip common trailing Chinese particles from an extracted customer name
+function cleanCustomer(raw: string): string {
+  return raw
+    .replace(/\s*(?:的|这个客户|这个|客户)\s*$/, '')
+    .replace(/["""''「」]/g, '')
+    .trim();
+}
+
+// Generate search aliases from a customer name (handles LLC / L.L.C / LLE / FZ variants)
+function generateSearchTerms(customer: string): string[] {
+  const s = cleanCustomer(customer);
+  if (!s) return [];
+
+  const terms = new Set<string>();
+  terms.add(s);
+
+  // Strip company suffixes to get core name
+  const SUFFIX_RE = /\s+(?:FZ[-\s]?LLC|FZ[-\s]?LLE|FZ[-\s]?L\.?L\.?C|FZ-LLC|FZ LLC|LLC|L\.L\.C|LLE|L\.LC|FZCO|Ltd\.?|Co\.|Inc\.?|FZE|EST|Establishment|Trading|Group|Corp)\s*$/i;
+  const core = s.replace(SUFFIX_RE, '').trim();
+  if (core && core !== s && core.length >= 2) terms.add(core);
+
+  // LLC / LLE / L.L.C interoperability
+  if (/LLE\b/i.test(s)) {
+    terms.add(s.replace(/LLE\b/i, 'LLC'));
+    terms.add(s.replace(/LLE\b/i, 'L.L.C'));
+  }
+  if (/\bLLC\b/i.test(s)) {
+    terms.add(s.replace(/\bLLC\b/i, 'LLE'));
+    terms.add(s.replace(/\bLLC\b/i, 'L.L.C'));
+  }
+  if (/L\.L\.C/i.test(s)) {
+    terms.add(s.replace(/L\.L\.C/i, 'LLC'));
+    terms.add(s.replace(/L\.L\.C/i, 'LLE'));
+  }
+
+  return [...terms].filter(t => t.length >= 2);
+}
+
+// Detect items that are image formulas or completely empty/zero
+function isInvalidItem(ir: any): boolean {
+  const name = (ir.item_name || '').trim();
+  if (/^=DISPIMG/i.test(name)) return true;
+  if (/^=IMAGE/i.test(name)) return true;
+  if (!name && !(ir.description || '').trim()) return true;
+  return false;
+}
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
@@ -32,20 +79,25 @@ export default async function handler(request: Request): Promise<Response> {
 
   if (!supabaseUrl || !key) return json({ ok: false, error: 'Supabase not configured' }, 500);
 
-  // Optional customer keyword filter (?customer=IFZA)
-  const reqUrl   = new URL(request.url);
-  const customer = reqUrl.searchParams.get('customer')?.trim() || '';
+  const reqUrl           = new URL(request.url);
+  const rawCustomer      = reqUrl.searchParams.get('customer')?.trim() || '';
+  const normalizedCustomer = rawCustomer ? cleanCustomer(rawCustomer) : '';
+  const searchTerms        = normalizedCustomer ? generateSearchTerms(normalizedCustomer) : [];
 
-  // quotation_records is FLAT (no payload wrapper).
-  // Select all statuses — this is a history view, not just pending.
-  // customer filter: ilike on customer_name (case-insensitive substring).
+  const selectCols = 'id,quote_no,customer_name,project_name,grand_total,status,created_at,quote_date,salesperson,quote_type,margin_percent,vat_amount,selling_total';
+
   let queryUrl = `${supabaseUrl}/rest/v1/quotation_records`
-    + `?select=id,quote_no,customer_name,project_name,grand_total,status,created_at,quote_date,salesperson,quote_type,margin_percent,vat_amount,selling_total`
+    + `?select=${selectCols}`
     + `&order=created_at.desc`
     + `&limit=20`;
 
-  if (customer) {
-    queryUrl += `&customer_name=ilike.*${encodeURIComponent(customer)}*`;
+  if (searchTerms.length === 1) {
+    queryUrl += `&customer_name=ilike.*${encodeURIComponent(searchTerms[0])}*`;
+  } else if (searchTerms.length > 1) {
+    const orParts = searchTerms
+      .map(t => `customer_name.ilike.*${encodeURIComponent(t)}*`)
+      .join(',');
+    queryUrl += `&or=(${orParts})`;
   }
 
   const res = await fetch(queryUrl, {
@@ -65,7 +117,8 @@ export default async function handler(request: Request): Promise<Response> {
 
   // Fetch quotation_items for all returned records in one query
   const recordIds: string[] = rows.map((r: any) => r.id).filter(Boolean);
-  const itemsMap: Record<string, any[]> = {};
+  const itemsMap: Record<string, { valid: any[]; hiddenCount: number }> = {};
+
   if (recordIds.length > 0) {
     const itemsUrl = `${supabaseUrl}/rest/v1/quotation_items`
       + `?quotation_id=in.(${recordIds.join(',')})`
@@ -77,9 +130,13 @@ export default async function handler(request: Request): Promise<Response> {
     if (itemsRes.ok) {
       const itemRows: any[] = await itemsRes.json().catch(() => []);
       for (const ir of itemRows) {
-        if (!itemsMap[ir.quotation_id]) itemsMap[ir.quotation_id] = [];
-        itemsMap[ir.quotation_id].push({
-          item_name:     ir.item_name     || '',
+        if (!itemsMap[ir.quotation_id]) itemsMap[ir.quotation_id] = { valid: [], hiddenCount: 0 };
+        if (isInvalidItem(ir)) {
+          itemsMap[ir.quotation_id].hiddenCount++;
+          continue;
+        }
+        itemsMap[ir.quotation_id].valid.push({
+          item_name:     (ir.item_name || '').trim(),
           description:   ir.description   || '',
           qty:           Number(ir.qty)   || 0,
           unit:          ir.unit          || '件',
@@ -90,6 +147,16 @@ export default async function handler(request: Request): Promise<Response> {
         });
       }
     }
+  }
+
+  // Determine which search term actually matched (for display)
+  let matchedBy: string | null = null;
+  if (normalizedCustomer && rows.length > 0) {
+    const firstCustomer = (rows[0].customer_name || '').toLowerCase();
+    for (const t of searchTerms) {
+      if (firstCustomer.includes(t.toLowerCase())) { matchedBy = t; break; }
+    }
+    if (!matchedBy) matchedBy = normalizedCustomer;
   }
 
   const quotes = rows.map(q => ({
@@ -108,7 +175,8 @@ export default async function handler(request: Request): Promise<Response> {
     salesperson:  q.salesperson || '',
     quoteDate:    q.quote_date || q.created_at || '',
     createdAt:    q.created_at || '',
-    items:        itemsMap[q.id] || [],
+    items:        itemsMap[q.id]?.valid       || [],
+    hiddenInvalidItemsCount: itemsMap[q.id]?.hiddenCount || 0,
   }));
 
   const totalAmount   = quotes.reduce((s, q) => s + q.grandTotal, 0);
@@ -118,13 +186,16 @@ export default async function handler(request: Request): Promise<Response> {
   }, {});
 
   return json({
-    ok:            true,
-    total:         quotes.length,
-    customerFilter: customer || null,
+    ok:                 true,
+    total:              quotes.length,
+    customerFilter:     rawCustomer || null,
+    normalizedCustomer: normalizedCustomer || null,
+    searchTerms:        searchTerms.length > 0 ? searchTerms : undefined,
+    matchedBy:          matchedBy || undefined,
     totalAmount,
     statusSummary,
     quotes,
-    source:        'quotation_records',
-    asOf:          new Date().toISOString(),
+    source:             'quotation_records',
+    asOf:               new Date().toISOString(),
   });
 }

@@ -318,7 +318,16 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
 
       for (let i = headerIdx + 1; i < raw.length; i++) {
         const row = raw[i] || [];
-        const name = String(row[COL.item] ?? '').trim();
+        let name = String(row[COL.item] ?? '').trim();
+        // If item column contains an image formula, try description column as fallback
+        if (/^=DISPIMG\b/i.test(name) || /^=IMAGE\b/i.test(name)) {
+          const descFallback = COL.spec !== -1 ? String(row[COL.spec] ?? '').trim() : '';
+          if (descFallback && !/^=DISPIMG\b/i.test(descFallback) && !/^=IMAGE\b/i.test(descFallback)) {
+            name = descFallback;
+          } else {
+            continue; // skip image-only rows
+          }
+        }
         if (!name) continue;
         // Skip grand-total summary rows
         if (/^(合计|小计|总计|grand total|total|subtotal|sum)\s*[:：]?\s*$/i.test(name)) {
