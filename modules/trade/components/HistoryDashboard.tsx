@@ -5,7 +5,7 @@ import {
   Search, Calendar, Eye, RefreshCw, Plus, CreditCard,
   Zap, PackageCheck, PieChart as PieChartIcon,
   Download as DownloadIcon, X, Info, Save, History,
-  ReceiptText, Box, Trash2, Ban, Edit3
+  ReceiptText, Box, Trash2, Ban, Edit3, Archive
 } from 'lucide-react';
 
 import {
@@ -75,6 +75,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
   const [activeSubTab, setActiveSubTab] = useState<'analytics' | 'history' | 'orders' | 'ar'>('history');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [showArchived, setShowArchived] = useState(false);
   const [orderViewFilter, setOrderViewFilter] = useState<'ALL' | 'CONSIGNMENT'>('ALL');
   const [selectedQuote, setSelectedQuote] = useState<QuoteRecord | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(null);
@@ -870,23 +871,34 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
     alert(`✅ 订单 ${orderId} 已作废`);
   };
 
-  const handleDeleteQuote = async (quoteId: string) => {
+  const handleArchiveQuote = async (quoteId: string) => {
     const q = (quotes || []).find(x => x.id === quoteId);
     if (!q) return;
-    const msg = q.status === 'CONVERTED'
-      ? `⚠️ 该报价单已转为订单 ${(q as any).convertedOrderId}，删除报价单不影响已生成的订单。\n确认删除报价单 ${quoteId}？`
-      : `确认删除报价单 ${quoteId}？`;
-    if (!window.confirm(msg)) return;
 
-    // Soft-delete: mark status='DELETED' + deletedAt, then upsert to Supabase
-    // This ensures the record stays in Supabase but won't reappear after hydration
+    const confirmed = window.confirm(
+      `此操作不会删除历史报价。\n它只会将该报价标记为未成交并从默认列表隐藏。\n之后仍可通过"显示归档"、搜索或 AI 查询查看。\n\n` +
+      `This will not delete the quote.\nIt will archive it as unsuccessful and hide it from the default list.\nIt can still be found through search, AI, or archived records.\n\n` +
+      (q.status === 'CONVERTED' ? `⚠️ 该报价单已转为订单 ${(q as any).convertedOrderId}，归档不影响已生成的订单。\n\n` : '') +
+      `报价单：${quoteId}`
+    );
+    if (!confirmed) return;
+
     const now = new Date().toISOString();
-    const softDeleted = { ...q, status: 'DELETED' as any, deletedAt: now, updated_at: now, updatedAt: now };
-    const updatedQuotes = (quotes || []).map(x => x.id === quoteId ? softDeleted : x);
+    // Preserve original status — archive is NOT a status change
+    const archived = {
+      ...q,
+      archivedAt: now,
+      hiddenFromDefault: true,
+      archiveReason: 'not_accepted',
+      archiveNote: 'Customer did not accept the quote / deal not completed',
+      updated_at: now,
+      updatedAt: now,
+    };
+    const updatedQuotes = (quotes || []).map(x => x.id === quoteId ? archived : x);
     await persistence.updateQuotes(updatedQuotes);
     await loadLocalData();
     setSelectedQuote(null);
-    alert(`✅ 报价单 ${quoteId} 已删除`);
+    alert(`✅ 报价单 ${quoteId} 已归档（未成交）。可通过"显示归档"查看。`);
   };
 
   const handleDeletePayment = async (paymentId: string) => {
@@ -1269,8 +1281,16 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
     const st = safeLower(searchTerm);
     return (quotes || [])
       .filter(q => {
-        // Exclude soft-deleted records
-        if ((q as any)?.status === 'DELETED' || (q as any)?.deletedAt) return false;
+        // Determine if this record is archived (any of the archive signals)
+        const isArchived =
+          (q as any)?.archivedAt ||
+          (q as any)?.hiddenFromDefault ||
+          (q as any)?.status === 'DELETED' ||   // backward compat with prior soft-delete
+          (q as any)?.deletedAt;                 // backward compat with prior soft-delete
+
+        if (isArchived && !showArchived) return false;
+        if (!isArchived && showArchived) return false; // show ONLY archived when toggle is on
+
         const matchSearch =
           safeLower(q?.customerName).includes(st) ||
           safeLower(q?.id).includes(st);
@@ -1282,7 +1302,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
         const ta = safeDateStr(a?.createdAt);
         return tb.localeCompare(ta);
       });
-  }, [quotes, searchTerm, statusFilter]);
+  }, [quotes, searchTerm, statusFilter, showArchived]);
 
   const filteredOrders = useMemo(() => {
     const st = safeLower(searchTerm);
@@ -1485,6 +1505,16 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
               ))}
             </div>
 
+            {/* 归档记录 toggle */}
+            <button
+              onClick={() => setShowArchived(v => !v)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border text-xs font-black uppercase tracking-wide transition-all shadow-sm shrink-0 ${showArchived ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-gray-400 border-gray-100 hover:text-amber-600 hover:border-amber-300'}`}
+              title={showArchived ? '返回默认列表' : '显示归档未成交报价 / Show Archived'}
+            >
+              <Archive className="w-4 h-4" />
+              {showArchived ? '归档中 / Archived' : '显示归档'}
+            </button>
+
             <button
               onClick={handleExportAllData}
               className="p-4 bg-white border border-gray-100 rounded-2xl text-[#CBA85C] hover:bg-[#080D1E] hover:text-white transition-all shadow-sm"
@@ -1526,9 +1556,16 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                       </span>
                     </td>
                     <td className="px-10 py-8">
-                      <span className={`px-4 py-1.5 rounded-full text-xs font-black tracking-wide shadow-sm border ${q.status === 'CONVERTED' ? 'bg-[#3F7D58] text-white border-[#3F7D58]' : 'bg-white text-gray-400 border-gray-100'}`}>
-                        {safeStr(q.status)}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className={`px-4 py-1.5 rounded-full text-xs font-black tracking-wide shadow-sm border inline-block ${q.status === 'CONVERTED' ? 'bg-[#3F7D58] text-white border-[#3F7D58]' : 'bg-white text-gray-400 border-gray-100'}`}>
+                          {safeStr(q.status)}
+                        </span>
+                        {((q as any).archivedAt || (q as any).hiddenFromDefault || (q as any).deletedAt || (q as any).status === 'DELETED') && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-50 text-amber-600 border border-amber-200 inline-block">
+                            已归档 · 未成交
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-10 py-8 text-right font-black font-mono text-gray-800 text-sm">
                       {(q.grandTotal ?? 0).toFixed(2)}
@@ -1542,13 +1579,15 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                         >
                           <Eye className="w-5 h-5" />
                         </button>
-                        <button
-                          onClick={() => handleDeleteQuote(q.id)}
-                          className="p-4 bg-white border border-red-100 rounded-2xl shadow-sm hover:bg-red-600 hover:text-white transition-all text-red-400"
-                          title="Delete Quote"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {!showArchived && (
+                          <button
+                            onClick={() => handleArchiveQuote(q.id)}
+                            className="p-4 bg-white border border-amber-100 rounded-2xl shadow-sm hover:bg-amber-600 hover:text-white transition-all text-amber-400"
+                            title="归档未成交报价 / Archive unsuccessful quote"
+                          >
+                            <Archive className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1557,7 +1596,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                 {filteredQuotes.length === 0 && (
                   <tr>
                     <td colSpan={6} className="py-20 text-center text-gray-300 font-black uppercase text-xs">
-                      没有匹配的记录
+                      {showArchived ? '暂无归档记录 / No archived quotes' : '没有匹配的记录'}
                     </td>
                   </tr>
                 )}
