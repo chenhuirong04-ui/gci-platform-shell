@@ -74,9 +74,9 @@ export const en = {
     send: 'Send',
   },
   quickActions: {
-    addClient: 'Add Client',
-    createQuote: 'Create Quote',
-    uploadBoq: 'Upload BOQ',
+    addClient: 'Customer Intake',
+    createQuote: 'PI Quotation',
+    uploadBoq: 'BOQ Quotation',
     createOrder: 'Create Order',
   },
   toast: {

@@ -75,9 +75,9 @@ export const zh: typeof en = {
     send: '发送',
   },
   quickActions: {
-    addClient: '新增客户',
-    createQuote: '创建报价',
-    uploadBoq: '上传 BOQ',
+    addClient: '客户新增 / 跟进',
+    createQuote: 'PI 报价',
+    uploadBoq: 'BOQ 报价',
     createOrder: '创建订单',
   },
   toast: {
