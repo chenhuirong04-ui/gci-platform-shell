@@ -152,7 +152,7 @@ function buildTaskFromFollowUpPage(page: any): any | null {
     const businessTypeRaw = extractSelect(props['业务类型']);
     const businessType = mapBusinessType(businessTypeRaw);
 
-    const lastFollowUpAt = extractDate(props['Follow-up Date']);
+    const lastFollowUpAt = extractDate(props['Follow-up Date（跟进日期）'] ?? props['Follow-up Date'] ?? null);
     const lastContext = extractRichText(props['Follow-up Notes'] ?? props['Follow-up Note'] ?? null);
     const followUpMethod = extractSelect(props['Follow-up Method'] ?? props['跟进方式'] ?? null);
     const owner = extractSelect(props['Follow-up Owner'] ?? props['Owner'] ?? props['跟进人'] ?? null);
@@ -248,9 +248,14 @@ export default async function handler(request: Request): Promise<Response> {
     ]);
 
     // Sort Follow-up Log by Follow-up Date descending (most recent first)
+    // Field name in Notion is 'Follow-up Date（跟进日期）' — fall back to bare name for safety
+    const getFollowUpDate = (page: any): string =>
+      page.properties?.['Follow-up Date（跟进日期）']?.date?.start
+      ?? page.properties?.['Follow-up Date']?.date?.start
+      ?? '';
     const followUpPages = [...followUpPagesRaw].sort((a, b) => {
-      const da = a.properties?.['Follow-up Date']?.date?.start ?? '';
-      const db2 = b.properties?.['Follow-up Date']?.date?.start ?? '';
+      const da = getFollowUpDate(a);
+      const db2 = getFollowUpDate(b);
       return db2 < da ? -1 : db2 > da ? 1 : 0;
     });
 
