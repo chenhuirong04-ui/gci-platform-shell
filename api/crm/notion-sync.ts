@@ -147,7 +147,10 @@ function buildTaskFromFollowUpPage(page: any): any | null {
     const { businessId, clientName } = parseCustomerTitle(rawTitle);
 
     const tradeStatusRaw = extractSelect(props['行动状态']);
-    const tradeStatus = tradeStatusRaw || '待人工确认';
+    // Normalize Notion select value to canonical APP value.
+    // Notion option is '待签合同'; APP code uses '合同待签'. Treat as identical.
+    const normalizeTradeStatus = (s: string) => s === '待签合同' ? '合同待签' : s;
+    const tradeStatus = normalizeTradeStatus(tradeStatusRaw) || '待人工确认';
 
     const businessTypeRaw = extractSelect(props['业务类型']);
     const businessType = mapBusinessType(businessTypeRaw);
