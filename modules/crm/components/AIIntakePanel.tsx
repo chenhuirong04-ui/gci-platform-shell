@@ -270,21 +270,27 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       const raw: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[bestSheet], { header: 1 });
       if (!raw || raw.length < 2) throw new Error('表格为空或只有一行数据');
 
-      // Column keyword detection (Chinese + English)
+      // Normalize: lowercase + strip fullwidth spaces, zero-width chars, BOM
+      const normHeader = (s: string) =>
+        String(s ?? '').toLowerCase()
+          .replace(/[ 　​-‍﻿­]/g, '')
+          .trim();
+
+      // Column keyword detection (simplified + traditional Chinese + English)
       const KW = {
-        item:  ['产品名称','品名','产品','名称','货物名称','工程项目','分项','项目名称','furniture item','item','product','description'],
-        spec:  ['规格','规格型号','尺寸','描述','spec','specification','size','dimension'],
-        qty:   ['数量','数','qty','quantity'],
-        unit:  ['单位','unit'],
-        price: ['单价','单价(aed)','单价aed','价格','目标价','报价单价','unit price','price','target price'],
-        total: ['合计','行合计','行小计','小计','金额','总价','total','amount','subtotal','line total'],
-        notes: ['备注','说明','remark','remarks','notes','note','交期','交货期'],
+        item:  ['产品名称','品名','产品','名称','名稱','货物名称','貨物名稱','工程项目','分项','项目名称','furniture item','item','product','description'],
+        spec:  ['规格','規格','规格型号','尺寸','描述','spec','specification','size','dimension'],
+        qty:   ['数量','數量','数','qty','quantity'],
+        unit:  ['单位','單位','unit'],
+        price: ['单价','單價','单价(aed)','单价aed','价格','目标价','报价单价','unit price','price','target price'],
+        total: ['合计','合計','行合计','行小计','小计','金额','總價','总价','total','amount','subtotal','line total'],
+        notes: ['备注','備注','说明','remark','remarks','notes','note','交期','交货期'],
       };
 
       // Find header row (first 20 rows, highest keyword score)
       let headerIdx = 0, bestScore = 0;
       for (let i = 0; i < Math.min(raw.length, 20); i++) {
-        const row = (raw[i] || []).map((c: any) => String(c ?? '').toLowerCase().trim());
+        const row = (raw[i] || []).map((c: any) => normHeader(String(c ?? '')));
         let score = 0;
         if (row.some((c: string) => KW.item.some(k => c === k || (c.length > 1 && c.includes(k))))) score += 4;
         if (row.some((c: string) => KW.qty.some(k => c === k || (c.length > 1 && c.includes(k))))) score += 2;
@@ -293,7 +299,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
         if (score > bestScore) { bestScore = score; headerIdx = i; }
       }
 
-      const headers = (raw[headerIdx] || []).map((c: any) => String(c ?? '').toLowerCase().trim());
+      const headers = (raw[headerIdx] || []).map((c: any) => normHeader(String(c ?? '')));
       const findCol = (kws: string[]) =>
         headers.findIndex((h: string) => kws.some(k => h === k || (h.length > 1 && h.includes(k))));
 
