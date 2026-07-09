@@ -140,6 +140,56 @@ const TYPE_LABEL: Record<string, string> = {
   TRADE: '贸易询盘', PROJECT: '项目推进', LOG_ONLY: '仅记录', INTERNAL: '内部任务',
 };
 
+// ── file intent detection ─────────────────────────────────────────────
+export type FileIntent =
+  | 'customer_quote_record'  // 我们已报给客户的报价单 / PI / 留底
+  | 'customer_inquiry'       // 客户发来的询价 / 产品清单，需要我们报价
+  | 'supplier_quote'         // 供应商发来的报价，用于转换成 GCI 报价
+  | 'boq'                    // 工程 / BOQ / 材料清单
+  | 'followup_context';      // 普通附件 / 截图 / 跟进上下文
+
+const FILE_INTENT_LABEL: Record<FileIntent, string> = {
+  customer_quote_record: '📋 客户报价留底',
+  customer_inquiry:      '❓ 客户询价清单',
+  supplier_quote:        '🏭 供应商报价',
+  boq:                   '📐 BOQ / 工程清单',
+  followup_context:      '📎 跟进附件',
+};
+
+function detectFileIntent(fileName: string, textHint: string): FileIntent {
+  const name = fileName.toLowerCase();
+
+  // 1. Explicit user intent in text — highest priority
+  if (/留底|已发给客户|已报价|已报给|报给客户|我们(发|报)的|我们(已经)?发|我们报价/i.test(textHint))
+    return 'customer_quote_record';
+  if (/供应商报价|供应商给(我们)?|supplier.*quote|vendor.*quote/i.test(textHint))
+    return 'supplier_quote';
+  if (/客户(询价|发来|的清单|发的)|客户要求|客户需要报价|需要我们报价|inquiry|客户问/i.test(textHint))
+    return 'customer_inquiry';
+  if (/boq|工程清单|材料清单|bill.?of.?quantity/i.test(textHint))
+    return 'boq';
+
+  // 2. File name — GCI own quote / PI indicators
+  if (/\b(pi|proforma.?invoice|gci.?quot|gci-q|doc-\d|quotation.?no|quote.?no|invoice.?no)/i.test(name))
+    return 'customer_quote_record';
+  if (/已报价|报价单|已发客户|sent.?to.?customer|customer.?quote/i.test(name))
+    return 'customer_quote_record';
+
+  // 3. Supplier / vendor file names
+  if (/supplier|vendor|供应商|厂家|工厂|factory|manufacturer/i.test(name))
+    return 'supplier_quote';
+
+  // 4. BOQ signals
+  if (/\bboq\b|bill.?of.?quantity|material.?list|materials|工程清单/i.test(name))
+    return 'boq';
+
+  // 5. Inquiry / customer product list
+  if (/inquiry|询价|product.?list|清单|catalogue|catalog/i.test(name))
+    return 'customer_inquiry';
+
+  return 'followup_context';
+}
+
 // ── quotation detection ───────────────────────────────────────────────
 interface QuoteDraft {
   customerName: string;
@@ -241,6 +291,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
   const [parsedFromFile, setParsedFromFile] = useState(false);
   const [xlsxStatus, setXlsxStatus] = useState<'idle'|'parsing'|'done'|'error'|'warn'>('idle');
   const [xlsxMsg, setXlsxMsg]       = useState('');
+  const [detectedFileType, setDetectedFileType] = useState<FileIntent>('followup_context');
 
   const hasInput = rawText.trim().length > 0 || attachments.length > 0;
 
@@ -483,7 +534,11 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
         name: f.name, type: f.type, data: base64,
         size: f.size, uploadedAt: new Date().toISOString(), isAnalyzed: false,
       });
-      // Auto-parse by file type
+      // Detect file intent before parsing
+      const intent = detectFileIntent(f.name, rawText);
+      setDetectedFileType(intent);
+      // customer_quote_record: try parsing for record keeping, but won't trigger supplier quote flow
+      // supplier_quote / customer_inquiry / boq: full parse + optional quote registration
       if (/\.(xlsx|xls|csv)$/i.test(f.name)) {
         parseExcelFile(f);
       } else if (f.type === 'application/pdf' || f.type.startsWith('image/')) {
@@ -522,15 +577,27 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
         result.clientName = optional.clientName.trim();
         result.missingFields = result.missingFields.filter(f => f !== '客户名称');
       }
-      // If file upload failed/warned but file name looks like BOQ/quotation, hint nextAction
-      if (xlsxStatus === 'warn' && !parsedFromFile && attachments.length > 0) {
-        const hasQuoteFile = attachments.some(a =>
-          /清单|报价|boq|quotation|quote|pi|offer|furniture|家具|产品|明细/i.test(a.name)
-        );
-        if (hasQuoteFile) result.nextAction = '整理报价文件并生成报价';
+      // Re-detect file intent now that we have the full text (text may clarify intent)
+      const finalIntent = attachments.length > 0
+        ? detectFileIntent(attachments[0].name, rawText)
+        : detectedFileType;
+      if (attachments.length > 0 && finalIntent !== detectedFileType) setDetectedFileType(finalIntent);
+
+      // Set nextAction based on file intent
+      if (attachments.length > 0 && !result.nextAction.includes('报价')) {
+        if (finalIntent === 'customer_quote_record') result.nextAction = '跟进客户对报价的反馈';
+        else if (finalIntent === 'customer_inquiry') result.nextAction = '整理客户询价并生成报价';
+        else if (finalIntent === 'supplier_quote') result.nextAction = '根据供应商报价生成 GCI 报价单';
+        else if (finalIntent === 'boq') result.nextAction = '整理 BOQ 并生成工程报价';
+        else if (xlsxStatus === 'warn' || xlsxStatus === 'done') result.nextAction = '整理报价文件并跟进';
       }
+
       // detect quotation alongside followup — preserve Excel-parsed quoteDraft
-      if (!parsedFromFile) {
+      // customer_quote_record: do NOT trigger registerQuote (it's a record, not a new quote to generate)
+      if (finalIntent === 'customer_quote_record') {
+        // Keep any parsed line items for record keeping, but don't register as new quote
+        setRegisterQuote(false);
+      } else if (!parsedFromFile) {
         const clientHint = optional.clientName.trim() || result.clientName;
         const qd = detectQuotation(text, clientHint);
         setQuoteDraft(qd);
@@ -557,6 +624,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
     setIsEditing(false); setDraftEdit(null);
     setLineItems([]); setShowItems(false);
     setParsedFromFile(false); setXlsxStatus('idle'); setXlsxMsg('');
+    setDetectedFileType('followup_context');
   };
 
   // ── line item helpers ─────────────────────────────────────────────
@@ -645,16 +713,29 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
     const isInternal = draft.type === 'INTERNAL';
     const clientName = optional.clientName || (isInternal ? '' : (draft.clientName === '待确认' ? '未知客户' : draft.clientName));
     const contactKey = (optional.whatsapp || optional.phoneE164 || optional.email || '').replace(/[\s+]/g,'').toLowerCase();
+    // Build lastContext: include quote record status if applicable
+    let lastContextNote = draft.notes;
+    if (detectedFileType === 'customer_quote_record') {
+      lastContextNote = `[客户报价留底] ${draft.notes}`.trim();
+    } else if (detectedFileType === 'customer_inquiry') {
+      lastContextNote = `[客户询价清单] ${draft.notes}`.trim();
+    } else if (detectedFileType === 'supplier_quote') {
+      lastContextNote = `[供应商报价] ${draft.notes}`.trim();
+    } else if (detectedFileType === 'boq') {
+      lastContextNote = `[BOQ/工程清单] ${draft.notes}`.trim();
+    }
+
     const task: Partial<FollowUpTask> = {
       clientName: isInternal ? '' : clientName,
       countryCity: optional.countryCity || 'Unknown',
       phoneE164: optional.phoneE164, whatsapp: optional.whatsapp, email: optional.email,
       contactKey, businessType: isInternal ? 'LOG_ONLY' : draft.type as BusinessType,
-      goal: draft.nextAction, lastContext: draft.notes,
+      goal: draft.nextAction, lastContext: lastContextNote,
       owner: draft.assignedTo === '本人' ? '本人' : draft.assignedTo,
       priority: draft.priority === 'High' ? 'A' : draft.priority === 'Low' ? 'C' : 'B',
       nextFollowUpAt: draft.dueDate + 'T09:00:00.000Z',
       attachments, inquirySummary: draft.title,
+      categories: detectedFileType !== 'followup_context' ? detectedFileType : undefined,
     };
     try {
       await onAdd(task);
@@ -747,22 +828,55 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
           </div>
         </div>
 
-        {/* Attachment chips */}
+        {/* Attachment chips + file intent badge */}
         {attachments.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {attachments.map(att => (
-              <div key={att.id}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold"
-                style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T2 }}>
-                {att.type.startsWith('image/') ? <ImageIcon className="w-3 h-3 text-indigo-400" /> : <FileText className="w-3 h-3" style={{ color: T3 }} />}
-                <span className="max-w-[120px] truncate">{att.name}</span>
-                <button type="button"
-                  onClick={() => setAttachments(p => p.filter(a => a.id !== att.id))}
-                  className="ml-1 hover:text-red-400 transition-colors" style={{ color: T3 }}>
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              {attachments.map(att => (
+                <div key={att.id}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold"
+                  style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T2 }}>
+                  {att.type.startsWith('image/') ? <ImageIcon className="w-3 h-3 text-indigo-400" /> : <FileText className="w-3 h-3" style={{ color: T3 }} />}
+                  <span className="max-w-[120px] truncate">{att.name}</span>
+                  <button type="button"
+                    onClick={() => setAttachments(p => p.filter(a => a.id !== att.id))}
+                    className="ml-1 hover:text-red-400 transition-colors" style={{ color: T3 }}>
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            {/* File intent badge — shows AI's classification of the uploaded file */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-2.5 py-1 rounded-lg font-bold"
+                style={{
+                  background: detectedFileType === 'customer_quote_record' ? 'rgba(99,102,241,0.12)'
+                    : detectedFileType === 'customer_inquiry' ? 'rgba(245,158,11,0.10)'
+                    : detectedFileType === 'supplier_quote' ? 'rgba(16,185,129,0.10)'
+                    : detectedFileType === 'boq' ? 'rgba(59,130,246,0.10)'
+                    : 'rgba(255,255,255,0.05)',
+                  color: detectedFileType === 'customer_quote_record' ? '#A5B4FC'
+                    : detectedFileType === 'customer_inquiry' ? '#FCD34D'
+                    : detectedFileType === 'supplier_quote' ? '#6EE7B7'
+                    : detectedFileType === 'boq' ? '#93C5FD'
+                    : T3,
+                  border: `1px solid ${
+                    detectedFileType === 'customer_quote_record' ? 'rgba(99,102,241,0.25)'
+                    : detectedFileType === 'customer_inquiry' ? 'rgba(245,158,11,0.25)'
+                    : detectedFileType === 'supplier_quote' ? 'rgba(16,185,129,0.2)'
+                    : detectedFileType === 'boq' ? 'rgba(59,130,246,0.2)'
+                    : BORDER
+                  }`,
+                }}>
+                {FILE_INTENT_LABEL[detectedFileType]}
+              </span>
+              <span className="text-xs" style={{ color: T3 }}>
+                {detectedFileType === 'customer_quote_record' ? '将保存为客户报价留底，不触发供应商报价流程' :
+                 detectedFileType === 'customer_inquiry' ? '将整理为客户询价需求' :
+                 detectedFileType === 'supplier_quote' ? '将用于生成 GCI 对客报价' :
+                 detectedFileType === 'boq' ? '将整理为工程报价清单' : '将作为跟进附件保存'}
+              </span>
+            </div>
           </div>
         )}
 
@@ -909,6 +1023,8 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                 ['标题', draft.title],
                 ['客户', draft.clientName],
                 ['类型', TYPE_LABEL[draft.type] ?? draft.type],
+                ...(attachments.length > 0 && detectedFileType !== 'followup_context'
+                  ? [['附件类型', FILE_INTENT_LABEL[detectedFileType]]] : []),
                 ['来源', draft.source],
                 ['优先级', draft.priority],
                 ['负责人', draft.assignedTo],
