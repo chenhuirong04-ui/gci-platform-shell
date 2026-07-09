@@ -39,6 +39,7 @@ const LeadMasterDetail: React.FC<LeadMasterDetailProps> = ({ task, onClose, onUp
   const [copySuccess, setCopySuccess] = useState<'final' | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showSalesCloser, setShowSalesCloser] = useState(false);
+  const [notionSync, setNotionSync] = useState<'idle' | 'syncing' | 'ok' | 'warn' | 'no_id'>('idle');
 
   // ── Edit state ──────────────────────────────────────────────
   const [draft, setDraft] = useState({
@@ -98,7 +99,7 @@ const LeadMasterDetail: React.FC<LeadMasterDetailProps> = ({ task, onClose, onUp
     }
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     const now = new Date().toISOString();
     const updated: FollowUpTask = {
       ...task,
@@ -127,6 +128,45 @@ const LeadMasterDetail: React.FC<LeadMasterDetailProps> = ({ task, onClose, onUp
     };
     onUpdateTask(updated);
     setMode('view');
+
+    // ── Sync to Notion Follow-up Log ─────────────────────────────────────────
+    const pageId = task.leadId;
+    const isLocalId = !pageId || /^(LEAD_|HIST_|SYNTH_|INT_|NOTION-)/i.test(pageId) || !pageId.includes('-');
+
+    if (isLocalId) {
+      setNotionSync('no_id');
+      console.warn('[LeadMasterDetail] No Notion pageId for task:', task.id, '— leadId:', pageId);
+      return;
+    }
+
+    setNotionSync('syncing');
+    try {
+      const base = typeof window !== 'undefined' ? window.location.origin : '';
+      const res = await fetch(`${base}/api/crm/notion-update-followup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pageId,
+          nextFollowUpAt: draft.nextFollowUpAt || undefined,
+          lastNote: draft.lastNote || undefined,
+          inquirySummary: draft.inquirySummary || undefined,
+          owner: draft.owner || undefined,
+          status: draft.status || undefined,
+          businessType: draft.businessType || undefined,
+        }),
+      });
+      const result = await res.json();
+      if (res.ok && result.ok) {
+        setNotionSync('ok');
+        setTimeout(() => setNotionSync('idle'), 4000);
+      } else {
+        console.error('[LeadMasterDetail] Notion sync failed:', result);
+        setNotionSync('warn');
+      }
+    } catch (e) {
+      console.error('[LeadMasterDetail] Notion sync error:', e);
+      setNotionSync('warn');
+    }
   };
 
   const handleSaveAppend = () => {
@@ -248,6 +288,21 @@ const LeadMasterDetail: React.FC<LeadMasterDetailProps> = ({ task, onClose, onUp
             </button>
           </div>
         </div>
+
+        {/* ── Notion sync status banner ───────────────────────── */}
+        {notionSync !== 'idle' && (
+          <div className={`px-6 py-2.5 flex items-center gap-2 text-xs font-bold border-b ${
+            notionSync === 'syncing' ? 'bg-indigo-50 border-indigo-100 text-indigo-600' :
+            notionSync === 'ok'      ? 'bg-emerald-50 border-emerald-100 text-emerald-700' :
+            notionSync === 'warn'    ? 'bg-amber-50 border-amber-100 text-amber-700' :
+                                       'bg-slate-50 border-slate-100 text-slate-500'
+          }`}>
+            {notionSync === 'syncing' && <><div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin shrink-0" /> 正在同步 Notion…</>}
+            {notionSync === 'ok'      && <>✓ 已保存并同步 Notion</>}
+            {notionSync === 'warn'    && <>⚠ 本地已保存，但 Notion 同步失败，请稍后重试</>}
+            {notionSync === 'no_id'   && <>ℹ 该记录缺少 Notion ID，无法更新原 Notion 页面（本地已保存）</>}
+          </div>
+        )}
 
         <div className="flex-grow overflow-y-auto bg-[#F8FAFC]">
           <div className="p-6 space-y-6 pb-32">

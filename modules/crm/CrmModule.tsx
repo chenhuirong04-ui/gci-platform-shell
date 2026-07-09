@@ -524,7 +524,7 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
 
         if (res.ok) {
           // Backfill the real Notion pageId so future archive/restore calls work
-          const notionPageId = result.followUpLogPageId || result.pageId;
+          const notionPageId = result.followUpLogPageId || result.followupPageId || result.pageId;
           if (notionPageId) {
             setTasks(prev => prev.map(t =>
               t.id === baseTask.id ? { ...t, leadId: notionPageId } : t
