@@ -562,18 +562,12 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       const data = await res.json();
 
       if (!data.ok || !Array.isArray(data.items) || data.items.length === 0) {
-        if (data.visionUnavailable) {
-          // Gemini 503 / 502 / overload — soft warning, do not block the flow
-          setXlsxStatus('warn');
-          setXlsxMsg(
-            rawText.trim()
-              ? '截图识别暂时失败，已根据文字内容生成草稿。直接点击下方按钮继续。'
-              : '截图识别服务暂时不可用。请在上方输入框补充关键信息，再点击「让 AI 整理成跟进记录」。'
-          );
-        } else {
-          setXlsxStatus('error');
-          setXlsxMsg(data.error || '文件已收到，但未能识别出产品明细，请手动录入报价明细。');
-        }
+        // All parse failures are non-blocking warnings — file is already saved as attachment
+        setXlsxStatus('warn');
+        setXlsxMsg(
+          data.error ||
+          '文件已保留为附件，但暂时无法自动识别明细。你仍可继续保存客户和跟进记录。'
+        );
         return;
       }
 
@@ -619,8 +613,8 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
         ` · ${confNote}${warnNote}`
       );
     } catch {
-      setXlsxStatus('error');
-      setXlsxMsg('网络错误，无法连接 AI 服务，请手动录入明细。');
+      setXlsxStatus('warn');
+      setXlsxMsg('文件已保留为附件，但暂时无法自动识别明细。你仍可继续保存客户和跟进记录。');
     }
   };
 

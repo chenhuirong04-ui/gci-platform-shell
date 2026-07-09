@@ -106,15 +106,13 @@ export default async function handler(request: Request): Promise<Response> {
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text().catch(() => '');
-      // 503 / 502 / 429 / 500 = service temporarily down — return soft unavailable signal
-      const isTransient = geminiRes.status >= 500 || geminiRes.status === 429;
+      // Any non-2xx from Gemini (404 = model/key issue, 5xx = overload, 429 = quota)
+      // is treated as service unavailable — never block the CRM save flow.
       return json({
         ok: false,
-        visionUnavailable: isTransient,
-        error: isTransient
-          ? '截图识别服务暂时不可用，请稍后重试或手动补充信息。'
-          : `图片识别失败 (${geminiRes.status})，请手动录入明细。`,
-        detail: errText.slice(0, 400),
+        visionUnavailable: true,
+        error: '文件已保留为附件，但暂时无法自动识别明细。你仍可继续保存客户和跟进记录。',
+        detail: `Gemini ${geminiRes.status}: ${errText.slice(0, 300)}`,
       });
     }
 
