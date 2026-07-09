@@ -138,10 +138,26 @@ export class PersistenceService {
     }
     delete this.pendingKV[key];
 
-    // Follow-up Log is the SOLE task source — write ONLY the incoming Notion
-    // records. Do NOT preserve old HIST_xxx / local-only records; they are
-    // stale and would re-inflate ICARE_HISTORY_V1 beyond Follow-up Log size.
-    localStorage.setItem(key, safeStringify(notionRecords));
+    // Preserve any records that were saved locally but haven't made it to Notion yet
+    // (e.g. Notion write failed, or sync ran before the write propagated).
+    // These are identified by id starting with HIST_ (locally generated) and not
+    // present in the incoming Notion records set.
+    const existing = safeParse(localStorage.getItem(key)) || [];
+    const notionIds = new Set(notionRecords.map((r: any) => r.id).filter(Boolean));
+    const localOnlyRecords = existing.filter(
+      (r: any) => r?.id && r.id.startsWith('HIST_') && !notionIds.has(r.id)
+    );
+
+    // Merge: local-only records first (they're the newest), then Notion records
+    const merged = localOnlyRecords.length > 0
+      ? [...localOnlyRecords, ...notionRecords]
+      : notionRecords;
+
+    if (localOnlyRecords.length > 0) {
+      console.log(`[PersistenceService] ℹ️ Preserving ${localOnlyRecords.length} local-only record(s) during Notion overwrite`);
+    }
+
+    localStorage.setItem(key, safeStringify(merged));
 
     if (!hasGatePassword()) return;
 
@@ -149,7 +165,7 @@ export class PersistenceService {
       // Pull cloud ONLY to preserve OTHER keys (PROJECTS, INTERNAL_TASKS).
       // We intentionally ignore cloud[key] — that's the stale snapshot.
       const cloudKV = await cloudPullAllKV();
-      const newKV = { ...(cloudKV || {}), [key]: notionRecords };
+      const newKV = { ...(cloudKV || {}), [key]: merged };
       await cloudPushAllKV(newKV);
 
       console.log(
