@@ -10,6 +10,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Attachment, BusinessType, FollowUpTask, Project } from '../types';
+import { uploadAllAttachmentsToDrive } from '../services/driveService';
 import {
   Sparkles, UploadCloud, X, ImageIcon, FileText,
   Trash2, ChevronDown, ChevronUp, User, Globe, Phone, Mail,
@@ -746,13 +747,43 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       setSaved(true);
 
       if (detectedFileType === 'customer_quote_record') {
-        // 云端留底：写入 quotation_records（所有同事和 AI 可查）
         setCloudSyncStatus('syncing');
-        setCloudSyncMsg('正在写入云端报价留底…');
-        const attNames = attachments.map(a => a.name).filter(Boolean);
+
+        // Step 1: Upload attachments to Google Drive
+        let uploadedAttachments = attachments;
+        let driveFailedCount = 0;
+        const hasUnuploaded = attachments.some(a => a.data && !a.driveUrl);
+        if (hasUnuploaded) {
+          setCloudSyncMsg('正在上传附件到 Google Drive…');
+          try {
+            const { attachments: driveResult, failedCount } = await uploadAllAttachmentsToDrive(
+              attachments,
+              { businessType: draft.type, clientName: clientName || draft.clientName }
+            );
+            // Merge driveUrls back (keep base64 data for Notion/CRM)
+            uploadedAttachments = attachments.map((orig, i) => {
+              const up = driveResult[i];
+              return up?.driveUrl ? { ...orig, driveUrl: up.driveUrl } : orig;
+            });
+            driveFailedCount = failedCount;
+          } catch {
+            driveFailedCount = attachments.length;
+          }
+        }
+
+        // Step 2: Build attachment list with URLs
+        const attWithUrls = uploadedAttachments.map(a => ({
+          name: a.name,
+          url:  a.driveUrl || '',
+          mimeType: a.type,
+          size: a.size,
+        }));
+        const uploadedCount = attWithUrls.filter(a => a.url).length;
+
+        // Step 3: Write to quotation_records (Supabase, server-side, all devices)
+        setCloudSyncMsg('正在写入云端报价留底记录…');
         const cloudPayload = {
           customer_name:        clientName || draft.clientName,
-          project_name:         draft.title || null,
           grand_total:          quoteDraft?.grandTotal ?? 0,
           status:               'CRM_留底',
           quote_type:           'CRM_RECORD',
@@ -760,8 +791,9 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
           salesperson:          draft.assignedTo === '本人' ? 'Chris' : draft.assignedTo,
           phone_wa:             optional.whatsapp || optional.phoneE164 || null,
           source_task_id:       savedTaskId,
-          crm_attachment_names: attNames,
+          crm_attachment_urls:  attWithUrls,
           crm_notes:            draft.nextAction,
+          project_name:         draft.title || null,
           items:                lineItems.filter(li => li.item_name.trim()).map(li => ({
             item_name:     li.item_name,
             description:   li.description,
@@ -779,21 +811,34 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
           });
           const data = await res.json().catch(() => ({}));
           if (data.ok) {
-            setCloudSyncStatus('ok');
-            setCloudSyncMsg(
-              attNames.length > 0
-                ? `报价留底已上传云端（${attNames.join('、')}）。附件文件名已记录，国内同事可在 AI 查询历史报价时查到。`
-                : '报价留底已写入云端，所有同事和 AI 均可查询。'
-            );
+            if (driveFailedCount > 0 && uploadedCount === 0) {
+              setCloudSyncStatus('warn');
+              setCloudSyncMsg(
+                `报价留底记录已保存到云端，但附件上传 Drive 失败，国内同事暂时无法打开原文件。请检查 VITE_DRIVE_UPLOAD_URL 是否已在 Vercel 配置。`
+              );
+            } else if (driveFailedCount > 0) {
+              setCloudSyncStatus('ok');
+              setCloudSyncMsg(
+                `报价留底已上传云端。${uploadedCount} 个附件已上传 Drive，${driveFailedCount} 个失败。`
+              );
+            } else if (uploadedCount > 0) {
+              setCloudSyncStatus('ok');
+              setCloudSyncMsg(
+                `报价留底已上传云端，附件已存入 Google Drive。国内同事和 AI 均可查询和打开文件。`
+              );
+            } else {
+              setCloudSyncStatus('ok');
+              setCloudSyncMsg('报价留底已写入云端，所有同事和 AI 均可查询。附件文件名已记录。');
+            }
           } else {
             setCloudSyncStatus('warn');
-            setCloudSyncMsg('本地已保存，但云端报价留底上传失败，国内同事暂时看不到。');
+            setCloudSyncMsg('本地已保存，但云端报价留底写入失败，国内同事暂时看不到。');
           }
         } catch {
           setCloudSyncStatus('warn');
           setCloudSyncMsg('本地已保存，但云端上传失败（网络错误），国内同事暂时看不到。');
         }
-        setTimeout(resetAll, 3500);
+        setTimeout(resetAll, 4000);
       } else if (registerQuote && quoteDraft?.isReady) {
         startQuoteFlow(quoteDraft);
       } else {

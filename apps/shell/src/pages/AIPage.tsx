@@ -725,17 +725,23 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                           {attFiles.length > 0 && (
                             <div style={{ marginTop: 4, paddingTop: 5, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                               <div style={{ fontSize: 10, color: MUTED, marginBottom: 3 }}>报价文件：</div>
-                              {attFiles.map((att: any, j: number) => (
-                                <div key={j} style={{ fontSize: 11, color: '#A5B4FC', padding: '1px 0' }}>
-                                  📎 {att.name || att.filename || `附件 ${j + 1}`}
-                                  {att.driveUrl && (
-                                    <a href={att.driveUrl} target="_blank" rel="noreferrer"
-                                      style={{ marginLeft: 8, color: GOLD, fontSize: 10 }}>
-                                      [Drive 链接]
+                              {attFiles.map((att: any, j: number) => {
+                                const fileUrl = att.url || att.driveUrl || '';
+                                const hasUrl = fileUrl && fileUrl.startsWith('http');
+                                return (
+                                <div key={j} style={{ fontSize: 11, color: hasUrl ? '#A5B4FC' : MUTED, padding: '2px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span>📎 {att.name || att.filename || `附件 ${j + 1}`}</span>
+                                  {hasUrl ? (
+                                    <a href={fileUrl} target="_blank" rel="noreferrer"
+                                      style={{ color: GOLD, fontSize: 10, border: '1px solid rgba(203,168,92,0.3)', borderRadius: 4, padding: '1px 6px', whiteSpace: 'nowrap' }}>
+                                      打开文件 ↗
                                     </a>
+                                  ) : (
+                                    <span style={{ fontSize: 10, color: SUBTLE }}>[未上传云端]</span>
                                   )}
                                 </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           )}
                           {attFiles.length === 0 && (

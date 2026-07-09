@@ -79,7 +79,7 @@ export default async function handler(request: Request): Promise<Response> {
       quote_no, customer_name, project_name, grand_total, status,
       quote_date, salesperson, quote_type, phone_wa,
       // CRM留底专用字段
-      source_task_id, crm_attachment_names, crm_notes,
+      source_task_id, crm_attachment_names, crm_attachment_urls, crm_notes,
     } = body;
 
     if (!customer_name) return json({ ok: false, error: 'customer_name is required' }, 400);
@@ -90,16 +90,30 @@ export default async function handler(request: Request): Promise<Response> {
 
     const now = new Date().toISOString();
 
-    // CRM留底：project_name 用于存附件名 + 摘要
+    // CRM留底：project_name 存为结构化 JSON，包含附件 URL（用于 quotation-history 解析返回）
     let projectNameVal: string | null = (project_name || '').trim() || null;
-    if (isCrmRecord && crm_attachment_names) {
-      const attStr = Array.isArray(crm_attachment_names)
-        ? crm_attachment_names.join(', ')
-        : String(crm_attachment_names);
-      projectNameVal = `[留底] ${attStr}`.slice(0, 500);
-    }
-    if (isCrmRecord && crm_notes && !projectNameVal) {
-      projectNameVal = `[留底] ${crm_notes}`.slice(0, 500);
+    if (isCrmRecord) {
+      // Build attachment list: prefer crm_attachment_urls (with Drive URLs), fallback to names only
+      let atts: Array<{name: string; url: string; mimeType?: string}> = [];
+      if (Array.isArray(crm_attachment_urls) && crm_attachment_urls.length > 0) {
+        atts = crm_attachment_urls.map((a: any) => ({
+          name: a.name || '',
+          url:  a.url  || '',
+          mimeType: a.mimeType || '',
+        }));
+      } else if (crm_attachment_names) {
+        const names = Array.isArray(crm_attachment_names)
+          ? crm_attachment_names
+          : String(crm_attachment_names).split(',').map((s: string) => s.trim());
+        atts = names.map((n: string) => ({ name: n, url: '' }));
+      }
+      const crmMeta = {
+        t:     '留底',
+        title: (project_name || '').trim() || null,
+        notes: crm_notes || null,
+        atts,
+      };
+      projectNameVal = JSON.stringify(crmMeta).slice(0, 2000);
     }
 
     // CRM留底：phone_wa 存 sourceTaskId 以便反查

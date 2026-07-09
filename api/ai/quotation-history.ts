@@ -61,6 +61,34 @@ function generateSearchTerms(customer: string): string[] {
   return [...terms].filter(t => t.length >= 2);
 }
 
+// Parse CRM_RECORD project_name JSON to extract attachments + title
+function parseCrmProjectName(raw: string | null): {
+  title: string | null;
+  notes: string | null;
+  attachments: Array<{name: string; url: string; mimeType?: string}>;
+} {
+  if (!raw) return { title: null, notes: null, attachments: [] };
+  try {
+    const obj = JSON.parse(raw);
+    if (obj.t === '留底') {
+      return {
+        title: obj.title || null,
+        notes: obj.notes || null,
+        attachments: Array.isArray(obj.atts)
+          ? obj.atts.map((a: any) => ({ name: a.name || '', url: a.url || '', mimeType: a.mimeType || '' }))
+          : [],
+      };
+    }
+  } catch { /* not JSON, treat as plain text */ }
+  // Plain text fallback (old format: "[留底] filename, filename2")
+  const plain = raw.replace(/^\[留底\]\s*/, '').trim();
+  return {
+    title: null,
+    notes: null,
+    attachments: plain ? plain.split(',').map(n => ({ name: n.trim(), url: '' })) : [],
+  };
+}
+
 // Detect items that are image formulas or completely empty/zero
 function isInvalidItem(ir: any): boolean {
   const name = (ir.item_name || '').trim();
@@ -222,12 +250,17 @@ export default async function handler(request: Request): Promise<Response> {
     const sourceTaskId = isCrmRecord && q.phone_wa?.startsWith('CRM_TASK:')
       ? q.phone_wa.replace('CRM_TASK:', '')
       : null;
+    // Parse CRM metadata from project_name JSON
+    const crmMeta = isCrmRecord ? parseCrmProjectName(q.project_name) : null;
+    const displayProjectName = isCrmRecord
+      ? (crmMeta?.title || '')
+      : (q.project_name || '');
     return {
       id:           q.id,
       source:       isCrmRecord ? 'crm_customer_quote_record' : 'quotation_records',
       quoteNo:      q.quote_no      || '—',
       customerName: q.customer_name || '—',
-      projectName:  q.project_name  || '',
+      projectName:  displayProjectName,
       grandTotal:   isCrmRecord && Number(q.grand_total) === 0 ? null : (Number(q.grand_total) || 0),
       sellingTotal: Number(q.selling_total) || 0,
       vatAmount:    Number(q.vat_amount)   || 0,
@@ -247,7 +280,8 @@ export default async function handler(request: Request): Promise<Response> {
       ...(isCrmRecord ? {
         amountStatus:  Number(q.grand_total) > 0 ? 'structured' : 'not_structured',
         sourceTaskId,
-        attachmentNote: q.project_name || null,
+        attachments:   crmMeta?.attachments || [],
+        crmNotes:      crmMeta?.notes || null,
       } : {}),
     };
   });
