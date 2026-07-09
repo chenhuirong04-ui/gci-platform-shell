@@ -822,7 +822,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
     const contactKey = (optional.whatsapp || optional.phoneE164 || optional.email || '').replace(/[\s+]/g,'').toLowerCase();
     // Build lastContext: include quote record status if applicable
     let lastContextNote = draft.notes;
-    if (detectedFileType === 'customer_quote_record') {
+    if (detectedFileType === 'customer_quote_record' || (registerQuote && attachments.some(a => a.data || a.driveUrl))) {
       lastContextNote = `[客户报价留底] ${draft.notes}`.trim();
     } else if (detectedFileType === 'customer_inquiry') {
       lastContextNote = `[客户询价清单] ${draft.notes}`.trim();
@@ -848,8 +848,12 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
     };
     try {
       // Init step tracker before onAdd so user can see progress
-      const isCrmRecord = detectedFileType === 'customer_quote_record';
-      const hasAtts = attachments.some(a => a.data);
+      // isCrmRecord = true when:
+      //   a) file was detected as customer quote record, OR
+      //   b) user explicitly checked "登记为历史报价" and has an attachment
+      const hasAtts = attachments.some(a => a.data || a.driveUrl);
+      const isCrmRecord = detectedFileType === 'customer_quote_record'
+        || (registerQuote && hasAtts);
       setSaveSteps([
         { label: '本地保存', status: 'pending' },
         { label: `Notion ${draft.type === 'PROJECT' ? '项目客户库' : '小客户池'} + 跟进记录`, status: 'pending' },
@@ -912,10 +916,11 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
 
         // Step C: Write to quotation_records (Supabase)
         setCloudSyncMsg('正在写入云端报价留底记录…');
+        const finalGrandTotal = quoteDraft?.grandTotal ?? 0;
         const cloudPayload = {
           customer_name:        clientName || draft.clientName,
-          grand_total:          quoteDraft?.grandTotal ?? 0,
-          status:               'CRM_留底',
+          grand_total:          finalGrandTotal,
+          status:               finalGrandTotal > 0 ? 'CRM_留底' : 'CRM_留底_待补充',
           quote_type:           'CRM_RECORD',
           quote_date:           draft.dueDate || new Date().toISOString().slice(0, 10),
           salesperson:          draft.assignedTo === '本人' ? 'Chris' : draft.assignedTo,
@@ -1512,13 +1517,15 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                       )}
                     </div>
 
-                    {/* Missing warning */}
+                    {/* Missing fields — actionable hints, not blockers */}
                     {!quoteDraft.isReady && (
-                      <div className="px-3 py-2 rounded-lg flex items-center gap-2 text-xs font-bold"
+                      <div className="px-3 py-2 rounded-lg flex items-start gap-2 text-xs font-bold"
                         style={{ background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)', color: '#FCD34D' }}>
-                        <AlertCircle className="w-3 h-3 shrink-0" />
-                        {quoteDraft.customerName === '待确认' && '缺少客户名称。'}
-                        {quoteDraft.grandTotal == null && '缺少报价金额，无法登记历史报价；可以只保存跟进记录。'}
+                        <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
+                        <span>
+                          {quoteDraft.customerName === '待确认' && '请在上方填写客户名称。'}
+                          {quoteDraft.grandTotal == null && ' 未自动识别到报价金额。你可以手工输入总金额，或直接保存为报价文件留底（金额待补充）。'}
+                        </span>
                       </div>
                     )}
                   </div>
