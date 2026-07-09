@@ -151,7 +151,7 @@ const LeadMasterDetail: React.FC<LeadMasterDetailProps> = ({ task, onClose, onUp
           lastNote: draft.lastNote || undefined,
           inquirySummary: draft.inquirySummary || undefined,
           owner: draft.owner || undefined,
-          status: draft.status || undefined,
+          // NOTE: do NOT send status — editing info fields must NOT overwrite 行动状态 in Notion.
           businessType: draft.businessType || undefined,
         }),
       });

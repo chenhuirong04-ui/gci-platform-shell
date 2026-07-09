@@ -202,7 +202,8 @@ export default function QuickFollowUpPanel({
           lastNote: updated.lastContext,
           inquirySummary: updated.goal,
           owner: updated.owner,
-          status: updated.status,
+          // NOTE: do NOT send status — editing info fields must NOT overwrite 行动状态 in Notion.
+          // 行动状态 is only changed via 关闭本次跟进 (archiveTask) or 恢复 (restoreTask).
           businessType: updated.businessType,
         }),
       });
