@@ -111,10 +111,10 @@ const ConsignmentManager: React.FC = () => {
   } | null>(null);
   const [quickVal, setQuickVal]     = useState('');
 
-  // SO寄售库存 人工校正 modal
+  // SO寄售库存 销售登记 / 校正 modal
   const [editingStock, setEditingStock] = useState<any | null>(null);
   const [editStockForm, setEditStockForm] = useState({
-    soldQty: 0, remainingQty: 0,
+    soldQty: 0, remainingQty: 0, receivedAmount: 0,
     settlementStatus: 'UNSETTLED' as 'UNSETTLED' | 'PARTIAL' | 'SETTLED',
     memo: '',
   });
@@ -296,9 +296,10 @@ const ConsignmentManager: React.FC = () => {
   const openEditStock = (item: any) => {
     setEditingStock(item);
     setEditStockForm({
-      soldQty:          Number(item.soldQty) || 0,
+      soldQty:          Number(item.soldQty)        || 0,
       remainingQty:     Number(item.remainingQty) ??
                         Math.max(0, (Number(item.consignedQty) || 0) - (Number(item.soldQty) || 0)),
+      receivedAmount:   Number(item.receivedAmount) || 0,
       settlementStatus: (item.settlementStatus || 'UNSETTLED') as any,
       memo:             (item as any).memo || '',
     });
@@ -306,24 +307,30 @@ const ConsignmentManager: React.FC = () => {
 
   const handleSaveEditStock = async () => {
     if (!editingStock) return;
-    const consignedQty = Number(editingStock.consignedQty) || 0;
-    const newSold      = Number(editStockForm.soldQty) || 0;
-    const newRemaining = Number(editStockForm.remainingQty) || 0;
-    if (newSold < 0 || newRemaining < 0) {
-      alert('⚠️ 数量不能为负数。'); return;
+    const consignedQty  = Number(editingStock.consignedQty) || 0;
+    const newSold       = Number(editStockForm.soldQty)       || 0;
+    const newRemaining  = Number(editStockForm.remainingQty)  || 0;
+    const newReceived   = Number(editStockForm.receivedAmount) || 0;
+    if (newSold < 0 || newRemaining < 0 || newReceived < 0) {
+      alert('⚠️ 数量/金额不能为负数。'); return;
     }
     if (newSold + newRemaining > consignedQty) {
       alert(`⚠️ 已售(${newSold}) + 剩余(${newRemaining}) = ${newSold + newRemaining}，超过发货量 ${consignedQty}，请检查。`);
       return;
     }
+    const inclUnitPrice = Number((editingStock as any).taxInclusiveUnitPrice) || r2((Number(editingStock.unitPrice) || 0) * 1.05);
+    const grossValue    = r2(consignedQty * inclUnitPrice);
+    if (newReceived > grossValue) {
+      alert(`⚠️ 已收金额(AED ${fmt2(newReceived)})不能超过总货值(AED ${fmt2(grossValue)})。`); return;
+    }
     await persistence.updateConsignmentStock({
       ...editingStock,
       soldQty:          newSold,
       remainingQty:     newRemaining,
+      receivedAmount:   newReceived,
       settlementStatus: editStockForm.settlementStatus,
       ...(editStockForm.memo ? { memo: editStockForm.memo } as any : {}),
     });
-    // Refresh soConsignStock from Supabase
     const fresh = await persistence.getConsignmentStock();
     setSoConsignStock(Array.isArray(fresh) ? fresh : []);
     setEditingStock(null);
@@ -459,7 +466,7 @@ const ConsignmentManager: React.FC = () => {
                             <button
                               onClick={() => openEditStock(item)}
                               className="p-1 rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-                              title="人工校正库存"
+                              title="登记销售 / 修改结算"
                             >
                               <Edit3 className="w-3 h-3" />
                             </button>
@@ -731,84 +738,124 @@ const ConsignmentManager: React.FC = () => {
           </div>
         </div>
       )}
-      {/* ── SO库存 人工校正 Modal ── */}
-      {editingStock && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <div>
-                <h3 className="text-sm font-black uppercase tracking-widest text-[#080D1E]">人工校正库存</h3>
-                <p className="text-xs text-gray-400 mt-0.5 font-mono">{editingStock.soNo}</p>
+      {/* ── 登记寄售销售 / Update Consignment Sales Modal ── */}
+      {editingStock && (() => {
+        const cQty       = Number(editingStock.consignedQty) || 0;
+        const inclPrice  = Number((editingStock as any).taxInclusiveUnitPrice) || r2((Number(editingStock.unitPrice) || 0) * 1.05);
+        const grossValue = r2(cQty * inclPrice);
+        const pending    = r2(Math.max(0, grossValue - (editStockForm.receivedAmount || 0)));
+        const overTotal  = editStockForm.soldQty + editStockForm.remainingQty > cQty;
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-widest text-[#080D1E]">
+                    登记寄售销售 / Update Consignment Sales
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-0.5 font-mono">{editingStock.soNo} · {editingStock.customerName}</p>
+                </div>
+                <button onClick={() => setEditingStock(null)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <button onClick={() => setEditingStock(null)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="px-6 py-5 space-y-4">
-              <div className="rounded-xl p-3 text-xs font-bold" style={{ backgroundColor: `${GOLD}15`, color: '#8A6D2F' }}>
-                {editingStock.productName} · 发货量 <span className="font-black">{editingStock.consignedQty} 件</span>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="已售数量 soldQty">
+
+              <div className="px-6 py-5 space-y-4">
+                {/* 只读信息栏 */}
+                <div className="rounded-xl p-3 space-y-1.5" style={{ backgroundColor: `${GOLD}0D` }}>
+                  <div className="text-xs font-black text-gray-700">{editingStock.productName}</div>
+                  <div className="flex flex-wrap gap-4 text-xs font-mono text-gray-500">
+                    <span>发货量 <span className="font-black text-gray-800">{cQty} 件</span></span>
+                    <span>含税单价 <span className="font-black text-gray-800">AED {fmt2(inclPrice)}</span></span>
+                    <span>总货值 <span className="font-black" style={{ color: GOLD }}>AED {fmt2(grossValue)}</span></span>
+                  </div>
+                </div>
+
+                {/* 可编辑字段 */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="累计已售数量 soldQty">
+                    <input
+                      type="number" min={0} max={cQty}
+                      value={editStockForm.soldQty}
+                      onChange={e => setEditStockForm(p => ({ ...p, soldQty: Math.max(0, Number(e.target.value) || 0) }))}
+                      className={INPUT}
+                    />
+                  </Field>
+                  <Field label="剩余数量 remainingQty">
+                    <input
+                      type="number" min={0}
+                      value={editStockForm.remainingQty}
+                      onChange={e => setEditStockForm(p => ({ ...p, remainingQty: Math.max(0, Number(e.target.value) || 0) }))}
+                      className={INPUT}
+                    />
+                  </Field>
+                </div>
+
+                {overTotal && (
+                  <p className="text-xs font-black text-[#A85D45] text-center">
+                    ⚠️ 已售({editStockForm.soldQty}) + 剩余({editStockForm.remainingQty}) = {editStockForm.soldQty + editStockForm.remainingQty}，超过发货量 {cQty}
+                  </p>
+                )}
+
+                <Field label="累计已收金额 receivedAmount (AED)">
                   <input
-                    type="number" min={0}
-                    value={editStockForm.soldQty}
-                    onChange={e => setEditStockForm(p => ({ ...p, soldQty: Math.max(0, Number(e.target.value) || 0) }))}
+                    type="number" min={0} step="0.01"
+                    value={editStockForm.receivedAmount}
+                    onChange={e => setEditStockForm(p => ({ ...p, receivedAmount: Math.max(0, Number(e.target.value) || 0) }))}
                     className={INPUT}
                   />
                 </Field>
-                <Field label="剩余数量 remainingQty">
-                  <input
-                    type="number" min={0}
-                    value={editStockForm.remainingQty}
-                    onChange={e => setEditStockForm(p => ({ ...p, remainingQty: Math.max(0, Number(e.target.value) || 0) }))}
+
+                {/* 待结算金额实时显示 */}
+                <div className="flex items-center justify-between rounded-lg px-4 py-2.5 text-xs font-bold"
+                  style={{ backgroundColor: pending > 0 ? 'rgba(224,132,106,0.08)' : 'rgba(111,191,142,0.1)' }}>
+                  <span className="text-gray-500">待结算金额</span>
+                  <span className="text-base font-black font-mono" style={{ color: pending > 0 ? '#A85D45' : '#3F7D58' }}>
+                    AED {fmt2(pending)}
+                  </span>
+                </div>
+
+                <Field label="结算状态 settlementStatus">
+                  <select
+                    value={editStockForm.settlementStatus}
+                    onChange={e => setEditStockForm(p => ({ ...p, settlementStatus: e.target.value as any }))}
                     className={INPUT}
+                  >
+                    <option value="UNSETTLED">UNSETTLED — 未结算</option>
+                    <option value="PARTIAL">PARTIAL — 部分结算</option>
+                    <option value="SETTLED">SETTLED — 已结算完成</option>
+                  </select>
+                </Field>
+
+                <Field label="备注 notes（可选）">
+                  <input
+                    value={editStockForm.memo}
+                    onChange={e => setEditStockForm(p => ({ ...p, memo: e.target.value }))}
+                    className={INPUT}
+                    placeholder="可选"
                   />
                 </Field>
+
+                <p className="text-xs rounded-lg px-3 py-2 text-gray-500" style={{ backgroundColor: 'rgba(0,0,0,0.03)' }}>
+                  ℹ SETTLED = 结算完成，不代表取消寄售。取消寄售请作废对应订单。
+                </p>
               </div>
-              <div className="text-xs text-center font-mono text-gray-500">
-                已售 + 剩余 = <span className={
-                  editStockForm.soldQty + editStockForm.remainingQty > (Number(editingStock.consignedQty) || 0)
-                    ? 'text-[#A85D45] font-black' : 'text-gray-700 font-bold'
-                }>{editStockForm.soldQty + editStockForm.remainingQty}</span>
-                {' '}/ 发货 {editingStock.consignedQty}
+
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
+                <button onClick={() => setEditingStock(null)}
+                  className="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wide bg-gray-100 text-gray-600">
+                  取消
+                </button>
+                <button onClick={handleSaveEditStock} disabled={overTotal}
+                  className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wide shadow ${overTotal ? 'bg-gray-300 text-gray-400 cursor-not-allowed' : 'bg-[#080D1E] text-white'}`}>
+                  <Save className="w-3.5 h-3.5" />保存登记
+                </button>
               </div>
-              <Field label="结算状态 settlementStatus">
-                <select
-                  value={editStockForm.settlementStatus}
-                  onChange={e => setEditStockForm(p => ({ ...p, settlementStatus: e.target.value as any }))}
-                  className={INPUT}
-                >
-                  <option value="UNSETTLED">UNSETTLED — 未结算</option>
-                  <option value="PARTIAL">PARTIAL — 部分结算</option>
-                  <option value="SETTLED">SETTLED — 已结算</option>
-                </select>
-              </Field>
-              <Field label="备注 memo">
-                <input
-                  value={editStockForm.memo}
-                  onChange={e => setEditStockForm(p => ({ ...p, memo: e.target.value }))}
-                  className={INPUT}
-                  placeholder="可选"
-                />
-              </Field>
-              <p className="text-xs font-bold rounded-lg px-3 py-2" style={{ color: '#8A6D2F', backgroundColor: `${GOLD}15` }}>
-                ⚠️ 仅更新寄售库存记录。不写收款、不写流水、不写 STOCK_LEDGER。
-              </p>
-            </div>
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
-              <button onClick={() => setEditingStock(null)}
-                className="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wide bg-gray-100 text-gray-600">
-                取消
-              </button>
-              <button onClick={handleSaveEditStock}
-                className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wide bg-[#080D1E] text-white shadow">
-                <Save className="w-3.5 h-3.5" />保存校正
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
     </div>
   );

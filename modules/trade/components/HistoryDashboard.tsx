@@ -877,10 +877,13 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
       ? `⚠️ 该报价单已转为订单 ${(q as any).convertedOrderId}，删除报价单不影响已生成的订单。\n确认删除报价单 ${quoteId}？`
       : `确认删除报价单 ${quoteId}？`;
     if (!window.confirm(msg)) return;
-    await Promise.all([
-      persistence.updateQuotes((quotes || []).filter(x => x.id !== quoteId)),
-      persistence.updateQuoteItems((quoteItems || []).filter(x => x.quoteId !== quoteId))
-    ]);
+
+    // Soft-delete: mark status='DELETED' + deletedAt, then upsert to Supabase
+    // This ensures the record stays in Supabase but won't reappear after hydration
+    const now = new Date().toISOString();
+    const softDeleted = { ...q, status: 'DELETED' as any, deletedAt: now, updated_at: now, updatedAt: now };
+    const updatedQuotes = (quotes || []).map(x => x.id === quoteId ? softDeleted : x);
+    await persistence.updateQuotes(updatedQuotes);
     await loadLocalData();
     setSelectedQuote(null);
     alert(`✅ 报价单 ${quoteId} 已删除`);
@@ -1266,6 +1269,8 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
     const st = safeLower(searchTerm);
     return (quotes || [])
       .filter(q => {
+        // Exclude soft-deleted records
+        if ((q as any)?.status === 'DELETED' || (q as any)?.deletedAt) return false;
         const matchSearch =
           safeLower(q?.customerName).includes(st) ||
           safeLower(q?.id).includes(st);
