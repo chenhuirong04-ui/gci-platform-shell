@@ -106,6 +106,19 @@ function formatSBId(n: number): string {
   return 'SB' + String(n).padStart(3, '0');
 }
 
+// Find existing SB Pool entry by client name (case-insensitive exact match)
+function findExistingClient(pages: any[], name: string): { sbId: string; pageId: string } | null {
+  const target = name.trim().toLowerCase();
+  for (const page of pages) {
+    const titleText = getText(page.properties?.['客户名称']).trim().toLowerCase();
+    const idText    = getText(page.properties?.['客户ID']).trim();
+    if (titleText === target && /^SB\d+$/i.test(idText)) {
+      return { sbId: idText.toUpperCase(), pageId: page.id };
+    }
+  }
+  return null;
+}
+
 // Map source string to SB Pool 来源 select option
 // Map any legacy / UI status value to the exact Notion 行动状态 select option.
 // Notion real options (confirmed 2026-07-09):
@@ -194,14 +207,27 @@ export default async function handler(request: Request): Promise<Response> {
     queryAll(followupDbId, token),
   ]);
 
-  const maxFromPool    = maxSBFromPool(sbPages);
-  const maxFromFollowup = maxSBFromFollowup(followupPages);
-  const maxSB          = Math.max(maxFromPool, maxFromFollowup);
-  const newSBId        = formatSBId(maxSB + 1);
+  // ── Duplicate check: reuse existing SB entry if same client name exists ────
+  const existingClient = findExistingClient(sbPages, payload.clientName);
+  let newSBId: string;
+  let sbPageId: string | null = null;
+  let sbWriteError: string | null = null;
+  let sbWasReused = false;
 
-  console.log(`[notion-write-lead] SB Pool max=${maxFromPool}, FollowupLog max=${maxFromFollowup} → newId=${newSBId}`);
+  if (existingClient) {
+    newSBId     = existingClient.sbId;
+    sbPageId    = existingClient.pageId;
+    sbWasReused = true;
+    console.log(`[notion-write-lead] ♻️ Reusing existing SB entry: ${newSBId} (pageId: ${sbPageId})`);
+  } else {
+    const maxFromPool    = maxSBFromPool(sbPages);
+    const maxFromFollowup = maxSBFromFollowup(followupPages);
+    const maxSB          = Math.max(maxFromPool, maxFromFollowup);
+    newSBId = formatSBId(maxSB + 1);
+    console.log(`[notion-write-lead] SB Pool max=${maxFromPool}, FollowupLog max=${maxFromFollowup} → newId=${newSBId}`);
+  }
 
-  // ── Step 1: Write to 小B/C客户池 ────────────────────────────────────────────
+  // ── Step 1: Write to 小B/C客户池 (skipped if reusing existing) ──────────────
   // Build enriched context note: prepend contact person + location + categories
   const contextParts: string[] = [];
   if (payload.contactPerson) contextParts.push(`联系人：${payload.contactPerson}`);
@@ -232,30 +258,28 @@ export default async function handler(request: Request): Promise<Response> {
     sbProperties['下次跟进日期'] = { date: { start: followUpDate } };
   }
 
-  // Step 1 is NON-FATAL: if SB Pool write fails we log it and continue to Step 2
-  // so the customer always lands in Follow-up Log and the CRM can sync it back.
-  let sbPageId: string | null = null;
-  let sbWriteError: string | null = null;
-
-  console.log(`[notion-write-lead] Step 1: writing ${newSBId} to SB Pool...`);
-  try {
-    const sbRes = await fetch('https://api.notion.com/v1/pages', {
-      method: 'POST',
-      headers: notionHeaders(token),
-      body: JSON.stringify({ parent: { database_id: sbDbId }, properties: sbProperties }),
-    });
-    if (sbRes.ok) {
-      const sbPage = await sbRes.json() as any;
-      sbPageId = sbPage.id;
-      console.log(`[notion-write-lead] Step 1 OK — SB Pool pageId: ${sbPage.id}`);
-    } else {
-      const sbErr = await sbRes.json().catch(() => ({}));
-      sbWriteError = `SB Pool ${sbRes.status}: ${JSON.stringify(sbErr).slice(0, 200)}`;
-      console.error('[notion-write-lead] Step 1 FAILED (non-fatal, continuing to Follow-up Log):', sbWriteError);
+  // Step 1 is NON-FATAL. Skipped entirely if reusing an existing SB entry.
+  console.log(`[notion-write-lead] Step 1: ${sbWasReused ? `skipped (reusing ${newSBId})` : `writing ${newSBId} to SB Pool...`}`);
+  if (!sbWasReused) {
+    try {
+      const sbRes = await fetch('https://api.notion.com/v1/pages', {
+        method: 'POST',
+        headers: notionHeaders(token),
+        body: JSON.stringify({ parent: { database_id: sbDbId }, properties: sbProperties }),
+      });
+      if (sbRes.ok) {
+        const sbPage = await sbRes.json() as any;
+        sbPageId = sbPage.id;
+        console.log(`[notion-write-lead] Step 1 OK — SB Pool pageId: ${sbPage.id}`);
+      } else {
+        const sbErr = await sbRes.json().catch(() => ({}));
+        sbWriteError = `SB Pool ${sbRes.status}: ${JSON.stringify(sbErr).slice(0, 200)}`;
+        console.error('[notion-write-lead] Step 1 FAILED (non-fatal):', sbWriteError);
+      }
+    } catch (e: any) {
+      sbWriteError = `SB Pool exception: ${e?.message}`;
+      console.error('[notion-write-lead] Step 1 exception (non-fatal):', sbWriteError);
     }
-  } catch (e: any) {
-    sbWriteError = `SB Pool exception: ${e?.message}`;
-    console.error('[notion-write-lead] Step 1 exception (non-fatal):', sbWriteError);
   }
 
   // ── Step 2: Write to Follow-up Log (always runs, even if Step 1 failed) ────
@@ -336,16 +360,20 @@ export default async function handler(request: Request): Promise<Response> {
 
     if (!followupRes.ok) {
       const followupErr = await followupRes.json().catch(() => ({}));
-      console.error('[notion-write-lead] Step 2 FAILED even with minimal fields:',
-        followupRes.status, JSON.stringify(followupErr).slice(0, 500));
+      const followupErrMsg = `Follow-up Log ${followupRes.status}: ${(followupErr as any)?.message || JSON.stringify(followupErr).slice(0, 200)}`;
+      console.error('[notion-write-lead] Step 2 FAILED even with minimal fields:', followupErrMsg);
+      // Return partial success (200) so frontend can still save the local record
+      // and backfill sbId. followupCreated: false signals the UI to show a retry option.
       return json({
-        error: `Follow-up Log write failed (${followupRes.status}): ${(followupErr as any)?.message || JSON.stringify(followupErr).slice(0, 200)}`,
-        detail: followupErr,
-        step: 2,
+        ok: true,
+        partial: true,
         sbId: sbPageId ? newSBId : null,
         sbPageId,
+        followupCreated: false,
+        followupError: followupErrMsg,
         sbWarning: sbWriteError,
-      }, followupRes.status);
+        sbReused: sbWasReused,
+      });
     }
     console.log('[notion-write-lead] Step 2 retry OK with minimal fields');
   }
@@ -356,9 +384,12 @@ export default async function handler(request: Request): Promise<Response> {
 
   return json({
     ok: true,
+    partial: false,
     sbId: sbPageId ? newSBId : null,
     sbPageId,
     followupPageId: followupPage.id,
+    followupCreated: true,
     sbWarning: sbWriteError,
+    sbReused: sbWasReused,
   });
 }

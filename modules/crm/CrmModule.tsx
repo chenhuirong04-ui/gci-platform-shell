@@ -356,11 +356,15 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
     try {
       const result = await notionSyncService.sync();
 
-      // ── result.notionTasks is the ONLY source of truth ─────────────────────
-      // result.tasks  = stale localStorage merge (42 NOTION + 26 HIST = 68) — NEVER use
-      // result.notionTasks = pure /api/crm/notion-sync output, exactly Follow-up Log count (~20)
+      // ── result.notionTasks is the canonical Notion source ──────────────────
+      // Preserve any local HIST_ records not yet synced to Notion (e.g. SB created
+      // but Follow-up Log write failed, or Notion propagation delay).
       notionOverwriteInProgressRef.current = true;
-      setTasks(result.notionTasks);       // exactly ~20 — no merge, no filter, no old data
+      const notionIds = new Set(result.notionTasks.map((t: any) => t.id).filter(Boolean));
+      const localHistOnly = tasks.filter(
+        (t: any) => t?.id?.startsWith('HIST_') && !notionIds.has(t.id)
+      );
+      setTasks([...localHistOnly, ...result.notionTasks]);
       setLastSyncAt(result.syncedAt);
       setTodayFollowupCount(result.todayFollowupCount);
 
@@ -565,28 +569,29 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
         if (res.ok) {
           // Backfill Notion page IDs so future archive/restore calls work
           const notionPageId = result.followupPageId || result.followUpLogPageId || result.pageId;
-          if (notionPageId) {
-            setTasks(prev => prev.map(t =>
-              t.id === baseTask.id ? { ...t, leadId: notionPageId } : t
-            ));
+          const updates: Partial<FollowUpTask> = {};
+          if (notionPageId)       updates.leadId = notionPageId;
+          if (result.sbId)        { updates.customerCode = result.sbId; (updates as any).notionSbPageId = result.sbPageId; }
+          if (result.projectPageId) (updates as any).notionProjectPageId = result.projectPageId;
+
+          if (Object.keys(updates).length > 0) {
+            setTasks(prev => prev.map(t => t.id === baseTask.id ? { ...t, ...updates } : t));
           }
-          // Backfill customer code
-          if (result.sbId) {
-            setTasks(prev => prev.map(t =>
-              t.id === baseTask.id
-                ? { ...t, customerCode: result.sbId, notionSbPageId: result.sbPageId }
-                : t
-            ));
+
+          if (result.partial) {
+            // SB Pool created/reused OK, but Follow-up Log failed — keep local record
+            const reuseLabel = result.sbReused ? `（复用 ${result.sbId}）` : `（${result.sbId}）`;
+            showToast(
+              `⚠️ 已进入贸易客户池 ${reuseLabel}，Follow-up Log 写入失败，请点击"重新同步跟进记录"`,
+              'error'
+            );
+            console.error('[LeadSubmit] Follow-up Log failed:', result.followupError);
+          } else {
+            const codeLabel = result.sbId ? ` · ${result.sbId}${result.sbReused ? '（已有）' : ''}` : '';
+            const dbLabel = businessType === 'TRADE' ? '贸易客户池' : businessType === 'PROJECT' ? '项目客户表' : 'Follow-up Log';
+            showToast(`✓ 已同步到 Notion ${dbLabel}${codeLabel}`, 'success');
+            syncFromNotion().catch((e: any) => console.warn('[LeadSubmit] sync after write failed', e));
           }
-          if (result.projectPageId) {
-            setTasks(prev => prev.map(t =>
-              t.id === baseTask.id ? { ...t, notionProjectPageId: result.projectPageId } : t
-            ));
-          }
-          const codeLabel = result.sbId ? ` · ${result.sbId}` : '';
-          const dbLabel = businessType === 'TRADE' ? '贸易客户池' : businessType === 'PROJECT' ? '项目客户表' : 'Follow-up Log';
-          showToast(`✓ 已同步到 Notion ${dbLabel}${codeLabel}`, 'success');
-          syncFromNotion().catch((e: any) => console.warn('[LeadSubmit] sync after write failed', e));
         } else {
           console.error('[LeadSubmit] Notion write failed', result);
           const detail = result?.error || result?.detail?.message || String(res.status);
