@@ -81,16 +81,36 @@ export default async function handler(request: Request): Promise<Response> {
 
   const reqUrl           = new URL(request.url);
   const rawCustomer      = reqUrl.searchParams.get('customer')?.trim() || '';
+  const rawProduct       = reqUrl.searchParams.get('product')?.trim()  || '';
   const normalizedCustomer = rawCustomer ? cleanCustomer(rawCustomer) : '';
   const searchTerms        = normalizedCustomer ? generateSearchTerms(normalizedCustomer) : [];
 
-  const selectCols = 'id,quote_no,customer_name,project_name,grand_total,status,created_at,quote_date,salesperson,quote_type,margin_percent,vat_amount,selling_total';
+  const selectCols = 'id,quote_no,customer_name,project_name,grand_total,status,created_at,quote_date,salesperson,quote_type,margin_percent,vat_amount,selling_total,archivedAt,hiddenFromDefault,archiveReason';
+
+  // When a product keyword is provided, we first find quotation_items matching
+  // the product, then filter records to only those containing that item.
+  let productFilterIds: string[] | null = null;
+  if (rawProduct) {
+    const enc = encodeURIComponent(rawProduct);
+    const piUrl = `${supabaseUrl}/rest/v1/quotation_items`
+      + `?or=(item_name.ilike.*${enc}*,description.ilike.*${enc}*)`
+      + `&select=quotation_id`
+      + `&limit=200`;
+    const piRes = await fetch(piUrl, {
+      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    });
+    if (piRes.ok) {
+      const piRows: any[] = await piRes.json().catch(() => []);
+      productFilterIds = [...new Set(piRows.map((r: any) => r.quotation_id).filter(Boolean))];
+    }
+  }
 
   let queryUrl = `${supabaseUrl}/rest/v1/quotation_records`
     + `?select=${selectCols}`
     + `&order=created_at.desc`
-    + `&limit=20`;
+    + `&limit=50`;
 
+  // Build customer filter
   if (searchTerms.length === 1) {
     queryUrl += `&customer_name=ilike.*${encodeURIComponent(searchTerms[0])}*`;
   } else if (searchTerms.length > 1) {
@@ -98,6 +118,30 @@ export default async function handler(request: Request): Promise<Response> {
       .map(t => `customer_name.ilike.*${encodeURIComponent(t)}*`)
       .join(',');
     queryUrl += `&or=(${orParts})`;
+  }
+
+  // When product filter found quotation IDs, restrict to those
+  if (productFilterIds !== null && productFilterIds.length > 0) {
+    queryUrl += `&id=in.(${productFilterIds.join(',')})`;
+  } else if (productFilterIds !== null && productFilterIds.length === 0) {
+    // Product keyword given but no matching items found — return empty early
+    return json({
+      ok: true,
+      total: 0,
+      customerFilter: rawCustomer || null,
+      normalizedCustomer: normalizedCustomer || null,
+      productFilter: rawProduct || null,
+      searchTerms: searchTerms.length > 0 ? searchTerms : undefined,
+      totalAmount: 0,
+      statusSummary: {},
+      quotes: [],
+      source: 'quotation_records',
+      sourceLabel: '历史报价 (quotation_records)',
+      primarySource: 'quotation_records',
+      fallbackUsed: false,
+      dataNote: `未在历史报价中找到包含「${rawProduct}」的报价记录。`,
+      asOf: new Date().toISOString(),
+    });
   }
 
   const res = await fetch(queryUrl, {
@@ -113,11 +157,12 @@ export default async function handler(request: Request): Promise<Response> {
     return json({ ok: false, error: `Supabase ${res.status}`, detail: errText });
   }
 
-  const rows: any[] = await res.json();
+  let rows: any[] = await res.json();
 
   // Fetch quotation_items for all returned records in one query
   const recordIds: string[] = rows.map((r: any) => r.id).filter(Boolean);
-  const itemsMap: Record<string, { valid: any[]; hiddenCount: number }> = {};
+  const itemsMap: Record<string, { valid: any[]; hiddenCount: number; matchedProduct: boolean }> = {};
+  const kwLower = rawProduct.toLowerCase();
 
   if (recordIds.length > 0) {
     const itemsUrl = `${supabaseUrl}/rest/v1/quotation_items`
@@ -130,11 +175,16 @@ export default async function handler(request: Request): Promise<Response> {
     if (itemsRes.ok) {
       const itemRows: any[] = await itemsRes.json().catch(() => []);
       for (const ir of itemRows) {
-        if (!itemsMap[ir.quotation_id]) itemsMap[ir.quotation_id] = { valid: [], hiddenCount: 0 };
+        if (!itemsMap[ir.quotation_id]) itemsMap[ir.quotation_id] = { valid: [], hiddenCount: 0, matchedProduct: false };
         if (isInvalidItem(ir)) {
           itemsMap[ir.quotation_id].hiddenCount++;
           continue;
         }
+        const nameMatch = kwLower && (
+          (ir.item_name || '').toLowerCase().includes(kwLower) ||
+          (ir.description || '').toLowerCase().includes(kwLower)
+        );
+        if (nameMatch) itemsMap[ir.quotation_id].matchedProduct = true;
         itemsMap[ir.quotation_id].valid.push({
           item_name:     (ir.item_name || '').trim(),
           description:   ir.description   || '',
@@ -144,6 +194,7 @@ export default async function handler(request: Request): Promise<Response> {
           line_total:    Number(ir.line_total)    || 0,
           currency:      ir.currency      || 'AED',
           item_notes:    ir.item_notes    || '',
+          matchedProduct: nameMatch,   // mark matched items for UI highlighting
         });
       }
     }
@@ -159,25 +210,35 @@ export default async function handler(request: Request): Promise<Response> {
     if (!matchedBy) matchedBy = normalizedCustomer;
   }
 
-  const quotes = rows.map(q => ({
-    id:           q.id,
-    quoteNo:      q.quote_no      || '—',
-    customerName: q.customer_name || '—',
-    projectName:  q.project_name  || '',
-    grandTotal:   Number(q.grand_total)  || 0,
-    sellingTotal: Number(q.selling_total) || 0,
-    vatAmount:    Number(q.vat_amount)   || 0,
-    margin:       Number(q.margin_percent) || 0,
-    currency:     'AED',
-    status:       q.status || 'DRAFT',
-    statusZh:     STATUS_ZH[q.status] || q.status,
-    quoteType:    q.quote_type || 'CUSTOM',
-    salesperson:  q.salesperson || '',
-    quoteDate:    q.quote_date || q.created_at || '',
-    createdAt:    q.created_at || '',
-    items:        itemsMap[q.id]?.valid       || [],
-    hiddenInvalidItemsCount: itemsMap[q.id]?.hiddenCount || 0,
-  }));
+  // If product filter was applied, only keep quotes that actually have matching items
+  if (rawProduct && productFilterIds !== null) {
+    rows = rows.filter((r: any) => itemsMap[r.id]?.matchedProduct);
+  }
+
+  const quotes = rows.map(q => {
+    const isArchived = !!(q.archivedAt || q.hiddenFromDefault);
+    return {
+      id:           q.id,
+      quoteNo:      q.quote_no      || '—',
+      customerName: q.customer_name || '—',
+      projectName:  q.project_name  || '',
+      grandTotal:   Number(q.grand_total)  || 0,
+      sellingTotal: Number(q.selling_total) || 0,
+      vatAmount:    Number(q.vat_amount)   || 0,
+      margin:       Number(q.margin_percent) || 0,
+      currency:     'AED',
+      status:       q.status || 'DRAFT',
+      statusZh:     STATUS_ZH[q.status] || q.status,
+      quoteType:    q.quote_type || 'CUSTOM',
+      salesperson:  q.salesperson || '',
+      quoteDate:    q.quote_date || q.created_at || '',
+      createdAt:    q.created_at || '',
+      items:        itemsMap[q.id]?.valid       || [],
+      hiddenInvalidItemsCount: itemsMap[q.id]?.hiddenCount || 0,
+      isArchived,
+      archiveReason: q.archiveReason || null,
+    };
+  });
 
   const totalAmount   = quotes.reduce((s, q) => s + q.grandTotal, 0);
   const statusSummary = quotes.reduce<Record<string, number>>((acc, q) => {
@@ -185,17 +246,29 @@ export default async function handler(request: Request): Promise<Response> {
     return acc;
   }, {});
 
+  // Build a concise data note for the UI
+  const dataNotes: string[] = [];
+  if (rawProduct) dataNotes.push(`产品筛选：「${rawProduct}」`);
+  if (normalizedCustomer) dataNotes.push(`客户筛选：「${normalizedCustomer}」`);
+  const archivedCount = quotes.filter(q => q.isArchived).length;
+  if (archivedCount > 0) dataNotes.push(`含 ${archivedCount} 条已归档（未成交）记录`);
+
   return json({
     ok:                 true,
     total:              quotes.length,
     customerFilter:     rawCustomer || null,
     normalizedCustomer: normalizedCustomer || null,
+    productFilter:      rawProduct || null,
     searchTerms:        searchTerms.length > 0 ? searchTerms : undefined,
     matchedBy:          matchedBy || undefined,
     totalAmount,
     statusSummary,
     quotes,
     source:             'quotation_records',
+    sourceLabel:        '历史报价 (quotation_records)',
+    primarySource:      'quotation_records',
+    fallbackUsed:       false,
+    dataNote:           dataNotes.length > 0 ? dataNotes.join(' · ') : null,
     asOf:               new Date().toISOString(),
   });
 }

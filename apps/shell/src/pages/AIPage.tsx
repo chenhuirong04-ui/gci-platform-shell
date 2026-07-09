@@ -618,6 +618,18 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
           {/* ── Quotation history result panel ── */}
           {intent.intentId === 'check_quotation_history' && state.resultData && state.resultData.ok && (
             <div style={{ marginBottom: 12 }}>
+              {/* Data source label */}
+              <div style={{ fontSize: 10, color: SUBTLE, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ padding: '1px 7px', borderRadius: 8, background: 'rgba(203,168,92,0.10)', border: '1px solid rgba(203,168,92,0.22)', color: GOLD, fontWeight: 700, letterSpacing: '0.04em' }}>
+                  数据来源：历史报价 / quotation_records
+                </span>
+                {state.resultData.productFilter && (
+                  <span style={{ padding: '1px 7px', borderRadius: 8, background: 'rgba(111,191,142,0.08)', border: '1px solid rgba(111,191,142,0.2)', color: '#6FBF8E' }}>
+                    产品筛选：{state.resultData.productFilter}
+                  </span>
+                )}
+              </div>
+
               {/* Alias match notice */}
               {state.resultData.matchedBy && state.resultData.matchedBy !== state.resultData.customerFilter && (
                 <div style={{ fontSize: 11, color: MUTED, marginBottom: 6, padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 6 }}>
@@ -647,16 +659,25 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
               )}
               {state.resultData.total === 0 ? (
                 <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 0' }}>
-                  <div style={{ marginBottom: 6 }}>未找到该客户的报价记录。</div>
+                  <div style={{ marginBottom: 6 }}>
+                    {state.resultData.dataNote || (
+                      state.resultData.productFilter
+                        ? `未在历史报价中找到包含「${state.resultData.productFilter}」的报价记录。`
+                        : '未找到该客户的报价记录。'
+                    )}
+                  </div>
                   {state.resultData.searchTerms?.length > 0 && (
                     <div style={{ fontSize: 11, color: MUTED }}>
                       <div style={{ marginBottom: 3 }}>已尝试搜索：</div>
                       {(state.resultData.searchTerms as string[]).map((t: string, i: number) => (
                         <div key={i} style={{ paddingLeft: 8 }}>· {t}</div>
                       ))}
-                      <div style={{ marginTop: 6, color: SUBTLE }}>请检查客户名称在报价记录中的写法是否不同。</div>
+                      <div style={{ marginTop: 6, color: SUBTLE }}>请检查客户名称或产品名称在报价记录中的写法是否不同。</div>
                     </div>
                   )}
+                  <div style={{ marginTop: 10, fontSize: 11, color: SUBTLE, padding: '6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    💡 降级建议：历史报价 (quotation_records) 未找到结果。如需查产品标准价格，请问"XX产品多少钱"，AI 将查询产品主库。
+                  </div>
                 </div>
               ) : (
                 <div style={{ maxHeight: 400, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -670,7 +691,13 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                     });
                     const hiddenCount = (q.items || []).length - validItems.length;
                     return (
-                    <div key={i} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <div key={i} style={{ padding: '10px 12px', borderRadius: 8, background: q.isArchived ? 'rgba(203,168,92,0.04)' : 'rgba(255,255,255,0.03)', border: q.isArchived ? '1px solid rgba(203,168,92,0.15)' : '1px solid rgba(255,255,255,0.07)' }}>
+                      {/* 归档警告 */}
+                      {q.isArchived && (
+                        <div style={{ fontSize: 10, color: '#D4A843', marginBottom: 5, padding: '3px 7px', borderRadius: 5, background: 'rgba(203,168,92,0.08)', border: '1px solid rgba(203,168,92,0.2)', display: 'inline-block' }}>
+                          ⚠️ 该报价已归档（未成交），不代表成交价格
+                        </div>
+                      )}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                         <span style={{ fontSize: 13, fontWeight: 700, color: TEXT, flex: 1 }}>{q.customerName}</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: GOLD, whiteSpace: 'nowrap' }}>
@@ -772,7 +799,9 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
 
                 {/* Section A: 产品主库 */}
                 <div style={{ padding: '10px 12px', background: CARD_BG, border: GOLD_BDR, borderRadius: 9, marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 6, letterSpacing: '0.04em' }}>产品主库 / PRODUCT MASTER</div>
+                  <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 6, letterSpacing: '0.04em' }}>产品主库 / PRODUCT MASTER
+                    <span style={{ marginLeft: 8, fontSize: 9, color: SUBTLE, fontWeight: 400 }}>Notion · 标准参考价</span>
+                  </div>
                   {!d.productMaster.found ? (
                     <div style={{ fontSize: 12, color: MUTED }}>未在产品主库找到「{d.productKeyword}」的匹配记录。</div>
                   ) : (
@@ -849,9 +878,16 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
 
                 {/* Section D: 历史报价 */}
                 <div style={{ padding: '10px 12px', background: CARD_BG, border: CARD_BDR, borderRadius: 9, marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 6, letterSpacing: '0.04em' }}>历史报价 / QUOTATION HISTORY</div>
+                  <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 6, letterSpacing: '0.04em' }}>历史报价 / QUOTATION HISTORY
+                    <span style={{ marginLeft: 8, fontSize: 9, color: SUBTLE, fontWeight: 400 }}>来源：quotation_records（实际报价单价，非标准价）</span>
+                  </div>
                   {!d.quotationHistory.found ? (
-                    <div style={{ fontSize: 12, color: MUTED }}>暂无历史报价记录。</div>
+                    <div style={{ fontSize: 12, color: MUTED }}>
+                      暂无历史报价记录。
+                      {d.productMaster.found && (
+                        <span style={{ color: SUBTLE }}> 可参考上方产品主库建议批发价。</span>
+                      )}
+                    </div>
                   ) : (
                     <>
                       {/* Price summary */}
@@ -2464,9 +2500,10 @@ export function AIPage() {
 
     // Quotation history intent — hardcoded regex.
     // Must come AFTER quotation followup check (followup is more specific).
-    const QUOTATION_HISTORY_RE = /历史报价|以前报价|之前报价|报价记录|报过什么价|报过价|quotation history|past quote/i;
+    const QUOTATION_HISTORY_RE = /历史报价|以前报价|之前报价|报价记录|报过什么价|报过价|上次.*报价|上次报|最近.*报价|quotation history|past quote/i;
     if (QUOTATION_HISTORY_RE.test(t)) {
       const customer = extractCustomerName(raw.trim());
+      const product  = extractProductName(raw.trim());
       const historyMatch: AIIntentMatch = {
         intent: {
           intentId: 'check_quotation_history',
@@ -2499,7 +2536,10 @@ export function AIPage() {
         () => {
           setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
           const base = typeof window !== 'undefined' ? window.location.origin : '';
-          const qs = customer ? `?customer=${encodeURIComponent(customer)}` : '';
+          const params = new URLSearchParams();
+          if (customer) params.set('customer', customer);
+          if (product)  params.set('product',  product);
+          const qs = params.toString() ? `?${params.toString()}` : '';
           fetch(`${base}/api/ai/quotation-history${qs}`)
             .then(r => r.json())
             .then(data => setCmdState(prev => prev ? { ...prev, resultData: data } : prev))
