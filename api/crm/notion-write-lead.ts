@@ -276,25 +276,54 @@ export default async function handler(request: Request): Promise<Response> {
     followupProperties['Follow-up Owner（负责人）'] = { select: { name: payload.owner } };
   }
 
-  console.log(`[notion-write-lead] Step 2: writing "${followupTitle}" to Follow-up Log...`);
-  const followupRes = await fetch('https://api.notion.com/v1/pages', {
-    method: 'POST',
-    headers: notionHeaders(token),
-    body: JSON.stringify({ parent: { database_id: followupDbId }, properties: followupProperties }),
-  });
+  // ── Follow-up Log write with auto-fallback ──────────────────────────────────
+  // Some Notion DBs have strict select options. If the full write fails (e.g.
+  // 行动状态/业务类型 value not in DB), retry with only safe fields so the
+  // customer record always lands in Follow-up Log.
+  const writeFollowup = async (properties: Record<string, any>) =>
+    fetch('https://api.notion.com/v1/pages', {
+      method: 'POST',
+      headers: notionHeaders(token),
+      body: JSON.stringify({ parent: { database_id: followupDbId }, properties }),
+    });
 
+  console.log(`[notion-write-lead] Step 2: writing "${followupTitle}" to Follow-up Log...`);
+  let followupRes = await writeFollowup(followupProperties);
+
+  // If full write failed, retry with minimal safe properties (title + dates + notes only)
   if (!followupRes.ok) {
-    const followupErr = await followupRes.json().catch(() => ({}));
-    console.error('[notion-write-lead] Step 2 FAILED — Follow-up Log write error:',
-      followupRes.status, JSON.stringify(followupErr).slice(0, 500));
-    return json({
-      error: `Follow-up Log write failed (${followupRes.status})`,
-      detail: followupErr,
-      step: 2,
-      sbId: sbPageId ? newSBId : null,
-      sbPageId,
-      sbWarning: sbWriteError,
-    }, followupRes.status);
+    const firstErr = await followupRes.json().catch(() => ({}));
+    console.warn('[notion-write-lead] Step 2 full write failed, retrying with minimal fields:',
+      followupRes.status, JSON.stringify(firstErr).slice(0, 300));
+
+    const minimalProperties: Record<string, any> = {
+      'Customer（客户）': followupProperties['Customer（客户）'],
+      'Follow-up Date（跟进日期）':  followupProperties['Follow-up Date（跟进日期）'],
+      'Next Follow-up（下次跟进）':  followupProperties['Next Follow-up（下次跟进）'],
+    };
+    if (followupProperties['Follow-up Notes（跟进内容）']) {
+      minimalProperties['Follow-up Notes（跟进内容）'] = followupProperties['Follow-up Notes（跟进内容）'];
+    }
+    if (followupProperties['下次行动内容']) {
+      minimalProperties['下次行动内容'] = followupProperties['下次行动内容'];
+    }
+
+    followupRes = await writeFollowup(minimalProperties);
+
+    if (!followupRes.ok) {
+      const followupErr = await followupRes.json().catch(() => ({}));
+      console.error('[notion-write-lead] Step 2 FAILED even with minimal fields:',
+        followupRes.status, JSON.stringify(followupErr).slice(0, 500));
+      return json({
+        error: `Follow-up Log write failed (${followupRes.status}): ${(followupErr as any)?.message || JSON.stringify(followupErr).slice(0, 200)}`,
+        detail: followupErr,
+        step: 2,
+        sbId: sbPageId ? newSBId : null,
+        sbPageId,
+        sbWarning: sbWriteError,
+      }, followupRes.status);
+    }
+    console.log('[notion-write-lead] Step 2 retry OK with minimal fields');
   }
 
   const followupPage = await followupRes.json() as any;
@@ -306,6 +335,6 @@ export default async function handler(request: Request): Promise<Response> {
     sbId: sbPageId ? newSBId : null,
     sbPageId,
     followupPageId: followupPage.id,
-    sbWarning: sbWriteError,   // null if SB Pool also succeeded
+    sbWarning: sbWriteError,
   });
 }
