@@ -72,6 +72,8 @@ export function BSNewQuotePage({
     whatsapp: '', email: '', country: '', requirement_summary: '',
   });
   const [savingCust, setSavingCust] = useState(false);
+  const [custNameError, setCustNameError] = useState(false);
+  const [custSaveError, setCustSaveError] = useState('');
   const custRef = useRef<HTMLDivElement>(null);
 
   // ── Service picker ────────────────────────────────────────────────────────
@@ -166,7 +168,12 @@ export function BSNewQuotePage({
   };
 
   const handleSaveNewCustomer = async () => {
-    if (!newCust.customer_name.trim()) return;
+    if (!newCust.customer_name.trim()) {
+      setCustNameError(true);
+      return;
+    }
+    setCustNameError(false);
+    setCustSaveError('');
     setSavingCust(true);
     const c: ServiceCustomer = {
       ...newCust,
@@ -183,7 +190,11 @@ export function BSNewQuotePage({
       setCustSearch(saved.customer_name);
       setShowNewCustForm(false);
       setNewCust({ customer_name: '', company_name: '', contact_name: '', whatsapp: '', email: '', country: '', requirement_summary: '' });
+      setCustNameError(false);
+      setCustSaveError('');
       syncCustomerToNotion(saved).catch(console.error);
+    } else {
+      setCustSaveError(isZh ? '保存失败，请检查网络后重试' : 'Save failed. Please check your connection and retry.');
     }
   };
 
@@ -266,52 +277,176 @@ export function BSNewQuotePage({
 
           {/* Inline new customer form */}
           {showNewCustForm && (
-            <div className="mb-4 p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-3">
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                {isZh ? '快速建档' : 'Quick Add Client'}
-              </p>
-              <input
-                className="w-full px-3 py-2 rounded-xl border text-sm outline-none"
-                style={{ borderColor: `${GOLD}50` }}
-                placeholder={isZh ? '客户名称 *' : 'Client Name *'}
-                value={newCust.customer_name}
-                onChange={e => setNewCust(v => ({ ...v, customer_name: e.target.value }))}
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <input className="px-3 py-2 rounded-xl border text-sm outline-none" style={{ borderColor: `${GOLD}30` }}
-                  placeholder={isZh ? '公司名称' : 'Company'} value={newCust.company_name}
-                  onChange={e => setNewCust(v => ({ ...v, company_name: e.target.value }))} />
-                <input className="px-3 py-2 rounded-xl border text-sm outline-none" style={{ borderColor: `${GOLD}30` }}
-                  placeholder={isZh ? '联系人' : 'Contact Person'} value={newCust.contact_name}
-                  onChange={e => setNewCust(v => ({ ...v, contact_name: e.target.value }))} />
-                <input className="px-3 py-2 rounded-xl border text-sm outline-none" style={{ borderColor: `${GOLD}30` }}
-                  placeholder="WhatsApp" value={newCust.whatsapp}
-                  onChange={e => setNewCust(v => ({ ...v, whatsapp: e.target.value }))} />
-                <input className="px-3 py-2 rounded-xl border text-sm outline-none" style={{ borderColor: `${GOLD}30` }}
-                  placeholder="Email" value={newCust.email}
-                  onChange={e => setNewCust(v => ({ ...v, email: e.target.value }))} />
-                <input className="px-3 py-2 rounded-xl border text-sm outline-none col-span-2" style={{ borderColor: `${GOLD}30` }}
-                  placeholder={isZh ? '国家' : 'Country'} value={newCust.country}
-                  onChange={e => setNewCust(v => ({ ...v, country: e.target.value }))} />
+            <div className="mb-4 rounded-2xl overflow-hidden" style={{ border: `1px solid ${GOLD}55`, background: '#fdfcfa' }}>
+              {/* Form header */}
+              <div className="px-5 py-3" style={{ background: `${GOLD}18`, borderBottom: `1px solid ${GOLD}40` }}>
+                <p style={{ fontSize: 12, fontWeight: 900, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.14em' }}>
+                  {isZh ? '快速建档' : 'Quick Add Client'}
+                </p>
               </div>
-              <textarea
-                className="w-full px-3 py-2 rounded-xl border text-sm outline-none resize-none"
-                style={{ borderColor: `${GOLD}30` }}
-                rows={2}
-                placeholder={isZh ? '需求摘要（可选）' : 'Requirement summary (optional)'}
-                value={newCust.requirement_summary}
-                onChange={e => setNewCust(v => ({ ...v, requirement_summary: e.target.value }))}
-              />
-              <button
-                onClick={handleSaveNewCustomer}
-                disabled={savingCust || !newCust.customer_name.trim()}
-                className="w-full py-2.5 rounded-xl text-sm font-black text-white transition-opacity disabled:opacity-40"
-                style={{ background: NAVY }}
-              >
-                {savingCust
-                  ? (isZh ? '保存中…' : 'Saving…')
-                  : (isZh ? '保存并选择此客户' : 'Save & Select Client')}
-              </button>
+
+              <div className="px-5 py-4 space-y-4">
+                {/* Customer name — required */}
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: NAVY, marginBottom: 6 }}>
+                    {isZh ? '客户名称' : 'Client Name'}
+                    <span style={{ color: '#e53e3e', marginLeft: 4 }}>*</span>
+                  </label>
+                  <input
+                    style={{
+                      display: 'block', width: '100%', boxSizing: 'border-box',
+                      padding: '11px 14px', borderRadius: 10,
+                      border: `1.5px solid ${custNameError ? '#e53e3e' : newCust.customer_name ? GOLD : '#b0bec5'}`,
+                      fontSize: 15, color: '#17233C', background: 'white', outline: 'none',
+                    }}
+                    placeholder={isZh ? '请输入客户名称' : 'Enter client name'}
+                    value={newCust.customer_name}
+                    onChange={e => {
+                      setNewCust(v => ({ ...v, customer_name: e.target.value }));
+                      if (e.target.value.trim()) setCustNameError(false);
+                    }}
+                    onFocus={e => { e.currentTarget.style.borderColor = GOLD; }}
+                    onBlur={e => {
+                      e.currentTarget.style.borderColor = custNameError ? '#e53e3e' : newCust.customer_name ? GOLD : '#b0bec5';
+                    }}
+                  />
+                  {custNameError && (
+                    <p style={{ fontSize: 12, color: '#e53e3e', marginTop: 5, fontWeight: 600 }}>
+                      {isZh ? '请输入客户名称' : 'Please enter customer name'}
+                    </p>
+                  )}
+                </div>
+
+                {/* Company + Contact row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: NAVY, marginBottom: 6 }}>
+                      {isZh ? '公司名称' : 'Company'}
+                    </label>
+                    <input
+                      style={{ display: 'block', width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #b0bec5', fontSize: 14, color: '#17233C', background: 'white', outline: 'none' }}
+                      placeholder={isZh ? '公司全称' : 'Company name'}
+                      value={newCust.company_name}
+                      onChange={e => setNewCust(v => ({ ...v, company_name: e.target.value }))}
+                      onFocus={e => { e.currentTarget.style.borderColor = GOLD; }}
+                      onBlur={e => { e.currentTarget.style.borderColor = '#b0bec5'; }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: NAVY, marginBottom: 6 }}>
+                      {isZh ? '联系人' : 'Contact Person'}
+                    </label>
+                    <input
+                      style={{ display: 'block', width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #b0bec5', fontSize: 14, color: '#17233C', background: 'white', outline: 'none' }}
+                      placeholder={isZh ? '联系人姓名' : 'Full name'}
+                      value={newCust.contact_name}
+                      onChange={e => setNewCust(v => ({ ...v, contact_name: e.target.value }))}
+                      onFocus={e => { e.currentTarget.style.borderColor = GOLD; }}
+                      onBlur={e => { e.currentTarget.style.borderColor = '#b0bec5'; }}
+                    />
+                  </div>
+                </div>
+
+                {/* WhatsApp + Email row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: NAVY, marginBottom: 6 }}>
+                      WhatsApp
+                    </label>
+                    <input
+                      style={{ display: 'block', width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #b0bec5', fontSize: 14, color: '#17233C', background: 'white', outline: 'none' }}
+                      placeholder="+971 ..."
+                      value={newCust.whatsapp}
+                      onChange={e => setNewCust(v => ({ ...v, whatsapp: e.target.value }))}
+                      onFocus={e => { e.currentTarget.style.borderColor = GOLD; }}
+                      onBlur={e => { e.currentTarget.style.borderColor = '#b0bec5'; }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: NAVY, marginBottom: 6 }}>
+                      {isZh ? '邮箱' : 'Email'}
+                    </label>
+                    <input
+                      type="email"
+                      style={{ display: 'block', width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #b0bec5', fontSize: 14, color: '#17233C', background: 'white', outline: 'none' }}
+                      placeholder="email@example.com"
+                      value={newCust.email}
+                      onChange={e => setNewCust(v => ({ ...v, email: e.target.value }))}
+                      onFocus={e => { e.currentTarget.style.borderColor = GOLD; }}
+                      onBlur={e => { e.currentTarget.style.borderColor = '#b0bec5'; }}
+                    />
+                  </div>
+                </div>
+
+                {/* Country */}
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: NAVY, marginBottom: 6 }}>
+                    {isZh ? '国家' : 'Country'}
+                  </label>
+                  <input
+                    style={{ display: 'block', width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #b0bec5', fontSize: 14, color: '#17233C', background: 'white', outline: 'none' }}
+                    placeholder={isZh ? '如：UAE / China / Saudi Arabia' : 'e.g. UAE / China / Saudi Arabia'}
+                    value={newCust.country}
+                    onChange={e => setNewCust(v => ({ ...v, country: e.target.value }))}
+                    onFocus={e => { e.currentTarget.style.borderColor = GOLD; }}
+                    onBlur={e => { e.currentTarget.style.borderColor = '#b0bec5'; }}
+                  />
+                </div>
+
+                {/* Requirement summary */}
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: NAVY, marginBottom: 6 }}>
+                    {isZh ? '需求摘要' : 'Requirement Summary'}
+                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8a9ab0', marginLeft: 6 }}>
+                      {isZh ? '（可选）' : '(optional)'}
+                    </span>
+                  </label>
+                  <textarea
+                    style={{ display: 'block', width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #b0bec5', fontSize: 14, color: '#17233C', background: 'white', outline: 'none', resize: 'none', minHeight: 80, lineHeight: 1.6 }}
+                    placeholder={isZh ? '简要描述客户主要需求…' : 'Briefly describe the client\'s main requirements…'}
+                    value={newCust.requirement_summary}
+                    onChange={e => setNewCust(v => ({ ...v, requirement_summary: e.target.value }))}
+                    onFocus={e => { e.currentTarget.style.borderColor = GOLD; }}
+                    onBlur={e => { e.currentTarget.style.borderColor = '#b0bec5'; }}
+                  />
+                </div>
+
+                {/* Save error */}
+                {custSaveError && (
+                  <div style={{ background: '#fff5f5', border: '1px solid #fed7d7', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#c53030', fontWeight: 600 }}>
+                    {custSaveError}
+                  </div>
+                )}
+
+                {/* Save button */}
+                <div>
+                  <button
+                    onClick={handleSaveNewCustomer}
+                    disabled={savingCust}
+                    style={{
+                      display: 'block', width: '100%',
+                      padding: '13px 0',
+                      borderRadius: 12,
+                      fontSize: 15,
+                      fontWeight: 900,
+                      cursor: savingCust ? 'not-allowed' : 'pointer',
+                      border: 'none',
+                      background: newCust.customer_name.trim() ? NAVY : '#d1d9e0',
+                      color: newCust.customer_name.trim() ? 'white' : '#8a9ab0',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {savingCust
+                      ? (isZh ? '保存中…' : 'Saving…')
+                      : (isZh ? '保存并选择此客户' : 'Save and Select Customer')}
+                  </button>
+                  {!newCust.customer_name.trim() && (
+                    <p style={{ textAlign: 'center', fontSize: 12, color: '#8a9ab0', marginTop: 6 }}>
+                      {isZh ? '请先填写客户名称' : 'Please enter a client name first'}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -359,31 +494,38 @@ export function BSNewQuotePage({
 
           {/* Selected customer info card */}
           {selectedCustomer && !showNewCustForm && (
-            <div className="mt-3 p-3 rounded-xl space-y-1.5 text-xs" style={{ background: `${GOLD}08`, border: `1px solid ${GOLD}25` }}>
-              <div className="flex justify-between items-start">
-                <span className="font-black text-gray-800 text-sm">{selectedCustomer.customer_name}</span>
+            <div className="mt-3 rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${GOLD}60` }}>
+              <div style={{ background: `${GOLD}18`, padding: '8px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 11, fontWeight: 900, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                  {isZh ? '已选客户' : 'Selected Client'}
+                </span>
                 {selectedCustomer.customer_number && (
-                  <span className="text-gray-400 text-[10px] font-mono">{selectedCustomer.customer_number}</span>
+                  <span style={{ fontSize: 11, color: '#8a9ab0', fontFamily: 'monospace' }}>{selectedCustomer.customer_number}</span>
                 )}
               </div>
-              {selectedCustomer.company_name && <div className="text-gray-600">{selectedCustomer.company_name}</div>}
-              <div className="flex gap-3 text-gray-400 flex-wrap">
-                {selectedCustomer.contact_name && <span>👤 {selectedCustomer.contact_name}</span>}
-                {selectedCustomer.whatsapp && <span>📱 {selectedCustomer.whatsapp}</span>}
-                {selectedCustomer.email && <span>✉ {selectedCustomer.email}</span>}
-                {selectedCustomer.country && <span>🌍 {selectedCustomer.country}</span>}
-              </div>
-              {selectedCustomer.requirement_summary && (
-                <div className="text-gray-500 border-t border-gray-100 pt-1.5 mt-1">
-                  {selectedCustomer.requirement_summary}
+              <div style={{ padding: '12px 14px', background: '#fdfcfa' }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: NAVY, marginBottom: 4 }}>{selectedCustomer.customer_name}</div>
+                {selectedCustomer.company_name && (
+                  <div style={{ fontSize: 13, color: '#3d4f6b', marginBottom: 6 }}>{selectedCustomer.company_name}</div>
+                )}
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 13, color: '#5a6a82' }}>
+                  {selectedCustomer.contact_name && <span>👤 {selectedCustomer.contact_name}</span>}
+                  {selectedCustomer.whatsapp && <span>📱 {selectedCustomer.whatsapp}</span>}
+                  {selectedCustomer.email && <span>✉ {selectedCustomer.email}</span>}
+                  {selectedCustomer.country && <span>🌍 {selectedCustomer.country}</span>}
                 </div>
-              )}
-              <button
-                className="text-gray-400 text-[10px] underline hover:text-gray-600"
-                onClick={() => { setSelectedCustomer(null); setCustSearch(''); }}
-              >
-                {isZh ? '更换客户' : 'Change client'}
-              </button>
+                {selectedCustomer.requirement_summary && (
+                  <div style={{ fontSize: 13, color: '#5a6a82', marginTop: 8, paddingTop: 8, borderTop: '1px solid #e8e0d0' }}>
+                    {selectedCustomer.requirement_summary}
+                  </div>
+                )}
+                <button
+                  style={{ fontSize: 12, color: '#8a9ab0', textDecoration: 'underline', marginTop: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  onClick={() => { setSelectedCustomer(null); setCustSearch(''); }}
+                >
+                  {isZh ? '更换客户' : 'Change client'}
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -880,16 +1022,16 @@ function BSQuotePreviewPanel(p: PreviewProps) {
             {p.customer.company_name && (
               <div style={{ fontSize: 14, color: TEXT_MD, marginBottom: 6, fontWeight: 600 }}>{p.customer.company_name}</div>
             )}
-            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 13, color: LABEL_CLR }}>
-              {p.customer.contact_name && <span>{p.customer.contact_name}</span>}
-              {p.customer.whatsapp && <span>{p.customer.whatsapp}</span>}
-              {p.customer.email && <span>{p.customer.email}</span>}
-              {p.customer.country && <span>{p.customer.country}</span>}
+            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', fontSize: 13, color: TEXT_MD }}>
+              {p.customer.contact_name && <span>👤 {p.customer.contact_name}</span>}
+              {p.customer.whatsapp && <span>📱 {p.customer.whatsapp}</span>}
+              {p.customer.email && <span>✉ {p.customer.email}</span>}
+              {p.customer.country && <span>🌍 {p.customer.country}</span>}
             </div>
           </div>
         ) : (
-          <div style={{ fontSize: 14, color: '#ccc', fontStyle: 'italic' }}>
-            {isZh ? '请选择服务客户…' : 'Select a service client…'}
+          <div style={{ fontSize: 14, color: '#94a3b8', fontStyle: 'italic' }}>
+            {isZh ? '← 请在左侧选择或新增服务客户' : '← Please select or add a service client on the left'}
           </div>
         )}
       </div>
