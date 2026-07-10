@@ -56,18 +56,27 @@ export function ServiceCustomerList({ lang, customers, loading, onView, onEdit, 
     return <div className="flex items-center justify-center h-40 text-gray-400 text-sm">{t.labels.loading}</div>;
   }
 
+  const addBtn = (
+    <button
+      onClick={onAddCustomer}
+      className="flex-shrink-0 bg-[#0c1b3a] text-white rounded px-4 py-2 text-sm font-semibold hover:bg-[#1a3060] whitespace-nowrap"
+    >
+      + {t.buttons.addCustomer}
+    </button>
+  );
+
   return (
     <div className="flex flex-col h-full">
-      {/* Toolbar */}
-      <div className="flex gap-2 p-3 border-b border-gray-100 flex-shrink-0 flex-wrap">
+      {/* Toolbar — single row, button never wraps */}
+      <div className="flex items-center gap-2 px-3 py-3 border-b border-gray-100 flex-shrink-0 min-w-0">
         <input
-          className="border border-gray-200 rounded px-3 py-1.5 text-sm w-44 focus:outline-none focus:border-blue-400"
+          className="border border-gray-200 rounded px-3 py-1.5 text-sm w-36 min-w-0 focus:outline-none focus:border-blue-400"
           placeholder={t.buttons.search + '…'}
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
         <select
-          className="border border-gray-200 rounded px-2 py-1.5 text-sm focus:outline-none"
+          className="border border-gray-200 rounded px-2 py-1.5 text-sm focus:outline-none min-w-0"
           value={filterStatus}
           onChange={e => setFilterStatus(e.target.value)}
         >
@@ -75,7 +84,7 @@ export function ServiceCustomerList({ lang, customers, loading, onView, onEdit, 
           {statusList.map(s => <option key={s} value={s!}>{t.customerStatus[s!] || s}</option>)}
         </select>
         <select
-          className="border border-gray-200 rounded px-2 py-1.5 text-sm focus:outline-none"
+          className="border border-gray-200 rounded px-2 py-1.5 text-sm focus:outline-none min-w-0"
           value={filterType}
           onChange={e => setFilterType(e.target.value)}
         >
@@ -83,19 +92,24 @@ export function ServiceCustomerList({ lang, customers, loading, onView, onEdit, 
           {typeList.map(s => <option key={s} value={s!}>{t.customerTypes[s!] || s}</option>)}
         </select>
         <div className="flex-1" />
-        <button
-          onClick={onAddCustomer}
-          className="bg-[#0c1b3a] text-white rounded px-3 py-1.5 text-sm font-medium hover:bg-[#1a3060]"
-        >
-          + {t.buttons.addCustomer}
-        </button>
+        {addBtn}
       </div>
 
       {/* Table */}
       <div className="flex-1 overflow-auto">
         {filtered.length === 0 ? (
-          <div className="flex items-center justify-center h-32 text-gray-400 text-sm">
-            {search || filterStatus || filterType ? t.empty.searchEmpty : t.empty.customers}
+          <div className="flex flex-col items-center justify-center gap-4 h-48">
+            <p className="text-gray-400 text-sm">
+              {search || filterStatus || filterType ? t.empty.searchEmpty : t.empty.customers}
+            </p>
+            {!search && !filterStatus && !filterType && (
+              <button
+                onClick={onAddCustomer}
+                className="bg-[#0c1b3a] text-white rounded px-5 py-2.5 text-sm font-semibold hover:bg-[#1a3060]"
+              >
+                + {lang === 'zh' ? '新增第一位客户' : 'Add First Customer'}
+              </button>
+            )}
           </div>
         ) : (
           <table className="w-full text-sm">
