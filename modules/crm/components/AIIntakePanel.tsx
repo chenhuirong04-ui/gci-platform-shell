@@ -700,20 +700,24 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
 
       // detect quotation alongside followup — preserve Excel/OCR-parsed quoteDraft
       if (finalIntent === 'customer_quote_record') {
-        // File was already parsed (Excel/OCR) — respect the parsed quoteDraft & lineItems.
-        // Only auto-enable registerQuote when parsing actually found a grandTotal.
-        // Save path (isCrmRecord) routes to Drive + Supabase, NOT startQuoteFlow.
-        if (parsedFromFile && quoteDraft?.grandTotal != null) {
-          setRegisterQuote(true);
-        } else {
-          // Parsing didn't find amount — let user decide by checking the checkbox manually
-          // (don't force false so the checkbox state from parseExcelFile is preserved)
-        }
-        // Update customerName from optional field if filled
+        // Always show + check the quote registration block for quote files,
+        // even if amount wasn't recognized (user sees "金额待补充").
+        setRegisterQuote(true);
         const cn = optional.clientName.trim() || result.clientName;
-        if (cn && cn !== '待确认') {
-          setQuoteDraft(p => p ? { ...p, customerName: cn, isReady: p.grandTotal != null } : null);
-        }
+        // Always ensure quoteDraft is initialized
+        setQuoteDraft(p => {
+          const customerName = cn && cn !== '待确认' ? cn : (p?.customerName ?? '待确认');
+          if (p) return { ...p, customerName, isReady: p.grandTotal != null && customerName !== '待确认' };
+          return {
+            customerName,
+            grandTotal: null,
+            quoteDate: new Date().toISOString().slice(0, 10),
+            quoteType: 'CRM_RECORD',
+            source: result.source || '',
+            itemSummary: '',
+            isReady: false,
+          };
+        });
       } else if (!parsedFromFile) {
         const clientHint = optional.clientName.trim() || result.clientName;
         const qd = detectQuotation(text, clientHint);
@@ -1327,6 +1331,41 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                   </span>
                 </div>
               ))}
+
+              {/* 历史报价登记 — always visible when quote-relevant file detected */}
+              {(quoteDraft != null || detectedFileType === 'customer_quote_record') && (
+                <div className="flex items-center px-5 py-3 gap-3" style={{ borderBottom: `1px solid ${BORDER}`, background: registerQuote ? 'rgba(245,158,11,0.05)' : 'transparent' }}>
+                  <span className="text-[10px] font-black uppercase tracking-widest w-16 shrink-0" style={{ color: T3 }}>历史报价</span>
+                  <label className="flex items-center gap-2 cursor-pointer select-none flex-1">
+                    <input type="checkbox" checked={registerQuote}
+                      onChange={e => {
+                        const checked = e.target.checked;
+                        setRegisterQuote(checked);
+                        if (checked && quoteDraft == null) {
+                          setQuoteDraft({
+                            customerName: draft.clientName !== '待确认' ? draft.clientName : '待确认',
+                            grandTotal: null,
+                            quoteDate: new Date().toISOString().slice(0, 10),
+                            quoteType: 'CRM_RECORD',
+                            source: draft.source || '',
+                            itemSummary: '',
+                            isReady: false,
+                          });
+                        }
+                      }}
+                      disabled={saved} className="w-4 h-4 accent-amber-500" />
+                    <span className="text-sm font-bold" style={{ color: registerQuote ? GOLD : T2 }}>
+                      同时登记为历史报价
+                    </span>
+                  </label>
+                  {registerQuote && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded"
+                      style={{ background: 'rgba(245,158,11,0.15)', color: GOLD, border: '1px solid rgba(245,158,11,0.3)' }}>
+                      {quoteDraft?.grandTotal != null ? `AED ${quoteDraft.grandTotal.toLocaleString()}` : '金额待补充'}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Missing warning */}
@@ -1337,24 +1376,15 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
               </div>
             )}
 
-            {/* Quotation block — shown when quotation keywords detected */}
-            {quoteDraft && (
+            {/* Quotation block — expanded details when registerQuote is checked */}
+            {(quoteDraft != null || detectedFileType === 'customer_quote_record') && registerQuote && (
               <div style={{ borderTop: `1px solid ${BORDER}`, background: '#0B1926' }}>
-                <div className="px-5 py-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileCheck className="w-4 h-4" style={{ color: GOLD }} />
-                    <span className="text-xs font-black uppercase tracking-widest" style={{ color: GOLD }}>检测到报价内容</span>
-                  </div>
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input type="checkbox" checked={registerQuote}
-                      onChange={e => setRegisterQuote(e.target.checked)}
-                      disabled={saved} className="w-3.5 h-3.5 accent-amber-500" />
-                    <span className="text-xs font-bold" style={{ color: T2 }}>同时登记为历史报价</span>
-                  </label>
+                <div className="px-5 py-3 flex items-center gap-2">
+                  <FileCheck className="w-4 h-4" style={{ color: GOLD }} />
+                  <span className="text-xs font-black uppercase tracking-widest" style={{ color: GOLD }}>历史报价登记详情</span>
                 </div>
 
-                {registerQuote && (
-                  <div className="px-5 pb-3 space-y-2">
+                <div className="px-5 pb-3 space-y-2">
                     {/* File attachment notice */}
                     {attachments.length > 0 && (
                       parsedFromFile && lineItems.length > 0 ? (
@@ -1373,7 +1403,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                     )}
 
                     {/* Field display */}
-                    <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+                    {quoteDraft && <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
                       {([
                         ['客户', quoteDraft.customerName],
                         ['报价日期', quoteDraft.quoteDate],
@@ -1385,10 +1415,10 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                           <span className="text-xs font-bold" style={{ color: T1 }}>{v}</span>
                         </div>
                       ))}
-                    </div>
+                    </div>}
 
                     {/* Editable: amount */}
-                    <div className="flex items-center gap-2 pt-1">
+                    {quoteDraft && <div className="flex items-center gap-2 pt-1">
                       <span className="text-[9px] font-black uppercase tracking-widest w-14 shrink-0" style={{ color: T3 }}>金额</span>
                       {quoteDraft.grandTotal != null ? (
                         <div className="flex items-center gap-2 flex-1">
@@ -1417,10 +1447,10 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                           />
                         </div>
                       )}
-                    </div>
+                    </div>}
 
                     {/* Editable: item summary */}
-                    <div className="flex items-center gap-2">
+                    {quoteDraft && <div className="flex items-center gap-2">
                       <span className="text-[9px] font-black uppercase tracking-widest w-14 shrink-0" style={{ color: T3 }}>产品摘要</span>
                       <input
                         type="text" placeholder="产品名称 / 项目摘要（可选）"
@@ -1431,7 +1461,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                         onFocus={e => e.target.style.borderColor = GOLD}
                         onBlur={e => e.target.style.borderColor = BORDER}
                       />
-                    </div>
+                    </div>}
 
                     {/* Line items section */}
                     <div className="pt-1">
@@ -1532,7 +1562,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                     </div>
 
                     {/* Missing fields — actionable hints, not blockers */}
-                    {!quoteDraft.isReady && (
+                    {quoteDraft && !quoteDraft.isReady && (
                       <div className="px-3 py-2 rounded-lg flex items-start gap-2 text-xs font-bold"
                         style={{ background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)', color: '#FCD34D' }}>
                         <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
@@ -1542,8 +1572,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                         </span>
                       </div>
                     )}
-                  </div>
-                )}
+                </div>
 
                 {/* Dup warning */}
                 {quotePhase === 'dupWarn' && dupRecords.length > 0 && (
@@ -1727,7 +1756,10 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                 style={{ background: saved ? '#059669' : '#0F172A', border: `1px solid ${saved ? '#059669' : GOLD}50` }}>
                 {saved
                   ? <><CheckCircle2 className="w-4 h-4" /> 已保存</>
-                  : isLoading ? '保存中…' : '保存为跟进记录'}
+                  : isLoading ? '保存中…'
+                  : registerQuote
+                    ? (quoteDraft?.grandTotal != null ? '保存跟进记录 + 登记历史报价' : '保存跟进记录 + 留底报价文件')
+                    : '保存为跟进记录'}
               </button>
               <button
                 onClick={() => {
