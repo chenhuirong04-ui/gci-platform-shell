@@ -228,16 +228,16 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
   ];
 
   return (
-    <div className="flex flex-col h-full bg-white relative overflow-hidden">
+    <div className="min-h-screen bg-white relative">
       {/* Module header */}
-      <div className="flex-shrink-0 bg-[#0c1b3a] px-4 py-3 flex items-center gap-3">
+      <div className="bg-[#0c1b3a] px-4 py-3 flex items-center gap-3">
         <span className="text-white font-semibold text-base">{t.moduleTitle}</span>
         <div className="flex-1" />
         <button onClick={reload} className="text-blue-200 hover:text-white text-xs">{loading ? '…' : '↺'}</button>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-100 flex-shrink-0 bg-white">
+      <div className="flex border-b border-gray-100 bg-white">
         {TABS.map(({ key, label }) => (
           <button
             key={key}
@@ -258,51 +258,47 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-hidden flex">
-        {/* Main content area */}
-        <div className="flex-1 overflow-hidden">
-          {tab === 'customers' && (
-            <div className="flex h-full">
-              {/* List panel */}
-              <div className={`flex flex-col overflow-hidden transition-all ${viewingCustomer || customerFormMode ? 'w-1/2' : 'w-full'}`}>
-                {customerFormMode ? (
-                  <div className="overflow-auto flex-1">
-                    <ServiceCustomerForm
-                      lang={lang}
-                      initial={editingCustomer || undefined}
-                      onSave={handleSaveCustomer}
-                      onCancel={() => { setCustomerFormMode(null); setEditingCustomer(null); }}
-                    />
-                  </div>
-                ) : (
-                  <ServiceCustomerList
-                    lang={lang}
-                    customers={customers}
-                    loading={loading}
-                    onView={handleViewCustomer}
-                    onEdit={handleEditCustomer}
-                    onNewQuote={handleNewQuoteForCustomer}
-                    onAddCustomer={() => { setCustomerFormMode('add'); setEditingCustomer(null); setViewingCustomer(null); }}
-                  />
-                )}
-              </div>
-
-              {/* Detail panel */}
-              {viewingCustomer && !customerFormMode && (
-                <div className="w-1/2 border-l border-gray-100 overflow-hidden flex flex-col">
-                  <ServiceCustomerDetail
-                    lang={lang}
-                    customer={viewingCustomer}
-                    quotes={customerQuotes}
-                    onEdit={() => handleEditCustomer(viewingCustomer)}
-                    onNewQuote={() => handleNewQuoteForCustomer(viewingCustomer)}
-                    onViewQuote={handleViewQuote}
-                    onClose={() => setViewingCustomer(null)}
-                  />
-                </div>
+      <div>
+        {tab === 'customers' && (
+          <div className="flex">
+            {/* List panel */}
+            <div className={`transition-all ${viewingCustomer || customerFormMode ? 'w-1/2' : 'w-full'}`}>
+              {customerFormMode ? (
+                <ServiceCustomerForm
+                  lang={lang}
+                  initial={editingCustomer || undefined}
+                  onSave={handleSaveCustomer}
+                  onCancel={() => { setCustomerFormMode(null); setEditingCustomer(null); }}
+                />
+              ) : (
+                <ServiceCustomerList
+                  lang={lang}
+                  customers={customers}
+                  loading={loading}
+                  onView={handleViewCustomer}
+                  onEdit={handleEditCustomer}
+                  onNewQuote={handleNewQuoteForCustomer}
+                  onAddCustomer={() => { setCustomerFormMode('add'); setEditingCustomer(null); setViewingCustomer(null); }}
+                />
               )}
             </div>
-          )}
+
+            {/* Detail panel */}
+            {viewingCustomer && !customerFormMode && (
+              <div className="w-1/2 border-l border-gray-100">
+                <ServiceCustomerDetail
+                  lang={lang}
+                  customer={viewingCustomer}
+                  quotes={customerQuotes}
+                  onEdit={() => handleEditCustomer(viewingCustomer)}
+                  onNewQuote={() => handleNewQuoteForCustomer(viewingCustomer)}
+                  onViewQuote={handleViewQuote}
+                  onClose={() => setViewingCustomer(null)}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
           {tab === 'new-quote' && (
             viewingQuote ? (
@@ -363,7 +359,6 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
               onDeleteItem={handleDeleteCatalogItem}
             />
           )}
-        </div>
       </div>
 
       {/* Toast */}

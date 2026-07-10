@@ -66,7 +66,7 @@ export function ServiceCustomerList({ lang, customers, loading, onView, onEdit, 
   );
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       {/* Toolbar — single row, button never wraps */}
       <div className="flex items-center gap-2 px-3 py-3 border-b border-gray-100 flex-shrink-0 min-w-0">
         <input
@@ -96,7 +96,7 @@ export function ServiceCustomerList({ lang, customers, loading, onView, onEdit, 
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto">
+      <div className="overflow-auto">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-4 h-48">
             <p className="text-gray-400 text-sm">
