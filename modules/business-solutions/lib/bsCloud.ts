@@ -494,6 +494,70 @@ export async function deleteComplianceItem(id: string): Promise<boolean> {
   return res !== null;
 }
 
+// ── service_customer_persons ──────────────────────────────────────────────────
+
+export interface CustomerPerson {
+  id?: string;
+  customer_id: string;
+  full_name: string;
+  role?: string;
+  nationality?: string;
+  passport_number?: string;
+  passport_expiry_date?: string;
+  emirates_id_number?: string;
+  emirates_id_expiry_date?: string;
+  uid_number?: string;
+  visa_number?: string;
+  visa_type?: string;
+  visa_expiry_date?: string;
+  date_of_birth?: string;
+  shareholding_percentage?: number;
+  is_legal_representative?: boolean;
+  is_manager?: boolean;
+  phone?: string;
+  email?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export async function listPersons(customerId: string): Promise<CustomerPerson[]> {
+  const res = await sbFetch(
+    `/rest/v1/service_customer_persons?customer_id=eq.${encodeURIComponent(customerId)}&order=created_at.asc`,
+    { method: 'GET' },
+  );
+  if (!res) return [];
+  return res.json().catch(() => []);
+}
+
+export async function savePerson(p: CustomerPerson): Promise<CustomerPerson | null> {
+  const payload = { ...p, updated_at: new Date().toISOString() };
+  const res = await sbFetch('/rest/v1/service_customer_persons', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(payload),
+  });
+  if (!res) return null;
+  const d = await res.json().catch(() => null);
+  return Array.isArray(d) ? d[0] : d;
+}
+
+export async function updatePerson(id: string, patch: Partial<CustomerPerson>): Promise<boolean> {
+  const res = await sbFetch(`/rest/v1/service_customer_persons?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
+  });
+  return res !== null;
+}
+
+export async function deletePerson(id: string): Promise<boolean> {
+  const res = await sbFetch(`/rest/v1/service_customer_persons?id=eq.${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+  return res !== null;
+}
+
 /** Fetch all upcoming/expired compliance items across all customers (for dashboard alerts). */
 export async function listExpiringCompliance(days = 90): Promise<ComplianceItem[]> {
   const future = new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
