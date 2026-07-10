@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type {
   ServiceCustomer, ServiceCatalogItem, ServiceCategory,
-  ServiceQuoteLineItem, ServiceQuote, BSLang,
+  ServiceQuoteLineItem, ServiceQuote, BSLang, PeriodicBilling,
 } from '../types';
 import { useT } from '../translations';
 import { calcQuoteTotals, calcLineTotal, fmt } from '../lib/bsCalculations';
@@ -23,13 +23,27 @@ interface Props {
 
 function uid() { return `item_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`; }
 
+function derivePB(bt: string, otf: number, mf: number, af: number): PeriodicBilling {
+  if (bt === 'monthly') return 'monthly_only';
+  if (bt === 'yearly' || bt === 'quarterly') return 'annual_only';
+  const hasMo = mf > 0, hasAn = af > 0;
+  if (hasMo && hasAn) return 'both';
+  if (hasMo) return 'monthly_only';
+  if (hasAn) return 'annual_only';
+  return 'none';
+}
+
 function makeItemFromCatalog(
   item: ServiceCatalogItem,
   categories: ServiceCategory[],
   lang: BSLang,
   existingCount: number,
 ): ServiceQuoteLineItem {
-  const cat = categories.find(c => c.id === item.category_id);
+  const cat  = categories.find(c => c.id === item.category_id);
+  const otf  = item.one_time_fee  || 0;
+  const mf   = item.monthly_fee   || 0;
+  const af   = item.annual_fee    || 0;
+  const bt   = item.default_billing_type || 'fixed';
   return {
     id: uid(),
     catalog_service_id: item.id,
@@ -43,12 +57,13 @@ function makeItemFromCatalog(
     unit: item.default_unit || '项',
     quantity: item.default_quantity || 1,
     months: item.default_months || 1,
-    billing_type: item.default_billing_type || 'fixed',
+    billing_type: bt,
     billing_label: '',
-    one_time_fee: item.one_time_fee || 0,
-    monthly_fee: item.monthly_fee || 0,
-    annual_fee: item.annual_fee || 0,
-    unit_price: item.one_time_fee || 0,
+    periodic_billing: derivePB(bt, otf, mf, af),
+    one_time_fee: otf,
+    monthly_fee: mf,
+    annual_fee: af,
+    unit_price: otf,
     line_total: 0,
     is_optional: false,
     sort_order: existingCount,
@@ -96,12 +111,13 @@ export function BSNewQuotePage({
   const [quoteNotes, setQuoteNotes] = useState('');
   const [quoteExclusions, setQuoteExclusions] = useState('');
   const [owner, setOwner] = useState('');
+  const [vatRate, setVatRate] = useState(0);  // e.g. 0.05 for 5%
   const [saving, setSaving] = useState(false);
 
   // ── Computed ──────────────────────────────────────────────────────────────
   const totals = useMemo(
-    () => calcQuoteTotals(items, discountType || undefined, discountValue),
-    [items, discountType, discountValue],
+    () => calcQuoteTotals(items, discountType || undefined, discountValue, vatRate),
+    [items, discountType, discountValue, vatRate],
   );
 
   const itemsWithTotals = useMemo(
@@ -153,6 +169,7 @@ export function BSNewQuotePage({
       service_name: isZh ? '自定义服务' : 'Custom Service',
       description: '', scope: '', deliverables: '', item_exclusions: '', timeline: '',
       unit: '项', quantity: 1, months: 1, billing_type: 'fixed', billing_label: '',
+      periodic_billing: 'none' as PeriodicBilling,
       one_time_fee: 0, monthly_fee: 0, annual_fee: 0, unit_price: 0, line_total: 0, is_optional: false,
     }]);
     setExpandedItemId(id);
@@ -232,8 +249,8 @@ export function BSNewQuotePage({
       total_one_time: totals.totalOneTime,
       monthly_fee: totals.monthlyFee,
       annual_recurring_amount: totals.annualRecurring,
-      grand_total: totals.grandTotal,
-      total_amount: totals.grandTotal,
+      grand_total: totals.firstYearValue,
+      total_amount: totals.firstYearValue,
     };
     const savedId = await saveQuote(quote, itemsWithTotals);
     setSaving(false);
@@ -695,22 +712,44 @@ export function BSNewQuotePage({
                         <textarea className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none resize-none bg-white" style={{ borderColor: `${GOLD}30` }}
                           rows={1} value={it.item_exclusions} onChange={e => updateItem(it.id, { item_exclusions: e.target.value })} />
                       </div>
+                      {/* Periodic billing mode */}
+                      <div>
+                        <label className="text-[9px] text-gray-400 font-black uppercase block mb-1" style={{ color: GOLD }}>
+                          {isZh ? '周期收费方式' : 'Billing Period Mode'}
+                        </label>
+                        <select
+                          className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none bg-white"
+                          style={{ borderColor: `${GOLD}50`, color: NAVY, fontWeight: 600 }}
+                          value={it.periodic_billing || 'auto'}
+                          onChange={e => updateItem(it.id, { periodic_billing: e.target.value as PeriodicBilling })}
+                        >
+                          <option value="auto">{isZh ? '自动检测（根据费用字段）' : 'Auto-detect (from fee fields)'}</option>
+                          <option value="monthly_only">{isZh ? '按月收费（月费 × 月数）' : 'Monthly only (fee × months)'}</option>
+                          <option value="annual_only">{isZh ? '按年收费（年费一次）' : 'Annual only (annual fee)'}</option>
+                          <option value="both">{isZh ? '月费 + 年费分别收取' : 'Monthly + Annual (separate)'}</option>
+                          <option value="none">{isZh ? '不适用（仅一次性）' : 'N/A (one-time only)'}</option>
+                        </select>
+                      </div>
+
+                      {/* Three fee inputs */}
                       <div className="grid grid-cols-3 gap-2">
                         <div>
                           <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '一次性费用' : 'One-time Fee'}</label>
-                          <input type="number" className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none text-right bg-white" style={{ borderColor: `${GOLD}30` }}
+                          <input type="number" className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none text-right bg-white" style={{ borderColor: `${GOLD}40`, color: '#17233C' }}
                             value={it.one_time_fee || ''} placeholder="0"
                             onChange={e => updateItem(it.id, { one_time_fee: parseFloat(e.target.value) || 0 })} />
                         </div>
                         <div>
                           <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '月服务费' : 'Monthly Fee'}</label>
-                          <input type="number" className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none text-right bg-white" style={{ borderColor: `${GOLD}30` }}
+                          <input type="number" className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none text-right bg-white" style={{ borderColor: `${GOLD}40`, color: '#17233C' }}
                             value={it.monthly_fee || ''} placeholder="0"
                             onChange={e => updateItem(it.id, { monthly_fee: parseFloat(e.target.value) || 0 })} />
                         </div>
                         <div>
-                          <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '年服务费' : 'Annual Fee'}</label>
-                          <input type="number" className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none text-right bg-white" style={{ borderColor: `${GOLD}30` }}
+                          <label className="text-[9px] font-black uppercase block mb-1" style={{ color: GOLD }}>
+                            {isZh ? '年服务费' : 'Annual Fee'}
+                          </label>
+                          <input type="number" className="w-full px-2 py-1.5 rounded-lg border-2 text-sm outline-none text-right bg-white" style={{ borderColor: GOLD, color: '#17233C', fontWeight: 600 }}
                             value={it.annual_fee || ''} placeholder="0"
                             onChange={e => updateItem(it.id, { annual_fee: parseFloat(e.target.value) || 0 })} />
                         </div>
@@ -718,17 +757,17 @@ export function BSNewQuotePage({
                       <div className="grid grid-cols-3 gap-2">
                         <div>
                           <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '数量' : 'Qty'}</label>
-                          <input type="number" min="1" className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none text-center bg-white" style={{ borderColor: `${GOLD}30` }}
+                          <input type="number" min="1" className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none text-center bg-white" style={{ borderColor: `${GOLD}40` }}
                             value={it.quantity} onChange={e => updateItem(it.id, { quantity: parseInt(e.target.value) || 1 })} />
                         </div>
                         <div>
                           <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '月数' : 'Months'}</label>
-                          <input type="number" min="1" className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none text-center bg-white" style={{ borderColor: `${GOLD}30` }}
+                          <input type="number" min="1" className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none text-center bg-white" style={{ borderColor: `${GOLD}40` }}
                             value={it.months} onChange={e => updateItem(it.id, { months: parseInt(e.target.value) || 1 })} />
                         </div>
                         <div>
                           <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '交付周期' : 'Timeline'}</label>
-                          <input className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none bg-white" style={{ borderColor: `${GOLD}30` }}
+                          <input className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none bg-white" style={{ borderColor: `${GOLD}40` }}
                             value={it.timeline} placeholder={isZh ? '如: 2-4周' : 'e.g. 2-4 wks'}
                             onChange={e => updateItem(it.id, { timeline: e.target.value })} />
                         </div>
@@ -753,14 +792,14 @@ export function BSNewQuotePage({
               )}
               {totals.subtotalMonthly > 0 && (
                 <div className="flex justify-between text-gray-500">
-                  <span>{isZh ? '月服务费小计' : 'Monthly Subtotal'}</span>
+                  <span>{isZh ? `月服务费（共 × 月）` : 'Monthly Period Cost'}</span>
                   <span className="font-medium font-mono">{fmt(totals.subtotalMonthly, currency)}</span>
                 </div>
               )}
               {totals.subtotalAnnual > 0 && (
-                <div className="flex justify-between text-gray-500">
-                  <span>{isZh ? '年服务费小计' : 'Annual Subtotal'}</span>
-                  <span className="font-medium font-mono">{fmt(totals.subtotalAnnual, currency)}</span>
+                <div className="flex justify-between" style={{ color: GOLD }}>
+                  <span className="font-semibold">{isZh ? '年服务费小计' : 'Annual Fee Subtotal'}</span>
+                  <span className="font-bold font-mono">{fmt(totals.subtotalAnnual, currency)}</span>
                 </div>
               )}
 
@@ -768,7 +807,7 @@ export function BSNewQuotePage({
               <div className="flex items-center gap-2 pt-1 pb-1">
                 <select
                   className="border rounded-lg px-2 py-1 text-xs outline-none"
-                  style={{ borderColor: `${GOLD}30` }}
+                  style={{ borderColor: `${GOLD}40` }}
                   value={discountType}
                   onChange={e => setDiscountType(e.target.value as any)}
                 >
@@ -780,7 +819,7 @@ export function BSNewQuotePage({
                   <input
                     type="number"
                     className="flex-1 border rounded-lg px-2 py-1 text-xs outline-none text-right"
-                    style={{ borderColor: `${GOLD}30` }}
+                    style={{ borderColor: `${GOLD}40` }}
                     value={discountValue || ''}
                     onChange={e => setDiscountValue(parseFloat(e.target.value) || 0)}
                     placeholder={discountType === 'percent' ? '%' : currency}
@@ -793,9 +832,27 @@ export function BSNewQuotePage({
                 )}
               </div>
 
-              <div className="flex justify-between font-black pt-2 border-t" style={{ color: NAVY }}>
-                <span className="text-sm">{isZh ? '总金额' : 'Grand Total'}</span>
-                <span className="text-base font-mono">{fmt(totals.grandTotal, currency)}</span>
+              {/* VAT row */}
+              <div className="flex items-center gap-2 pb-1">
+                <span className="text-xs text-gray-400 flex-shrink-0">{isZh ? 'VAT 税率 %' : 'VAT Rate %'}</span>
+                <input
+                  type="number" min="0" max="100" step="1"
+                  className="w-20 border rounded-lg px-2 py-1 text-xs outline-none text-right"
+                  style={{ borderColor: `${GOLD}40` }}
+                  value={vatRate > 0 ? vatRate * 100 : ''}
+                  placeholder="0"
+                  onChange={e => setVatRate((parseFloat(e.target.value) || 0) / 100)}
+                />
+                {totals.vatAmount > 0 && (
+                  <span className="text-xs font-medium text-gray-500 flex-shrink-0">
+                    +{fmt(totals.vatAmount, currency)}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex justify-between font-black pt-2 border-t-2" style={{ color: NAVY, borderColor: NAVY }}>
+                <span className="text-sm">{isZh ? '首年合同价值' : 'First Year Value'}</span>
+                <span className="text-base font-mono">{fmt(totals.firstYearValue, currency)}</span>
               </div>
             </div>
 
@@ -924,6 +981,7 @@ export function BSNewQuotePage({
           quoteTitle={quoteTitle}
           discountType={discountType || undefined}
           discountValue={discountValue}
+          vatRate={vatRate}
         />
       </div>
     </div>
@@ -948,6 +1006,7 @@ interface PreviewProps {
   quoteTitle?: string;
   discountType?: 'fixed' | 'percent';
   discountValue?: number;
+  vatRate?: number;
 }
 
 function BSQuotePreviewPanel(p: PreviewProps) {
@@ -1056,25 +1115,26 @@ function BSQuotePreviewPanel(p: PreviewProps) {
             {isZh ? '从左侧选择服务项目…' : 'Select service items on the left…'}
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr style={{ borderBottom: `2px solid ${NAVY}` }}>
-                <th style={{ textAlign: 'center', paddingBottom: 10, paddingRight: 8, fontSize: 11, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.06em', width: 32 }}>
-                  #
-                </th>
-                <th style={{ textAlign: 'left', paddingBottom: 10, paddingRight: 8, fontSize: 11, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                <th style={{ textAlign: 'center', paddingBottom: 10, paddingRight: 6, fontSize: 10, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.04em', width: 28 }}>#</th>
+                <th style={{ textAlign: 'left', paddingBottom: 10, paddingRight: 6, fontSize: 10, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   {isZh ? '服务内容' : 'Service'}
                 </th>
-                <th style={{ textAlign: 'center', paddingBottom: 10, paddingRight: 8, fontSize: 11, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.06em', width: 50 }}>
+                <th style={{ textAlign: 'center', paddingBottom: 10, paddingRight: 4, fontSize: 10, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.04em', width: 36 }}>
                   {isZh ? '数量' : 'Qty'}
                 </th>
-                <th style={{ textAlign: 'right', paddingBottom: 10, paddingRight: 8, fontSize: 11, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.06em', width: 100 }}>
+                <th style={{ textAlign: 'right', paddingBottom: 10, paddingRight: 4, fontSize: 10, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.04em', width: 82 }}>
                   {isZh ? '一次性' : 'One-time'}
                 </th>
-                <th style={{ textAlign: 'right', paddingBottom: 10, paddingRight: 8, fontSize: 11, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.06em', width: 90 }}>
+                <th style={{ textAlign: 'right', paddingBottom: 10, paddingRight: 4, fontSize: 10, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.04em', width: 75 }}>
                   {isZh ? '月费' : 'Monthly'}
                 </th>
-                <th style={{ textAlign: 'right', paddingBottom: 10, fontSize: 11, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.06em', width: 90 }}>
+                <th style={{ textAlign: 'right', paddingBottom: 10, paddingRight: 4, fontSize: 10, fontWeight: 800, color: GOLD, textTransform: 'uppercase', letterSpacing: '0.04em', width: 75 }}>
+                  {isZh ? '年服务费' : 'Annual'}
+                </th>
+                <th style={{ textAlign: 'right', paddingBottom: 10, fontSize: 10, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.04em', width: 80 }}>
                   {isZh ? '小计' : 'Subtotal'}
                 </th>
               </tr>
@@ -1082,45 +1142,29 @@ function BSQuotePreviewPanel(p: PreviewProps) {
             <tbody>
               {p.items.map((it, i) => {
                 const lt = calcLineTotal(it);
-                const subDisplay = lt > 0
-                  ? fmt(lt, p.currency)
-                  : it.monthly_fee > 0
-                    ? `${fmt(it.monthly_fee * it.quantity, p.currency)}/${isZh ? '月' : 'mo'}`
-                    : (isZh ? '待定' : 'TBD');
+                const subDisplay = lt > 0 ? fmt(lt, p.currency) : (isZh ? '待定' : 'TBD');
                 const rowBg = i % 2 === 1 ? WARM_BG : 'transparent';
                 return (
                   <tr key={it.id} style={{ background: rowBg, borderBottom: `1px solid ${DIVIDER}` }}>
-                    <td style={{ padding: '13px 8px 13px 4px', textAlign: 'center', fontSize: 12, color: LABEL_CLR, fontWeight: 700 }}>{i + 1}</td>
-                    <td style={{ padding: '13px 8px 13px 0', verticalAlign: 'top' }}>
+                    <td style={{ padding: '11px 6px 11px 2px', textAlign: 'center', fontSize: 11, color: LABEL_CLR, fontWeight: 700 }}>{i + 1}</td>
+                    <td style={{ padding: '11px 6px 11px 0', verticalAlign: 'top' }}>
                       <div style={{ fontWeight: 700, color: TEXT_DK, fontSize: 13 }}>{it.service_name}</div>
-                      {it.category_name && (
-                        <div style={{ fontSize: 11, color: GOLD, fontWeight: 600, marginTop: 2 }}>{it.category_name}</div>
-                      )}
-                      {it.description && (
-                        <div style={{ fontSize: 12, color: TEXT_MD, marginTop: 4, lineHeight: 1.55 }}>{it.description}</div>
-                      )}
-                      {it.scope && (
-                        <div style={{ fontSize: 12, color: LABEL_CLR, marginTop: 3, lineHeight: 1.5 }}>{it.scope}</div>
-                      )}
-                      {it.timeline && (
-                        <div style={{ fontSize: 12, color: GOLD, fontWeight: 600, marginTop: 4 }}>
-                          {isZh ? '交付周期: ' : 'Timeline: '}{it.timeline}
-                        </div>
-                      )}
-                      {it.is_optional && (
-                        <div style={{ fontSize: 11, color: '#9f7aea', fontWeight: 700, marginTop: 3 }}>
-                          {isZh ? '（可选项目）' : '(Optional)'}
-                        </div>
-                      )}
+                      {it.category_name && <div style={{ fontSize: 11, color: GOLD, fontWeight: 600, marginTop: 2 }}>{it.category_name}</div>}
+                      {it.description && <div style={{ fontSize: 12, color: TEXT_MD, marginTop: 3, lineHeight: 1.5 }}>{it.description}</div>}
+                      {it.timeline && <div style={{ fontSize: 11, color: GOLD, fontWeight: 600, marginTop: 3 }}>{isZh ? '周期: ' : 'Timeline: '}{it.timeline}</div>}
+                      {it.is_optional && <div style={{ fontSize: 11, color: '#9f7aea', fontWeight: 700, marginTop: 2 }}>{isZh ? '（可选）' : '(Optional)'}</div>}
                     </td>
-                    <td style={{ padding: '13px 8px', textAlign: 'center', color: TEXT_MD, fontWeight: 600 }}>{it.quantity}</td>
-                    <td style={{ padding: '13px 8px', textAlign: 'right', color: TEXT_MD, fontFamily: 'monospace', fontSize: 13 }}>
+                    <td style={{ padding: '11px 4px', textAlign: 'center', color: TEXT_MD, fontWeight: 600, fontSize: 12 }}>{it.quantity}</td>
+                    <td style={{ padding: '11px 4px', textAlign: 'right', color: TEXT_MD, fontFamily: 'monospace', fontSize: 12 }}>
                       {it.one_time_fee > 0 ? fmt(it.one_time_fee, p.currency) : '—'}
                     </td>
-                    <td style={{ padding: '13px 8px', textAlign: 'right', color: TEXT_MD, fontFamily: 'monospace', fontSize: 13 }}>
+                    <td style={{ padding: '11px 4px', textAlign: 'right', color: TEXT_MD, fontFamily: 'monospace', fontSize: 12 }}>
                       {it.monthly_fee > 0 ? fmt(it.monthly_fee, p.currency) : '—'}
                     </td>
-                    <td style={{ padding: '13px 0 13px 8px', textAlign: 'right', fontWeight: 800, color: NAVY, fontFamily: 'monospace', fontSize: 13 }}>
+                    <td style={{ padding: '11px 4px', textAlign: 'right', color: GOLD, fontFamily: 'monospace', fontSize: 12, fontWeight: 700 }}>
+                      {it.annual_fee > 0 ? fmt(it.annual_fee, p.currency) : '—'}
+                    </td>
+                    <td style={{ padding: '11px 0 11px 4px', textAlign: 'right', fontWeight: 800, color: NAVY, fontFamily: 'monospace', fontSize: 13 }}>
                       {subDisplay}
                     </td>
                   </tr>
@@ -1143,38 +1187,47 @@ function BSQuotePreviewPanel(p: PreviewProps) {
             )}
             {p.totals.subtotalMonthly > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', color: TEXT_MD }}>
-                <span>{isZh ? '月服务费小计' : 'Monthly Subtotal'}</span>
+                <span>{isZh ? '月服务费（周期）' : 'Monthly Period Cost'}</span>
                 <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{fmt(p.totals.subtotalMonthly, p.currency)}</span>
               </div>
             )}
             {p.totals.subtotalAnnual > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', color: TEXT_MD }}>
-                <span>{isZh ? '年服务费小计' : 'Annual Subtotal'}</span>
-                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{fmt(p.totals.subtotalAnnual, p.currency)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', color: GOLD }}>
+                <span style={{ fontWeight: 700 }}>{isZh ? '年服务费小计' : 'Annual Fee Subtotal'}</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{fmt(p.totals.subtotalAnnual, p.currency)}</span>
               </div>
             )}
             {p.totals.discountAmount > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', color: '#e53e3e' }}>
-                <span>
-                  {isZh ? '折扣' : 'Discount'}
-                  {p.discountType === 'percent' ? ` (${p.discountValue}%)` : ''}
-                </span>
+                <span>{isZh ? '折扣' : 'Discount'}{p.discountType === 'percent' ? ` (${p.discountValue}%)` : ''}</span>
                 <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>-{fmt(p.totals.discountAmount, p.currency)}</span>
               </div>
             )}
-            {/* Grand total */}
+            {(p.vatRate || 0) > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', color: TEXT_MD }}>
+                <span>{isZh ? `VAT (${((p.vatRate||0)*100).toFixed(0)}%)` : `VAT (${((p.vatRate||0)*100).toFixed(0)}%)`}</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>+{fmt(p.totals.vatAmount, p.currency)}</span>
+              </div>
+            )}
+            {/* First Year Value */}
             <div style={{ marginTop: 10, paddingTop: 12, borderTop: `2px solid ${NAVY}`, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                {isZh ? '总金额' : 'GRAND TOTAL'}
+              <span style={{ fontSize: 13, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {isZh ? '首年合同价值' : 'FIRST YEAR VALUE'}
               </span>
               <span style={{ fontSize: 24, fontWeight: 900, color: NAVY, fontFamily: 'monospace' }}>
-                {fmt(p.totals.grandTotal, p.currency)}
+                {fmt(p.totals.firstYearValue, p.currency)}
               </span>
             </div>
-            {p.totals.subtotalMonthly > 0 && (
+            {p.totals.monthlyRate > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 6, color: LABEL_CLR }}>
                 <span>{isZh ? '每月持续费用' : 'Monthly Recurring'}</span>
-                <span style={{ fontFamily: 'monospace' }}>{fmt(p.totals.subtotalMonthly, p.currency)}/{isZh ? '月' : 'mo'}</span>
+                <span style={{ fontFamily: 'monospace' }}>{fmt(p.totals.monthlyRate, p.currency)}/{isZh ? '月' : 'mo'}</span>
+              </div>
+            )}
+            {p.totals.annualRate > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 4, color: GOLD }}>
+                <span>{isZh ? '每年续费' : 'Annual Recurring'}</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{fmt(p.totals.annualRate, p.currency)}/{isZh ? '年' : 'yr'}</span>
               </div>
             )}
           </div>

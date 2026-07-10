@@ -89,6 +89,8 @@ export interface ServiceCatalogItem {
   updated_at?: string;
 }
 
+export type PeriodicBilling = 'monthly_only' | 'annual_only' | 'both' | 'none' | 'auto';
+
 export interface ServiceQuoteLineItem {
   id: string;
   catalog_service_id?: string;
@@ -104,6 +106,7 @@ export interface ServiceQuoteLineItem {
   months: number;
   billing_type: BillingType;
   billing_label: string;
+  periodic_billing?: PeriodicBilling;
   one_time_fee: number;
   monthly_fee: number;
   annual_fee: number;

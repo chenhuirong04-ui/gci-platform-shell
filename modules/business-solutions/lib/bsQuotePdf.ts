@@ -82,22 +82,33 @@ export async function generateServiceQuotePdf(
     '#',
     t.fields.serviceName,
     isZh ? '说明/范围' : 'Description / Scope',
-    t.fields.billing_type ?? t.billingType.fixed,
+    isZh ? '计费周期' : 'Billing Period',
     t.fields.quantity,
-    isZh ? '单价/月费' : 'Price',
+    t.fields.oneTimeFee ?? (isZh ? '一次性' : 'One-time'),
+    t.fields.monthlyFee ?? (isZh ? '月费' : 'Monthly'),
+    t.fields.annualFee ?? (isZh ? '年服务费' : 'Annual'),
     t.fields.lineTotal,
   ]];
 
   const body = items.map((it, i) => {
     const desc = [it.description, it.scope].filter(Boolean).join('\n');
-    const priceStr = it.monthly_fee > 0 ? fmt(it.monthly_fee, '') + '/mo' : fmt(it.one_time_fee, '');
+    const pb = it.periodic_billing || 'auto';
+    const pbLabel: Record<string, string> = {
+      monthly_only: isZh ? '按月' : 'Monthly',
+      annual_only:  isZh ? '按年' : 'Annual',
+      both:         isZh ? '月+年' : 'Mo+Yr',
+      none:         isZh ? '一次性' : 'One-time',
+      auto:         t.billingType[it.billing_type] || it.billing_type,
+    };
     return [
       String(i + 1),
       it.service_name,
       desc || '—',
-      t.billingType[it.billing_type] || it.billing_type,
-      `${it.quantity} ${it.unit}`,
-      priceStr,
+      pbLabel[pb] || pb,
+      `${it.quantity}`,
+      it.one_time_fee > 0 ? fmt(it.one_time_fee, '') : '—',
+      it.monthly_fee > 0  ? fmt(it.monthly_fee, '')  : '—',
+      it.annual_fee > 0   ? fmt(it.annual_fee, '')   : '—',
       fmt(it.line_total, quote.currency),
     ];
   });
@@ -106,17 +117,19 @@ export async function generateServiceQuotePdf(
     startY: tableStartY,
     head,
     body,
-    headStyles: { fillColor: NAVY, textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
-    bodyStyles: { fontSize: 8, cellPadding: 3 },
+    headStyles: { fillColor: NAVY, textColor: [255, 255, 255], fontSize: 7, fontStyle: 'bold' },
+    bodyStyles: { fontSize: 7, cellPadding: 2.5 },
     alternateRowStyles: { fillColor: [248, 249, 252] },
     columnStyles: {
-      0: { cellWidth: 8 },
-      1: { cellWidth: 35 },
-      2: { cellWidth: 60 },
-      3: { cellWidth: 22 },
-      4: { cellWidth: 16 },
-      5: { cellWidth: 24 },
-      6: { cellWidth: 25 },
+      0: { cellWidth: 7 },
+      1: { cellWidth: 30 },
+      2: { cellWidth: 50 },
+      3: { cellWidth: 16 },
+      4: { cellWidth: 10 },
+      5: { cellWidth: 22 },
+      6: { cellWidth: 22 },
+      7: { cellWidth: 22 },
+      8: { cellWidth: 21 },
     },
     margin: { left: 14, right: 14 },
   });
@@ -133,10 +146,11 @@ export async function generateServiceQuotePdf(
 
   const totalsData: [string, string][] = [];
   if (totals.subtotalOneTime > 0) totalsData.push([t.fields.subtotalOneTime, fmt(totals.subtotalOneTime, cur)]);
-  if (totals.subtotalMonthly > 0) totalsData.push([t.fields.subtotalMonthly, fmt(totals.subtotalMonthly, cur)]);
-  if (totals.subtotalAnnual > 0) totalsData.push([t.fields.subtotalAnnual, fmt(totals.subtotalAnnual, cur)]);
-  if (totals.discountAmount > 0) totalsData.push([t.fields.discount, `-${fmt(totals.discountAmount, cur)}`]);
-  totalsData.push([t.fields.grandTotal, fmt(totals.grandTotal, cur)]);
+  if (totals.subtotalMonthly > 0) totalsData.push([isZh ? '月服务费（周期合计）' : 'Monthly Period Cost', fmt(totals.subtotalMonthly, cur)]);
+  if (totals.subtotalAnnual > 0)  totalsData.push([t.fields.subtotalAnnual, fmt(totals.subtotalAnnual, cur)]);
+  if (totals.discountAmount > 0)  totalsData.push([t.fields.discount, `-${fmt(totals.discountAmount, cur)}`]);
+  if (totals.vatAmount > 0)       totalsData.push([isZh ? 'VAT' : 'VAT', `+${fmt(totals.vatAmount, cur)}`]);
+  totalsData.push([isZh ? '首年合同价值' : 'First Year Contract Value', fmt(totals.firstYearValue, cur)]);
 
   autoTable(doc, {
     startY: afterTable,
