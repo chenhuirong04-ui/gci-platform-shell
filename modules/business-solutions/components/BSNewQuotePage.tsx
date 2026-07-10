@@ -47,8 +47,8 @@ function makeItemFromCatalog(
   return {
     id: uid(),
     catalog_service_id: item.id,
-    category_name: lang === 'zh' ? (cat?.name_cn || '') : (cat?.name_en || ''),
-    service_name: lang === 'zh' ? item.name_cn : item.name_en,
+    category_name: lang === 'zh' ? (cat?.name_cn || '') : (cat?.name_en || cat?.name_cn || ''),
+    service_name: lang === 'zh' ? item.name_cn : (item.name_en || item.name_cn),
     description: lang === 'zh' ? (item.description_zh || '') : (item.description_en || ''),
     scope: lang === 'zh' ? (item.scope_zh || '') : (item.scope_en || ''),
     deliverables: lang === 'zh' ? (item.deliverables_zh || '') : (item.deliverables_en || ''),
@@ -141,7 +141,7 @@ export function BSNewQuotePage({
     if (svcSearch) {
       const q = svcSearch.toLowerCase();
       list = list.filter(i =>
-        (isZh ? i.name_cn : i.name_en).toLowerCase().includes(q) ||
+        (isZh ? i.name_cn : (i.name_en || i.name_cn)).toLowerCase().includes(q) ||
         (isZh ? (i.description_zh || '') : (i.description_en || '')).toLowerCase().includes(q),
       );
     }
@@ -586,7 +586,7 @@ export function BSNewQuotePage({
                   border: activeCatId === cat.id ? 'none' : '1px solid #e5e7eb',
                 }}
               >
-                {isZh ? cat.name_cn : cat.name_en}
+                {isZh ? cat.name_cn : (cat.name_en || cat.name_cn)}
               </button>
             ))}
           </div>
@@ -598,7 +598,7 @@ export function BSNewQuotePage({
                 {isZh ? '暂无服务项目' : 'No services found'}
               </div>
             ) : filteredServices.map(svc => {
-              const name = isZh ? svc.name_cn : svc.name_en;
+              const name = isZh ? svc.name_cn : (svc.name_en || svc.name_cn);
               const fee = svc.one_time_fee
                 ? fmt(svc.one_time_fee, currency)
                 : svc.monthly_fee
