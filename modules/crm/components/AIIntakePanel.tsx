@@ -329,7 +329,8 @@ interface Props {
 export default function AIIntakePanel({ onAdd, isLoading }: Props) {
   const [rawText, setRawText]         = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [isDragging, setIsDragging]   = useState(false);
+  const [isDragging, setIsDragging]         = useState(false);
+  const [isDraggingQuote, setIsDraggingQuote] = useState(false);
   const [showOptional, setShowOptional] = useState(false);
   const [optional, setOptional] = useState({
     clientName: '', countryCity: '', phoneE164: '', whatsapp: '', email: '',
@@ -338,7 +339,8 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
   const [analysing, setAnalysing] = useState(false);
   const [saved, setSaved]       = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef      = useRef<HTMLInputElement>(null);
+  const quoteFileInputRef = useRef<HTMLInputElement>(null);
 
   // quotation state
   const [quoteDraft, setQuoteDraft]     = useState<QuoteDraft | null>(null);
@@ -871,7 +873,11 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
   };
 
   // ── file handling ─────────────────────────────────────────────────
-  const handleFiles = async (files: FileList | File[]) => {
+  // uploadPurpose is the PRIMARY routing signal:
+  //   'followup' = customer chat / attachments → never enters quote flow
+  //   'quote'    = quote documents → always enters quote parsing
+  // File name / textHint are secondary (used inside quote zone for BOQ vs PI etc.)
+  const handleFiles = async (files: FileList | File[], uploadPurpose: 'followup' | 'quote' = 'followup') => {
     const arr = Array.from(files);
     const next: Attachment[] = [];
     for (const f of arr) {
@@ -883,68 +889,92 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
         name: f.name, type: f.type, data: base64,
         size: f.size, uploadedAt: new Date().toISOString(), isAnalyzed: false,
       });
-      // Detect file intent before parsing
-      const intent = detectFileIntent(f.name, f.type, rawText);
+
+      // Zone determines intent first; file name/text only refine within quote zone
+      let intent: FileIntent;
+      if (uploadPurpose === 'followup') {
+        // Follow-up zone: images → chat_screenshot (text extract), others → plain attachment
+        intent = f.type.startsWith('image/') ? 'chat_screenshot' : 'followup_context';
+      } else {
+        // Quote zone: use detectFileIntent, but images can't be chat_screenshot here
+        intent = detectFileIntent(f.name, f.type, rawText);
+        if (intent === 'chat_screenshot') intent = 'customer_quote_record';
+      }
       setDetectedFileType(intent);
-      console.log('[FILE] name:', f.name, '| type:', f.type, '| intent:', intent);
+      console.log('[FILE] zone:', uploadPurpose, '| name:', f.name, '| intent:', intent);
 
-      if (/\.(xlsx|xls|csv)$/i.test(f.name)) {
-        // Excel / CSV → always quote parsing
-        parseExcelFile(f, intent);
-      } else if (f.type === 'application/pdf') {
-        // PDF: try local text extraction first, fallback to Gemini quote OCR
-        setXlsxStatus('parsing');
-        setXlsxMsg('正在提取 PDF 文本内容…');
-        parsePDFText(base64, f.name).then(pdfResult => {
-          if (pdfResult.items.length > 0) {
-            const grandTotal = pdfResult.grandTotal;
-            const clientHint = optional.clientName.trim();
-            setLineItems(pdfResult.items);
-            setShowItems(true);
-            setQuoteDraft({
-              customerName: pdfResult.customerName || clientHint || '待确认',
-              itemSummary:  f.name.replace(/\.\w+$/, ''),
-              grandTotal,
-              quoteDate:    new Date().toISOString().slice(0, 10),
-              quoteType:    'TRADE',
-              source:       'PDF',
-              isReady:      grandTotal != null && !!(pdfResult.customerName || clientHint),
-            });
-            setRegisterQuote(true);
-            setParsedFromFile(true);
-            setXlsxStatus('done');
-            setXlsxMsg(
-              `PDF 已解析 ${pdfResult.items.length} 行产品明细` +
-              (grandTotal ? `，合计 AED ${grandTotal.toLocaleString()}` : '（未检测到总额，请手动填写）')
-            );
-          } else {
-            parseFileWithAI(f.type, base64, f.name);
-          }
-        }).catch(() => parseFileWithAI(f.type, base64, f.name));
-
-      } else if (f.type.startsWith('image/')) {
-        if (intent === 'chat_screenshot') {
-          // Chat screenshot → extract text, feed into analyseInput. No quote parsing.
+      if (uploadPurpose === 'followup') {
+        // Follow-up zone routing
+        if (f.type.startsWith('image/')) {
           extractChatText(f.type, base64, f.name);
         } else {
-          // Explicitly tagged quote image → OCR for structured parsing
-          parseFileWithAI(f.type, base64, f.name);
+          // Non-image in follow-up zone: save as attachment, no parsing
+          setXlsxStatus('done');
+          setXlsxMsg(`${f.name} 已保存为跟进附件`);
         }
       } else {
-        console.warn('[FILE] no parser for:', f.name, f.type);
+        // Quote zone routing
+        if (/\.(xlsx|xls|csv)$/i.test(f.name)) {
+          parseExcelFile(f, intent);
+        } else if (f.type === 'application/pdf') {
+          setXlsxStatus('parsing');
+          setXlsxMsg('正在提取 PDF 文本内容…');
+          parsePDFText(base64, f.name).then(pdfResult => {
+            if (pdfResult.items.length > 0) {
+              const grandTotal = pdfResult.grandTotal;
+              const clientHint = optional.clientName.trim();
+              setLineItems(pdfResult.items);
+              setShowItems(true);
+              setQuoteDraft({
+                customerName: pdfResult.customerName || clientHint || '待确认',
+                itemSummary:  f.name.replace(/\.\w+$/, ''),
+                grandTotal,
+                quoteDate:    new Date().toISOString().slice(0, 10),
+                quoteType:    'TRADE',
+                source:       'PDF',
+                isReady:      grandTotal != null && !!(pdfResult.customerName || clientHint),
+              });
+              setRegisterQuote(true);
+              setParsedFromFile(true);
+              setXlsxStatus('done');
+              setXlsxMsg(
+                `PDF 已解析 ${pdfResult.items.length} 行产品明细` +
+                (grandTotal ? `，合计 AED ${grandTotal.toLocaleString()}` : '（未检测到总额，请手动填写）')
+              );
+            } else {
+              parseFileWithAI(f.type, base64, f.name);
+            }
+          }).catch(() => parseFileWithAI(f.type, base64, f.name));
+        } else if (f.type.startsWith('image/')) {
+          // Image in quote zone → structured OCR (not text extraction)
+          parseFileWithAI(f.type, base64, f.name);
+        } else {
+          setXlsxStatus('done');
+          setXlsxMsg(`${f.name} 已保存为报价附件`);
+        }
       }
     }
     setAttachments(p => [...p, ...next]);
   };
 
+  // Drag handlers — separate per zone
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault(); e.stopPropagation();
     setIsDragging(e.type === 'dragenter' || e.type === 'dragover');
   };
+  const handleDragQuote = (e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    setIsDraggingQuote(e.type === 'dragenter' || e.type === 'dragover');
+  };
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault(); e.stopPropagation(); setIsDragging(false);
-    if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+    if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files, 'followup');
   };
+  const onDropQuote = (e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation(); setIsDraggingQuote(false);
+    if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files, 'quote');
+  };
+  // Paste always goes to follow-up zone (most natural for screenshots)
   const handlePasteOnArea = (e: React.ClipboardEvent) => {
     const files: File[] = [];
     for (let i = 0; i < e.clipboardData.items.length; i++) {
@@ -952,7 +982,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
         const f = e.clipboardData.items[i].getAsFile(); if (f) files.push(f);
       }
     }
-    if (files.length) handleFiles(files);
+    if (files.length) handleFiles(files, 'followup');
   };
 
   // ── analyse ───────────────────────────────────────────────────────
@@ -1342,30 +1372,57 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
           onBlur={e => (e.target.style.borderColor = BORDER)}
         />
 
-        {/* File upload zone */}
-        <div
-          tabIndex={0}
-          onDragEnter={handleDrag} onDragOver={handleDrag}
-          onDragLeave={handleDrag} onDrop={onDrop}
-          onPaste={handlePasteOnArea}
-          onClick={() => !draft && fileInputRef.current?.click()}
-          className="relative rounded-xl px-5 py-4 flex items-center gap-3 transition-all cursor-pointer select-none"
-          style={{
-            border: `2px dashed ${isDragging ? GOLD : BORDER}`,
-            background: isDragging ? 'rgba(184,150,12,0.06)' : CARD2,
-            opacity: draft ? 0.5 : 1,
-            pointerEvents: draft ? 'none' : 'auto',
-          }}
-        >
-          <input ref={fileInputRef} type="file" multiple className="hidden"
-            accept="image/*,application/pdf,.xls,.xlsx,.doc,.docx,.txt"
-            onChange={e => e.target.files && handleFiles(e.target.files)} />
-          <UploadCloud className="w-5 h-5 shrink-0" style={{ color: isDragging ? GOLD_L : T3 }} />
-          <div>
-            <p className="text-sm font-bold" style={{ color: T2 }}>
-              拖拽截图 / 文件，或点击上传，或 Ctrl+V 粘贴图片
-            </p>
-            <p className="text-xs mt-0.5" style={{ color: T3 }}>支持图片、PDF、Word、Excel、TXT</p>
+        {/* Two-zone file upload */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Zone 1: Follow-up / Chat (images → chat_screenshot, others → plain attachment) */}
+          <div
+            tabIndex={0}
+            onDragEnter={handleDrag} onDragOver={handleDrag}
+            onDragLeave={handleDrag} onDrop={onDrop}
+            onPaste={handlePasteOnArea}
+            onClick={() => !draft && fileInputRef.current?.click()}
+            className="relative rounded-xl px-4 py-3 flex flex-col items-center gap-2 transition-all cursor-pointer select-none"
+            style={{
+              border: `2px dashed ${isDragging ? GOLD : BORDER}`,
+              background: isDragging ? 'rgba(184,150,12,0.06)' : CARD2,
+              opacity: draft ? 0.5 : 1,
+              pointerEvents: draft ? 'none' : 'auto',
+            }}
+          >
+            <input ref={fileInputRef} type="file" multiple className="hidden"
+              accept="image/*,.pdf,.doc,.docx,.txt"
+              onChange={e => e.target.files && handleFiles(e.target.files, 'followup')} />
+            <UploadCloud className="w-5 h-5 shrink-0" style={{ color: isDragging ? GOLD_L : T3 }} />
+            <div className="text-center">
+              <p className="text-xs font-bold" style={{ color: T2 }}>💬 客户资料 / 聊天截图</p>
+              <p className="text-xs mt-0.5" style={{ color: T3 }}>截图 · 聊天记录 · 客户附件</p>
+              <p className="text-xs" style={{ color: T3 }}>Ctrl+V 粘贴截图</p>
+            </div>
+          </div>
+
+          {/* Zone 2: Quote files (PDF/Excel/image → quote parsing) */}
+          <div
+            tabIndex={0}
+            onDragEnter={handleDragQuote} onDragOver={handleDragQuote}
+            onDragLeave={handleDragQuote} onDrop={onDropQuote}
+            onClick={() => !draft && quoteFileInputRef.current?.click()}
+            className="relative rounded-xl px-4 py-3 flex flex-col items-center gap-2 transition-all cursor-pointer select-none"
+            style={{
+              border: `2px dashed ${isDraggingQuote ? GOLD : BORDER}`,
+              background: isDraggingQuote ? 'rgba(184,150,12,0.06)' : CARD2,
+              opacity: draft ? 0.5 : 1,
+              pointerEvents: draft ? 'none' : 'auto',
+            }}
+          >
+            <input ref={quoteFileInputRef} type="file" multiple className="hidden"
+              accept="image/*,application/pdf,.xls,.xlsx,.csv"
+              onChange={e => e.target.files && handleFiles(e.target.files, 'quote')} />
+            <FileText className="w-5 h-5 shrink-0" style={{ color: isDraggingQuote ? GOLD_L : T3 }} />
+            <div className="text-center">
+              <p className="text-xs font-bold" style={{ color: T2 }}>📋 报价文件 / 价格资料</p>
+              <p className="text-xs mt-0.5" style={{ color: T3 }}>Quotation · PI · BOQ · Excel</p>
+              <p className="text-xs" style={{ color: T3 }}>PDF · 图片报价单</p>
+            </div>
           </div>
         </div>
 
