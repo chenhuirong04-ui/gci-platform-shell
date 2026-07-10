@@ -576,7 +576,7 @@ export function BSNewQuotePage({
           {/* Search */}
           <input
             className="w-full px-3 py-2 rounded-xl border text-sm outline-none mb-3"
-            style={{ borderColor: `${GOLD}30` }}
+            style={{ borderColor: '#cbd5e1' }}
             placeholder={isZh ? '搜索服务项目…' : 'Search services…'}
             value={svcSearch}
             onChange={e => setSvcSearch(e.target.value)}
@@ -702,44 +702,44 @@ export function BSNewQuotePage({
                     <div className="px-3 pb-3 pt-1 space-y-2.5 border-t border-gray-100 bg-gray-50">
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '服务名称' : 'Service Name'}</label>
-                          <input className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none bg-white" style={{ borderColor: `${GOLD}30` }}
+                          <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '服务名称' : 'Service Name'}</label>
+                          <input className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none bg-white" style={{ borderColor: '#cbd5e1' }}
                             value={it.service_name} onChange={e => updateItem(it.id, { service_name: e.target.value })} />
                         </div>
                         <div>
-                          <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '服务分类' : 'Category'}</label>
-                          <input className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none bg-white" style={{ borderColor: `${GOLD}30` }}
+                          <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '服务分类' : 'Category'}</label>
+                          <input className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none bg-white" style={{ borderColor: '#cbd5e1' }}
                             value={it.category_name} onChange={e => updateItem(it.id, { category_name: e.target.value })} />
                         </div>
                       </div>
                       <div>
-                        <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '服务说明' : 'Description'}</label>
-                        <textarea className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none resize-none bg-white" style={{ borderColor: `${GOLD}30` }}
+                        <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '服务说明' : 'Description'}</label>
+                        <textarea className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none resize-none bg-white" style={{ borderColor: '#cbd5e1' }}
                           rows={2} value={it.description} onChange={e => updateItem(it.id, { description: e.target.value })} />
                       </div>
                       <div>
-                        <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '服务范围' : 'Scope of Work'}</label>
-                        <textarea className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none resize-none bg-white" style={{ borderColor: `${GOLD}30` }}
+                        <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '服务范围' : 'Scope of Work'}</label>
+                        <textarea className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none resize-none bg-white" style={{ borderColor: '#cbd5e1' }}
                           rows={2} value={it.scope} onChange={e => updateItem(it.id, { scope: e.target.value })} />
                       </div>
                       <div>
-                        <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '交付内容' : 'Deliverables'}</label>
-                        <textarea className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none resize-none bg-white" style={{ borderColor: `${GOLD}30` }}
+                        <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '交付内容' : 'Deliverables'}</label>
+                        <textarea className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none resize-none bg-white" style={{ borderColor: '#cbd5e1' }}
                           rows={2} value={it.deliverables} onChange={e => updateItem(it.id, { deliverables: e.target.value })} />
                       </div>
                       <div>
-                        <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '不包含事项' : 'Exclusions'}</label>
-                        <textarea className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none resize-none bg-white" style={{ borderColor: `${GOLD}30` }}
+                        <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '不包含事项' : 'Exclusions'}</label>
+                        <textarea className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none resize-none bg-white" style={{ borderColor: '#cbd5e1' }}
                           rows={1} value={it.item_exclusions} onChange={e => updateItem(it.id, { item_exclusions: e.target.value })} />
                       </div>
                       {/* Periodic billing mode */}
                       <div>
-                        <label className="text-[9px] text-gray-400 font-black uppercase block mb-1" style={{ color: GOLD }}>
+                        <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide" style={{ color: GOLD }}>
                           {isZh ? '周期收费方式' : 'Billing Period Mode'}
                         </label>
                         <select
-                          className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none bg-white"
-                          style={{ borderColor: `${GOLD}50`, color: NAVY, fontWeight: 600 }}
+                          className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none bg-white"
+                          style={{ borderColor: '#cbd5e1', color: NAVY, fontWeight: 600 }}
                           value={it.periodic_billing || 'auto'}
                           onChange={e => updateItem(it.id, { periodic_billing: e.target.value as PeriodicBilling })}
                         >
@@ -754,40 +754,40 @@ export function BSNewQuotePage({
                       {/* Three fee inputs */}
                       <div className="grid grid-cols-3 gap-2">
                         <div>
-                          <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '一次性费用' : 'One-time Fee'}</label>
-                          <input type="number" className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none text-right bg-white" style={{ borderColor: `${GOLD}40`, color: '#17233C' }}
+                          <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '一次性费用' : 'One-time Fee'}</label>
+                          <input type="number" className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none text-right bg-white" style={{ borderColor: '#cbd5e1', color: '#17233C' }}
                             value={it.one_time_fee || ''} placeholder="0"
                             onChange={e => updateItem(it.id, { one_time_fee: parseFloat(e.target.value) || 0 })} />
                         </div>
                         <div>
-                          <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '月服务费' : 'Monthly Fee'}</label>
-                          <input type="number" className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none text-right bg-white" style={{ borderColor: `${GOLD}40`, color: '#17233C' }}
+                          <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '月服务费' : 'Monthly Fee'}</label>
+                          <input type="number" className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none text-right bg-white" style={{ borderColor: '#cbd5e1', color: '#17233C' }}
                             value={it.monthly_fee || ''} placeholder="0"
                             onChange={e => updateItem(it.id, { monthly_fee: parseFloat(e.target.value) || 0 })} />
                         </div>
                         <div>
-                          <label className="text-[9px] font-black uppercase block mb-1" style={{ color: GOLD }}>
+                          <label className="text-[12px] font-semibold uppercase block mb-1.5 tracking-wide" style={{ color: GOLD }}>
                             {isZh ? '年服务费' : 'Annual Fee'}
                           </label>
-                          <input type="number" className="w-full px-2 py-1.5 rounded-lg border-2 text-sm outline-none text-right bg-white" style={{ borderColor: GOLD, color: '#17233C', fontWeight: 600 }}
+                          <input type="number" className="w-full px-3 py-[10px] rounded-lg border-2 text-[15px] text-[#0f172a] outline-none text-right bg-white" style={{ borderColor: GOLD, color: '#17233C', fontWeight: 600 }}
                             value={it.annual_fee || ''} placeholder="0"
                             onChange={e => updateItem(it.id, { annual_fee: parseFloat(e.target.value) || 0 })} />
                         </div>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
                         <div>
-                          <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '数量' : 'Qty'}</label>
-                          <input type="number" min="1" className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none text-center bg-white" style={{ borderColor: `${GOLD}40` }}
+                          <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '数量' : 'Qty'}</label>
+                          <input type="number" min="1" className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none text-center bg-white" style={{ borderColor: '#cbd5e1' }}
                             value={it.quantity} onChange={e => updateItem(it.id, { quantity: parseInt(e.target.value) || 1 })} />
                         </div>
                         <div>
-                          <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '月数' : 'Months'}</label>
-                          <input type="number" min="1" className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none text-center bg-white" style={{ borderColor: `${GOLD}40` }}
+                          <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '月数' : 'Months'}</label>
+                          <input type="number" min="1" className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none text-center bg-white" style={{ borderColor: '#cbd5e1' }}
                             value={it.months} onChange={e => updateItem(it.id, { months: parseInt(e.target.value) || 1 })} />
                         </div>
                         <div>
-                          <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '交付周期' : 'Timeline'}</label>
-                          <input className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none bg-white" style={{ borderColor: `${GOLD}40` }}
+                          <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '交付周期' : 'Timeline'}</label>
+                          <input className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none bg-white" style={{ borderColor: '#cbd5e1' }}
                             value={it.timeline} placeholder={isZh ? '如: 2-4周' : 'e.g. 2-4 wks'}
                             onChange={e => updateItem(it.id, { timeline: e.target.value })} />
                         </div>
@@ -827,7 +827,7 @@ export function BSNewQuotePage({
               <div className="flex items-center gap-2 pt-1 pb-1">
                 <select
                   className="border rounded-lg px-2 py-1 text-xs outline-none"
-                  style={{ borderColor: `${GOLD}40` }}
+                  style={{ borderColor: '#cbd5e1' }}
                   value={discountType}
                   onChange={e => setDiscountType(e.target.value as any)}
                 >
@@ -839,7 +839,7 @@ export function BSNewQuotePage({
                   <input
                     type="number"
                     className="flex-1 border rounded-lg px-2 py-1 text-xs outline-none text-right"
-                    style={{ borderColor: `${GOLD}40` }}
+                    style={{ borderColor: '#cbd5e1' }}
                     value={discountValue || ''}
                     onChange={e => setDiscountValue(parseFloat(e.target.value) || 0)}
                     placeholder={discountType === 'percent' ? '%' : currency}
@@ -858,7 +858,7 @@ export function BSNewQuotePage({
                 <input
                   type="number" min="0" max="100" step="1"
                   className="w-20 border rounded-lg px-2 py-1 text-xs outline-none text-right"
-                  style={{ borderColor: `${GOLD}40` }}
+                  style={{ borderColor: '#cbd5e1' }}
                   value={vatRate > 0 ? vatRate * 100 : ''}
                   placeholder="0"
                   onChange={e => setVatRate((parseFloat(e.target.value) || 0) / 100)}
@@ -878,13 +878,13 @@ export function BSNewQuotePage({
 
             {/* Commercial terms */}
             <div className="mt-5 pt-4 border-t border-gray-100 space-y-3">
-              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+              <p className="text-[12px] font-bold uppercase tracking-widest text-[#334155]">
                 {isZh ? '商务条款' : 'Commercial Terms'}
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '币种' : 'Currency'}</label>
-                  <select className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none" style={{ borderColor: `${GOLD}30` }}
+                  <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '币种' : 'Currency'}</label>
+                  <select className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none bg-white" style={{ borderColor: '#cbd5e1' }}
                     value={currency} onChange={e => setCurrency(e.target.value)}>
                     <option value="AED">AED</option>
                     <option value="USD">USD</option>
@@ -892,31 +892,31 @@ export function BSNewQuotePage({
                   </select>
                 </div>
                 <div>
-                  <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '有效期至' : 'Valid Until'}</label>
-                  <input type="date" className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none" style={{ borderColor: `${GOLD}30` }}
+                  <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '有效期至' : 'Valid Until'}</label>
+                  <input type="date" className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none bg-white" style={{ borderColor: '#cbd5e1' }}
                     value={validUntil} onChange={e => setValidUntil(e.target.value)} />
                 </div>
               </div>
               <div>
-                <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '付款方式' : 'Payment Terms'}</label>
-                <input className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none" style={{ borderColor: `${GOLD}30` }}
+                <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '付款方式' : 'Payment Terms'}</label>
+                <input className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none bg-white" style={{ borderColor: '#cbd5e1' }}
                   value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)}
                   placeholder={isZh ? '如: 50% 预付，完成后付 50%' : 'e.g. 50% upfront, 50% on completion'} />
               </div>
               <div>
-                <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '项目总周期' : 'Project Timeline'}</label>
-                <input className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none" style={{ borderColor: `${GOLD}30` }}
+                <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '项目总周期' : 'Project Timeline'}</label>
+                <input className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none bg-white" style={{ borderColor: '#cbd5e1' }}
                   value={deliveryPeriod} onChange={e => setDeliveryPeriod(e.target.value)}
                   placeholder={isZh ? '如: 60 个工作日' : 'e.g. 60 business days'} />
               </div>
               <div>
-                <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '总体不包含事项' : 'Exclusions'}</label>
-                <textarea className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none resize-none" style={{ borderColor: `${GOLD}30` }}
+                <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '总体不包含事项' : 'Exclusions'}</label>
+                <textarea className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none resize-none bg-white" style={{ borderColor: '#cbd5e1' }}
                   rows={2} value={quoteExclusions} onChange={e => setQuoteExclusions(e.target.value)} />
               </div>
               <div>
-                <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '总体备注' : 'Notes'}</label>
-                <textarea className="w-full px-2 py-1.5 rounded-lg border text-sm outline-none resize-none" style={{ borderColor: `${GOLD}30` }}
+                <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '总体备注' : 'Notes'}</label>
+                <textarea className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none resize-none bg-white" style={{ borderColor: '#cbd5e1' }}
                   rows={2} value={quoteNotes} onChange={e => setQuoteNotes(e.target.value)} />
               </div>
             </div>
@@ -930,10 +930,10 @@ export function BSNewQuotePage({
           </label>
           <div className="space-y-3">
             <div>
-              <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '报价标题' : 'Quote Title'}</label>
+              <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '报价标题' : 'Quote Title'}</label>
               <input
-                className="w-full px-3 py-2.5 rounded-xl border text-sm outline-none"
-                style={{ borderColor: `${GOLD}30` }}
+                className="w-full px-3 py-[11px] rounded-xl border text-[15px] text-[#0f172a] outline-none bg-white"
+                style={{ borderColor: '#cbd5e1' }}
                 value={quoteTitle}
                 onChange={e => setQuoteTitle(e.target.value)}
                 placeholder={selectedCustomer
@@ -942,10 +942,10 @@ export function BSNewQuotePage({
               />
             </div>
             <div>
-              <label className="text-[9px] text-gray-400 font-black uppercase block mb-1">{isZh ? '负责人' : 'Owner'}</label>
+              <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '负责人' : 'Owner'}</label>
               <input
-                className="w-full px-3 py-2.5 rounded-xl border text-sm outline-none"
-                style={{ borderColor: `${GOLD}30` }}
+                className="w-full px-3 py-[11px] rounded-xl border text-[15px] text-[#0f172a] outline-none bg-white"
+                style={{ borderColor: '#cbd5e1' }}
                 value={owner}
                 onChange={e => setOwner(e.target.value)}
                 placeholder="Chris / Lili / Novie"

@@ -41,7 +41,7 @@ export function ServiceCatalogManager({ lang, categories, items, loading, onSave
 
   const shownItems = activeOnly ? items.filter(it => it.active !== false) : items;
 
-  const inp = 'border border-gray-200 rounded px-2 py-1.5 text-sm w-full focus:outline-none focus:border-blue-400';
+  const inp = 'border border-[#cbd5e1] rounded-lg px-3 py-[10px] text-[15px] text-[#0f172a] w-full focus:outline-none focus:border-[#C9A84C] bg-white';
 
   const handleSaveItem = async () => {
     if (!editItem?.name_cn && !editItem?.name_en) return;
@@ -149,52 +149,52 @@ export function ServiceCatalogManager({ lang, categories, items, loading, onSave
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <div className="text-xs text-gray-400 mb-1">中文名称 *</div>
+                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">中文名称 *</div>
                 <input className={inp} value={editItem.name_cn || ''} onChange={e => setEditItem(v => ({ ...v!, name_cn: e.target.value }))} />
               </div>
               <div>
-                <div className="text-xs text-gray-400 mb-1">English Name *</div>
+                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">English Name *</div>
                 <input className={inp} value={editItem.name_en || ''} onChange={e => setEditItem(v => ({ ...v!, name_en: e.target.value }))} />
               </div>
             </div>
 
             <div>
-              <div className="text-xs text-gray-400 mb-1">{t.fields.description} (中文)</div>
+              <div className="text-[13px] text-[#334155] font-semibold mb-1.5">{t.fields.description} (中文)</div>
               <textarea className={inp + ' resize-none'} rows={2} value={editItem.description_zh || ''} onChange={e => setEditItem(v => ({ ...v!, description_zh: e.target.value }))} />
             </div>
             <div>
-              <div className="text-xs text-gray-400 mb-1">{t.fields.description} (EN)</div>
+              <div className="text-[13px] text-[#334155] font-semibold mb-1.5">{t.fields.description} (EN)</div>
               <textarea className={inp + ' resize-none'} rows={2} value={editItem.description_en || ''} onChange={e => setEditItem(v => ({ ...v!, description_en: e.target.value }))} />
             </div>
 
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <div className="text-xs text-gray-400 mb-1">{t.fields.oneTimeFee}</div>
+                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">{t.fields.oneTimeFee}</div>
                 <input className={inp} type="number" min={0} value={editItem.one_time_fee || ''} onChange={e => setEditItem(v => ({ ...v!, one_time_fee: Number(e.target.value) }))} />
               </div>
               <div>
-                <div className="text-xs text-gray-400 mb-1">{t.fields.monthlyFee}</div>
+                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">{t.fields.monthlyFee}</div>
                 <input className={inp} type="number" min={0} value={editItem.monthly_fee || ''} onChange={e => setEditItem(v => ({ ...v!, monthly_fee: Number(e.target.value) }))} />
               </div>
               <div>
-                <div className="text-xs text-gray-400 mb-1">{t.fields.annualFee}</div>
+                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">{t.fields.annualFee}</div>
                 <input className={inp} type="number" min={0} value={editItem.annual_fee || ''} onChange={e => setEditItem(v => ({ ...v!, annual_fee: Number(e.target.value) }))} />
               </div>
             </div>
 
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <div className="text-xs text-gray-400 mb-1">Billing Type</div>
+                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">Billing Type</div>
                 <select className={inp} value={editItem.default_billing_type || 'fixed'} onChange={e => setEditItem(v => ({ ...v!, default_billing_type: e.target.value as BillingType }))}>
                   {BILLING_TYPES.map(bt => <option key={bt} value={bt}>{t.billingType[bt]}</option>)}
                 </select>
               </div>
               <div>
-                <div className="text-xs text-gray-400 mb-1">{t.fields.unit}</div>
+                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">{t.fields.unit}</div>
                 <input className={inp} value={editItem.default_unit || ''} onChange={e => setEditItem(v => ({ ...v!, default_unit: e.target.value }))} />
               </div>
               <div>
-                <div className="text-xs text-gray-400 mb-1">Category</div>
+                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">Category</div>
                 <select className={inp} value={editItem.category_id || ''} onChange={e => setEditItem(v => ({ ...v!, category_id: e.target.value }))}>
                   {categories.map(c => <option key={c.id} value={c.id!}>{isZh ? c.name_cn : c.name_en}</option>)}
                 </select>

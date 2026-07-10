@@ -39,9 +39,9 @@ export function ServiceCustomerForm({ lang, initial, onSave, onCancel }: Props) 
     try { await onSave(form); } finally { setSaving(false); }
   };
 
-  const inp = 'w-full border border-gray-200 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-400';
+  const inp = 'w-full border border-[#cbd5e1] rounded-lg px-3 py-[11px] text-[15px] text-[#0f172a] bg-white focus:outline-none focus:border-[#C9A84C]';
   const sel = inp + ' cursor-pointer';
-  const label = 'block text-xs text-gray-500 mb-1 font-medium';
+  const label = 'block text-[13px] text-[#334155] mb-1.5 font-semibold';
   const row = 'grid grid-cols-2 gap-3';
 
   return (

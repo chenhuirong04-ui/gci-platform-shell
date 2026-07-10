@@ -107,8 +107,8 @@ export function ServiceQuoteBuilder({ lang, customers, categories, catalogItems,
     try { await onSave(finalQuote, items); } finally { setSaving(false); }
   };
 
-  const inp = 'border border-gray-200 rounded px-2 py-1.5 text-sm w-full focus:outline-none focus:border-blue-400';
-  const label = 'text-xs text-gray-400 mb-1 block';
+  const inp = 'border border-[#cbd5e1] rounded-lg px-3 py-[10px] text-[15px] text-[#0f172a] w-full focus:outline-none focus:border-[#C9A84C] bg-white';
+  const label = 'text-[13px] text-[#334155] font-semibold mb-1.5 block';
 
   // Step 1: Select customer
   if (step === 1) {
