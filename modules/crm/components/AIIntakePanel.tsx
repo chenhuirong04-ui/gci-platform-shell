@@ -226,9 +226,12 @@ function detectFileIntent(fileName: string, textHint: string): FileIntent {
   if (/\bboq\b|bill.?of.?quantity|material.?list|materials|工程清单/i.test(name))
     return 'boq';
 
-  // 5. Inquiry / customer product list
+  // 5. Inquiry / customer product list / generic quotation file
   if (/inquiry|询价|product.?list|清单|catalogue|catalog/i.test(name))
     return 'customer_inquiry';
+  // "quotation" in file name = some kind of quote document → treat as customer record
+  if (/\bquotation\b|\bquote\b|报价单/i.test(name))
+    return 'customer_quote_record';
 
   return 'followup_context';
 }
@@ -695,11 +698,22 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
         else if (xlsxStatus === 'warn' || xlsxStatus === 'done') result.nextAction = '整理报价文件并跟进';
       }
 
-      // detect quotation alongside followup — preserve Excel-parsed quoteDraft
-      // customer_quote_record: do NOT trigger registerQuote (it's a record, not a new quote to generate)
+      // detect quotation alongside followup — preserve Excel/OCR-parsed quoteDraft
       if (finalIntent === 'customer_quote_record') {
-        // Keep any parsed line items for record keeping, but don't register as new quote
-        setRegisterQuote(false);
+        // File was already parsed (Excel/OCR) — respect the parsed quoteDraft & lineItems.
+        // Only auto-enable registerQuote when parsing actually found a grandTotal.
+        // Save path (isCrmRecord) routes to Drive + Supabase, NOT startQuoteFlow.
+        if (parsedFromFile && quoteDraft?.grandTotal != null) {
+          setRegisterQuote(true);
+        } else {
+          // Parsing didn't find amount — let user decide by checking the checkbox manually
+          // (don't force false so the checkbox state from parseExcelFile is preserved)
+        }
+        // Update customerName from optional field if filled
+        const cn = optional.clientName.trim() || result.clientName;
+        if (cn && cn !== '待确认') {
+          setQuoteDraft(p => p ? { ...p, customerName: cn, isReady: p.grandTotal != null } : null);
+        }
       } else if (!parsedFromFile) {
         const clientHint = optional.clientName.trim() || result.clientName;
         const qd = detectQuotation(text, clientHint);

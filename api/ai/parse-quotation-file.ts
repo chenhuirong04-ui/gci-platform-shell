@@ -1,6 +1,6 @@
 // /api/ai/parse-quotation-file
 // POST { mimeType: string, data: string (base64 or dataURL), fileName?: string }
-// Sends PDF / image to Gemini 2.5 Flash (server-side only — key never exposed to browser).
+// Sends PDF / image to Gemini (server-side only — key never exposed to browser).
 // Returns parsed quotation items in a format ready for AIIntakePanel lineItems[].
 export const config = { runtime: 'edge' };
 
@@ -49,6 +49,13 @@ Rules:
 - If a numeric value cannot be read, use null — never guess.
 - confidence: "high" if all key columns (name, qty, price) are clearly visible; "low" if many values unclear.`;
 
+// Models tried in order. gemini-2.0-flash is more widely available than 2.5-flash.
+const GEMINI_MODELS = [
+  'gemini-2.0-flash',
+  'gemini-2.5-flash',
+  'gemini-1.5-flash',
+];
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'POST') return json({ ok: false, error: 'Method not allowed' }, 405);
@@ -78,36 +85,51 @@ export default async function handler(request: Request): Promise<Response> {
   // Strip data URL prefix (data:image/jpeg;base64,<actual_base64>)
   const base64 = typeof data === 'string' && data.includes(',') ? data.split(',')[1] : data;
 
-  try {
-    const geminiUrl =
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const geminiBody = JSON.stringify({
+    contents: [{
+      parts: [
+        { text: PARSE_PROMPT + (fileName ? `\n\nDocument file name: ${fileName}` : '') },
+        { inlineData: { mimeType, data: base64 } },
+      ],
+    }],
+    generationConfig: {
+      temperature: 0.1,
+      responseMimeType: 'application/json',
+    },
+  });
 
-    const geminiRes = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            {
-              text: PARSE_PROMPT +
-                (fileName ? `\n\nDocument file name: ${fileName}` : ''),
-            },
-            {
-              inlineData: { mimeType, data: base64 },
-            },
-          ],
-        }],
-        generationConfig: {
-          temperature: 0.1,
-          responseMimeType: 'application/json',
-        },
-      }),
-    });
+  try {
+    // Try each model until one works (404 = model not available on this key)
+    let geminiRes: Response | null = null;
+    let triedModels: string[] = [];
+
+    for (const model of GEMINI_MODELS) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: geminiBody,
+      });
+      triedModels.push(model);
+      if (res.ok || res.status !== 404) {
+        geminiRes = res;
+        break;
+      }
+      console.warn(`[parse-quotation-file] ${model} → 404, trying next model...`);
+    }
+
+    if (!geminiRes) {
+      return json({
+        ok: false,
+        visionUnavailable: true,
+        error: '文件已保留为附件，但暂时无法自动识别明细。你仍可继续保存客户和跟进记录。',
+        detail: `All models returned 404: ${triedModels.join(', ')}`,
+      });
+    }
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text().catch(() => '');
-      // Any non-2xx from Gemini (404 = model/key issue, 5xx = overload, 429 = quota)
-      // is treated as service unavailable — never block the CRM save flow.
+      // Any non-2xx from Gemini is treated as service unavailable — never block the CRM save flow.
       return json({
         ok: false,
         visionUnavailable: true,
