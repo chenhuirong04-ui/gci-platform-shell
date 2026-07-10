@@ -11,6 +11,7 @@ export interface ModuleDef {
     | 'supplierQuote'
     | 'packageQuote'
     | 'serviceQuote'
+    | 'businessSolutions'
     | 'quoteHistory'
     | 'inventory'
     | 'consignment'
@@ -62,6 +63,7 @@ export const sections: SectionDef[] = [
       { code: 'SQ', nameKey: 'supplierQuote', path: '/quotation?mode=supplier-quote' },
       { code: 'PK', nameKey: 'packageQuote', path: '/quotation?mode=package-quote' },
       { code: 'SV', nameKey: 'serviceQuote', path: '/quotation?mode=service-quote' },
+      { code: 'BS', nameKey: 'businessSolutions', path: '/business-solutions' },
       { code: 'QH', nameKey: 'quoteHistory', path: '/trade?tab=history' },
       { code: 'IV', nameKey: 'inventory', count: '2', badgeColor: '#D0906A', badgeBg: 'rgba(224,132,106,0.14)', path: '/trade?tab=inventory' },
       { code: 'CS', nameKey: 'consignment', path: '/trade?tab=consignment' },

@@ -13,6 +13,7 @@ import { InvoicePage } from './pages/InvoicePage';
 import TradeModule from '../../../modules/trade/TradeModule';
 import CrmModule from '../../../modules/crm/CrmModule';
 import QuotationModule from '../../../modules/quotation/QuotationModule';
+import { BusinessSolutionsModule } from '../../../modules/business-solutions/BusinessSolutionsModule';
 
 // ── Inner shell (requires auth context already mounted) ──────────────────────
 function Shell() {
@@ -139,6 +140,14 @@ function Shell() {
             element={
               <ProtectedRoute module="quotation">
                 <QuotationModule initialMode={searchParams.get('mode') as any} initialView={searchParams.get('view') as any} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/business-solutions/*"
+            element={
+              <ProtectedRoute module={['quotation', 'crm']}>
+                <BusinessSolutionsModule lang={lang as any} />
               </ProtectedRoute>
             }
           />

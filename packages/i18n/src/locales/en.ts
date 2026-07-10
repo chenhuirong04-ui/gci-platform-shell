@@ -16,6 +16,7 @@ export const en = {
     supplierQuote: 'Supplier Quote',
     packageQuote: 'Package Quote',
     serviceQuote: 'Service Quote',
+    businessSolutions: 'Business Solutions',
     quoteHistory: 'Quote History',
     inventory: 'Inventory',
     consignment: 'Consignment',

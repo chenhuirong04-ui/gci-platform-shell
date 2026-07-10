@@ -18,6 +18,7 @@ export const zh: typeof en = {
     supplierQuote: '供应商报价',
     packageQuote: '套餐报价',
     serviceQuote: '服务报价',
+    businessSolutions: '企业解决方案',
     quoteHistory: '报价历史',
     inventory: '库存',
     consignment: '寄售',
