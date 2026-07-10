@@ -236,7 +236,7 @@ export function BSNewQuotePage({
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex gap-6 p-6 w-full" style={{ minHeight: 'calc(100vh - 140px)' }}>
+    <div className="flex gap-6 p-6 w-full" style={{ minHeight: 'calc(100vh - 140px)', background: '#f5f3ef' }}>
 
       {/* ═══ LEFT SIDE 45% ═══════════════════════════════════════════════════ */}
       <div
@@ -245,7 +245,7 @@ export function BSNewQuotePage({
       >
 
         {/* ── Card 1: Customer Selection ──────────────────────────────────── */}
-        <div className="bg-white p-7 rounded-[28px] shadow-sm" style={{ border: `1px solid ${GOLD}33` }}>
+        <div className="bg-white p-7 rounded-[24px] shadow-sm" style={{ border: `1px solid #e8e0d0` }}>
           <div className="flex items-center justify-between mb-4">
             <label className="text-[10px] font-black uppercase tracking-widest" style={{ color: GOLD }}>
               {isZh ? '1. 选择服务客户' : '1. Customer Selection'}
@@ -389,7 +389,7 @@ export function BSNewQuotePage({
         </div>
 
         {/* ── Card 2: Service Selection ───────────────────────────────────── */}
-        <div className="bg-white p-7 rounded-[28px] shadow-sm" style={{ border: `1px solid ${GOLD}33` }}>
+        <div className="bg-white p-7 rounded-[24px] shadow-sm" style={{ border: '1px solid #e8e0d0' }}>
           <label className="text-[10px] font-black uppercase tracking-widest block mb-4" style={{ color: GOLD }}>
             {isZh ? '2. 选择服务' : '2. Service Selection'}
           </label>
@@ -484,7 +484,7 @@ export function BSNewQuotePage({
 
         {/* ── Card 3: Quote Items + Terms ─────────────────────────────────── */}
         {items.length > 0 && (
-          <div className="bg-white p-7 rounded-[28px] shadow-sm" style={{ border: `2px solid ${GOLD}40` }}>
+          <div className="bg-white p-7 rounded-[24px] shadow-sm" style={{ border: `1px solid ${GOLD}50` }}>
             <label className="text-[10px] font-black uppercase tracking-widest block mb-4" style={{ color: GOLD }}>
               {isZh ? '3. 报价明细与商务条款' : '3. Quotation Details & Commercial Terms'}
             </label>
@@ -705,7 +705,7 @@ export function BSNewQuotePage({
         )}
 
         {/* ── Card 4: Save ────────────────────────────────────────────────── */}
-        <div className="bg-white p-7 rounded-[28px] shadow-sm" style={{ border: `1px solid ${GOLD}33` }}>
+        <div className="bg-white p-7 rounded-[24px] shadow-sm" style={{ border: '1px solid #e8e0d0' }}>
           <label className="text-[10px] font-black uppercase tracking-widest block mb-4" style={{ color: GOLD }}>
             {isZh ? '4. 保存报价' : '4. Save Quote'}
           </label>
@@ -744,8 +744,8 @@ export function BSNewQuotePage({
               <button
                 onClick={() => handleSaveQuote('FINAL')}
                 disabled={saving || !selectedCustomer || items.length === 0}
-                className="flex-1 py-3 rounded-2xl text-sm font-black text-white transition-all disabled:opacity-40"
-                style={{ background: NAVY }}
+                className="flex-1 py-3 rounded-2xl text-sm font-black transition-all disabled:opacity-40"
+                style={{ background: GOLD, color: NAVY }}
               >
                 {isZh ? '生成正式报价' : 'Generate Quote'}
               </button>
@@ -810,74 +810,77 @@ interface PreviewProps {
 
 function BSQuotePreviewPanel(p: PreviewProps) {
   const isZh = p.lang === 'zh';
-  const docTitle = isZh ? '服务报价单' : 'SERVICE QUOTATION';
+
+  // warm palette
+  const WARM_BG   = '#faf8f5';   // warm near-white
+  const DIVIDER   = '#e8e0d0';   // warm tan divider
+  const LABEL_CLR = '#8a7f72';   // warm muted label
+  const TEXT_DK   = '#1a2540';   // deep navy-blue body text
+  const TEXT_MD   = '#4a5568';   // mid body
 
   return (
     <div
-      className="bg-white rounded-[28px] shadow-md overflow-hidden"
-      style={{ border: '1px solid #e5e7eb', fontFamily: "'Inter', 'Helvetica Neue', Arial, sans-serif" }}
+      style={{
+        background: '#fff',
+        borderRadius: 20,
+        boxShadow: '0 4px 24px rgba(12,27,58,0.10)',
+        border: `1px solid ${DIVIDER}`,
+        fontFamily: "'Inter', 'Helvetica Neue', Arial, sans-serif",
+        overflow: 'hidden',
+      }}
     >
-      {/* Company header */}
-      <div className="px-10 pt-8 pb-6 text-center" style={{ background: NAVY }}>
-        <div className="text-[10px] font-black tracking-[0.25em] uppercase mb-1" style={{ color: GOLD }}>
-          GCI
+      {/* ── TOP ACCENT LINE ─────────────────────────────────────────── */}
+      <div style={{ height: 5, background: `linear-gradient(90deg, ${NAVY} 0%, ${GOLD} 100%)` }} />
+
+      {/* ── LETTERHEAD HEADER ───────────────────────────────────────── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '28px 36px 22px', borderBottom: `1px solid ${DIVIDER}` }}>
+        {/* Left: company identity */}
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.22em', color: GOLD, textTransform: 'uppercase', marginBottom: 4 }}>
+            GCI
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: NAVY, letterSpacing: '0.04em', textTransform: 'uppercase', lineHeight: 1.3 }}>
+            GLOBALCARE INFO<br />GENERAL TRADING FZCO
+          </div>
+          <div style={{ marginTop: 8, fontSize: 12, color: LABEL_CLR, lineHeight: 1.7 }}>
+            Dubai, UAE<br />
+            TEL: +971 58 556 6809<br />
+            chris@globalcareinfo.com
+          </div>
         </div>
-        <div className="text-[11px] font-black tracking-[0.1em] uppercase text-white/90 leading-tight">
-          GLOBALCARE INFO GENERAL TRADING FZCO
-        </div>
-        <div className="text-[9px] text-white/40 mt-1 tracking-widest uppercase">
-          TEL: +971585566809 · chris@globalcareinfo.com · Dubai, UAE
-        </div>
-        <div
-          className="mt-5 inline-block px-6 py-2 rounded-full text-sm font-black tracking-[0.12em] uppercase"
-          style={{ background: GOLD, color: NAVY }}
-        >
-          {docTitle}
+
+        {/* Right: document type + meta */}
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 20, fontWeight: 900, color: NAVY, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>
+            {isZh ? '服务报价单' : 'SERVICE QUOTATION'}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto auto', columnGap: 16, rowGap: 5, fontSize: 13 }}>
+            <span style={{ color: LABEL_CLR, textAlign: 'right' }}>{isZh ? '报价编号' : 'Quote No.'}</span>
+            <span style={{ fontWeight: 700, color: TEXT_DK, fontFamily: 'monospace' }}>{p.quoteNo}</span>
+            <span style={{ color: LABEL_CLR, textAlign: 'right' }}>{isZh ? '报价日期' : 'Date'}</span>
+            <span style={{ fontWeight: 700, color: TEXT_DK }}>{p.quoteDate}</span>
+            {p.validUntil && <>
+              <span style={{ color: LABEL_CLR, textAlign: 'right' }}>{isZh ? '有效期至' : 'Valid Until'}</span>
+              <span style={{ fontWeight: 700, color: TEXT_DK }}>{p.validUntil}</span>
+            </>}
+            <span style={{ color: LABEL_CLR, textAlign: 'right' }}>{isZh ? '币种' : 'Currency'}</span>
+            <span style={{ fontWeight: 700, color: GOLD }}>{p.currency}</span>
+          </div>
         </div>
       </div>
 
-      {/* Quote meta */}
-      <div className="px-10 py-5 border-b border-gray-100">
-        <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
-          <div className="flex gap-2">
-            <span className="text-gray-400 w-24 flex-shrink-0">{isZh ? '报价编号' : 'Quote No.'}</span>
-            <span className="font-bold text-gray-800 font-mono">{p.quoteNo}</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="text-gray-400 w-24 flex-shrink-0">{isZh ? '报价日期' : 'Date'}</span>
-            <span className="font-bold text-gray-800">{p.quoteDate}</span>
-          </div>
-          {p.validUntil && (
-            <div className="flex gap-2">
-              <span className="text-gray-400 w-24 flex-shrink-0">{isZh ? '有效期至' : 'Valid Until'}</span>
-              <span className="font-bold text-gray-800">{p.validUntil}</span>
-            </div>
-          )}
-          <div className="flex gap-2">
-            <span className="text-gray-400 w-24 flex-shrink-0">{isZh ? '币种' : 'Currency'}</span>
-            <span className="font-bold text-gray-800">{p.currency}</span>
-          </div>
-          {p.quoteTitle && (
-            <div className="flex gap-2 col-span-2">
-              <span className="text-gray-400 w-24 flex-shrink-0">{isZh ? '标题' : 'Subject'}</span>
-              <span className="font-bold text-gray-800">{p.quoteTitle}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Client info */}
-      <div className="px-10 py-5 border-b border-gray-100">
-        <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2">
+      {/* ── CLIENT INFO ─────────────────────────────────────────────── */}
+      <div style={{ background: WARM_BG, padding: '18px 36px', borderBottom: `1px solid ${DIVIDER}` }}>
+        <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.18em', color: GOLD, textTransform: 'uppercase', marginBottom: 10 }}>
           {isZh ? '客户信息' : 'CLIENT INFORMATION'}
         </div>
         {p.customer ? (
           <div>
-            <div className="font-black text-base" style={{ color: NAVY }}>{p.customer.customer_name}</div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: NAVY, marginBottom: 4 }}>{p.customer.customer_name}</div>
             {p.customer.company_name && (
-              <div className="text-sm text-gray-600 mt-0.5">{p.customer.company_name}</div>
+              <div style={{ fontSize: 14, color: TEXT_MD, marginBottom: 6, fontWeight: 600 }}>{p.customer.company_name}</div>
             )}
-            <div className="flex gap-4 mt-1.5 text-xs text-gray-400 flex-wrap">
+            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 13, color: LABEL_CLR }}>
               {p.customer.contact_name && <span>{p.customer.contact_name}</span>}
               {p.customer.whatsapp && <span>{p.customer.whatsapp}</span>}
               {p.customer.email && <span>{p.customer.email}</span>}
@@ -885,33 +888,51 @@ function BSQuotePreviewPanel(p: PreviewProps) {
             </div>
           </div>
         ) : (
-          <div className="text-gray-200 text-sm italic">{isZh ? '请选择服务客户…' : 'Select a service client…'}</div>
+          <div style={{ fontSize: 14, color: '#ccc', fontStyle: 'italic' }}>
+            {isZh ? '请选择服务客户…' : 'Select a service client…'}
+          </div>
         )}
       </div>
 
-      {/* Service items */}
-      <div className="px-10 py-5">
-        <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3">
+      {/* ── SUBJECT LINE ────────────────────────────────────────────── */}
+      {p.quoteTitle && (
+        <div style={{ padding: '12px 36px', borderBottom: `1px solid ${DIVIDER}`, display: 'flex', gap: 12, alignItems: 'center' }}>
+          <span style={{ fontSize: 11, fontWeight: 800, color: LABEL_CLR, textTransform: 'uppercase', letterSpacing: '0.12em', flexShrink: 0 }}>
+            {isZh ? '主题' : 'SUBJECT'}
+          </span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: TEXT_DK }}>{p.quoteTitle}</span>
+        </div>
+      )}
+
+      {/* ── SERVICE TABLE ───────────────────────────────────────────── */}
+      <div style={{ padding: '22px 36px 8px' }}>
+        <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.18em', color: GOLD, textTransform: 'uppercase', marginBottom: 14 }}>
           {isZh ? '服务项目明细' : 'SERVICE ITEMS'}
         </div>
         {p.items.length === 0 ? (
-          <div className="text-gray-200 text-sm italic py-8 text-center">
+          <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 14, color: '#ccc', fontStyle: 'italic' }}>
             {isZh ? '从左侧选择服务项目…' : 'Select service items on the left…'}
           </div>
         ) : (
-          <table className="w-full text-xs">
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: `2px solid ${NAVY}` }}>
-                <th className="text-left pb-2 font-black text-[9px] uppercase tracking-wider pr-3" style={{ color: NAVY }}>
-                  {isZh ? '服务项目' : 'Service'}
+                <th style={{ textAlign: 'center', paddingBottom: 10, paddingRight: 8, fontSize: 11, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.06em', width: 32 }}>
+                  #
                 </th>
-                <th className="text-center pb-2 font-black text-[9px] uppercase tracking-wider w-10" style={{ color: NAVY }}>
+                <th style={{ textAlign: 'left', paddingBottom: 10, paddingRight: 8, fontSize: 11, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  {isZh ? '服务内容' : 'Service'}
+                </th>
+                <th style={{ textAlign: 'center', paddingBottom: 10, paddingRight: 8, fontSize: 11, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.06em', width: 50 }}>
                   {isZh ? '数量' : 'Qty'}
                 </th>
-                <th className="text-right pb-2 font-black text-[9px] uppercase tracking-wider w-28" style={{ color: NAVY }}>
-                  {isZh ? '费用' : 'Fee'}
+                <th style={{ textAlign: 'right', paddingBottom: 10, paddingRight: 8, fontSize: 11, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.06em', width: 100 }}>
+                  {isZh ? '一次性' : 'One-time'}
                 </th>
-                <th className="text-right pb-2 font-black text-[9px] uppercase tracking-wider w-28" style={{ color: NAVY }}>
+                <th style={{ textAlign: 'right', paddingBottom: 10, paddingRight: 8, fontSize: 11, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.06em', width: 90 }}>
+                  {isZh ? '月费' : 'Monthly'}
+                </th>
+                <th style={{ textAlign: 'right', paddingBottom: 10, fontSize: 11, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.06em', width: 90 }}>
                   {isZh ? '小计' : 'Subtotal'}
                 </th>
               </tr>
@@ -919,44 +940,45 @@ function BSQuotePreviewPanel(p: PreviewProps) {
             <tbody>
               {p.items.map((it, i) => {
                 const lt = calcLineTotal(it);
-                const feeDisplay = it.one_time_fee > 0
-                  ? fmt(it.one_time_fee, p.currency)
-                  : it.monthly_fee > 0
-                    ? `${fmt(it.monthly_fee, p.currency)}/${isZh ? '月' : 'mo'}`
-                    : it.annual_fee > 0
-                      ? `${fmt(it.annual_fee, p.currency)}/${isZh ? '年' : 'yr'}`
-                      : (isZh ? '待定' : 'TBD');
                 const subDisplay = lt > 0
                   ? fmt(lt, p.currency)
                   : it.monthly_fee > 0
                     ? `${fmt(it.monthly_fee * it.quantity, p.currency)}/${isZh ? '月' : 'mo'}`
                     : (isZh ? '待定' : 'TBD');
+                const rowBg = i % 2 === 1 ? WARM_BG : 'transparent';
                 return (
-                  <tr key={it.id} style={{ borderBottom: i < p.items.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
-                    <td className="py-3 pr-3">
-                      <div className="font-bold text-gray-800">{it.service_name}</div>
+                  <tr key={it.id} style={{ background: rowBg, borderBottom: `1px solid ${DIVIDER}` }}>
+                    <td style={{ padding: '13px 8px 13px 4px', textAlign: 'center', fontSize: 12, color: LABEL_CLR, fontWeight: 700 }}>{i + 1}</td>
+                    <td style={{ padding: '13px 8px 13px 0', verticalAlign: 'top' }}>
+                      <div style={{ fontWeight: 700, color: TEXT_DK, fontSize: 13 }}>{it.service_name}</div>
                       {it.category_name && (
-                        <div className="text-[10px] text-gray-400 mt-0.5">{it.category_name}</div>
+                        <div style={{ fontSize: 11, color: GOLD, fontWeight: 600, marginTop: 2 }}>{it.category_name}</div>
                       )}
                       {it.description && (
-                        <div className="text-[10px] text-gray-500 mt-0.5 whitespace-pre-wrap leading-relaxed line-clamp-3">
-                          {it.description}
-                        </div>
+                        <div style={{ fontSize: 12, color: TEXT_MD, marginTop: 4, lineHeight: 1.55 }}>{it.description}</div>
+                      )}
+                      {it.scope && (
+                        <div style={{ fontSize: 12, color: LABEL_CLR, marginTop: 3, lineHeight: 1.5 }}>{it.scope}</div>
                       )}
                       {it.timeline && (
-                        <div className="text-[10px] mt-1 font-medium" style={{ color: GOLD }}>
+                        <div style={{ fontSize: 12, color: GOLD, fontWeight: 600, marginTop: 4 }}>
                           {isZh ? '交付周期: ' : 'Timeline: '}{it.timeline}
                         </div>
                       )}
                       {it.is_optional && (
-                        <span className="text-[9px] text-purple-400 font-bold">
-                          {isZh ? '(可选项目)' : '(Optional)'}
-                        </span>
+                        <div style={{ fontSize: 11, color: '#9f7aea', fontWeight: 700, marginTop: 3 }}>
+                          {isZh ? '（可选项目）' : '(Optional)'}
+                        </div>
                       )}
                     </td>
-                    <td className="py-3 text-center text-gray-600">{it.quantity}</td>
-                    <td className="py-3 text-right text-gray-600 font-mono">{feeDisplay}</td>
-                    <td className="py-3 text-right font-bold font-mono" style={{ color: NAVY }}>
+                    <td style={{ padding: '13px 8px', textAlign: 'center', color: TEXT_MD, fontWeight: 600 }}>{it.quantity}</td>
+                    <td style={{ padding: '13px 8px', textAlign: 'right', color: TEXT_MD, fontFamily: 'monospace', fontSize: 13 }}>
+                      {it.one_time_fee > 0 ? fmt(it.one_time_fee, p.currency) : '—'}
+                    </td>
+                    <td style={{ padding: '13px 8px', textAlign: 'right', color: TEXT_MD, fontFamily: 'monospace', fontSize: 13 }}>
+                      {it.monthly_fee > 0 ? fmt(it.monthly_fee, p.currency) : '—'}
+                    </td>
+                    <td style={{ padding: '13px 0 13px 8px', textAlign: 'right', fontWeight: 800, color: NAVY, fontFamily: 'monospace', fontSize: 13 }}>
                       {subDisplay}
                     </td>
                   </tr>
@@ -967,97 +989,97 @@ function BSQuotePreviewPanel(p: PreviewProps) {
         )}
       </div>
 
-      {/* Fee breakdown */}
+      {/* ── FEE SUMMARY ─────────────────────────────────────────────── */}
       {p.items.length > 0 && (
-        <div className="px-10 pb-5">
-          <div style={{ marginLeft: 'auto', maxWidth: 290 }}>
+        <div style={{ padding: '16px 36px 24px', borderTop: `1px solid ${DIVIDER}` }}>
+          <div style={{ marginLeft: 'auto', maxWidth: 340, borderRadius: 14, border: `1px solid ${DIVIDER}`, background: WARM_BG, padding: '18px 22px' }}>
             {p.totals.subtotalOneTime > 0 && (
-              <div className="flex justify-between text-xs py-1">
-                <span className="text-gray-400">{isZh ? '一次性费用小计' : 'One-time Subtotal'}</span>
-                <span className="font-medium font-mono">{fmt(p.totals.subtotalOneTime, p.currency)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', color: TEXT_MD }}>
+                <span>{isZh ? '一次性费用小计' : 'One-time Subtotal'}</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{fmt(p.totals.subtotalOneTime, p.currency)}</span>
               </div>
             )}
             {p.totals.subtotalMonthly > 0 && (
-              <div className="flex justify-between text-xs py-1">
-                <span className="text-gray-400">{isZh ? '月服务费小计' : 'Monthly Subtotal'}</span>
-                <span className="font-medium font-mono">{fmt(p.totals.subtotalMonthly, p.currency)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', color: TEXT_MD }}>
+                <span>{isZh ? '月服务费小计' : 'Monthly Subtotal'}</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{fmt(p.totals.subtotalMonthly, p.currency)}</span>
               </div>
             )}
             {p.totals.subtotalAnnual > 0 && (
-              <div className="flex justify-between text-xs py-1">
-                <span className="text-gray-400">{isZh ? '年服务费小计' : 'Annual Subtotal'}</span>
-                <span className="font-medium font-mono">{fmt(p.totals.subtotalAnnual, p.currency)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', color: TEXT_MD }}>
+                <span>{isZh ? '年服务费小计' : 'Annual Subtotal'}</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{fmt(p.totals.subtotalAnnual, p.currency)}</span>
               </div>
             )}
             {p.totals.discountAmount > 0 && (
-              <div className="flex justify-between text-xs py-1 text-red-500">
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', color: '#e53e3e' }}>
                 <span>
                   {isZh ? '折扣' : 'Discount'}
                   {p.discountType === 'percent' ? ` (${p.discountValue}%)` : ''}
                 </span>
-                <span className="font-medium font-mono">-{fmt(p.totals.discountAmount, p.currency)}</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>-{fmt(p.totals.discountAmount, p.currency)}</span>
               </div>
             )}
-            <div
-              className="flex justify-between text-sm font-black pt-2 border-t-2 mt-1"
-              style={{ borderColor: NAVY, color: NAVY }}
-            >
-              <span>{isZh ? '总金额' : 'GRAND TOTAL'}</span>
-              <span className="font-mono">{fmt(p.totals.grandTotal, p.currency)}</span>
+            {/* Grand total */}
+            <div style={{ marginTop: 10, paddingTop: 12, borderTop: `2px solid ${NAVY}`, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <span style={{ fontSize: 14, fontWeight: 800, color: NAVY, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {isZh ? '总金额' : 'GRAND TOTAL'}
+              </span>
+              <span style={{ fontSize: 24, fontWeight: 900, color: NAVY, fontFamily: 'monospace' }}>
+                {fmt(p.totals.grandTotal, p.currency)}
+              </span>
             </div>
             {p.totals.subtotalMonthly > 0 && (
-              <div className="flex justify-between text-xs pt-1 text-gray-400">
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 6, color: LABEL_CLR }}>
                 <span>{isZh ? '每月持续费用' : 'Monthly Recurring'}</span>
-                <span className="font-mono">{fmt(p.totals.subtotalMonthly, p.currency)}/{isZh ? '月' : 'mo'}</span>
+                <span style={{ fontFamily: 'monospace' }}>{fmt(p.totals.subtotalMonthly, p.currency)}/{isZh ? '月' : 'mo'}</span>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Commercial terms */}
+      {/* ── COMMERCIAL TERMS ────────────────────────────────────────── */}
       {(p.paymentTerms || p.deliveryPeriod || p.exclusions || p.notes) && (
-        <div className="px-10 pb-8 pt-3 border-t border-gray-100 space-y-2.5">
-          {p.paymentTerms && (
-            <div className="text-xs">
-              <span className="font-black text-gray-400 uppercase tracking-widest text-[9px]">
-                {isZh ? '付款方式  ·  ' : 'Payment Terms  ·  '}
-              </span>
-              <span className="text-gray-600">{p.paymentTerms}</span>
-            </div>
-          )}
-          {p.deliveryPeriod && (
-            <div className="text-xs">
-              <span className="font-black text-gray-400 uppercase tracking-widest text-[9px]">
-                {isZh ? '交付周期  ·  ' : 'Timeline  ·  '}
-              </span>
-              <span className="text-gray-600">{p.deliveryPeriod}</span>
-            </div>
-          )}
-          {p.exclusions && (
-            <div className="text-xs">
-              <span className="font-black text-gray-400 uppercase tracking-widest text-[9px]">
-                {isZh ? '不包含  ·  ' : 'Exclusions  ·  '}
-              </span>
-              <span className="text-gray-600">{p.exclusions}</span>
-            </div>
-          )}
-          {p.notes && (
-            <div className="text-xs">
-              <span className="font-black text-gray-400 uppercase tracking-widest text-[9px]">
-                {isZh ? '备注  ·  ' : 'Notes  ·  '}
-              </span>
-              <span className="text-gray-600">{p.notes}</span>
-            </div>
-          )}
+        <div style={{ padding: '20px 36px 24px', borderTop: `1px solid ${DIVIDER}`, background: WARM_BG }}>
+          <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.18em', color: GOLD, textTransform: 'uppercase', marginBottom: 14 }}>
+            {isZh ? '商务条款' : 'COMMERCIAL TERMS'}
+          </div>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {p.paymentTerms && (
+              <div style={{ display: 'flex', gap: 12, fontSize: 13 }}>
+                <span style={{ fontWeight: 800, color: NAVY, minWidth: 80, flexShrink: 0 }}>{isZh ? '付款方式' : 'Payment'}</span>
+                <span style={{ color: TEXT_MD }}>{p.paymentTerms}</span>
+              </div>
+            )}
+            {p.deliveryPeriod && (
+              <div style={{ display: 'flex', gap: 12, fontSize: 13 }}>
+                <span style={{ fontWeight: 800, color: NAVY, minWidth: 80, flexShrink: 0 }}>{isZh ? '项目周期' : 'Timeline'}</span>
+                <span style={{ color: TEXT_MD }}>{p.deliveryPeriod}</span>
+              </div>
+            )}
+            {p.exclusions && (
+              <div style={{ display: 'flex', gap: 12, fontSize: 13 }}>
+                <span style={{ fontWeight: 800, color: NAVY, minWidth: 80, flexShrink: 0 }}>{isZh ? '不包含' : 'Exclusions'}</span>
+                <span style={{ color: TEXT_MD }}>{p.exclusions}</span>
+              </div>
+            )}
+            {p.notes && (
+              <div style={{ display: 'flex', gap: 12, fontSize: 13 }}>
+                <span style={{ fontWeight: 800, color: NAVY, minWidth: 80, flexShrink: 0 }}>{isZh ? '备注' : 'Notes'}</span>
+                <span style={{ color: TEXT_MD }}>{p.notes}</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Footer */}
-      <div className="px-10 py-4 text-center" style={{ borderTop: `1px solid ${GOLD}30` }}>
-        <div className="text-[9px] text-gray-300 uppercase tracking-widest">
-          GLOBALCARE INFO GENERAL TRADING FZCO · DUBAI · UAE · GCI PLATFORM
+      {/* ── FOOTER ──────────────────────────────────────────────────── */}
+      <div style={{ padding: '14px 36px', borderTop: `1px solid ${DIVIDER}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontSize: 11, color: LABEL_CLR, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          GLOBALCARE INFO GENERAL TRADING FZCO · DUBAI · UAE
         </div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: GOLD, letterSpacing: '0.1em' }}>GCI PLATFORM</div>
       </div>
     </div>
   );
