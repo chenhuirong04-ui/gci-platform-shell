@@ -348,7 +348,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
   const hasInput = rawText.trim().length > 0 || attachments.length > 0;
 
   // ── PDF text extraction (runs before Gemini OCR; no API key needed) ──
-  const parsePDFText = async (dataURL: string, fileName: string): Promise<{
+  const parsePDFText = async (dataURL: string, _fileName: string): Promise<{
     items: LineItem[]; grandTotal: number | null; customerName: string | null;
   }> => {
     const pdfjsLib = await import('pdfjs-dist');
@@ -363,7 +363,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
 
     const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
 
-    // ── Extract text items with (x, y) positions from all pages ─────
+    // ── Extract all text items with (x, y) across all pages ────────
     type TI = { x: number; y: number; text: string };
     const allItems: TI[] = [];
     let pageYOffset = 0;
@@ -371,109 +371,151 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       const page = await pdf.getPage(p);
       const vp   = page.getViewport({ scale: 1 });
       const content = await page.getTextContent();
-      for (const item of content.items) {
-        if ('str' in item && item.str.trim()) {
+      for (const it of content.items) {
+        if ('str' in it && it.str.trim()) {
           allItems.push({
-            x: item.transform[4],
-            y: pageYOffset + (vp.height - item.transform[5]),
-            text: item.str.trim(),
+            x: Math.round(it.transform[4]),
+            y: Math.round(pageYOffset + (vp.height - it.transform[5])),
+            text: it.str.trim(),
           });
         }
       }
       pageYOffset += vp.height + 10;
     }
-
     if (allItems.length === 0) return { items: [], grandTotal: null, customerName: null };
 
-    // ── Group by y-coordinate (4pt tolerance) to rebuild rows ────────
-    allItems.sort((a, b) => a.y - b.y);
-    const rowGroups: Array<{ y: number; cells: Array<{ x: number; text: string }> }> = [];
-    for (const item of allItems) {
+    // ── Group into rows by y-coordinate (8pt tolerance) ─────────────
+    allItems.sort((a, b) => a.y - b.y || a.x - b.x);
+    type Row = { y: number; cells: TI[] };
+    const rowGroups: Row[] = [];
+    for (const it of allItems) {
       const last = rowGroups[rowGroups.length - 1];
-      if (last && Math.abs(last.y - item.y) <= 4) {
-        last.cells.push({ x: item.x, text: item.text });
+      if (last && Math.abs(last.y - it.y) <= 8) {
+        last.cells.push(it);
       } else {
-        rowGroups.push({ y: item.y, cells: [{ x: item.x, text: item.text }] });
+        rowGroups.push({ y: it.y, cells: [it] });
       }
     }
     rowGroups.forEach(r => r.cells.sort((a, b) => a.x - b.x));
-    const rows = rowGroups.map(r => r.cells.map(c => c.text));
 
-    // ── Column keyword detection (same as Excel parser) ───────────────
-    const normH = (s: string) => s.toLowerCase().replace(/\s/g, '').trim();
+    console.log('[PDF TEXT] pages:', pdf.numPages, '| rowGroups:', rowGroups.length);
+    console.log('[PDF TEXT] raw text:', rowGroups.map(r => r.cells.map(c => c.text).join(' | ')).join('\n'));
+
+    // ── Keyword sets ─────────────────────────────────────────────────
+    const normH = (s: string) => s.toLowerCase().replace(/[\s_\-]/g, '').trim();
     const KW = {
-      item:  ['产品名称','品名','名称','货物名称','furniture item','item','product','description','name'],
+      item:  ['产品名称','品名','名称','货物名称','furniture','item','product','description','name'],
       spec:  ['规格','尺寸','spec','specification','size','dimension'],
-      qty:   ['数量','qty','quantity'],
+      qty:   ['数量','数','qty','quantity'],
       unit:  ['单位','unit'],
-      price: ['单价','unit price','price','aed/unit'],
+      price: ['单价','unitprice','price'],
       total: ['合计','小计','total','amount','subtotal'],
     };
-    const matchKW = (h: string, kws: string[]) => kws.some(k => normH(h).includes(normH(k)));
+    const matchKW = (h: string, kws: string[]) =>
+      kws.some(k => normH(h).includes(normH(k)));
 
+    // ── Find header row (highest keyword score) ──────────────────────
     let headerIdx = -1, bestScore = 0;
-    for (let i = 0; i < Math.min(rows.length, 20); i++) {
+    for (let i = 0; i < Math.min(rowGroups.length, 25); i++) {
+      const texts = rowGroups[i].cells.map(c => c.text);
       let score = 0;
-      if (rows[i].some(c => matchKW(c, KW.item)))  score += 4;
-      if (rows[i].some(c => matchKW(c, KW.qty)))   score += 2;
-      if (rows[i].some(c => matchKW(c, KW.price))) score += 2;
-      if (rows[i].some(c => matchKW(c, KW.total))) score += 1;
+      if (texts.some(t => matchKW(t, KW.item)))  score += 4;
+      if (texts.some(t => matchKW(t, KW.qty)))   score += 2;
+      if (texts.some(t => matchKW(t, KW.price))) score += 2;
+      if (texts.some(t => matchKW(t, KW.total))) score += 1;
       if (score > bestScore) { bestScore = score; headerIdx = i; }
     }
 
-    console.log('[PDF TEXT] pages:', pdf.numPages, '| rows:', rows.length, '| headerIdx:', headerIdx, '| score:', bestScore);
-
-    // No table found — try to extract grand total from raw text
+    // No recognizable header — try regex grand-total extraction from raw text
     if (headerIdx === -1 || bestScore < 2) {
-      const flat = rows.flat().join(' ');
+      const flat = rowGroups.flatMap(r => r.cells.map(c => c.text)).join(' ');
       const m = flat.match(/grand\s*total[^0-9]*([\d,]+(?:\.\d+)?)/i)
-             || flat.match(/total\s+(?:aed\s*)?([\d,]+(?:\.\d+)?)/i);
+             || flat.match(/合计[^0-9]*([\d,]+(?:\.\d+)?)/i);
       const gt = m ? parseFloat(m[1].replace(/,/g, '')) : null;
-      console.log('[PDF TEXT] no table header found; raw grandTotal:', gt);
+      console.log('[PDF TEXT] no header found; raw grand total:', gt);
       return { items: [], grandTotal: gt, customerName: null };
     }
 
-    const headers = rows[headerIdx];
-    const findCol = (kws: string[]) => headers.findIndex(h => matchKW(h, kws));
-    const COL = {
-      item:  findCol(KW.item),
-      spec:  findCol(KW.spec),
-      qty:   findCol(KW.qty),
-      unit:  findCol(KW.unit),
-      price: findCol(KW.price),
-      total: findCol(KW.total),
+    // ── Build column definitions from header x-positions ─────────────
+    // KEY FIX: each header cell defines a column by its x-position.
+    // Bilingual cells ("名称" + "Name") are separate but we resolve by keyword.
+    // For data rows, each cell is assigned to the NEAREST header x-position.
+    const headerCells = rowGroups[headerIdx].cells; // sorted by x
+    console.log('[PDF TEXT] headerCells:', headerCells.map(c => `${c.x}:"${c.text}"`).join(', '));
+
+    // Map each header cell to a column type
+    type ColType = 'item' | 'spec' | 'qty' | 'unit' | 'price' | 'total' | 'skip';
+    const colTypes: ColType[] = headerCells.map(c => {
+      if (matchKW(c.text, KW.item))  return 'item';
+      if (matchKW(c.text, KW.spec))  return 'spec';
+      if (matchKW(c.text, KW.qty))   return 'qty';
+      if (matchKW(c.text, KW.unit))  return 'unit';
+      if (matchKW(c.text, KW.price)) return 'price';
+      if (matchKW(c.text, KW.total)) return 'total';
+      return 'skip';
+    });
+    console.log('[PDF TEXT] colTypes:', colTypes);
+
+    // Assign a data cell to the nearest header cell (by x-distance)
+    const assignColType = (cellX: number): ColType => {
+      let bestType: ColType = 'skip';
+      let bestDist = Infinity;
+      for (let i = 0; i < headerCells.length; i++) {
+        const dist = Math.abs(cellX - headerCells[i].x);
+        if (dist < bestDist) { bestDist = dist; bestType = colTypes[i]; }
+      }
+      return bestType;
     };
-    console.log('[PDF TEXT] headers:', headers, '| COL:', COL);
 
-    if (COL.item === -1) return { items: [], grandTotal: null, customerName: null };
-
+    // ── Parse data rows ───────────────────────────────────────────────
     const items: LineItem[] = [];
     let sumTotal = 0;
     let detectedGT: number | null = null;
 
-    for (let i = headerIdx + 1; i < rows.length; i++) {
-      const row = rows[i];
-      if (!row.length) continue;
-      const name = (row[COL.item] ?? '').trim();
+    for (let i = headerIdx + 1; i < rowGroups.length; i++) {
+      const row = rowGroups[i];
+      if (!row.cells.length) continue;
+
+      // Build col-type → text map for this row
+      const colMap: Record<ColType, string[]> = {
+        item: [], spec: [], qty: [], unit: [], price: [], total: [], skip: [],
+      };
+      for (const cell of row.cells) {
+        const ct = assignColType(cell.x);
+        colMap[ct].push(cell.text);
+      }
+      const get = (ct: ColType) => colMap[ct].join(' ').trim();
+
+      const name = get('item');
+      console.log(`[PDF TEXT] row ${i} | name:"${name}" | spec:"${get('spec')}" | qty:"${get('qty')}" | price:"${get('price')}" | total:"${get('total')}"`);
+
       if (!name) continue;
-      if (/grand\s*total|总计|合计总额|total\s*amount/i.test(name)) {
-        const rawGT = row[COL.total !== -1 ? COL.total : row.length - 1] ?? row[row.length - 1] ?? '';
-        const gt = parseFloat(String(rawGT).replace(/[^0-9.]/g, ''));
+
+      // Grand-total row detection
+      if (/grand\s*total|总计|合计总额|total\s*amount/i.test(name) || name === '总计' || name === 'Total') {
+        const rawGT = get('total') || get('price') || get('qty');
+        const gt = parseFloat(rawGT.replace(/[^0-9.]/g, ''));
         if (!isNaN(gt) && gt > 0) detectedGT = gt;
         continue;
       }
-      const qty      = COL.qty   !== -1 ? parseFloat(String(row[COL.qty]   ?? '').replace(/,/g, '')) : NaN;
-      const price    = COL.price !== -1 ? parseFloat(String(row[COL.price] ?? '').replace(/,/g, '')) : NaN;
-      const rawTot   = COL.total !== -1 ? parseFloat(String(row[COL.total] ?? '').replace(/,/g, '')) : NaN;
-      const lineTotal = !isNaN(rawTot) ? rawTot : (!isNaN(qty) && !isNaN(price) ? qty * price : NaN);
+      // Skip rows where "name" looks like a dimension or number (mis-assigned)
+      if (/^\d+$/.test(name) || /^[\d*×xX,.\s]+$/.test(name) || /^AED/i.test(name)) continue;
+
+      const parseNum = (s: string) => parseFloat(s.replace(/[^0-9.]/g, ''));
+      const qty      = parseNum(get('qty'));
+      const price    = parseNum(get('price'));
+      const rawTot   = get('total');
+      const tot      = rawTot ? parseNum(rawTot) : NaN;
+      const lineTotal = !isNaN(tot) && tot > 0 ? tot
+                      : (!isNaN(qty) && !isNaN(price) ? qty * price : NaN);
       if (!isNaN(lineTotal) && lineTotal > 0) sumTotal += lineTotal;
 
       items.push({
         id:            `LI_PDF_${i}`,
         item_name:     name,
-        description:   COL.spec !== -1 ? (row[COL.spec] ?? '').trim() : '',
+        description:   get('spec'),
         qty:           !isNaN(qty)   ? qty   : '',
-        unit:          COL.unit !== -1 ? (row[COL.unit] ?? 'pc').trim() || 'pc' : 'pc',
+        unit:          get('unit') || 'pc',
         selling_price: !isNaN(price) ? price : '',
         line_total:    !isNaN(lineTotal) ? lineTotal : '',
         item_notes:    '',
@@ -482,6 +524,9 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
 
     const grandTotal = detectedGT ?? (sumTotal > 0 ? sumTotal : null);
     console.log('[PDF TEXT] parsed items:', items.length, '| grandTotal:', grandTotal);
+    console.log('[PDF TEXT] items detail:', items.map(it =>
+      `${it.item_name} qty=${it.qty} price=${it.selling_price} total=${it.line_total}`
+    ));
     return { items, grandTotal, customerName: null };
   };
 
