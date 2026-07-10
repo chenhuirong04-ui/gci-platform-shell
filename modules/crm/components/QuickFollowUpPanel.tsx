@@ -10,12 +10,13 @@
  *      (Notion write-back for individual fields not implemented yet)
  */
 
-import React, { useState } from 'react';
-import { FollowUpTask } from '../types';
+import React, { useState, useRef } from 'react';
+import { FollowUpTask, Proposal } from '../types';
+import { uploadFileToDrive } from '../services/driveService';
 import {
   X, ChevronRight, MessageSquare, Calendar, Phone, Mail, MapPin,
   User, Clock, CheckCircle2, Archive, Building2, Edit2, Save, XCircle,
-  Paperclip, FileText, ChevronDown, ChevronUp,
+  Paperclip, FileText, ChevronDown, ChevronUp, UploadCloud, ExternalLink,
 } from 'lucide-react';
 import { getTaskBusinessId } from '../utils/businessId';
 import { isLikelyNotionPageId } from '../utils/notionId';
@@ -110,7 +111,43 @@ export default function QuickFollowUpPanel({
   const priority = task.priority || 'B';
   const typeLabel = TYPE_LABEL[task.businessType || 'TRADE'] ?? '贸易询盘';
 
-  const [tab, setTab]   = useState<'info' | 'action' | 'quotes'>('info');
+  const [tab, setTab]   = useState<'info' | 'action' | 'quotes' | 'proposals'>('info');
+  const [proposalUploadStatus, setProposalUploadStatus] = useState<'idle' | 'uploading' | 'ok' | 'fail'>('idle');
+  const proposalInputRef = useRef<HTMLInputElement>(null);
+
+  const handleProposalUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onUpdateTask) return;
+    e.target.value = '';
+    setProposalUploadStatus('uploading');
+    const reader = new FileReader();
+    reader.onerror = () => setProposalUploadStatus('fail');
+    reader.onload = async (ev) => {
+      const dataURL = ev.target?.result as string;
+      const propId = `PROP_${Date.now()}`;
+      const uploadedAt = new Date().toISOString();
+      const newProposal: Proposal = { id: propId, name: file.name, mimeType: file.type, size: file.size, uploadedAt, uploadStatus: 'uploading' };
+      const withNew = [...(task.proposals || []), newProposal];
+      onUpdateTask({ ...task, proposals: withNew });
+      try {
+        const result = await uploadFileToDrive(
+          { id: propId, name: file.name, type: file.type, data: dataURL, size: file.size, uploadedAt, isAnalyzed: false },
+          { businessType: task.businessType, clientName: task.clientName }
+        );
+        if (result.ok && result.driveUrl) {
+          onUpdateTask({ ...task, proposals: withNew.map(p => p.id === propId ? { ...p, driveUrl: result.driveUrl, uploadStatus: 'uploaded' as const } : p) });
+          setProposalUploadStatus('ok');
+        } else {
+          onUpdateTask({ ...task, proposals: withNew.map(p => p.id === propId ? { ...p, uploadStatus: 'failed' as const } : p) });
+          setProposalUploadStatus('fail');
+        }
+      } catch {
+        onUpdateTask({ ...task, proposals: withNew.map(p => p.id === propId ? { ...p, uploadStatus: 'failed' as const } : p) });
+        setProposalUploadStatus('fail');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
   const [editing, setEditing] = useState(false);
 
   // ── Quote history state ───────────────────────────────────────────
@@ -312,11 +349,12 @@ export default function QuickFollowUpPanel({
           {!editing && (
             <div className="flex gap-1 mt-4 p-1 rounded-xl" style={{ background: CARD2 }}>
               {([
-                ['info',   '客户详情'],
-                ['action', '跟进记录'],
-                ['quotes', '历史报价'],
+                ['info',      '客户详情'],
+                ['action',    '跟进记录'],
+                ['quotes',    '历史报价'],
+                ['proposals', '提案'],
               ] as const).map(([key, label]) => (
-                <button key={key} onClick={() => { setTab(key); if (key === 'quotes') loadQuoteHistory(); }}
+                <button key={key} onClick={() => { setTab(key); if (key === 'quotes') loadQuoteHistory(); if (key === 'proposals') setProposalUploadStatus('idle'); }}
                   className="flex-1 py-1.5 rounded-lg text-xs font-black transition-all"
                   style={tab === key ? { background: GOLD, color: '#fff' } : { color: T3 }}>
                   {label}
@@ -745,12 +783,86 @@ export default function QuickFollowUpPanel({
               )}
             </div>
           )}
+
+          {/* ── PROPOSALS TAB ─── */}
+          {!editing && tab === 'proposals' && (
+            <div className="p-5 space-y-3">
+              {/* Upload status banner */}
+              {proposalUploadStatus !== 'idle' && (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold"
+                  style={
+                    proposalUploadStatus === 'uploading' ? { background: 'rgba(99,102,241,0.1)', color: '#A5B4FC', border: '1px solid rgba(99,102,241,0.2)' } :
+                    proposalUploadStatus === 'ok'        ? { background: 'rgba(16,185,129,0.1)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.2)' } :
+                                                          { background: 'rgba(239,68,68,0.08)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.15)' }
+                  }>
+                  {proposalUploadStatus === 'uploading' && <><div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin shrink-0" /> 正在上传到 Drive…</>}
+                  {proposalUploadStatus === 'ok'        && <>✓ 提案已上传 Drive</>}
+                  {proposalUploadStatus === 'fail'      && <>✗ Drive 上传失败，请稍后重试</>}
+                </div>
+              )}
+
+              {/* Proposals list */}
+              {task.proposals && task.proposals.length > 0 ? (
+                <>
+                  <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>
+                    提案文件 ({task.proposals.length})
+                  </div>
+                  <div className="space-y-2">
+                    {task.proposals.map(p => (
+                      <div key={p.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+                        style={{ background: CARD2, border: `1px solid ${BORD}` }}>
+                        <FileText className="w-4 h-4 shrink-0" style={{ color: T3 }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold truncate" style={{ color: T1 }}>{p.name}</p>
+                          <p className="text-[10px]" style={{ color: T3 }}>
+                            {new Date(p.uploadedAt).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                          </p>
+                        </div>
+                        <div className="shrink-0 flex items-center gap-2">
+                          {p.uploadStatus === 'uploading' && <div className="w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />}
+                          {p.uploadStatus === 'uploaded' && p.driveUrl && (
+                            <a href={p.driveUrl} target="_blank" rel="noreferrer"
+                              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black transition-colors"
+                              style={{ background: `${GOLD}18`, color: GOLD }}>
+                              <ExternalLink className="w-3 h-3" /> Drive
+                            </a>
+                          )}
+                          {p.uploadStatus === 'failed' && <span className="text-[10px] font-bold text-red-400">失败</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center gap-2 py-8">
+                  <UploadCloud className="w-8 h-8" style={{ color: T3 }} />
+                  <p className="text-xs font-bold" style={{ color: T3 }}>暂无提案文件</p>
+                  <p className="text-[10px]" style={{ color: T3 }}>点击下方"上传提案"添加</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ── Footer ─────────────────────────────────────────── */}
         <div className="shrink-0 p-4 space-y-2" style={{ borderTop: `1px solid ${BORD}`, background: CARD }}>
 
           {/* Edit mode: Save / Cancel */}
+          {/* Proposals tab — upload button */}
+          {!editing && tab === 'proposals' && (
+            <>
+              <input ref={proposalInputRef} type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,image/*" className="hidden" onChange={handleProposalUpload} />
+              <button
+                onClick={() => { setProposalUploadStatus('idle'); proposalInputRef.current?.click(); }}
+                disabled={proposalUploadStatus === 'uploading'}
+                className="w-full py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-40"
+                style={{ background: GOLD, color: '#fff' }}>
+                <UploadCloud className="w-4 h-4" />
+                {proposalUploadStatus === 'uploading' ? '上传中…' : '上传提案'}
+              </button>
+            </>
+          )}
+
           {editing ? (
             <div className="flex gap-2">
               <button onClick={saveEdit}
