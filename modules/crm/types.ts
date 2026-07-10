@@ -39,6 +39,16 @@ export interface Attachment {
   driveUrl?: string;  // 上传到 Google Drive 后的可访问链接
 }
 
+export interface Proposal {
+  id: string;
+  name: string;
+  driveUrl?: string;
+  mimeType?: string;
+  size?: number;
+  uploadedAt: string;
+  uploadStatus?: 'uploading' | 'uploaded' | 'failed';
+}
+
 export interface ProjectLogEntry {
   content: string;
   time: string;
@@ -128,6 +138,7 @@ export interface FollowUpTask {
   notionFollowupPageId?: string;
   // Notion sync status — 'followup_failed' means SB Pool OK but Follow-up Log write failed
   notionSyncStatus?: 'ok' | 'followup_failed';
+  proposals?: Proposal[];
 }
 
 export interface AIInsights {
