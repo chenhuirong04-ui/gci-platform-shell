@@ -347,6 +347,144 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
 
   const hasInput = rawText.trim().length > 0 || attachments.length > 0;
 
+  // ── PDF text extraction (runs before Gemini OCR; no API key needed) ──
+  const parsePDFText = async (dataURL: string, fileName: string): Promise<{
+    items: LineItem[]; grandTotal: number | null; customerName: string | null;
+  }> => {
+    const pdfjsLib = await import('pdfjs-dist');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+      'pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url
+    ).href;
+
+    const base64 = dataURL.includes(',') ? dataURL.split(',')[1] : dataURL;
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+    const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+
+    // ── Extract text items with (x, y) positions from all pages ─────
+    type TI = { x: number; y: number; text: string };
+    const allItems: TI[] = [];
+    let pageYOffset = 0;
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const vp   = page.getViewport({ scale: 1 });
+      const content = await page.getTextContent();
+      for (const item of content.items) {
+        if ('str' in item && item.str.trim()) {
+          allItems.push({
+            x: item.transform[4],
+            y: pageYOffset + (vp.height - item.transform[5]),
+            text: item.str.trim(),
+          });
+        }
+      }
+      pageYOffset += vp.height + 10;
+    }
+
+    if (allItems.length === 0) return { items: [], grandTotal: null, customerName: null };
+
+    // ── Group by y-coordinate (4pt tolerance) to rebuild rows ────────
+    allItems.sort((a, b) => a.y - b.y);
+    const rowGroups: Array<{ y: number; cells: Array<{ x: number; text: string }> }> = [];
+    for (const item of allItems) {
+      const last = rowGroups[rowGroups.length - 1];
+      if (last && Math.abs(last.y - item.y) <= 4) {
+        last.cells.push({ x: item.x, text: item.text });
+      } else {
+        rowGroups.push({ y: item.y, cells: [{ x: item.x, text: item.text }] });
+      }
+    }
+    rowGroups.forEach(r => r.cells.sort((a, b) => a.x - b.x));
+    const rows = rowGroups.map(r => r.cells.map(c => c.text));
+
+    // ── Column keyword detection (same as Excel parser) ───────────────
+    const normH = (s: string) => s.toLowerCase().replace(/\s/g, '').trim();
+    const KW = {
+      item:  ['产品名称','品名','名称','货物名称','furniture item','item','product','description','name'],
+      spec:  ['规格','尺寸','spec','specification','size','dimension'],
+      qty:   ['数量','qty','quantity'],
+      unit:  ['单位','unit'],
+      price: ['单价','unit price','price','aed/unit'],
+      total: ['合计','小计','total','amount','subtotal'],
+    };
+    const matchKW = (h: string, kws: string[]) => kws.some(k => normH(h).includes(normH(k)));
+
+    let headerIdx = -1, bestScore = 0;
+    for (let i = 0; i < Math.min(rows.length, 20); i++) {
+      let score = 0;
+      if (rows[i].some(c => matchKW(c, KW.item)))  score += 4;
+      if (rows[i].some(c => matchKW(c, KW.qty)))   score += 2;
+      if (rows[i].some(c => matchKW(c, KW.price))) score += 2;
+      if (rows[i].some(c => matchKW(c, KW.total))) score += 1;
+      if (score > bestScore) { bestScore = score; headerIdx = i; }
+    }
+
+    console.log('[PDF TEXT] pages:', pdf.numPages, '| rows:', rows.length, '| headerIdx:', headerIdx, '| score:', bestScore);
+
+    // No table found — try to extract grand total from raw text
+    if (headerIdx === -1 || bestScore < 2) {
+      const flat = rows.flat().join(' ');
+      const m = flat.match(/grand\s*total[^0-9]*([\d,]+(?:\.\d+)?)/i)
+             || flat.match(/total\s+(?:aed\s*)?([\d,]+(?:\.\d+)?)/i);
+      const gt = m ? parseFloat(m[1].replace(/,/g, '')) : null;
+      console.log('[PDF TEXT] no table header found; raw grandTotal:', gt);
+      return { items: [], grandTotal: gt, customerName: null };
+    }
+
+    const headers = rows[headerIdx];
+    const findCol = (kws: string[]) => headers.findIndex(h => matchKW(h, kws));
+    const COL = {
+      item:  findCol(KW.item),
+      spec:  findCol(KW.spec),
+      qty:   findCol(KW.qty),
+      unit:  findCol(KW.unit),
+      price: findCol(KW.price),
+      total: findCol(KW.total),
+    };
+    console.log('[PDF TEXT] headers:', headers, '| COL:', COL);
+
+    if (COL.item === -1) return { items: [], grandTotal: null, customerName: null };
+
+    const items: LineItem[] = [];
+    let sumTotal = 0;
+    let detectedGT: number | null = null;
+
+    for (let i = headerIdx + 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row.length) continue;
+      const name = (row[COL.item] ?? '').trim();
+      if (!name) continue;
+      if (/grand\s*total|总计|合计总额|total\s*amount/i.test(name)) {
+        const rawGT = row[COL.total !== -1 ? COL.total : row.length - 1] ?? row[row.length - 1] ?? '';
+        const gt = parseFloat(String(rawGT).replace(/[^0-9.]/g, ''));
+        if (!isNaN(gt) && gt > 0) detectedGT = gt;
+        continue;
+      }
+      const qty      = COL.qty   !== -1 ? parseFloat(String(row[COL.qty]   ?? '').replace(/,/g, '')) : NaN;
+      const price    = COL.price !== -1 ? parseFloat(String(row[COL.price] ?? '').replace(/,/g, '')) : NaN;
+      const rawTot   = COL.total !== -1 ? parseFloat(String(row[COL.total] ?? '').replace(/,/g, '')) : NaN;
+      const lineTotal = !isNaN(rawTot) ? rawTot : (!isNaN(qty) && !isNaN(price) ? qty * price : NaN);
+      if (!isNaN(lineTotal) && lineTotal > 0) sumTotal += lineTotal;
+
+      items.push({
+        id:            `LI_PDF_${i}`,
+        item_name:     name,
+        description:   COL.spec !== -1 ? (row[COL.spec] ?? '').trim() : '',
+        qty:           !isNaN(qty)   ? qty   : '',
+        unit:          COL.unit !== -1 ? (row[COL.unit] ?? 'pc').trim() || 'pc' : 'pc',
+        selling_price: !isNaN(price) ? price : '',
+        line_total:    !isNaN(lineTotal) ? lineTotal : '',
+        item_notes:    '',
+      });
+    }
+
+    const grandTotal = detectedGT ?? (sumTotal > 0 ? sumTotal : null);
+    console.log('[PDF TEXT] parsed items:', items.length, '| grandTotal:', grandTotal);
+    return { items, grandTotal, customerName: null };
+  };
+
   // ── Excel / CSV file parser (frontend-only, no API key) ──────────
   const parseExcelFile = async (file: File, intent?: FileIntent) => {
     setXlsxStatus('parsing');
@@ -645,13 +783,48 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       const intent = detectFileIntent(f.name, rawText);
       setDetectedFileType(intent);
       console.log('[QUOTE PARSE] file name:', f.name, '| type:', f.type, '| intent:', intent);
-      // customer_quote_record: try parsing for record keeping, but won't trigger supplier quote flow
-      // supplier_quote / customer_inquiry / boq: full parse + optional quote registration
       if (/\.(xlsx|xls|csv)$/i.test(f.name)) {
         console.log('[QUOTE PARSE] → parseExcelFile, isCrmCtx:', intent === 'customer_quote_record');
         parseExcelFile(f, intent);
-      } else if (f.type === 'application/pdf' || f.type.startsWith('image/')) {
-        console.log('[QUOTE PARSE] → parseFileWithAI (Gemini OCR)');
+      } else if (f.type === 'application/pdf') {
+        // PDF: try local text extraction first, fallback to Gemini OCR only if needed
+        console.log('[QUOTE PARSE] → PDF: trying local text extraction first');
+        setXlsxStatus('parsing');
+        setXlsxMsg('正在提取 PDF 文本内容…');
+        parsePDFText(base64, f.name).then(pdfResult => {
+          console.log('[QUOTE PARSE] PDF text result | items:', pdfResult.items.length, '| grandTotal:', pdfResult.grandTotal);
+          if (pdfResult.items.length > 0) {
+            const grandTotal = pdfResult.grandTotal;
+            const clientHint = optional.clientName.trim();
+            setLineItems(pdfResult.items);
+            setShowItems(true);
+            setQuoteDraft({
+              customerName: pdfResult.customerName || clientHint || '待确认',
+              itemSummary:  f.name.replace(/\.\w+$/, ''),
+              grandTotal,
+              quoteDate:    new Date().toISOString().slice(0, 10),
+              quoteType:    'TRADE',
+              source:       'PDF',
+              isReady:      grandTotal != null && !!(pdfResult.customerName || clientHint),
+            });
+            setRegisterQuote(true);
+            setParsedFromFile(true);
+            setXlsxStatus('done');
+            setXlsxMsg(
+              `PDF 已解析 ${pdfResult.items.length} 行产品明细` +
+              (grandTotal ? `，合计 AED ${grandTotal.toLocaleString()}` : '（未检测到总额，请手动填写）')
+            );
+          } else {
+            // No table found in text — fallback to Gemini OCR
+            console.log('[QUOTE PARSE] PDF text: no items, fallback to Gemini');
+            parseFileWithAI(f.type, base64, f.name);
+          }
+        }).catch(err => {
+          console.warn('[QUOTE PARSE] PDF text extraction error, fallback to Gemini:', err);
+          parseFileWithAI(f.type, base64, f.name);
+        });
+      } else if (f.type.startsWith('image/')) {
+        console.log('[QUOTE PARSE] → parseFileWithAI (Gemini OCR, image)');
         parseFileWithAI(f.type, base64, f.name);
       } else {
         console.warn('[QUOTE PARSE] → NO parser matched! name:', f.name, 'type:', f.type);

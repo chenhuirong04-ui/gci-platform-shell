@@ -12,5 +12,8 @@
     "dev": "npm run dev --workspace=@gci/shell",
     "build": "npm run build --workspace=@gci/shell",
     "preview": "npm run preview --workspace=@gci/shell"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^6.1.200"
   }
 }
