@@ -4,9 +4,8 @@
  * Does NOT touch: CRM, PI quotes, BOQ, supplier quotes, trade module
  */
 
-const SUPA_URL = 'https://efrkvwhzpgahjgfukjth.supabase.co';
-const SUPA_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmcmt2d2h6cGdhaGpnZnVranRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNTUwNDgsImV4cCI6MjA5NDkzMTA0OH0.i8TGQneIZHTWeJzuzVv-JBiBppaOjYkPbs4E5K73clU';
+const SUPA_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 import type { ServiceCustomer, ServiceCatalogItem, ServiceCategory, ServiceQuote, ServiceQuoteLineItem } from '../types';
 

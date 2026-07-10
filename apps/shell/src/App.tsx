@@ -138,9 +138,13 @@ function Shell() {
           <Route
             path="/quotation/*"
             element={
-              <ProtectedRoute module="quotation">
-                <QuotationModule initialMode={searchParams.get('mode') as any} initialView={searchParams.get('view') as any} />
-              </ProtectedRoute>
+              searchParams.get('mode') === 'service-quote'
+                ? <Navigate to="/business-solutions" replace />
+                : (
+                  <ProtectedRoute module="quotation">
+                    <QuotationModule initialMode={searchParams.get('mode') as any} initialView={searchParams.get('view') as any} />
+                  </ProtectedRoute>
+                )
             }
           />
           <Route

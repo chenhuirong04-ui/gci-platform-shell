@@ -36,6 +36,7 @@ create table if not exists service_customers (
 );
 
 alter table service_customers enable row level security;
+drop policy if exists "anon all sc" on service_customers;
 create policy "anon all sc" on service_customers for all using (true) with check (true);
 create index if not exists idx_sc_status on service_customers(status);
 create index if not exists idx_sc_type on service_customers(primary_service_type);
