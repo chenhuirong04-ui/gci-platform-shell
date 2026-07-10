@@ -503,20 +503,24 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
 
       const parseNum = (s: string) => parseFloat(s.replace(/[^0-9.]/g, ''));
       const qty      = parseNum(get('qty'));
-      const price    = parseNum(get('price'));
+      let   price    = parseNum(get('price'));
       const rawTot   = get('total');
       const tot      = rawTot ? parseNum(rawTot) : NaN;
       const lineTotal = !isNaN(tot) && tot > 0 ? tot
                       : (!isNaN(qty) && !isNaN(price) ? qty * price : NaN);
+      // Fallback: reverse-calculate unit price from qty × line_total
+      if ((isNaN(price) || price === 0) && !isNaN(qty) && qty > 0 && !isNaN(lineTotal) && lineTotal > 0) {
+        price = Math.round((lineTotal / qty) * 100) / 100;
+      }
       if (!isNaN(lineTotal) && lineTotal > 0) sumTotal += lineTotal;
 
       items.push({
         id:            `LI_PDF_${i}`,
         item_name:     name,
         description:   get('spec'),
-        qty:           !isNaN(qty)   ? qty   : '',
+        qty:           !isNaN(qty)      ? qty       : '',
         unit:          get('unit') || 'pc',
-        selling_price: !isNaN(price) ? price : '',
+        selling_price: !isNaN(price)    ? price     : '',
         line_total:    !isNaN(lineTotal) ? lineTotal : '',
         item_notes:    '',
       });
