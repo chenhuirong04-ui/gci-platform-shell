@@ -338,6 +338,10 @@ interface Props {
 
 export default function AIIntakePanel({ onAdd, isLoading }: Props) {
   const [rawText, setRawText]         = useState('');
+  // ocrExtracted stores the last successful OCR result separately from user-typed rawText.
+  // On handleSave, PROJECT + chat_screenshot prefers this over rawText so that a user
+  // typing a short note ("新增一个项目客户MAHMOOD") does NOT overwrite OCR content.
+  const [ocrExtracted, setOcrExtracted] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isDragging, setIsDragging]         = useState(false);
   const [isDraggingQuote, setIsDraggingQuote] = useState(false);
@@ -396,11 +400,12 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       const data = await res.json();
       if (data.ok && data.text) {
         const extracted = data.text.trim();
-        // Append extracted text to rawText then immediately run analyseInput
+        // Store OCR result separately — persists even if user edits the textarea
+        setOcrExtracted(prev => prev ? prev + '\n\n' + extracted : extracted);
+        // Also append to rawText (shown in textarea) and auto-generate draft
         setRawText(prev => {
           const sep = prev.trim() ? '\n\n' : '';
           const merged = prev + sep + extracted;
-          // Auto-generate draft from extracted content
           const result = analyseInput(merged, true);
           setDraft(result);
           setRegisterQuote(false);
@@ -1080,7 +1085,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
 
   // ── reset all state ───────────────────────────────────────────────
   const resetAll = () => {
-    setSaved(false); setDraft(null); setRawText(''); setAttachments([]);
+    setSaved(false); setDraft(null); setRawText(''); setOcrExtracted(''); setAttachments([]);
     setOptional({ clientName:'', countryCity:'', phoneE164:'', whatsapp:'', email:'' });
     setQuoteDraft(null); setRegisterQuote(false);
     setQuotePhase('idle'); setDupRecords([]); setQuoteError('');
@@ -1180,10 +1185,12 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
     const rawClientName = optional.clientName || (isInternal ? '' : draft.clientName.replace(/（待确认）$/, '').trim());
     const clientName = rawClientName || (isInternal ? '' : '未知客户');
     const contactKey = (optional.whatsapp || optional.phoneE164 || optional.email || '').replace(/[\s+]/g,'').toLowerCase();
-    // Build lastContext: for PROJECT/chat_screenshot, use full rawText (not truncated draft.notes)
-    // so Business Master 项目情况 and Follow-up Log get the complete project description.
-    const fullContext = draft.type === 'PROJECT' || detectedFileType === 'chat_screenshot'
-      ? (rawText.trim() || draft.notes)
+    // Build lastContext: for PROJECT/chat_screenshot, prefer ocrExtracted (screenshot OCR result)
+    // over rawText so a short user note ("新增一个项目客户X") never overwrites OCR content.
+    // Fallback chain: ocrExtracted → rawText → draft.notes
+    const isProjectOrScreenshot = draft.type === 'PROJECT' || detectedFileType === 'chat_screenshot';
+    const fullContext = isProjectOrScreenshot
+      ? (ocrExtracted.trim() || rawText.trim() || draft.notes)
       : draft.notes;
     let lastContextNote = fullContext;
     if (detectedFileType === 'customer_quote_record' || (registerQuote && attachments.some(a => a.data || a.driveUrl))) {

@@ -112,7 +112,8 @@ export default async function handler(request: Request): Promise<Response> {
   // ── Build enriched context string ────────────────────────────────────────────
   const contextParts: string[] = [];
   if (payload.contactPerson) contextParts.push(`联系人：${payload.contactPerson}`);
-  if (payload.countryCity)   contextParts.push(`地区：${payload.countryCity}`);
+  // Skip countryCity if it's the placeholder 'Unknown' — adds no value to the project description
+  if (payload.countryCity && payload.countryCity !== 'Unknown') contextParts.push(`地区：${payload.countryCity}`);
   if (payload.categories === 'customer_quote_record') contextParts.push('【客户报价留底】');
   else if (payload.categories === 'customer_inquiry') contextParts.push('【客户询价清单】');
   else if (payload.categories === 'boq')              contextParts.push('【BOQ/工程清单】');
@@ -128,8 +129,11 @@ export default async function handler(request: Request): Promise<Response> {
   //   项目情况 (text), 城市 (text), 联系电话 (phone_number), 联系邮件 (email),
   //   联系人 (text), 负责人 (select: Chris/lili/novie), 下次跟进日期 (date)
   // Fields that DO NOT exist: 客户名称, 业务类型, 电话, WhatsApp, Email, 备注
-  const goalSnippet = payload.lastContext?.slice(0, 40) || payload.clientName.trim();
-  const projectTitle = `${payload.clientName.trim()} — ${goalSnippet}`;
+  // Use goal (nextAction) as title suffix — it's a short action summary, not the full context
+  const goalSnippet = (payload.goal || payload.lastContext || '').trim().slice(0, 50);
+  const projectTitle = goalSnippet
+    ? `${payload.clientName.trim()} — ${goalSnippet}`
+    : payload.clientName.trim();
   const projectProperties: Record<string, any> = {
     '项目名称': { title: [{ type: 'text', text: { content: projectTitle } }] },
     '客户名':   { rich_text: [{ type: 'text', text: { content: payload.clientName.trim() } }] },
@@ -182,7 +186,7 @@ export default async function handler(request: Request): Promise<Response> {
   const noteParts: string[] = [];
   if (payload.source)        noteParts.push(`[来源: ${payload.source}]`);
   if (payload.contactPerson) noteParts.push(`联系人：${payload.contactPerson}`);
-  if (payload.countryCity)   noteParts.push(`地区：${payload.countryCity}`);
+  if (payload.countryCity && payload.countryCity !== 'Unknown') noteParts.push(`地区：${payload.countryCity}`);
   if (payload.categories === 'customer_quote_record') noteParts.push('【客户报价留底】');
   else if (payload.categories === 'customer_inquiry') noteParts.push('【客户询价清单】');
   else if (payload.categories === 'boq')              noteParts.push('【BOQ/工程清单】');
