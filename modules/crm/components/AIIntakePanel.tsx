@@ -352,6 +352,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
     setXlsxStatus('parsing');
     setXlsxMsg('正在解析 Excel 报价单…');
     const isCrmCtx = intent === 'customer_quote_record' || intent === 'boq' || intent === 'customer_inquiry';
+    console.log('[QUOTE PARSE] parseExcelFile start | intent:', intent, '| isCrmCtx:', isCrmCtx);
     try {
       const XLSX = await import('xlsx');
       const ab = await file.arrayBuffer();
@@ -450,8 +451,10 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
         }
       }
 
+      console.log('[QUOTE PARSE] Excel headers found:', headers.filter(Boolean).slice(0, 10), '| COL:', COL);
       if (COL.item === -1) {
         const detected = headers.filter(Boolean).slice(0, 8).join('、');
+        console.warn('[QUOTE PARSE] Excel: no item column found. headers:', detected);
         setXlsxStatus('warn');
         if (isCrmCtx) {
           setXlsxMsg('已识别为客户报价留底，文件已保存。产品明细暂未完全结构化，可继续保存客户记录；如需生成明细报价，可稍后进入报价/BOQ模块整理。');
@@ -527,6 +530,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       const grandTotal = detectedGrandTotal ?? (sumTotal > 0 ? sumTotal : null);
       const clientHint = optional.clientName.trim();
 
+      console.log('[QUOTE PARSE] Excel success | items:', items.length, '| grandTotal:', grandTotal);
       setLineItems(items);
       setShowItems(true);
       setQuoteDraft({
@@ -538,7 +542,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
         source:       'Excel',
         isReady:      grandTotal != null && !!clientHint,
       });
-      setRegisterQuote(grandTotal != null && !!clientHint);
+      setRegisterQuote(true);
       setParsedFromFile(true);
       setXlsxStatus('done');
       setXlsxMsg(
@@ -556,6 +560,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
   const parseFileWithAI = async (mimeType: string, dataURL: string, fileName: string) => {
     setXlsxStatus('parsing');
     setXlsxMsg('正在用 AI 识别报价内容（PDF / 图片）…');
+    console.log('[QUOTE PARSE] parseFileWithAI start | mimeType:', mimeType, '| fileName:', fileName);
     try {
       const res = await fetch('/api/ai/parse-quotation-file', {
         method: 'POST',
@@ -563,14 +568,15 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
         body: JSON.stringify({ mimeType, data: dataURL, fileName }),
       });
       const data = await res.json();
+      console.log('[QUOTE PARSE] parseFileWithAI API response | ok:', data.ok, '| items:', data.items?.length, '| grandTotal:', data.grandTotal, '| error:', data.error, '| detail:', data.detail);
 
       if (!data.ok || !Array.isArray(data.items) || data.items.length === 0) {
         // All parse failures are non-blocking warnings — file is already saved as attachment
+        const reason = data.error || '文件已保留为附件，但暂时无法自动识别明细。你仍可继续保存客户和跟进记录。';
+        const detail = data.detail ? ` (${data.detail.slice(0, 100)})` : '';
+        console.warn('[QUOTE PARSE] parseFileWithAI failed:', reason, detail);
         setXlsxStatus('warn');
-        setXlsxMsg(
-          data.error ||
-          '文件已保留为附件，但暂时无法自动识别明细。你仍可继续保存客户和跟进记录。'
-        );
+        setXlsxMsg(reason + detail);
         return;
       }
 
@@ -602,7 +608,8 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
         source:      mimeType === 'application/pdf' ? 'PDF' : 'Image',
         isReady:     grandTotal != null && customerName !== '待确认',
       });
-      setRegisterQuote(grandTotal != null && customerName !== '待确认');
+      console.log('[QUOTE PARSE] parseFileWithAI success | items:', items.length, '| grandTotal:', grandTotal);
+      setRegisterQuote(true);
       setParsedFromFile(true);
 
       const confNote = data.confidence === 'high' ? '识别度高'
@@ -637,12 +644,17 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       // Detect file intent before parsing
       const intent = detectFileIntent(f.name, rawText);
       setDetectedFileType(intent);
+      console.log('[QUOTE PARSE] file name:', f.name, '| type:', f.type, '| intent:', intent);
       // customer_quote_record: try parsing for record keeping, but won't trigger supplier quote flow
       // supplier_quote / customer_inquiry / boq: full parse + optional quote registration
       if (/\.(xlsx|xls|csv)$/i.test(f.name)) {
+        console.log('[QUOTE PARSE] → parseExcelFile, isCrmCtx:', intent === 'customer_quote_record');
         parseExcelFile(f, intent);
       } else if (f.type === 'application/pdf' || f.type.startsWith('image/')) {
+        console.log('[QUOTE PARSE] → parseFileWithAI (Gemini OCR)');
         parseFileWithAI(f.type, base64, f.name);
+      } else {
+        console.warn('[QUOTE PARSE] → NO parser matched! name:', f.name, 'type:', f.type);
       }
     }
     setAttachments(p => [...p, ...next]);
@@ -1387,7 +1399,13 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                 <div className="px-5 pb-3 space-y-2">
                     {/* File attachment notice */}
                     {attachments.length > 0 && (
-                      parsedFromFile && lineItems.length > 0 ? (
+                      xlsxStatus === 'parsing' ? (
+                        <div className="px-3 py-2 rounded-lg flex items-center gap-2 text-xs font-bold"
+                          style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: '#A5B4FC' }}>
+                          <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin shrink-0" />
+                          正在识别文件内容…
+                        </div>
+                      ) : parsedFromFile && lineItems.length > 0 ? (
                         <div className="px-3 py-2 rounded-lg flex items-start gap-2 text-xs font-bold"
                           style={{ background: 'rgba(5,150,105,0.08)', border: '1px solid rgba(5,150,105,0.3)', color: '#6EE7B7' }}>
                           <CheckCircle2 className="w-3 h-3 shrink-0 mt-0.5" />
@@ -1395,9 +1413,13 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                         </div>
                       ) : (
                         <div className="px-3 py-2 rounded-lg flex items-start gap-2 text-xs font-bold"
-                          style={{ background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.25)', color: '#A5B4FC' }}>
+                          style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', color: '#FCD34D' }}>
                           <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
-                          当前附件尚未自动识别（暂无 OCR），请粘贴报价文字或在下方手动补充金额。
+                          <span>
+                            {xlsxStatus === 'warn' && xlsxMsg
+                              ? `识别结果：${xlsxMsg}`
+                              : '文件已保存为附件，未能自动识别明细。请手动输入总金额，或添加产品明细后保存留底。'}
+                          </span>
                         </div>
                       )
                     )}
