@@ -120,7 +120,7 @@ export default async function handler(request: Request): Promise<Response> {
     payload.driveUrls.forEach(f => f.url && contextParts.push(`附件：${f.name} → ${f.url}`));
   }
   if (payload.lastContext) contextParts.push(payload.lastContext);
-  const enrichedContext = contextParts.join('\n').slice(0, 2000);
+  const enrichedContext = contextParts.join('\n').slice(0, 4000);
 
   // ── Step 1: Write to Business Master (🏗️ Business Master) ──────────────────
   // Real schema confirmed 2026-07-10 via Notion MCP:
@@ -190,7 +190,7 @@ export default async function handler(request: Request): Promise<Response> {
     payload.driveUrls.forEach(f => f.url && noteParts.push(`附件：${f.name} → ${f.url}`));
   }
   if (payload.lastContext) noteParts.push(payload.lastContext);
-  const followupNotes = noteParts.join('\n').slice(0, 2000);
+  const followupNotes = noteParts.join('\n').slice(0, 4000);
 
   const followupProperties: Record<string, any> = {
     'Customer（客户）': { title: [{ type: 'text', text: { content: followupTitle } }] },

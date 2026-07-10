@@ -60,7 +60,7 @@ function analyseInput(text: string, hasFiles: boolean): FollowUpDraft {
 
   let type: BusinessType | 'INTERNAL' = 'TRADE';
   if (internal) type = 'INTERNAL';
-  else if (/project|项目|工程|villa|fitout|interior|renovation|ff&e|design|装修|室内/i.test(text)) type = 'PROJECT';
+  else if (/project|项目|工程|villa|fitout|interior|renovation|ff&e|design|装修|室内|accommodation|workers.*acc|宿舍|宿\s*舍|G\+\d|楼宿|工人住|camp\s*capacity|asking\s*price.*million|for\s*sale.*floor|land\s*area|building\s*area|total.*area/i.test(text)) type = 'PROJECT';
   else if (/log|仅记录|note|备注/i.test(text)) type = 'LOG_ONLY';
 
   let source = '手动输入';
@@ -127,6 +127,10 @@ function analyseInput(text: string, hasFiles: boolean): FollowUpDraft {
   const displayClientName = clientName || '待确认';
 
   let nextAction = '确认需求并回复';
+  if (type === 'PROJECT') {
+    if (/for\s*sale|出售|asking\s*price|selling/i.test(text)) nextAction = '确认客户角色（买方/卖方/中介）、产权文件、是否可谈价，以及是否有买方资源';
+    else nextAction = '了解项目详情、预算、时间节点，安排实地考察或资料提交';
+  }
   if (/confirm|确认/i.test(text)) nextAction = '确认相关信息并回复';
   if (/send|发送|发一下|发报价/i.test(text)) nextAction = '发送报价 / 资料';
   if (/follow.?up|跟进/i.test(text)) nextAction = '跟进进展';
@@ -137,6 +141,12 @@ function analyseInput(text: string, hasFiles: boolean): FollowUpDraft {
   if (internal) {
     title = text.replace(/让\s*(lili|novie|本人)/i, '').trim();
     if (title.length > 50) title = title.slice(0, 50) + '…';
+  } else if (type === 'PROJECT' && text.trim()) {
+    // For PROJECT, try to build a meaningful title from property/project keywords
+    const forSaleMatch = text.match(/for\s*sale[^:：\n]*[:：\s]+([^\n]{4,60})/i);
+    const firstLine = text.trim().split('\n')[0];
+    const raw = forSaleMatch?.[1]?.trim() || firstLine;
+    title = raw.length > 60 ? raw.slice(0, 60) + '…' : raw;
   } else if (text.trim()) {
     const firstLine = text.trim().split('\n')[0];
     title = firstLine.length > 60 ? firstLine.slice(0, 60) + '…' : firstLine;
@@ -159,7 +169,7 @@ function analyseInput(text: string, hasFiles: boolean): FollowUpDraft {
     contactPerson,
     type, source, priority, assignedTo,
     nextAction, dueDate: tom.toISOString().slice(0, 10),
-    notes: text.slice(0, 300), missingFields,
+    notes: text.slice(0, 2000), missingFields,
   };
 }
 
@@ -386,13 +396,19 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       const data = await res.json();
       if (data.ok && data.text) {
         const extracted = data.text.trim();
-        // Append extracted text to rawText so analyseInput can process it
+        // Append extracted text to rawText then immediately run analyseInput
         setRawText(prev => {
           const sep = prev.trim() ? '\n\n' : '';
-          return prev + sep + extracted;
+          const merged = prev + sep + extracted;
+          // Auto-generate draft from extracted content
+          const result = analyseInput(merged, true);
+          setDraft(result);
+          setRegisterQuote(false);
+          setQuoteDraft(null);
+          return merged;
         });
         setXlsxStatus('done');
-        setXlsxMsg(`截图文字已提取（${extracted.length} 字符）。请点击"AI 分析"生成跟进草稿。`);
+        setXlsxMsg(`截图文字已提取（${extracted.length} 字符），草稿已生成，请确认后保存。`);
       } else {
         // Graceful fallback: file is saved as attachment, prompt user to paste text
         setXlsxStatus('warn');
@@ -1164,16 +1180,20 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
     const rawClientName = optional.clientName || (isInternal ? '' : draft.clientName.replace(/（待确认）$/, '').trim());
     const clientName = rawClientName || (isInternal ? '' : '未知客户');
     const contactKey = (optional.whatsapp || optional.phoneE164 || optional.email || '').replace(/[\s+]/g,'').toLowerCase();
-    // Build lastContext: include quote record status if applicable
-    let lastContextNote = draft.notes;
+    // Build lastContext: for PROJECT/chat_screenshot, use full rawText (not truncated draft.notes)
+    // so Business Master 项目情况 and Follow-up Log get the complete project description.
+    const fullContext = draft.type === 'PROJECT' || detectedFileType === 'chat_screenshot'
+      ? (rawText.trim() || draft.notes)
+      : draft.notes;
+    let lastContextNote = fullContext;
     if (detectedFileType === 'customer_quote_record' || (registerQuote && attachments.some(a => a.data || a.driveUrl))) {
-      lastContextNote = `[客户报价留底] ${draft.notes}`.trim();
+      lastContextNote = `[客户报价留底] ${fullContext}`.trim();
     } else if (detectedFileType === 'customer_inquiry') {
-      lastContextNote = `[客户询价清单] ${draft.notes}`.trim();
+      lastContextNote = `[客户询价清单] ${fullContext}`.trim();
     } else if (detectedFileType === 'supplier_quote') {
-      lastContextNote = `[供应商报价] ${draft.notes}`.trim();
+      lastContextNote = `[供应商报价] ${fullContext}`.trim();
     } else if (detectedFileType === 'boq') {
-      lastContextNote = `[BOQ/工程清单] ${draft.notes}`.trim();
+      lastContextNote = `[BOQ/工程清单] ${fullContext}`.trim();
     }
 
     const task: Partial<FollowUpTask> = {
