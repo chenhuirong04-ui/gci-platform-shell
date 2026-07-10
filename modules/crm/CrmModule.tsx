@@ -356,15 +356,11 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
     try {
       const result = await notionSyncService.sync();
 
-      // ── result.notionTasks is the canonical Notion source ──────────────────
-      // Preserve any local HIST_ records not yet synced to Notion (e.g. SB created
-      // but Follow-up Log write failed, or Notion propagation delay).
+      // ── result.tasks is already the merged set (Notion + preserved HIST_ from localStorage) ──
+      // notionSync.sync() reads localStorage directly so local HIST_ records are preserved
+      // even when tasks React state is empty (e.g. during initial page load race condition).
       notionOverwriteInProgressRef.current = true;
-      const notionIds = new Set(result.notionTasks.map((t: any) => t.id).filter(Boolean));
-      const localHistOnly = tasks.filter(
-        (t: any) => t?.id?.startsWith('HIST_') && !notionIds.has(t.id)
-      );
-      setTasks([...localHistOnly, ...result.notionTasks]);
+      setTasks(result.tasks);
       setLastSyncAt(result.syncedAt);
       setTodayFollowupCount(result.todayFollowupCount);
 
@@ -559,12 +555,18 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
           followUpDate: new Date().toISOString().slice(0, 10),
         } : basePayload;
 
+        console.log(`[PROJECT SAVE] endpoint=${endpoint} businessType=${businessType}`);
+        console.log('[PROJECT SAVE] payload', notionPayload);
+
         const res = await fetch(`${base}${endpoint}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(notionPayload),
         });
-        const result = await res.json();
+        const text = await res.text();
+        console.log('[PROJECT SAVE] status', res.status, '| body:', text.slice(0, 500));
+        let result: any;
+        try { result = JSON.parse(text); } catch { result = { error: text }; }
 
         if (res.ok) {
           // Backfill Notion page IDs so future archive/restore calls work

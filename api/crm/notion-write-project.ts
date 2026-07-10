@@ -122,26 +122,41 @@ export default async function handler(request: Request): Promise<Response> {
   if (payload.lastContext) contextParts.push(payload.lastContext);
   const enrichedContext = contextParts.join('\n').slice(0, 2000);
 
-  // ── Step 1: Write to 项目客户库 ──────────────────────────────────────────────
-  // Field names based on what notion-sync.ts reads from this DB
+  // ── Step 1: Write to Business Master (🏗️ Business Master) ──────────────────
+  // Real schema confirmed 2026-07-10 via Notion MCP:
+  //   项目名称 (title), 客户名 (text), 项目类型 (select), 项目阶段 (select),
+  //   项目情况 (text), 城市 (text), 联系电话 (phone_number), 联系邮件 (email),
+  //   联系人 (text), 负责人 (select: Chris/lili/novie), 下次跟进日期 (date)
+  // Fields that DO NOT exist: 客户名称, 业务类型, 电话, WhatsApp, Email, 备注
+  const goalSnippet = payload.lastContext?.slice(0, 40) || payload.clientName.trim();
+  const projectTitle = `${payload.clientName.trim()} — ${goalSnippet}`;
   const projectProperties: Record<string, any> = {
-    // Title field — try 客户名称 (most common in GCI's Chinese Notion setup)
-    '客户名称': { title: [{ type: 'text', text: { content: payload.clientName.trim() } }] },
-    '业务类型': { select: { name: '项目型' } },
+    '项目名称': { title: [{ type: 'text', text: { content: projectTitle } }] },
+    '客户名':   { rich_text: [{ type: 'text', text: { content: payload.clientName.trim() } }] },
+    '项目阶段': { select: { name: '询盘' } },
+    '项目类型': { select: { name: '贸易采购类' } },
   };
   if (payload.phone || payload.whatsapp) {
     const phone = (payload.whatsapp || payload.phone || '').trim();
-    if (phone) projectProperties['电话'] = { phone_number: phone };
-    if (payload.whatsapp) projectProperties['WhatsApp'] = { phone_number: payload.whatsapp.trim() };
+    if (phone) projectProperties['联系电话'] = { phone_number: phone };
   }
   if (payload.countryCity) {
     projectProperties['城市'] = { rich_text: [{ type: 'text', text: { content: payload.countryCity } }] };
   }
   if (payload.email) {
-    projectProperties['Email'] = { email: payload.email.trim() };
+    projectProperties['联系邮件'] = { email: payload.email.trim() };
+  }
+  if (payload.contactPerson) {
+    projectProperties['联系人'] = { rich_text: [{ type: 'text', text: { content: payload.contactPerson } }] };
   }
   if (enrichedContext) {
-    projectProperties['备注'] = { rich_text: [{ type: 'text', text: { content: enrichedContext } }] };
+    projectProperties['项目情况'] = { rich_text: [{ type: 'text', text: { content: enrichedContext } }] };
+  }
+  // 负责人 select must be one of: Chris, lili, novie
+  const ownerVal = (payload.owner === 'lili' || payload.owner === 'novie') ? payload.owner : 'Chris';
+  projectProperties['负责人'] = { select: { name: ownerVal } };
+  if (followUpDate) {
+    projectProperties['下次跟进日期'] = { date: { start: followUpDate } };
   }
 
   console.log('[notion-write-project] Step 1: writing to projects DB...');
