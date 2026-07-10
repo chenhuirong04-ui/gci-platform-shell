@@ -195,21 +195,48 @@ export default async function handler(request: Request): Promise<Response> {
     followupProperties['Follow-up Owner（负责人）'] = { select: { name: payload.owner } };
   }
 
+  const writeFollowup = (props: Record<string, any>) =>
+    fetch('https://api.notion.com/v1/pages', {
+      method: 'POST',
+      headers: notionHeaders(token),
+      body: JSON.stringify({ parent: { database_id: followupDbId }, properties: props }),
+    });
+
   console.log('[notion-write-project] Step 2: writing to Follow-up Log...');
-  const followupRes = await fetch('https://api.notion.com/v1/pages', {
-    method: 'POST',
-    headers: notionHeaders(token),
-    body: JSON.stringify({ parent: { database_id: followupDbId }, properties: followupProperties }),
-  });
+  let followupRes = await writeFollowup(followupProperties);
 
   if (!followupRes.ok) {
-    const err = await followupRes.json().catch(() => ({}));
-    console.error('[notion-write-project] Step 2 FAILED:', followupRes.status, JSON.stringify(err).slice(0, 500));
-    return json({
-      error: `Follow-up Log 写入失败 (${followupRes.status})`,
-      detail: err, step: 2,
-      projectPageId: projectPage.id,
-    }, followupRes.status);
+    const firstErr = await followupRes.json().catch(() => ({}));
+    console.warn('[notion-write-project] Step 2 full write failed, retrying minimal fields:',
+      followupRes.status, JSON.stringify(firstErr).slice(0, 200));
+
+    const minimalProps: Record<string, any> = {
+      'Customer（客户）': followupProperties['Customer（客户）'],
+      'Follow-up Date（跟进日期）': followupProperties['Follow-up Date（跟进日期）'],
+      'Next Follow-up（下次跟进）': followupProperties['Next Follow-up（下次跟进）'],
+    };
+    if (followupProperties['Follow-up Notes（跟进内容）']) {
+      minimalProps['Follow-up Notes（跟进内容）'] = followupProperties['Follow-up Notes（跟进内容）'];
+    }
+    if (followupProperties['下次行动内容']) {
+      minimalProps['下次行动内容'] = followupProperties['下次行动内容'];
+    }
+
+    followupRes = await writeFollowup(minimalProps);
+
+    if (!followupRes.ok) {
+      const err2 = await followupRes.json().catch(() => ({}));
+      const followupError = `Follow-up Log ${followupRes.status}: ${(err2 as any)?.message || JSON.stringify(err2).slice(0, 200)}`;
+      console.error('[notion-write-project] Step 2 FAILED even with minimal fields:', followupError);
+      return json({
+        ok: true,
+        partial: true,
+        projectPageId: projectPage.id,
+        followupCreated: false,
+        followupError,
+      });
+    }
+    console.log('[notion-write-project] Step 2 retry OK (minimal fields)');
   }
 
   const followupPage = await followupRes.json() as any;
@@ -217,7 +244,9 @@ export default async function handler(request: Request): Promise<Response> {
 
   return json({
     ok: true,
+    partial: false,
     projectPageId: projectPage.id,
     followupPageId: followupPage.id,
+    followupCreated: true,
   });
 }

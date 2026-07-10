@@ -216,11 +216,12 @@ function isScreenshotImage(fileName: string, mimeType: string): boolean {
 function detectFileIntent(fileName: string, mimeType: string, textHint: string): FileIntent {
   const name = fileName.toLowerCase();
 
-  // 0. Image files: screenshots and chat images → chat_screenshot (never quote OCR)
-  //    Unless user explicitly says it's a quote document
+  // 0. Image files → chat_screenshot by default (chat screenshots, WhatsApp photos).
+  //    Only treat as quote image if file name OR user text contains explicit quote keywords.
   if (mimeType.startsWith('image/')) {
-    const isQuoteHint = /留底|已发给客户|已报价|已报给|报给客户|我们(发|报)的|报价单|pi |proforma/i.test(textHint);
-    if (!isQuoteHint) return 'chat_screenshot';
+    const isQuoteFileName = /quotation|invoice|\bpi[-_\s]|\bpi\d|proforma|报价单?|留底/i.test(name);
+    const isQuoteTextHint = /留底|已发给客户|已报价|已报给|报给客户|我们(发|报)的|报价单|proforma/i.test(textHint);
+    if (!isQuoteFileName && !isQuoteTextHint) return 'chat_screenshot';
   }
 
   // 1. Explicit user intent in text — highest priority
