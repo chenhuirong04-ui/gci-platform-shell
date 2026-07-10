@@ -192,6 +192,15 @@ export default async function handler(request: Request): Promise<Response> {
   if (payload.lastContext) noteParts.push(payload.lastContext);
   const followupNotes = noteParts.join('\n').slice(0, 4000);
 
+  // 项目背景 = the full project context (same as 项目情况 in Business Master)
+  // Use enrichedContext so both databases get the same content.
+  const projectBackground = enrichedContext || followupNotes;
+
+  console.log('[notion-write-project] Step 2 debug:',
+    'followupNotes.len=', followupNotes.length,
+    '| projectBackground.len=', projectBackground.length,
+    '| goal=', payload.goal?.slice(0, 80));
+
   const followupProperties: Record<string, any> = {
     'Customer（客户）': { title: [{ type: 'text', text: { content: followupTitle } }] },
     '行动状态':  { select: { name: statusLabel } },
@@ -203,12 +212,16 @@ export default async function handler(request: Request): Promise<Response> {
   if (followupNotes) {
     followupProperties['Follow-up Notes（跟进内容）'] = { rich_text: [{ type: 'text', text: { content: followupNotes } }] };
   }
+  if (projectBackground) {
+    followupProperties['项目背景'] = { rich_text: [{ type: 'text', text: { content: projectBackground } }] };
+  }
   if (payload.goal) {
     followupProperties['下次行动内容'] = { rich_text: [{ type: 'text', text: { content: payload.goal.slice(0, 2000) } }] };
   }
-  if (payload.owner) {
-    followupProperties['Follow-up Owner（负责人）'] = { select: { name: payload.owner } };
-  }
+  // Follow-up Owner: must be one of Chris / lili / novie (Notion select)
+  const validOwners = new Set(['Chris', 'lili', 'novie']);
+  const ownerForLog = validOwners.has(payload.owner ?? '') ? payload.owner! : 'Chris';
+  followupProperties['Follow-up Owner（负责人）'] = { select: { name: ownerForLog } };
 
   const writeFollowup = (props: Record<string, any>) =>
     fetch('https://api.notion.com/v1/pages', {
@@ -232,6 +245,9 @@ export default async function handler(request: Request): Promise<Response> {
     };
     if (followupProperties['Follow-up Notes（跟进内容）']) {
       minimalProps['Follow-up Notes（跟进内容）'] = followupProperties['Follow-up Notes（跟进内容）'];
+    }
+    if (followupProperties['项目背景']) {
+      minimalProps['项目背景'] = followupProperties['项目背景'];
     }
     if (followupProperties['下次行动内容']) {
       minimalProps['下次行动内容'] = followupProperties['下次行动内容'];

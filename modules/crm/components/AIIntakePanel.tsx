@@ -1196,6 +1196,10 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       lastContextNote = `[BOQ/工程清单] ${fullContext}`.trim();
     }
 
+    console.log('[PROJECT SAVE] draft.type=', draft.type, '| detectedFileType=', detectedFileType);
+    console.log('[PROJECT SAVE] rawText.len=', rawText.length, '| draft.notes.len=', draft.notes?.length);
+    console.log('[PROJECT SAVE] fullContext.len=', fullContext.length, '| lastContextNote.len=', lastContextNote.length);
+
     const task: Partial<FollowUpTask> = {
       clientName: isInternal ? '' : clientName,
       countryCity: optional.countryCity || 'Unknown',
@@ -1210,6 +1214,8 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       tradeStatus: tradeStatus as any,
       contactPerson: draft.contactPerson || undefined,
     };
+    console.log('[PROJECT SAVE] task.lastContext.len=', (task.lastContext || '').length,
+      '| task.goal=', task.goal?.slice(0, 60));
     try {
       // Init step tracker before onAdd so user can see progress
       // isCrmRecord = true when:

@@ -556,7 +556,11 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
         } : basePayload;
 
         console.log(`[PROJECT SAVE] endpoint=${endpoint} businessType=${businessType}`);
-        console.log('[PROJECT SAVE] payload', notionPayload);
+        console.log('[PROJECT Notion] payload.clientName=', notionPayload.clientName);
+        console.log('[PROJECT Notion] payload.lastContext.len=', (notionPayload.lastContext || '').length);
+        console.log('[PROJECT Notion] payload.goal=', notionPayload.goal?.slice?.(0, 80));
+        console.log('[PROJECT Notion] payload.tradeStatus=', notionPayload.tradeStatus);
+        console.log('[PROJECT SAVE] full payload', notionPayload);
 
         const res = await fetch(`${base}${endpoint}`, {
           method: 'POST',
