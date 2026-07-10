@@ -4,6 +4,7 @@ import { useT } from '../translations';
 import { fmt } from '../lib/bsCalculations';
 import { CustomerDocumentManager } from './CustomerDocumentManager';
 import { ComplianceItemManager } from './ComplianceItemManager';
+import { PersonManager } from './PersonManager';
 
 interface Props {
   lang: BSLang;
@@ -32,7 +33,7 @@ const STATUS_COLOR: Record<string, string> = {
 const GOLD = '#C9A84C';
 const NAVY = '#0c1b3a';
 
-type DetailTab = 'info' | 'service' | 'quotes' | 'documents' | 'compliance' | 'followup';
+type DetailTab = 'info' | 'service' | 'quotes' | 'documents' | 'compliance' | 'persons' | 'followup';
 
 export function ServiceCustomerDetail({
   lang, customer, quotes, onEdit, onNewQuote, onViewQuote, onClose,
@@ -41,15 +42,24 @@ export function ServiceCustomerDetail({
   const isZh = lang === 'zh';
   const [activeTab, setActiveTab] = useState<DetailTab>('info');
 
-  // Bridge: when a document is uploaded that needs a compliance item,
-  // auto-switch to compliance tab and pass prefill data
+  // Bridge: compliance prefill from document upload
   const [compliancePrefill, setCompliancePrefill] = useState<
-    { documentId: string; documentType: string; documentName: string } | undefined
+    { documentId: string; documentType: string; documentName: string; parsed?: Record<string, unknown> } | undefined
   >();
+
+  // Bridge: persons prefill from document upload
+  const [personPrefill, setPersonPrefill] = useState<{
+    documentId: string; documentType: string; documentName: string; parsed: Record<string, unknown>;
+  } | null>(null);
 
   const handleComplianceTrigger = (info: { documentId: string; documentType: string; documentName: string }) => {
     setCompliancePrefill(info);
     setActiveTab('compliance');
+  };
+
+  const handlePersonTrigger = (info: { documentId: string; documentType: string; documentName: string; parsed: Record<string, unknown> }) => {
+    setPersonPrefill(info);
+    setActiveTab('persons');
   };
 
   const tabs: { key: DetailTab; label: string }[] = [
@@ -58,6 +68,7 @@ export function ServiceCustomerDetail({
     { key: 'quotes',     label: isZh ? '报价记录' : 'Quotes' },
     { key: 'documents',  label: isZh ? '客户文件' : 'Files' },
     { key: 'compliance', label: isZh ? '证照合规' : 'Compliance' },
+    { key: 'persons',   label: isZh ? '公司人员' : 'Persons' },
     { key: 'followup',   label: isZh ? '跟进记录' : 'Follow-up' },
   ];
 
@@ -191,7 +202,13 @@ export function ServiceCustomerDetail({
             customerId={customer.id}
             customerName={customer.customer_name}
             lang={lang}
-            onComplianceTrigger={handleComplianceTrigger}
+            onCreateComplianceItem={({ documentId, documentType, documentName, parsed }) => {
+              setCompliancePrefill({ documentId, documentType, documentName, parsed: parsed as Record<string, unknown> });
+              setActiveTab('compliance');
+            }}
+            onCreatePerson={({ documentId, documentType, documentName, parsed }) => {
+              handlePersonTrigger({ documentId, documentType, documentName, parsed: parsed as Record<string, unknown> });
+            }}
           />
         )}
 
@@ -205,7 +222,17 @@ export function ServiceCustomerDetail({
           />
         )}
 
-        {/* ── 6. 跟进记录 ── */}
+        {/* ── 6. 公司人员 ── */}
+        {activeTab === 'persons' && customer.id && (
+          <PersonManager
+            customerId={customer.id}
+            lang={lang}
+            prefillFromDocument={personPrefill}
+            onPrefillHandled={() => setPersonPrefill(null)}
+          />
+        )}
+
+        {/* ── 7. 跟进记录 ── */}
         {activeTab === 'followup' && (
           <div>
             <div className="text-[10px] font-black uppercase tracking-widest mb-3" style={{ color: GOLD }}>
