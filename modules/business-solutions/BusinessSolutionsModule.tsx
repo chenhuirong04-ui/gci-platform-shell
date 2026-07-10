@@ -349,6 +349,7 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
             quote={viewingQuote.quote}
             items={viewingQuote.items}
             onClose={() => setViewingQuote(null)}
+            onEdit={() => handleEditQuote(viewingQuote.quote)}
             onMarkSent={handleMarkSent}
             onMarkAccepted={handleMarkAccepted}
             onCopyAsNew={handleCopyQuoteAsNew}
