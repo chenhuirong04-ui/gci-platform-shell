@@ -580,9 +580,13 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
 
           if (result.partial) {
             // SB Pool created/reused OK, but Follow-up Log failed — keep local record
+            (updates as any).notionSyncStatus = 'followup_failed';
+            if (Object.keys(updates).length > 0) {
+              setTasks(prev => prev.map(t => t.id === baseTask.id ? { ...t, ...updates } : t));
+            }
             const reuseLabel = result.sbReused ? `（复用 ${result.sbId}）` : `（${result.sbId}）`;
             showToast(
-              `⚠️ 已进入贸易客户池 ${reuseLabel}，Follow-up Log 写入失败，请点击"重新同步跟进记录"`,
+              `⚠️ 已进入贸易客户池 ${reuseLabel}，Follow-up Log 写入失败，点击导航栏"补写记录"重试`,
               'error'
             );
             console.error('[LeadSubmit] Follow-up Log failed:', result.followupError);
@@ -838,6 +842,61 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
     }
   };
 
+  // ── 补写 Follow-up Log（partial 失败时重试）──────────────────────────
+  const [retryFollowupSyncing, setRetryFollowupSyncing] = useState(false);
+  const retryFollowupLog = async () => {
+    const failedTasks = tasks.filter(t => (t as any).notionSyncStatus === 'followup_failed' && (t as any).customerCode);
+    if (failedTasks.length === 0) {
+      showToast('没有需要补写的 Follow-up Log 记录', 'info');
+      return;
+    }
+    setRetryFollowupSyncing(true);
+    showToast(`正在补写 ${failedTasks.length} 条 Follow-up Log…`, 'info');
+    const base = typeof window !== 'undefined' ? window.location.origin : '';
+    let ok = 0, fail = 0;
+    for (const task of failedTasks) {
+      try {
+        const res = await fetch(`${base}/api/crm/notion-create-followup-only`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sbId: (task as any).customerCode,
+            customerName: task.clientName,
+            tradeStatus: task.tradeStatus,
+            businessType: task.businessType,
+            owner: task.owner,
+            notes: task.lastContext || task.notes,
+            goal: task.goal,
+            nextFollowUpAt: task.nextFollowUpAt,
+            phone: task.phoneE164,
+            whatsapp: task.whatsapp,
+          }),
+        });
+        const result = await res.json();
+        if (result.ok) {
+          ok++;
+          setTasks(prev => prev.map(t =>
+            t.id === task.id
+              ? { ...t, leadId: result.followupPageId || t.leadId, notionSyncStatus: 'ok' } as any
+              : t
+          ));
+        } else {
+          fail++;
+          console.error('[retryFollowupLog] failed for', task.clientName, result.error);
+        }
+      } catch (e: any) {
+        fail++;
+        console.error('[retryFollowupLog] error for', task.clientName, e?.message);
+      }
+    }
+    setRetryFollowupSyncing(false);
+    if (fail === 0) {
+      showToast(`✓ ${ok} 条 Follow-up Log 已补写成功`, 'success');
+    } else {
+      showToast(`补写完成：${ok} 成功 / ${fail} 失败，请查看控制台`, fail > 0 ? 'error' : 'success');
+    }
+  };
+
   // ── 批量同步本地已归档记录 → Notion ────────────────────────────────
   // For records that were archived before Notion write-back was available,
   // or if individual write-backs failed. Runs in parallel, shows summary.
@@ -987,6 +1046,19 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
                   return diff < 1 ? '刚刚' : `${diff}分钟前`;
                 })()}
               </span>
+            )}
+            {/* 补写 Follow-up Log（partial 失败时） */}
+            {tasks.some(t => (t as any).notionSyncStatus === 'followup_failed') && (
+              <button
+                onClick={retryFollowupLog}
+                disabled={retryFollowupSyncing}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black transition-all disabled:opacity-50"
+                style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.35)' }}
+                title="补写 Follow-up Log（SB Pool 已创建，但 Follow-up Log 未写入）"
+              >
+                <RefreshCw className={`w-3 h-3 ${retryFollowupSyncing ? 'animate-spin' : ''}`} />
+                {retryFollowupSyncing ? '补写中…' : '⚠ 补写记录'}
+              </button>
             )}
             {/* 批量同步归档→Notion */}
             {tasks.some(t => t.status === 'archived' && t.leadId?.includes('-') && !/^(LEAD_|HIST_|SYNTH_|INT_|NOTION-)/i.test(t.leadId)) && (

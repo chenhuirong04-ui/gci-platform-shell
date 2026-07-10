@@ -109,7 +109,7 @@ export default async function handler(request: Request): Promise<Response> {
 
   // Follow-up Notes (same truncated key as notion-write-lead)
   if (payload.lastNote) {
-    properties['Follow-up Notes（跟进内容'] = {
+    properties['Follow-up Notes（跟进内容）'] = {
       rich_text: [{ type: 'text', text: { content: payload.lastNote.slice(0, 2000) } }],
     };
   }

@@ -126,6 +126,8 @@ export interface FollowUpTask {
   // Notion Follow-up Log 页面 ID — 独立于 leadId，专用于 Notion 回写
   // 编辑时优先用此字段，通过 isLikelyNotionPageId() 校验后再调用 API
   notionFollowupPageId?: string;
+  // Notion sync status — 'followup_failed' means SB Pool OK but Follow-up Log write failed
+  notionSyncStatus?: 'ok' | 'followup_failed';
 }
 
 export interface AIInsights {

@@ -106,17 +106,22 @@ function formatSBId(n: number): string {
   return 'SB' + String(n).padStart(3, '0');
 }
 
-// Find existing SB Pool entry by client name (case-insensitive exact match)
+// Find existing SB Pool entry by client name (case-insensitive exact match).
+// Returns the EARLIEST entry (lowest SB number) when duplicates exist.
 function findExistingClient(pages: any[], name: string): { sbId: string; pageId: string } | null {
   const target = name.trim().toLowerCase();
+  let best: { sbId: string; pageId: string; num: number } | null = null;
   for (const page of pages) {
     const titleText = getText(page.properties?.['客户名称']).trim().toLowerCase();
     const idText    = getText(page.properties?.['客户ID']).trim();
     if (titleText === target && /^SB\d+$/i.test(idText)) {
-      return { sbId: idText.toUpperCase(), pageId: page.id };
+      const num = parseInt(idText.replace(/^SB/i, ''), 10);
+      if (!best || num < best.num) {
+        best = { sbId: idText.toUpperCase(), pageId: page.id, num };
+      }
     }
   }
-  return null;
+  return best ? { sbId: best.sbId, pageId: best.pageId } : null;
 }
 
 // Map source string to SB Pool 来源 select option
@@ -314,7 +319,6 @@ export default async function handler(request: Request): Promise<Response> {
     'Follow-up Method（跟进方式）': { select: { name: mapMethod(payload.followUpMethod) } },
   };
   if (followupNotes) {
-    // ⚠️ Field name must match Notion DB exactly (includes full-width brackets)
     followupProperties['Follow-up Notes（跟进内容）'] = { rich_text: [{ type: 'text', text: { content: followupNotes } }] };
   }
   if (payload.goal) {

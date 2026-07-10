@@ -185,13 +185,15 @@ const TYPE_LABEL: Record<string, string> = {
 
 // ── file intent detection ─────────────────────────────────────────────
 export type FileIntent =
+  | 'chat_screenshot'        // WhatsApp / 邮件 / 客户聊天截图 → 生成跟进记录，不进报价流程
   | 'customer_quote_record'  // 我们已报给客户的报价单 / PI / 留底
   | 'customer_inquiry'       // 客户发来的询价 / 产品清单，需要我们报价
   | 'supplier_quote'         // 供应商发来的报价，用于转换成 GCI 报价
   | 'boq'                    // 工程 / BOQ / 材料清单
-  | 'followup_context';      // 普通附件 / 截图 / 跟进上下文
+  | 'followup_context';      // 普通附件 / 文档 / 跟进上下文
 
 const FILE_INTENT_LABEL: Record<FileIntent, string> = {
+  chat_screenshot:       '💬 客户聊天截图',
   customer_quote_record: '📋 客户报价留底',
   customer_inquiry:      '❓ 客户询价清单',
   supplier_quote:        '🏭 供应商报价',
@@ -199,8 +201,27 @@ const FILE_INTENT_LABEL: Record<FileIntent, string> = {
   followup_context:      '📎 跟进附件',
 };
 
-function detectFileIntent(fileName: string, textHint: string): FileIntent {
+// Image files that are screenshots / chat images — NOT quote documents
+function isScreenshotImage(fileName: string, mimeType: string): boolean {
+  if (!mimeType.startsWith('image/')) return false;
   const name = fileName.toLowerCase();
+  // WhatsApp images, phone screenshots, generic captures
+  if (/^whatsapp.?image/i.test(name)) return true;
+  if (/^screenshot|屏幕截图|截图|截屏|capture|screen.?shot/i.test(name)) return true;
+  if (/^img_\d|^image\d|^photo_\d|^pic_\d/i.test(name)) return true;
+  if (/^\d{8}_\d{6}|^\d{4}-\d{2}-\d{2}/i.test(name)) return true; // date-stamped photos
+  return false;
+}
+
+function detectFileIntent(fileName: string, mimeType: string, textHint: string): FileIntent {
+  const name = fileName.toLowerCase();
+
+  // 0. Image files: screenshots and chat images → chat_screenshot (never quote OCR)
+  //    Unless user explicitly says it's a quote document
+  if (mimeType.startsWith('image/')) {
+    const isQuoteHint = /留底|已发给客户|已报价|已报给|报给客户|我们(发|报)的|报价单|pi |proforma/i.test(textHint);
+    if (!isQuoteHint) return 'chat_screenshot';
+  }
 
   // 1. Explicit user intent in text — highest priority
   if (/留底|已发给客户|已报价|已报给|报给客户|我们(发|报)的|我们(已经)?发|我们报价/i.test(textHint))
@@ -346,6 +367,39 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
   const [tradeStatus, setTradeStatus] = useState<string>('新询盘');
 
   const hasInput = rawText.trim().length > 0 || attachments.length > 0;
+
+  // ── Chat screenshot text extraction ──────────────────────────────────
+  // Calls Gemini in text_only mode, appends extracted text to rawText,
+  // then auto-triggers analyseInput. Does NOT enter quotation flow.
+  const extractChatText = async (mimeType: string, dataURL: string, fileName: string) => {
+    setXlsxStatus('parsing');
+    setXlsxMsg('正在从截图中提取文字内容…');
+    try {
+      const res = await fetch('/api/ai/parse-quotation-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mimeType, data: dataURL, fileName, mode: 'text_only' }),
+      });
+      const data = await res.json();
+      if (data.ok && data.text) {
+        const extracted = data.text.trim();
+        // Append extracted text to rawText so analyseInput can process it
+        setRawText(prev => {
+          const sep = prev.trim() ? '\n\n' : '';
+          return prev + sep + extracted;
+        });
+        setXlsxStatus('done');
+        setXlsxMsg(`截图文字已提取（${extracted.length} 字符）。请点击"AI 分析"生成跟进草稿。`);
+      } else {
+        // Graceful fallback: file is saved as attachment, prompt user to paste text
+        setXlsxStatus('warn');
+        setXlsxMsg('截图已保存为附件。如 AI 无法识别，请将聊天内容手动粘贴到上方输入框，再点击分析。');
+      }
+    } catch {
+      setXlsxStatus('warn');
+      setXlsxMsg('截图已保存为附件。请将聊天内容手动粘贴到输入框后点击分析。');
+    }
+  };
 
   // ── PDF text extraction (runs before Gemini OCR; no API key needed) ──
   const parsePDFText = async (dataURL: string, _fileName: string): Promise<{
@@ -829,19 +883,18 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
         size: f.size, uploadedAt: new Date().toISOString(), isAnalyzed: false,
       });
       // Detect file intent before parsing
-      const intent = detectFileIntent(f.name, rawText);
+      const intent = detectFileIntent(f.name, f.type, rawText);
       setDetectedFileType(intent);
-      console.log('[QUOTE PARSE] file name:', f.name, '| type:', f.type, '| intent:', intent);
+      console.log('[FILE] name:', f.name, '| type:', f.type, '| intent:', intent);
+
       if (/\.(xlsx|xls|csv)$/i.test(f.name)) {
-        console.log('[QUOTE PARSE] → parseExcelFile, isCrmCtx:', intent === 'customer_quote_record');
+        // Excel / CSV → always quote parsing
         parseExcelFile(f, intent);
       } else if (f.type === 'application/pdf') {
-        // PDF: try local text extraction first, fallback to Gemini OCR only if needed
-        console.log('[QUOTE PARSE] → PDF: trying local text extraction first');
+        // PDF: try local text extraction first, fallback to Gemini quote OCR
         setXlsxStatus('parsing');
         setXlsxMsg('正在提取 PDF 文本内容…');
         parsePDFText(base64, f.name).then(pdfResult => {
-          console.log('[QUOTE PARSE] PDF text result | items:', pdfResult.items.length, '| grandTotal:', pdfResult.grandTotal);
           if (pdfResult.items.length > 0) {
             const grandTotal = pdfResult.grandTotal;
             const clientHint = optional.clientName.trim();
@@ -864,19 +917,20 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
               (grandTotal ? `，合计 AED ${grandTotal.toLocaleString()}` : '（未检测到总额，请手动填写）')
             );
           } else {
-            // No table found in text — fallback to Gemini OCR
-            console.log('[QUOTE PARSE] PDF text: no items, fallback to Gemini');
             parseFileWithAI(f.type, base64, f.name);
           }
-        }).catch(err => {
-          console.warn('[QUOTE PARSE] PDF text extraction error, fallback to Gemini:', err);
-          parseFileWithAI(f.type, base64, f.name);
-        });
+        }).catch(() => parseFileWithAI(f.type, base64, f.name));
+
       } else if (f.type.startsWith('image/')) {
-        console.log('[QUOTE PARSE] → parseFileWithAI (Gemini OCR, image)');
-        parseFileWithAI(f.type, base64, f.name);
+        if (intent === 'chat_screenshot') {
+          // Chat screenshot → extract text, feed into analyseInput. No quote parsing.
+          extractChatText(f.type, base64, f.name);
+        } else {
+          // Explicitly tagged quote image → OCR for structured parsing
+          parseFileWithAI(f.type, base64, f.name);
+        }
       } else {
-        console.warn('[QUOTE PARSE] → NO parser matched! name:', f.name, 'type:', f.type);
+        console.warn('[FILE] no parser for:', f.name, f.type);
       }
     }
     setAttachments(p => [...p, ...next]);
@@ -911,20 +965,23 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
         result.clientName = optional.clientName.trim();
         result.missingFields = result.missingFields.filter(f => f !== '客户名称');
       }
-      // Re-detect file intent now that we have the full text (text may clarify intent)
-      const finalIntent = attachments.length > 0
-        ? detectFileIntent(attachments[0].name, rawText)
+      // Re-detect file intent now that we have the full text (text may clarify intent).
+      // For chat screenshots: only re-classify if user explicitly typed a quote hint.
+      const firstAtt = attachments[0];
+      const finalIntent: FileIntent = attachments.length > 0
+        ? (detectedFileType === 'chat_screenshot' && !/留底|已报价|报给客户|proforma/i.test(rawText)
+            ? 'chat_screenshot'  // keep chat_screenshot unless user overrides
+            : detectFileIntent(firstAtt.name, firstAtt.type || 'image/jpeg', rawText))
         : detectedFileType;
       if (attachments.length > 0 && finalIntent !== detectedFileType) {
         setDetectedFileType(finalIntent);
-        // Auto-set 行动状态 default based on file intent
         if (finalIntent === 'customer_quote_record') setTradeStatus('已报价待确认');
         else if (finalIntent === 'customer_inquiry')  setTradeStatus('待报价');
         else if (finalIntent === 'boq')               setTradeStatus('需求整理中');
       }
 
-      // Set nextAction based on file intent
-      if (attachments.length > 0 && !result.nextAction.includes('报价')) {
+      // Set nextAction based on file intent (not for chat screenshots — analyseInput handles that)
+      if (attachments.length > 0 && finalIntent !== 'chat_screenshot' && !result.nextAction.includes('报价')) {
         if (finalIntent === 'customer_quote_record') result.nextAction = '跟进客户对报价的反馈';
         else if (finalIntent === 'customer_inquiry') result.nextAction = '整理客户询价并生成报价';
         else if (finalIntent === 'supplier_quote') result.nextAction = '根据供应商报价生成 GCI 报价单';
@@ -933,7 +990,11 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       }
 
       // detect quotation alongside followup — preserve Excel/OCR-parsed quoteDraft
-      if (finalIntent === 'customer_quote_record') {
+      // Chat screenshots NEVER enter the quote flow
+      if (finalIntent === 'chat_screenshot') {
+        setRegisterQuote(false);
+        setQuoteDraft(null);
+      } else if (finalIntent === 'customer_quote_record') {
         // Always show + check the quote registration block for quote files,
         // even if amount wasn't recognized (user sees "金额待补充").
         setRegisterQuote(true);
@@ -1566,8 +1627,8 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
                 </div>
               ))}
 
-              {/* 历史报价登记 — always visible when quote-relevant file detected */}
-              {(quoteDraft != null || detectedFileType === 'customer_quote_record') && (
+              {/* 历史报价登记 — only for quote files, never for chat screenshots */}
+              {detectedFileType !== 'chat_screenshot' && (quoteDraft != null || detectedFileType === 'customer_quote_record') && (
                 <div className="flex items-center px-5 py-3 gap-3" style={{ borderBottom: `1px solid ${BORDER}`, background: registerQuote ? 'rgba(245,158,11,0.05)' : 'transparent' }}>
                   <span className="text-[10px] font-black uppercase tracking-widest w-16 shrink-0" style={{ color: T3 }}>历史报价</span>
                   <label className="flex items-center gap-2 cursor-pointer select-none flex-1">

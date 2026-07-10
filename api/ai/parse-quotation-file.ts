@@ -70,7 +70,7 @@ export default async function handler(request: Request): Promise<Response> {
     return json({ ok: false, error: 'Invalid JSON body' }, 400);
   }
 
-  const { mimeType, data, fileName } = body;
+  const { mimeType, data, fileName, mode } = body;
   if (!mimeType || !data) return json({ ok: false, error: 'Missing required fields: mimeType, data' }, 400);
 
   const isImage = (mimeType as string).startsWith('image/');
@@ -85,16 +85,25 @@ export default async function handler(request: Request): Promise<Response> {
   // Strip data URL prefix (data:image/jpeg;base64,<actual_base64>)
   const base64 = typeof data === 'string' && data.includes(',') ? data.split(',')[1] : data;
 
+  // mode='text_only': extract raw text for chat screenshots — no structured parsing
+  const TEXT_ONLY_PROMPT = `Extract all visible text from this image exactly as it appears.
+Return the raw text content only — no JSON, no formatting, no analysis.
+Preserve line breaks. If the image contains a chat conversation, extract all message text.`;
+
+  const promptText = mode === 'text_only'
+    ? TEXT_ONLY_PROMPT
+    : PARSE_PROMPT + (fileName ? `\n\nDocument file name: ${fileName}` : '');
+
   const geminiBody = JSON.stringify({
     contents: [{
       parts: [
-        { text: PARSE_PROMPT + (fileName ? `\n\nDocument file name: ${fileName}` : '') },
+        { text: promptText },
         { inlineData: { mimeType, data: base64 } },
       ],
     }],
     generationConfig: {
       temperature: 0.1,
-      responseMimeType: 'application/json',
+      ...(mode !== 'text_only' ? { responseMimeType: 'application/json' } : {}),
     },
   });
 
@@ -140,6 +149,11 @@ export default async function handler(request: Request): Promise<Response> {
 
     const geminiData = await geminiRes.json();
     const rawText: string = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    // text_only mode: return raw extracted text directly
+    if (mode === 'text_only') {
+      return json({ ok: true, text: rawText.trim(), mode: 'text_only' });
+    }
 
     let parsed: any;
     try {
