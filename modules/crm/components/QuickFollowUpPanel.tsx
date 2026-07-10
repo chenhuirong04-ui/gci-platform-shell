@@ -113,36 +113,61 @@ export default function QuickFollowUpPanel({
 
   const [tab, setTab]   = useState<'info' | 'action' | 'quotes' | 'proposals'>('info');
   const [proposalUploadStatus, setProposalUploadStatus] = useState<'idle' | 'uploading' | 'ok' | 'fail'>('idle');
+  const [isDraggingProposal, setIsDraggingProposal] = useState(false);
   const proposalInputRef = useRef<HTMLInputElement>(null);
 
-  const handleProposalUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  // Single entry point for all proposal file uploads (click + drag-drop)
+  const handleProposalFiles = async (files: File[]) => {
+    const file = files[0];
     if (!file || !onUpdateTask) return;
-    e.target.value = '';
+    console.log('[PROPOSAL UPLOAD] files', files);
     setProposalUploadStatus('uploading');
+
     const reader = new FileReader();
-    reader.onerror = () => setProposalUploadStatus('fail');
+    reader.onerror = () => {
+      console.error('[PROPOSAL UPLOAD] FileReader error');
+      setProposalUploadStatus('fail');
+    };
     reader.onload = async (ev) => {
       const dataURL = ev.target?.result as string;
       const propId = `PROP_${Date.now()}`;
       const uploadedAt = new Date().toISOString();
-      const newProposal: Proposal = { id: propId, name: file.name, mimeType: file.type, size: file.size, uploadedAt, uploadStatus: 'uploading' };
-      const withNew = [...(task.proposals || []), newProposal];
+      const newProposal: Proposal = {
+        id: propId, name: file.name, mimeType: file.type,
+        size: file.size, uploadedAt, uploadStatus: 'uploading',
+      };
+      // Snapshot current proposals so both async updates use same base
+      const currentProposals = task.proposals || [];
+      const withNew = [...currentProposals, newProposal];
       onUpdateTask({ ...task, proposals: withNew });
+      console.log('[PROPOSAL UPLOAD] updated proposals (uploading)', withNew);
+
       try {
         const result = await uploadFileToDrive(
           { id: propId, name: file.name, type: file.type, data: dataURL, size: file.size, uploadedAt, isAnalyzed: false },
           { businessType: task.businessType, clientName: task.clientName }
         );
+        console.log('[PROPOSAL UPLOAD] drive result', result);
         if (result.ok && result.driveUrl) {
-          onUpdateTask({ ...task, proposals: withNew.map(p => p.id === propId ? { ...p, driveUrl: result.driveUrl, uploadStatus: 'uploaded' as const } : p) });
+          const finalProposals = withNew.map(p =>
+            p.id === propId ? { ...p, driveUrl: result.driveUrl, uploadStatus: 'uploaded' as const } : p
+          );
+          onUpdateTask({ ...task, proposals: finalProposals });
           setProposalUploadStatus('ok');
+          console.log('[PROPOSAL UPLOAD] updated proposals (ok)', finalProposals);
         } else {
-          onUpdateTask({ ...task, proposals: withNew.map(p => p.id === propId ? { ...p, uploadStatus: 'failed' as const } : p) });
+          const finalProposals = withNew.map(p =>
+            p.id === propId ? { ...p, uploadStatus: 'failed' as const } : p
+          );
+          onUpdateTask({ ...task, proposals: finalProposals });
           setProposalUploadStatus('fail');
         }
-      } catch {
-        onUpdateTask({ ...task, proposals: withNew.map(p => p.id === propId ? { ...p, uploadStatus: 'failed' as const } : p) });
+      } catch (err) {
+        console.error('[PROPOSAL UPLOAD] exception', err);
+        const finalProposals = withNew.map(p =>
+          p.id === propId ? { ...p, uploadStatus: 'failed' as const } : p
+        );
+        onUpdateTask({ ...task, proposals: finalProposals });
         setProposalUploadStatus('fail');
       }
     };
@@ -787,6 +812,32 @@ export default function QuickFollowUpPanel({
           {/* ── PROPOSALS TAB ─── */}
           {!editing && tab === 'proposals' && (
             <div className="p-5 space-y-3">
+
+              {/* Drop zone — click or drag to upload */}
+              <div
+                onClick={() => { if (proposalUploadStatus !== 'uploading') proposalInputRef.current?.click(); }}
+                onDragOver={e => { e.preventDefault(); e.stopPropagation(); setIsDraggingProposal(true); }}
+                onDragLeave={e => { e.preventDefault(); setIsDraggingProposal(false); }}
+                onDrop={e => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDraggingProposal(false);
+                  const files = Array.from(e.dataTransfer.files);
+                  if (files.length > 0) handleProposalFiles(files);
+                }}
+                className="flex flex-col items-center gap-2 py-6 rounded-xl cursor-pointer transition-all"
+                style={{
+                  border: `2px dashed ${isDraggingProposal ? GOLD : BORD}`,
+                  background: isDraggingProposal ? `${GOLD}0A` : CARD2,
+                }}
+              >
+                <UploadCloud className="w-7 h-7" style={{ color: isDraggingProposal ? GOLD : T3 }} />
+                <p className="text-xs font-black" style={{ color: isDraggingProposal ? GOLD : T2 }}>
+                  {proposalUploadStatus === 'uploading' ? '上传中…' : '拖拽提案文件到这里，或点击上传'}
+                </p>
+                <p className="text-[10px]" style={{ color: T3 }}>PDF · Word · PPT · 图片</p>
+              </div>
+
               {/* Upload status banner */}
               {proposalUploadStatus !== 'idle' && (
                 <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold"
@@ -802,42 +853,34 @@ export default function QuickFollowUpPanel({
               )}
 
               {/* Proposals list */}
-              {task.proposals && task.proposals.length > 0 ? (
-                <>
+              {task.proposals && task.proposals.length > 0 && (
+                <div className="space-y-2">
                   <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>
                     提案文件 ({task.proposals.length})
                   </div>
-                  <div className="space-y-2">
-                    {task.proposals.map(p => (
-                      <div key={p.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
-                        style={{ background: CARD2, border: `1px solid ${BORD}` }}>
-                        <FileText className="w-4 h-4 shrink-0" style={{ color: T3 }} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold truncate" style={{ color: T1 }}>{p.name}</p>
-                          <p className="text-[10px]" style={{ color: T3 }}>
-                            {new Date(p.uploadedAt).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}
-                          </p>
-                        </div>
-                        <div className="shrink-0 flex items-center gap-2">
-                          {p.uploadStatus === 'uploading' && <div className="w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />}
-                          {p.uploadStatus === 'uploaded' && p.driveUrl && (
-                            <a href={p.driveUrl} target="_blank" rel="noreferrer"
-                              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black transition-colors"
-                              style={{ background: `${GOLD}18`, color: GOLD }}>
-                              <ExternalLink className="w-3 h-3" /> Drive
-                            </a>
-                          )}
-                          {p.uploadStatus === 'failed' && <span className="text-[10px] font-bold text-red-400">失败</span>}
-                        </div>
+                  {task.proposals.map(p => (
+                    <div key={p.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+                      style={{ background: CARD2, border: `1px solid ${BORD}` }}>
+                      <FileText className="w-4 h-4 shrink-0" style={{ color: T3 }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold truncate" style={{ color: T1 }}>{p.name}</p>
+                        <p className="text-[10px]" style={{ color: T3 }}>
+                          {new Date(p.uploadedAt).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                        </p>
                       </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center gap-2 py-8">
-                  <UploadCloud className="w-8 h-8" style={{ color: T3 }} />
-                  <p className="text-xs font-bold" style={{ color: T3 }}>暂无提案文件</p>
-                  <p className="text-[10px]" style={{ color: T3 }}>点击下方"上传提案"添加</p>
+                      <div className="shrink-0 flex items-center gap-2">
+                        {p.uploadStatus === 'uploading' && <div className="w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />}
+                        {p.uploadStatus === 'uploaded' && p.driveUrl && (
+                          <a href={p.driveUrl} target="_blank" rel="noreferrer"
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black transition-colors"
+                            style={{ background: `${GOLD}18`, color: GOLD }}>
+                            <ExternalLink className="w-3 h-3" /> 打开文件
+                          </a>
+                        )}
+                        {p.uploadStatus === 'failed' && <span className="text-[10px] font-bold text-red-400">上传失败</span>}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -848,17 +891,27 @@ export default function QuickFollowUpPanel({
         <div className="shrink-0 p-4 space-y-2" style={{ borderTop: `1px solid ${BORD}`, background: CARD }}>
 
           {/* Edit mode: Save / Cancel */}
-          {/* Proposals tab — upload button */}
+          {/* Proposals tab — hidden file input (shared by drop zone click + this button) */}
           {!editing && tab === 'proposals' && (
             <>
-              <input ref={proposalInputRef} type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,image/*" className="hidden" onChange={handleProposalUpload} />
+              <input
+                ref={proposalInputRef}
+                type="file"
+                accept=".pdf,.doc,.docx,.ppt,.pptx,image/*"
+                className="hidden"
+                onChange={e => {
+                  const files = Array.from(e.target.files || []);
+                  e.target.value = '';
+                  if (files.length > 0) handleProposalFiles(files);
+                }}
+              />
               <button
-                onClick={() => { setProposalUploadStatus('idle'); proposalInputRef.current?.click(); }}
+                onClick={() => proposalInputRef.current?.click()}
                 disabled={proposalUploadStatus === 'uploading'}
                 className="w-full py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-40"
                 style={{ background: GOLD, color: '#fff' }}>
                 <UploadCloud className="w-4 h-4" />
-                {proposalUploadStatus === 'uploading' ? '上传中…' : '上传提案'}
+                {proposalUploadStatus === 'uploading' ? '上传中…' : '选择文件上传'}
               </button>
             </>
           )}
