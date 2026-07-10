@@ -115,6 +115,14 @@ export default function QuickFollowUpPanel({
   const [proposalUploadStatus, setProposalUploadStatus] = useState<'idle' | 'uploading' | 'ok' | 'fail'>('idle');
   const [isDraggingProposal, setIsDraggingProposal] = useState(false);
   const proposalInputRef = useRef<HTMLInputElement>(null);
+  const [fileCategory, setFileCategory] = useState<'proposal' | 'contract' | 'project_doc' | 'other'>('proposal');
+
+  const FILE_CATEGORY_LABELS: Record<string, string> = {
+    proposal:    '提案 / 方案',
+    contract:    '合同 / 回签文件',
+    project_doc: '项目资料',
+    other:       '其他附件',
+  };
 
   // Single entry point for all proposal file uploads (click + drag-drop)
   const handleProposalFiles = async (files: File[]) => {
@@ -135,6 +143,7 @@ export default function QuickFollowUpPanel({
       const newProposal: Proposal = {
         id: propId, name: file.name, mimeType: file.type,
         size: file.size, uploadedAt, uploadStatus: 'uploading',
+        category: fileCategory,
       };
       // Snapshot current proposals so both async updates use same base
       const currentProposals = task.proposals || [];
@@ -301,11 +310,8 @@ export default function QuickFollowUpPanel({
     setTimeout(() => { setSaved(false); setContent(''); }, 1400);
   };
 
-  // Close follow-up confirm
-  const [confirmClose, setConfirmClose] = useState(false);
+  // Close drawer only — does NOT archive, does NOT change task.status
   const handleCloseFollowUp = () => {
-    if (!confirmClose) { setConfirmClose(true); return; }
-    if (onArchiveTask) onArchiveTask(task.id);
     onClose();
   };
 
@@ -377,7 +383,7 @@ export default function QuickFollowUpPanel({
                 ['info',      '客户详情'],
                 ['action',    '跟进记录'],
                 ['quotes',    '历史报价'],
-                ['proposals', '提案'],
+                ['proposals', '文件'],
               ] as const).map(([key, label]) => (
                 <button key={key} onClick={() => { setTab(key); if (key === 'quotes') loadQuoteHistory(); if (key === 'proposals') setProposalUploadStatus('idle'); }}
                   className="flex-1 py-1.5 rounded-lg text-xs font-black transition-all"
@@ -813,6 +819,22 @@ export default function QuickFollowUpPanel({
           {!editing && tab === 'proposals' && (
             <div className="p-5 space-y-3">
 
+              {/* File category selector */}
+              <div className="flex flex-col gap-1">
+                <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: T3 }}>文件类型</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {(['proposal', 'contract', 'project_doc', 'other'] as const).map(cat => (
+                    <button key={cat} onClick={() => setFileCategory(cat)}
+                      className="py-1.5 px-2 rounded-lg text-[11px] font-bold transition-all text-left"
+                      style={fileCategory === cat
+                        ? { background: `${GOLD}22`, color: GOLD, border: `1px solid ${GOLD}60` }
+                        : { background: CARD2, color: T3, border: `1px solid ${BORD}` }}>
+                      {FILE_CATEGORY_LABELS[cat]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Drop zone — click or drag to upload */}
               <div
                 onClick={() => { if (proposalUploadStatus !== 'uploading') proposalInputRef.current?.click(); }}
@@ -833,7 +855,7 @@ export default function QuickFollowUpPanel({
               >
                 <UploadCloud className="w-7 h-7" style={{ color: isDraggingProposal ? GOLD : T3 }} />
                 <p className="text-xs font-black" style={{ color: isDraggingProposal ? GOLD : T2 }}>
-                  {proposalUploadStatus === 'uploading' ? '上传中…' : '拖拽提案文件到这里，或点击上传'}
+                  {proposalUploadStatus === 'uploading' ? '上传中…' : `拖拽文件到这里，或点击上传`}
                 </p>
                 <p className="text-[10px]" style={{ color: T3 }}>PDF · Word · PPT · 图片</p>
               </div>
@@ -847,7 +869,7 @@ export default function QuickFollowUpPanel({
                                                           { background: 'rgba(239,68,68,0.08)', color: '#FCA5A5', border: '1px solid rgba(239,68,68,0.15)' }
                   }>
                   {proposalUploadStatus === 'uploading' && <><div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin shrink-0" /> 正在上传到 Drive…</>}
-                  {proposalUploadStatus === 'ok'        && <>✓ 提案已上传 Drive</>}
+                  {proposalUploadStatus === 'ok'        && <>✓ {FILE_CATEGORY_LABELS[fileCategory]} 已上传 Drive</>}
                   {proposalUploadStatus === 'fail'      && <>✗ Drive 上传失败，请稍后重试</>}
                 </div>
               )}
@@ -856,7 +878,7 @@ export default function QuickFollowUpPanel({
               {task.proposals && task.proposals.length > 0 && (
                 <div className="space-y-2">
                   <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>
-                    提案文件 ({task.proposals.length})
+                    客户文件 ({task.proposals.length})
                   </div>
                   {task.proposals.map(p => (
                     <div key={p.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
@@ -865,6 +887,7 @@ export default function QuickFollowUpPanel({
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-bold truncate" style={{ color: T1 }}>{p.name}</p>
                         <p className="text-[10px]" style={{ color: T3 }}>
+                          {p.category ? FILE_CATEGORY_LABELS[p.category] + ' · ' : ''}
                           {new Date(p.uploadedAt).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}
                         </p>
                       </div>
@@ -932,16 +955,12 @@ export default function QuickFollowUpPanel({
           ) : (
             <>
               {/* Close follow-up */}
-              {onArchiveTask && task.status !== 'archived' && (
-                <button onClick={handleCloseFollowUp}
-                  className="w-full py-3 rounded-xl text-sm font-black transition-all hover:opacity-90 flex items-center justify-center gap-2"
-                  style={confirmClose
-                    ? { background: '#EF4444', color: '#fff' }
-                    : { background: `${GOLD}18`, color: GOLD, border: `1px solid ${GOLD}40` }}>
-                  <Archive className="w-4 h-4" />
-                  {confirmClose ? '确认关闭？再次点击确认' : '关闭本次跟进'}
-                </button>
-              )}
+              <button onClick={handleCloseFollowUp}
+                className="w-full py-3 rounded-xl text-sm font-black transition-all hover:opacity-90 flex items-center justify-center gap-2"
+                style={{ background: `${GOLD}18`, color: GOLD, border: `1px solid ${GOLD}40` }}>
+                <X className="w-4 h-4" />
+                关闭面板
+              </button>
 
               {/* Mark complete (coming soon) */}
               <button disabled

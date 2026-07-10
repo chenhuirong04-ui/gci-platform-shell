@@ -386,8 +386,9 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
   const hasInput = rawText.trim().length > 0 || attachments.length > 0;
 
   // ── Chat screenshot text extraction ──────────────────────────────────
-  // Calls Gemini in text_only mode, appends extracted text to rawText,
-  // then auto-triggers analyseInput. Does NOT enter quotation flow.
+  // Calls Gemini in chat_extract_cn mode: returns { rawText, chineseSummary }.
+  // rawText → textarea + analyseInput (type detection, client name)
+  // chineseSummary → ocrExtracted (flows to Notion as project content)
   const extractChatText = async (mimeType: string, dataURL: string, fileName: string) => {
     setXlsxStatus('parsing');
     setXlsxMsg('正在从截图中提取文字内容…');
@@ -395,17 +396,20 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
       const res = await fetch('/api/ai/parse-quotation-file', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mimeType, data: dataURL, fileName, mode: 'text_only' }),
+        body: JSON.stringify({ mimeType, data: dataURL, fileName, mode: 'chat_extract_cn' }),
       });
       const data = await res.json();
-      if (data.ok && data.text) {
-        const extracted = data.text.trim();
-        // Store OCR result separately — persists even if user edits the textarea
-        setOcrExtracted(prev => prev ? prev + '\n\n' + extracted : extracted);
-        // Also append to rawText (shown in textarea) and auto-generate draft
+      if (data.ok && (data.chineseSummary || data.rawText)) {
+        const chineseSummary = (data.chineseSummary || '').trim();
+        const englishText    = (data.rawText || data.chineseSummary || '').trim();
+        // Chinese summary → stored as ocrExtracted, written to Notion
+        if (chineseSummary) {
+          setOcrExtracted(prev => prev ? prev + '\n\n' + chineseSummary : chineseSummary);
+        }
+        // English raw text → textarea display + analyseInput (regex type detection)
         setRawText(prev => {
-          const sep = prev.trim() ? '\n\n' : '';
-          const merged = prev + sep + extracted;
+          const sep    = prev.trim() ? '\n\n' : '';
+          const merged = prev + sep + englishText;
           const result = analyseInput(merged, true);
           setDraft(result);
           setRegisterQuote(false);
@@ -413,7 +417,7 @@ export default function AIIntakePanel({ onAdd, isLoading }: Props) {
           return merged;
         });
         setXlsxStatus('done');
-        setXlsxMsg(`截图文字已提取（${extracted.length} 字符），草稿已生成，请确认后保存。`);
+        setXlsxMsg(`截图已提取并生成中文摘要（${chineseSummary.length} 字），草稿已生成，请确认后保存。`);
       } else {
         // Graceful fallback: file is saved as attachment, prompt user to paste text
         setXlsxStatus('warn');

@@ -6,7 +6,7 @@ import type {
 import { useT } from '../translations';
 import { calcLineTotal, calcQuoteTotals, fmt } from '../lib/bsCalculations';
 import { ServiceCatalogPicker } from './ServiceCatalogPicker';
-import { generateQuoteNo } from '../lib/bsCloud';
+import { generateFwQuoteNo } from '../lib/bsCloud';
 
 interface Props {
   lang: BSLang;
@@ -26,7 +26,7 @@ function makeEmptyQuote(customer?: ServiceCustomer): ServiceQuote {
   const today = new Date().toISOString().slice(0, 10);
   const validUntil = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
   return {
-    quote_no: generateQuoteNo(),
+    quote_no: `FW-${new Date().getFullYear()}-DRAFT`,
     version: 1,
     quotation_title: '',
     customer_id: customer?.id,
@@ -88,8 +88,10 @@ export function ServiceQuoteBuilder({ lang, customers, categories, catalogItems,
   };
 
   const handleSave = async (status: 'DRAFT' | 'FINAL') => {
+    const fwNo = await generateFwQuoteNo();
     const finalQuote: ServiceQuote = {
       ...quote,
+      quote_no: fwNo,
       status,
       total_amount: totals.grandTotal,
       grand_total: totals.grandTotal,

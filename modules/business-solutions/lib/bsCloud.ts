@@ -36,10 +36,33 @@ export function generateCustomerNumber(): string {
   return `SC-${year}-${String(Math.floor(1000 + Math.random() * 9000))}`;
 }
 
+/** @deprecated use generateFwQuoteNo() instead */
 export function generateQuoteNo(): string {
-  const d = new Date();
-  const ds = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-  return `SQ-${ds}-${Math.floor(100 + Math.random() * 900)}`;
+  const year = new Date().getFullYear();
+  return `FW-${year}-DRAFT`;
+}
+
+/**
+ * Generates the next sequential FW quote number for the current year.
+ * Queries the DB for existing FW-YYYY-#### numbers and returns max+1.
+ * Format: FW-2026-0001
+ */
+export async function generateFwQuoteNo(): Promise<string> {
+  const year = new Date().getFullYear();
+  const prefix = `FW-${year}-`;
+  const res = await sbFetch(
+    `/rest/v1/service_quotes?select=quote_no&quote_no=like.${encodeURIComponent(prefix + '%')}&order=quote_no.desc&limit=100`,
+    { method: 'GET' },
+  );
+  let next = 1;
+  if (res) {
+    const rows: { quote_no: string }[] = await res.json().catch(() => []);
+    for (const r of rows) {
+      const num = parseInt(r.quote_no.replace(prefix, ''), 10);
+      if (!isNaN(num) && num >= next) next = num + 1;
+    }
+  }
+  return `${prefix}${String(next).padStart(4, '0')}`;
 }
 
 // ── service_customers ─────────────────────────────────────────────────────────
@@ -270,6 +293,137 @@ export async function deleteQuote(id: string): Promise<boolean> {
   await sbFetch(`/rest/v1/service_quote_items?service_quote_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
   const res = await sbFetch(`/rest/v1/service_quotes?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
   return res !== null;
+}
+
+// ── service_customer_documents ────────────────────────────────────────────────
+
+export interface CustomerDocument {
+  id?: string;
+  customer_id: string;
+  document_type: string;
+  document_name: string;
+  file_url?: string;
+  storage_path?: string;
+  issue_date?: string;
+  expiry_date?: string;
+  reminder_days?: number;
+  status?: string;
+  notes?: string;
+  uploaded_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export async function listCustomerDocuments(customerId: string): Promise<CustomerDocument[]> {
+  const res = await sbFetch(
+    `/rest/v1/service_customer_documents?customer_id=eq.${encodeURIComponent(customerId)}&order=created_at.desc`,
+    { method: 'GET' },
+  );
+  if (!res) return [];
+  return res.json().catch(() => []);
+}
+
+export async function saveCustomerDocument(doc: CustomerDocument): Promise<CustomerDocument | null> {
+  const payload = { ...doc, updated_at: new Date().toISOString() };
+  const res = await sbFetch('/rest/v1/service_customer_documents', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(payload),
+  });
+  if (!res) return null;
+  const d = await res.json().catch(() => null);
+  return Array.isArray(d) ? d[0] : d;
+}
+
+export async function updateCustomerDocument(id: string, patch: Partial<CustomerDocument>): Promise<boolean> {
+  const res = await sbFetch(`/rest/v1/service_customer_documents?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
+  });
+  return res !== null;
+}
+
+export async function deleteCustomerDocument(id: string): Promise<boolean> {
+  const res = await sbFetch(`/rest/v1/service_customer_documents?id=eq.${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+  return res !== null;
+}
+
+const BUCKET = 'service-customer-documents';
+
+/** Upload a file to Supabase Storage. Returns { path, url } or null on failure. */
+export async function uploadDocumentFile(
+  customerId: string,
+  file: File,
+): Promise<{ path: string; url: string } | null> {
+  const ext = file.name.split('.').pop() || 'bin';
+  const path = `service-customers/${customerId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+  const uploadUrl = `${SUPA_URL}/storage/v1/object/${BUCKET}/${path}`;
+  try {
+    const res = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        apikey: SUPA_KEY,
+        Authorization: `Bearer ${SUPA_KEY}`,
+        'Content-Type': file.type || 'application/octet-stream',
+        'x-upsert': 'true',
+      },
+      body: file,
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      console.error('[bsCloud] Storage upload failed:', res.status, txt);
+      return null;
+    }
+    // Build a signed URL (1 year = 31536000s)
+    const signedUrl = await getSignedUrl(path);
+    return { path, url: signedUrl || `${SUPA_URL}/storage/v1/object/${BUCKET}/${path}` };
+  } catch (e) {
+    console.error('[bsCloud] Storage upload error:', e);
+    return null;
+  }
+}
+
+/** Get a signed URL for a storage path (valid 1 year). */
+export async function getSignedUrl(path: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${SUPA_URL}/storage/v1/object/sign/${BUCKET}/${path}`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPA_KEY,
+        Authorization: `Bearer ${SUPA_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ expiresIn: 31536000 }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    if (data?.signedURL) return `${SUPA_URL}${data.signedURL}`;
+    if (data?.signedUrl) return data.signedUrl;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Delete a file from Supabase Storage. */
+export async function deleteDocumentFile(path: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${SUPA_URL}/storage/v1/object/${BUCKET}`, {
+      method: 'DELETE',
+      headers: {
+        apikey: SUPA_KEY,
+        Authorization: `Bearer ${SUPA_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ prefixes: [path] }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 export async function checkTableExists(): Promise<boolean> {

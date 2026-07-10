@@ -47,6 +47,7 @@ export interface Proposal {
   size?: number;
   uploadedAt: string;
   uploadStatus?: 'uploading' | 'uploaded' | 'failed';
+  category?: 'proposal' | 'contract' | 'project_doc' | 'other';
 }
 
 export interface ProjectLogEntry {

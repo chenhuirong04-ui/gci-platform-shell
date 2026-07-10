@@ -90,9 +90,47 @@ export default async function handler(request: Request): Promise<Response> {
 Return the raw text content only — no JSON, no formatting, no analysis.
 Preserve line breaks. If the image contains a chat conversation, extract all message text.`;
 
-  const promptText = mode === 'text_only'
-    ? TEXT_ONLY_PROMPT
-    : PARSE_PROMPT + (fileName ? `\n\nDocument file name: ${fileName}` : '');
+  // mode='chat_extract_cn': extract text AND produce structured Chinese CRM summary in one call.
+  // Returns JSON: { rawText, chineseSummary }
+  const CHAT_EXTRACT_CN_PROMPT = `You are processing a WhatsApp/chat screenshot for GCI, a Middle East B2B platform.
+
+Do TWO things in one response:
+1. Extract all visible text from the image exactly as shown.
+2. Produce a structured Chinese summary for internal CRM records.
+
+Return ONLY valid JSON (no markdown fences):
+{
+  "rawText": "<all extracted text in original language, preserve line breaks>",
+  "chineseSummary": "<structured Chinese CRM summary — see format rules below>"
+}
+
+Chinese summary format rules:
+- Language: Chinese for all descriptions, labels, action items
+- Preserve in English: place names (Jebel Ali, Al Warsan, Dubai, etc.), currency units (AED, SAR, USD), measurements (sq ft, m2), proper nouns
+- If content contains property/project listings, use this structure:
+  客户[Name]提供了[N]个[项目类型]：
+
+  项目一：[Location]，[楼型] [用途]
+  - [属性名]：[值]
+  ...
+  - 要价：[Currency] [Amount]
+
+  （如有多个项目，继续列项目二、三...）
+
+  下一步：
+  确认客户角色（卖方/中介/买方）、产权文件、具体位置、收益证明、价格是否可谈、佣金关系，以及是否有买方资源。
+
+- If content is a general chat conversation, summarize key business points in Chinese bullet points
+- If content has no clear business intent, write: "（普通消息，无明确业务内容）"`;
+
+  const isJsonMode = mode !== 'text_only';
+  const isCnMode   = mode === 'chat_extract_cn';
+
+  const promptText = isCnMode
+    ? CHAT_EXTRACT_CN_PROMPT
+    : mode === 'text_only'
+      ? TEXT_ONLY_PROMPT
+      : PARSE_PROMPT + (fileName ? `\n\nDocument file name: ${fileName}` : '');
 
   const geminiBody = JSON.stringify({
     contents: [{
@@ -103,7 +141,7 @@ Preserve line breaks. If the image contains a chat conversation, extract all mes
     }],
     generationConfig: {
       temperature: 0.1,
-      ...(mode !== 'text_only' ? { responseMimeType: 'application/json' } : {}),
+      ...(isJsonMode ? { responseMimeType: 'application/json' } : {}),
     },
   });
 

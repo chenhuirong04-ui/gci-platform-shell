@@ -5,7 +5,7 @@ import type {
 } from '../types';
 import { useT } from '../translations';
 import { calcQuoteTotals, calcLineTotal, fmt } from '../lib/bsCalculations';
-import { saveCustomer, generateCustomerNumber, generateQuoteNo, saveQuote } from '../lib/bsCloud';
+import { saveCustomer, generateCustomerNumber, generateFwQuoteNo, saveQuote } from '../lib/bsCloud';
 import { syncCustomerToNotion, syncQuoteToNotion } from '../lib/bsNotionSync';
 
 const GOLD = '#C9A84C';
@@ -19,6 +19,8 @@ interface Props {
   onCustomerSaved: (c: ServiceCustomer) => void;
   onQuoteSaved: () => void;
   initialCustomer?: ServiceCustomer;
+  onGoToCustomerFiles?: (c: ServiceCustomer) => void;
+  onGoToCustomerProfile?: (c: ServiceCustomer) => void;
 }
 
 function uid() { return `item_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`; }
@@ -72,6 +74,7 @@ function makeItemFromCatalog(
 
 export function BSNewQuotePage({
   lang, customers, categories, catalogItems, onCustomerSaved, onQuoteSaved, initialCustomer,
+  onGoToCustomerFiles, onGoToCustomerProfile,
 }: Props) {
   const t = useT(lang);
   const today = new Date().toISOString().split('T')[0];
@@ -100,7 +103,8 @@ export function BSNewQuotePage({
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
 
   // ── Quote meta ────────────────────────────────────────────────────────────
-  const [quoteNo] = useState(() => generateQuoteNo());
+  const year = new Date().getFullYear();
+  const [quoteNo, setQuoteNo] = useState(`FW-${year}-DRAFT`);
   const [quoteTitle, setQuoteTitle] = useState('');
   const [currency, setCurrency] = useState('AED');
   const [validUntil, setValidUntil] = useState('');
@@ -225,8 +229,10 @@ export function BSNewQuotePage({
       return;
     }
     setSaving(true);
+    const fwNo = await generateFwQuoteNo();
+    setQuoteNo(fwNo);
     const quote: ServiceQuote = {
-      quote_no: quoteNo, version: 1,
+      quote_no: fwNo, version: 1,
       quotation_title: quoteTitle || `${selectedCustomer.customer_name} - ${isZh ? '服务报价' : 'Service Quote'}`,
       customer_id: selectedCustomer.id,
       customer_name: selectedCustomer.customer_name,
@@ -536,12 +542,26 @@ export function BSNewQuotePage({
                     {selectedCustomer.requirement_summary}
                   </div>
                 )}
-                <button
-                  style={{ fontSize: 12, color: '#8a9ab0', textDecoration: 'underline', marginTop: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                  onClick={() => { setSelectedCustomer(null); setCustSearch(''); }}
-                >
-                  {isZh ? '更换客户' : 'Change client'}
-                </button>
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #e8e0d0', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    style={{ fontSize: 11, fontWeight: 700, color: GOLD, border: `1px solid ${GOLD}50`, background: `${GOLD}10`, borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }}
+                    onClick={() => onGoToCustomerFiles && onGoToCustomerFiles(selectedCustomer)}
+                  >
+                    📎 {isZh ? '客户文件' : 'Client Files'}
+                  </button>
+                  <button
+                    style={{ fontSize: 11, fontWeight: 700, color: '#3b82f6', border: '1px solid #bfdbfe', background: '#eff6ff', borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }}
+                    onClick={() => onGoToCustomerProfile && onGoToCustomerProfile(selectedCustomer)}
+                  >
+                    👤 {isZh ? '查看档案' : 'View Profile'}
+                  </button>
+                  <button
+                    style={{ fontSize: 11, color: '#8a9ab0', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: '5px 0', marginLeft: 'auto' }}
+                    onClick={() => { setSelectedCustomer(null); setCustSearch(''); }}
+                  >
+                    {isZh ? '更换客户' : 'Change'}
+                  </button>
+                </div>
               </div>
             </div>
           )}

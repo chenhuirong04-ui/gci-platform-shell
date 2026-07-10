@@ -16,7 +16,7 @@ import {
   listCategories, saveCategory, updateCategory, deleteCategory,
   listCatalogItems, saveCatalogItem, updateCatalogItem, deleteCatalogItem,
   listQuotes, listQuotesByCustomer, loadQuote, saveQuote, updateQuote, deleteQuote,
-  checkTableExists, generateQuoteNo,
+  checkTableExists, generateFwQuoteNo,
 } from './lib/bsCloud';
 
 interface Props { lang?: BSLang; }
@@ -165,12 +165,13 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
     showToast(t.toast.markedAccepted);
   };
 
-  const handleCopyQuoteAsNew = () => {
+  const handleCopyQuoteAsNew = async () => {
     if (!viewingQuote) return;
+    const fwNo = await generateFwQuoteNo();
     const newVersion: ServiceQuote = {
       ...viewingQuote.quote,
       id: undefined,
-      quote_no: generateQuoteNo(),
+      quote_no: fwNo,
       version: (viewingQuote.quote.version || 1) + 1,
       status: 'DRAFT',
       sent_at: undefined,
@@ -285,6 +286,16 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
           onCustomerSaved={handleCustomerSavedFromQuote}
           onQuoteSaved={handleQuoteSavedFromQuote}
           initialCustomer={quoteBuilderCustomer}
+          onGoToCustomerFiles={(c) => {
+            setViewingCustomer(c);
+            setTab('customers');
+            if (c.id) listQuotesByCustomer(c.id).then(setCustomerQuotes);
+          }}
+          onGoToCustomerProfile={(c) => {
+            setViewingCustomer(c);
+            setTab('customers');
+            if (c.id) listQuotesByCustomer(c.id).then(setCustomerQuotes);
+          }}
         />
       )}
 

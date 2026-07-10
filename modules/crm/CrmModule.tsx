@@ -395,7 +395,24 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
         ]);
 
         if (!alive) return;
-        setTasks(Array.isArray(t) ? (t as any) : []);
+        // One-time recovery: if AHMED was accidentally archived by the close-drawer bug, restore it.
+        const rawTasks: FollowUpTask[] = Array.isArray(t) ? (t as any) : [];
+        const now = new Date().toISOString();
+        const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+        const recovered = rawTasks.map(task => {
+          const isAhmed = /ahmed/i.test(task.clientName || '');
+          if (isAhmed && task.status === 'archived') {
+            console.info('[RECOVERY] Restoring archived AHMED task:', task.id, task.clientName);
+            return {
+              ...task,
+              status: 'todo' as const,
+              updatedAt: now,
+              nextFollowUpAt: task.nextFollowUpAt || tomorrow,
+            };
+          }
+          return task;
+        });
+        setTasks(recovered);
         setProjects(Array.isArray(p) ? (p as any) : []);
       } catch (e) {
         console.warn('Init load failed', e);
@@ -730,7 +747,54 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
   };
 
   const updateTradeStatus = (id: string, tradeStatus: any) => {
-    setTasks(prev => prev.map(t => (t.id === id ? { ...t, tradeStatus } : t)));
+    const now = new Date().toISOString();
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+
+    const updated: FollowUpTask = { ...task, tradeStatus, updatedAt: now };
+
+    // 1. Update tasks list
+    setTasks(prev => prev.map(t => (t.id === id ? updated : t)));
+
+    // 2. Sync drawer if this task is currently open
+    if (selectedTask?.id === id) {
+      setSelectedTask(updated);
+    }
+
+    // 3. Notion write-back — update 行动状态 on the Follow-up Log page
+    const pageId = task.notionFollowupPageId || task.leadId;
+    const hasNotionPage = pageId &&
+      !/^(LEAD_|HIST_|SYNTH_|INT_|NOTION-)/i.test(pageId) &&
+      pageId.includes('-');
+
+    console.info('[INLINE STATUS UPDATE] task id:', id);
+    console.info('[INLINE STATUS UPDATE] new tradeStatus:', tradeStatus);
+    console.info('[INLINE STATUS UPDATE] notion page id:', pageId, '| hasNotionPage:', hasNotionPage);
+
+    if (hasNotionPage) {
+      const base = typeof window !== 'undefined' ? window.location.origin : '';
+      fetch(`${base}/api/crm/notion-update-followup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pageId, status: tradeStatus }),
+      })
+        .then(async res => {
+          const body = await res.json().catch(() => ({}));
+          console.info('[INLINE STATUS UPDATE] notion response:', res.status, body);
+          if (res.ok) {
+            showToast(`行动状态已更新：${tradeStatus}`, 'success');
+          } else {
+            console.error('[INLINE STATUS UPDATE] notion write-back failed:', res.status, body);
+            showToast(`本地已更新，Notion 同步失败：${res.status}`, 'error');
+          }
+        })
+        .catch(e => {
+          console.error('[INLINE STATUS UPDATE] notion error:', e);
+          showToast(`本地已更新，Notion 连接失败`, 'error');
+        });
+    } else {
+      showToast(`行动状态已更新：${tradeStatus}（本地）`, 'info');
+    }
   };
 
   // ── 帮助函数：判断 task 与 project 是否匹配同一客户 ──────────────
