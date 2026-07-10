@@ -426,6 +426,87 @@ export async function deleteDocumentFile(path: string): Promise<boolean> {
   }
 }
 
+// ── service_customer_compliance_items ─────────────────────────────────────────
+
+export interface ComplianceItem {
+  id?: string;
+  customer_id: string;
+  document_id?: string;
+  compliance_type: string;
+  title: string;
+  license_number?: string;
+  licensee_name?: string;
+  trade_name?: string;
+  legal_status?: string;
+  issuing_authority?: string;
+  manager_name?: string;
+  premises_number?: string;
+  building_name?: string;
+  area_name?: string;
+  activities?: string[];
+  issue_date?: string;
+  expiry_date?: string;
+  renewal_date?: string;
+  filing_frequency?: string;
+  next_due_date?: string;
+  reminder_days?: number;
+  status?: string;
+  assigned_to?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export async function listComplianceItems(customerId: string): Promise<ComplianceItem[]> {
+  const res = await sbFetch(
+    `/rest/v1/service_customer_compliance_items?customer_id=eq.${encodeURIComponent(customerId)}&order=expiry_date.asc.nullslast`,
+    { method: 'GET' },
+  );
+  if (!res) return [];
+  return res.json().catch(() => []);
+}
+
+export async function saveComplianceItem(item: ComplianceItem): Promise<ComplianceItem | null> {
+  const payload = { ...item, updated_at: new Date().toISOString() };
+  const res = await sbFetch('/rest/v1/service_customer_compliance_items', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(payload),
+  });
+  if (!res) return null;
+  const d = await res.json().catch(() => null);
+  return Array.isArray(d) ? d[0] : d;
+}
+
+export async function updateComplianceItem(id: string, patch: Partial<ComplianceItem>): Promise<boolean> {
+  const res = await sbFetch(`/rest/v1/service_customer_compliance_items?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
+  });
+  return res !== null;
+}
+
+export async function deleteComplianceItem(id: string): Promise<boolean> {
+  const res = await sbFetch(`/rest/v1/service_customer_compliance_items?id=eq.${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+  return res !== null;
+}
+
+/** Fetch all upcoming/expired compliance items across all customers (for dashboard alerts). */
+export async function listExpiringCompliance(days = 90): Promise<ComplianceItem[]> {
+  const future = new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+  const today  = new Date().toISOString().slice(0, 10);
+  // Items where expiry_date <= future (includes already expired)
+  const res = await sbFetch(
+    `/rest/v1/service_customer_compliance_items?expiry_date=lte.${future}&status=eq.ACTIVE&order=expiry_date.asc&limit=200`,
+    { method: 'GET' },
+  );
+  if (!res) return [];
+  return res.json().catch(() => []);
+}
+
 export async function checkTableExists(): Promise<boolean> {
   try {
     const res = await sbFetch('/rest/v1/service_customers?limit=1', { method: 'GET' });

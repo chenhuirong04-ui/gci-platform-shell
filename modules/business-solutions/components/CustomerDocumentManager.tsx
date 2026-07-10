@@ -22,10 +22,19 @@ const DOC_TYPES_EN = [
 
 const REMINDER_OPTIONS = [30, 60, 90];
 
+// Types that should trigger a compliance item prompt after upload
+const COMPLIANCE_TRIGGER_TYPES = new Set([
+  '营业执照', 'Trade License',
+  'VAT Certificate', 'Corporate Tax Certificate',
+  'Emirates ID',
+]);
+
 interface Props {
   customerId: string;
   customerName: string;
   lang: BSLang;
+  /** Called when a document that should create a compliance item is saved */
+  onComplianceTrigger?: (info: { documentId: string; documentType: string; documentName: string }) => void;
 }
 
 function getExpiryStatus(expiryDate?: string): 'expired' | 'warning' | 'soon' | 'ok' | 'none' {
@@ -47,7 +56,7 @@ const STATUS_STYLE: Record<string, { bg: string; text: string; label: string; la
   none:    { bg: '#F3F4F6', text: '#6B7280', label: '无到期日', labelEn: 'No expiry' },
 };
 
-export function CustomerDocumentManager({ customerId, customerName, lang }: Props) {
+export function CustomerDocumentManager({ customerId, customerName, lang, onComplianceTrigger }: Props) {
   const isZh = lang === 'zh';
   const docTypes = isZh ? DOC_TYPES_ZH : DOC_TYPES_EN;
 
@@ -150,7 +159,17 @@ export function CustomerDocumentManager({ customerId, customerName, lang }: Prop
       }
     } else {
       const saved = await saveCustomerDocument(payload);
-      if (saved) setDocs(prev => [saved, ...prev]);
+      if (saved) {
+        setDocs(prev => [saved, ...prev]);
+        // Trigger compliance item creation for key document types
+        if (saved.id && onComplianceTrigger && COMPLIANCE_TRIGGER_TYPES.has(form.document_type)) {
+          onComplianceTrigger({
+            documentId: saved.id,
+            documentType: form.document_type,
+            documentName: saved.document_name,
+          });
+        }
+      }
     }
 
     setSaving(false);

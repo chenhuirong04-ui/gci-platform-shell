@@ -1,6 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { ServiceCustomer, BSLang, ServiceCustomerStatus, ServiceCustomerType } from '../types';
 import { useT } from '../translations';
+import { listExpiringCompliance } from '../lib/bsCloud';
+import type { ComplianceItem } from '../lib/bsCloud';
 
 interface Props {
   lang: BSLang;
@@ -45,6 +47,11 @@ export function ServiceCustomerList({
   const [filterStatus, setFilterStatus] = useState('');
   const [filterType, setFilterType]   = useState('');
   const [filterOwner, setFilterOwner] = useState('');
+  const [expiringItems, setExpiringItems] = useState<ComplianceItem[]>([]);
+
+  useEffect(() => {
+    listExpiringCompliance(30).then(setExpiringItems).catch(() => {});
+  }, []);
 
   // ── Stats ──────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -87,6 +94,33 @@ export function ServiceCustomerList({
 
   return (
     <div className="flex flex-col">
+
+      {/* ── Expiry alert banner ──────────────────────────────────────── */}
+      {expiringItems.length > 0 && (
+        <div className="mx-6 mt-4 p-3 rounded-xl text-xs" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
+          <div className="font-black text-red-700 mb-1.5">
+            🔔 {isZh
+              ? `${expiringItems.length} 项合规事项 30天内到期或已过期`
+              : `${expiringItems.length} compliance item(s) expiring within 30 days`}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {expiringItems.slice(0, 5).map(it => {
+              const d = Math.ceil((new Date(it.expiry_date!).getTime() - Date.now()) / 86400000);
+              return (
+                <span key={it.id} className="px-2 py-0.5 rounded font-bold"
+                  style={{ background: d < 0 ? '#FEE2E2' : '#FED7AA', color: d < 0 ? '#B91C1C' : '#C2410C' }}>
+                  {it.title} · {d < 0
+                    ? (isZh ? `已逾期${Math.abs(d)}天` : `${Math.abs(d)}d overdue`)
+                    : (isZh ? `还剩${d}天` : `${d}d`)}
+                </span>
+              );
+            })}
+            {expiringItems.length > 5 && (
+              <span className="text-red-600 font-bold">+{expiringItems.length - 5} {isZh ? '项' : 'more'}</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Stats dashboard ──────────────────────────────────────────── */}
       <div className="px-6 pt-5 pb-4 border-b border-gray-100">
