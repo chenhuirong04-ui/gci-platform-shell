@@ -152,4 +152,4 @@ export interface ServiceQuote {
   updated_at?: string;
 }
 
-export type BSTab = 'customers' | 'new-quote' | 'quotes' | 'catalog';
+export type BSTab = 'customers' | 'new-quote' | 'quotes' | 'catalog' | 'finance';

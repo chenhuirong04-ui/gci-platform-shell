@@ -11,6 +11,7 @@ import { ServiceCustomerDetail } from './components/ServiceCustomerDetail';
 import { ServiceCatalogManager } from './components/ServiceCatalogManager';
 import { ServiceQuoteHistory } from './components/ServiceQuoteHistory';
 import { ServiceQuotePreview } from './components/ServiceQuotePreview';
+import { BSFinancialDashboard } from './components/BSFinancialDashboard';
 import {
   listCustomers, saveCustomer, updateCustomer,
   listCategories, saveCategory, updateCategory, deleteCategory,
@@ -227,12 +228,13 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
     );
   }
 
-  // Tab order: new-quote → customers → quotes → catalog
+  // Tab order: new-quote → customers → quotes → catalog → finance
   const TABS: { key: BSTab; label: string }[] = [
     { key: 'new-quote',  label: t.tabs.newQuote },
     { key: 'customers',  label: t.tabs.customers },
     { key: 'quotes',     label: t.tabs.quotes },
     { key: 'catalog',    label: t.tabs.catalog },
+    { key: 'finance',    label: t.tabs.finance },
   ];
 
   return (
@@ -353,6 +355,7 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
             onMarkSent={handleMarkSent}
             onMarkAccepted={handleMarkAccepted}
             onCopyAsNew={handleCopyQuoteAsNew}
+            onToast={showToast}
           />
         ) : (
           <ServiceQuoteHistory
@@ -364,6 +367,11 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
             onDelete={handleDeleteQuote}
           />
         )
+      )}
+
+      {/* FINANCE */}
+      {tab === 'finance' && (
+        <BSFinancialDashboard lang={lang} />
       )}
 
       {/* CATALOG */}

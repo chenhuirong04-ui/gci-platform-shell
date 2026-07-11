@@ -1,7 +1,8 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import type { ServiceQuote, ServiceQuoteLineItem, BSLang } from '../types';
 import { useT } from '../translations';
 import { calcQuoteTotals, fmt } from '../lib/bsCalculations';
+import { ReceivablesPanel } from './ReceivablesPanel';
 
 interface Props {
   lang: BSLang;
@@ -12,17 +13,19 @@ interface Props {
   onMarkSent?: () => void;
   onMarkAccepted?: () => void;
   onCopyAsNew?: () => void;
+  onToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 const GOLD = '#C9A84C';
 const NAVY = '#0c1b3a';
 
-export function ServiceQuotePreview({ lang, quote, items, onClose, onEdit, onMarkSent, onMarkAccepted, onCopyAsNew }: Props) {
+export function ServiceQuotePreview({ lang, quote, items, onClose, onEdit, onMarkSent, onMarkAccepted, onCopyAsNew, onToast }: Props) {
   const t = useT(lang);
   const isZh = lang === 'zh';
   const totals = calcQuoteTotals(items, quote.discount_type, quote.discount_value || 0);
   const cur = quote.currency;
   const printRef = useRef<HTMLDivElement>(null);
+  const [showReceivables, setShowReceivables] = useState(false);
 
   // ── PDF download via html2canvas ─────────────────────────────────────────
   const handlePdf = async () => {
@@ -200,6 +203,17 @@ export function ServiceQuotePreview({ lang, quote, items, onClose, onEdit, onMar
             ⊕ {t.buttons.copyAsNewVersion}
           </button>
         )}
+        {/* Receivables toggle */}
+        <button
+          onClick={() => setShowReceivables(v => !v)}
+          className="text-xs rounded-lg px-3 py-1.5 font-semibold transition-all"
+          style={showReceivables
+            ? { background: NAVY, color: 'white' }
+            : { background: '#f8fafc', color: NAVY, border: `1px solid ${NAVY}` }
+          }
+        >
+          💰 {isZh ? '应收与收款' : 'Receivables'}
+        </button>
         <div className="flex-1" />
         <span className="text-xs text-gray-400 self-center">
           {isZh ? 'v' : 'v'}{quote.version || 1}
@@ -466,6 +480,15 @@ export function ServiceQuotePreview({ lang, quote, items, onClose, onEdit, onMar
             ↓ {t.buttons.downloadPdf}
           </button>
         </div>
+
+        {/* ── Receivables & Payments panel ─────────────────────────── */}
+        {showReceivables && (
+          <ReceivablesPanel
+            lang={lang}
+            quote={quote}
+            onToast={onToast ?? (() => {})}
+          />
+        )}
       </div>
     </div>
   );

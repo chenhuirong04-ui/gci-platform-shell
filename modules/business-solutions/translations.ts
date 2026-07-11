@@ -7,6 +7,7 @@ const zh = {
     newQuote: '新建报价',
     quotes: '报价记录',
     catalog: '服务目录',
+    finance: '财务',
   },
   customerTypes: {
     GLOBAL_EXPANSION: '企业出海客户',
@@ -199,6 +200,7 @@ const en: typeof zh = {
     newQuote: 'New Quote',
     quotes: 'Quote Records',
     catalog: 'Service Catalog',
+    finance: 'Finance',
   },
   customerTypes: {
     GLOBAL_EXPANSION: 'Global Expansion',
