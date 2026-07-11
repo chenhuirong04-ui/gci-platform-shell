@@ -57,6 +57,66 @@ function normalizeInventoryQuery(raw: string): string | null {
   return s;
 }
 
+// ── AI-assisted inventory resolver ───────────────────────────────────────────
+// Calls /api/ai/resolve-product which fetches the live product catalog and uses
+// OpenAI to map natural-language input to exact product names from the DB.
+// Falls back to normalizeInventoryQuery if the endpoint fails.
+async function resolveInventoryProduct(
+  rawQuery: string,
+  base: string,
+): Promise<{
+  queryType: 'full_inventory' | 'specific_product';
+  productNames: string[];   // exact DB product names (may be empty → not found)
+  productFilter: string;    // display label for UI
+  notFound: boolean;
+  ambiguous: boolean;
+  candidates: string[];
+}> {
+  try {
+    const res = await fetch(`${base}/api/ai/resolve-product?q=${encodeURIComponent(rawQuery)}`);
+    if (!res.ok) throw new Error('resolve-product failed');
+    const data = await res.json() as {
+      ok: boolean;
+      queryType: 'full_inventory' | 'specific_product';
+      matchedProducts: string[];
+      keywords: string[];
+      confidence: number;
+      ambiguous: boolean;
+    };
+
+    if (!data.ok) throw new Error('resolve-product returned ok:false');
+
+    if (data.queryType === 'full_inventory') {
+      return { queryType: 'full_inventory', productNames: [], productFilter: '', notFound: false, ambiguous: false, candidates: [] };
+    }
+
+    // specific_product
+    const matched = data.matchedProducts || [];
+    if (matched.length === 0) {
+      return { queryType: 'specific_product', productNames: [], productFilter: rawQuery, notFound: true, ambiguous: false, candidates: [] };
+    }
+    if (data.ambiguous && matched.length > 1) {
+      return { queryType: 'specific_product', productNames: [], productFilter: rawQuery, notFound: false, ambiguous: true, candidates: matched };
+    }
+    // Single strong match (or a small set where all are clearly related)
+    return {
+      queryType: 'specific_product',
+      productNames: matched,
+      productFilter: matched.join(' / '),
+      notFound: false,
+      ambiguous: false,
+      candidates: matched,
+    };
+  } catch {
+    // Fallback to regex normalization
+    const keyword = normalizeInventoryQuery(rawQuery);
+    if (!keyword) {
+      return { queryType: 'full_inventory', productNames: [], productFilter: '', notFound: false, ambiguous: false, candidates: [] };
+    }
+    return { queryType: 'specific_product', productNames: [keyword], productFilter: keyword, notFound: false, ambiguous: false, candidates: [keyword] };
+  }
+}
+
 // ── Customer name extraction for quotation history queries ────────────────────
 // "IFZA 之前报过什么价" → "IFZA"
 // "查 Namas 的历史报价" → "Namas"
@@ -458,8 +518,48 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
             {intent.approvalRequired ? dict.ai.panel.waitingApproval : dict.ai.panel.done}
           </div>
 
+          {/* ── Inventory: not found ── */}
+          {intent.intentId === 'check_inventory' && state.resultData?.notFound && (
+            <div style={{ fontSize: 13, color: MUTED, padding: '10px 0', marginBottom: 8 }}>
+              <span style={{ color: '#E0846A', fontWeight: 700 }}>未找到相关库存产品。</span>
+              <span style={{ marginLeft: 6 }}>「{state.resultData.productFilter}」在库存表和寄售库存中均无匹配记录。</span>
+            </div>
+          )}
+
+          {/* ── Inventory: disambiguation ── */}
+          {intent.intentId === 'check_inventory' && state.resultData?.disambiguate && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: GOLD, fontWeight: 700, marginBottom: 8 }}>找到以下相关产品，请确认要查询哪一款：</div>
+              {(state.resultData.candidates as string[]).map((name: string, i: number) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    const base = typeof window !== 'undefined' ? window.location.origin : '';
+                    const qs = `?product=${encodeURIComponent(name)}`;
+                    Promise.allSettled([
+                      fetch(`${base}/api/ai/inventory-table-alerts${qs}`).then(r => r.json()),
+                      fetch(`${base}/api/trade/check-inventory${qs}`).then(r => r.json()),
+                    ]).then(([whRes, csRes]) => {
+                      setCmdState(prev => prev ? { ...prev, resultData: {
+                        ok: true,
+                        warehouse: whRes.status === 'fulfilled' ? whRes.value : { ok: false, error: '库存表读取失败' },
+                        consignment: csRes.status === 'fulfilled' ? csRes.value : { ok: false, error: '寄售库存读取失败' },
+                        productFilter: name,
+                      } } : prev);
+                    });
+                  }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 12px', marginBottom: 4, borderRadius: 7,
+                    border: '1px solid rgba(201,168,76,0.3)', background: 'rgba(201,168,76,0.06)',
+                    color: TEXT, fontSize: 13, cursor: 'pointer' }}
+                >
+                  {i + 1}. {name}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* ── Inventory result panel (combined: warehouse + consignment) ── */}
-          {intent.intentId === 'check_inventory' && state.resultData && state.resultData.ok && (() => {
+          {intent.intentId === 'check_inventory' && state.resultData && state.resultData.ok && !state.resultData.notFound && !state.resultData.disambiguate && (() => {
             const wh = state.resultData.warehouse;
             const cs = state.resultData.consignment;
             const productFilter = state.resultData.productFilter;
@@ -2513,24 +2613,39 @@ export function AIPage() {
       setTab('chat');
       setCmdState({ raw: raw.trim(), match: inventoryMatch, phase: 'processing', step: 0 });
       runner.run(
-        ['正在识别指令…', '正在连接库存数据库…', '正在检查库存水位…'],
+        ['正在识别产品…', '正在连接库存数据库…', '正在检查库存水位…'],
         (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
         () => {
           setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
           const base = typeof window !== 'undefined' ? window.location.origin : '';
-          const qs = product ? `?product=${encodeURIComponent(product)}` : '';
-          Promise.allSettled([
-            fetch(`${base}/api/ai/inventory-table-alerts${qs}`).then(r => r.json()),
-            fetch(`${base}/api/trade/check-inventory${qs}`).then(r => r.json()),
-          ]).then(([whRes, csRes]) => {
-            const combined = {
-              ok: true,
-              warehouse: whRes.status === 'fulfilled' ? whRes.value : { ok: false, error: '库存表读取失败' },
-              consignment: csRes.status === 'fulfilled' ? csRes.value : { ok: false, error: '寄售库存读取失败' },
-              productFilter: product || null,
-            };
-            setCmdState(prev => prev ? { ...prev, resultData: combined } : prev);
-          }).catch(e => console.error('[AI] inventory fetch failed', e));
+          resolveInventoryProduct(raw.trim(), base).then(resolved => {
+            // Not found: skip DB fetch, return not-found state
+            if (resolved.notFound) {
+              setCmdState(prev => prev ? { ...prev, resultData: { ok: true, notFound: true, productFilter: resolved.productFilter } } : prev);
+              return;
+            }
+            // Disambiguation: skip DB fetch, return candidates
+            if (resolved.ambiguous) {
+              setCmdState(prev => prev ? { ...prev, resultData: { ok: true, disambiguate: true, candidates: resolved.candidates, rawQuery: raw.trim() } } : prev);
+              return;
+            }
+            // Full inventory or matched products — fetch from DB
+            // For matched products, pass the first/only product name as filter
+            const productParam = resolved.queryType === 'full_inventory' ? null
+              : resolved.productNames.length > 0 ? resolved.productNames[0] : null;
+            const qs = productParam ? `?product=${encodeURIComponent(productParam)}` : '';
+            Promise.allSettled([
+              fetch(`${base}/api/ai/inventory-table-alerts${qs}`).then(r => r.json()),
+              fetch(`${base}/api/trade/check-inventory${qs}`).then(r => r.json()),
+            ]).then(([whRes, csRes]) => {
+              setCmdState(prev => prev ? { ...prev, resultData: {
+                ok: true,
+                warehouse: whRes.status === 'fulfilled' ? whRes.value : { ok: false, error: '库存表读取失败' },
+                consignment: csRes.status === 'fulfilled' ? csRes.value : { ok: false, error: '寄售库存读取失败' },
+                productFilter: resolved.productFilter || null,
+              } } : prev);
+            }).catch(e => console.error('[AI] inventory fetch failed', e));
+          });
         },
       );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
@@ -3169,23 +3284,33 @@ export function AIPage() {
         (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
         ()  => {
           setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
-          // For check_inventory, fetch both warehouse + consignment after animation completes
+          // For check_inventory, resolve product then fetch both sources
           if (intent.intentId === 'check_inventory') {
             const base = typeof window !== 'undefined' ? window.location.origin : '';
-            const product = normalizeInventoryQuery(raw.trim());
-            const qs = product ? `?product=${encodeURIComponent(product)}` : '';
-            Promise.allSettled([
-              fetch(`${base}/api/ai/inventory-table-alerts${qs}`).then(r => r.json()),
-              fetch(`${base}/api/trade/check-inventory${qs}`).then(r => r.json()),
-            ]).then(([whRes, csRes]) => {
-              const combined = {
-                ok: true,
-                warehouse: whRes.status === 'fulfilled' ? whRes.value : { ok: false, error: '库存表读取失败' },
-                consignment: csRes.status === 'fulfilled' ? csRes.value : { ok: false, error: '寄售库存读取失败' },
-                productFilter: product || null,
-              };
-              setCmdState(prev => prev ? { ...prev, resultData: combined } : prev);
-            }).catch(e => console.error('[check_inventory] fetch failed', e));
+            resolveInventoryProduct(raw.trim(), base).then(resolved => {
+              if (resolved.notFound) {
+                setCmdState(prev => prev ? { ...prev, resultData: { ok: true, notFound: true, productFilter: resolved.productFilter } } : prev);
+                return;
+              }
+              if (resolved.ambiguous) {
+                setCmdState(prev => prev ? { ...prev, resultData: { ok: true, disambiguate: true, candidates: resolved.candidates, rawQuery: raw.trim() } } : prev);
+                return;
+              }
+              const productParam = resolved.queryType === 'full_inventory' ? null
+                : resolved.productNames.length > 0 ? resolved.productNames[0] : null;
+              const qs = productParam ? `?product=${encodeURIComponent(productParam)}` : '';
+              Promise.allSettled([
+                fetch(`${base}/api/ai/inventory-table-alerts${qs}`).then(r => r.json()),
+                fetch(`${base}/api/trade/check-inventory${qs}`).then(r => r.json()),
+              ]).then(([whRes, csRes]) => {
+                setCmdState(prev => prev ? { ...prev, resultData: {
+                  ok: true,
+                  warehouse: whRes.status === 'fulfilled' ? whRes.value : { ok: false, error: '库存表读取失败' },
+                  consignment: csRes.status === 'fulfilled' ? csRes.value : { ok: false, error: '寄售库存读取失败' },
+                  productFilter: resolved.productFilter || null,
+                } } : prev);
+              }).catch(e => console.error('[check_inventory] fetch failed', e));
+            });
           }
           // For check_quotation_followups, fetch real data after animation completes
           if (intent.intentId === 'check_quotation_followups') {
