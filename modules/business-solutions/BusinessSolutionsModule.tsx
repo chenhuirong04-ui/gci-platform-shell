@@ -251,11 +251,14 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
               if (key !== 'new-quote') setQuoteBuilderCustomer(undefined);
               if (key !== 'quotes')    setViewingQuote(null);
             }}
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+            className={`px-4 py-3 text-sm border-b-2 transition-colors ${
               tab === key
-                ? 'border-[#0c1b3a] text-[#0c1b3a]'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-[#C69A2D] font-bold'
+                : 'border-transparent font-medium hover:text-[#0B1F44]'
             }`}
+            style={{
+              color: tab === key ? '#0B1F44' : '#475569',
+            }}
           >
             {label}
             {key === 'customers' && customers.length > 0 && (
@@ -371,7 +374,7 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
 
       {/* FINANCE */}
       {tab === 'finance' && (
-        <BSFinancialDashboard lang={lang} />
+        <BSFinancialDashboard lang={lang} onGoToQuotes={() => { setTab('quotes'); setViewingQuote(null); }} />
       )}
 
       {/* CATALOG */}

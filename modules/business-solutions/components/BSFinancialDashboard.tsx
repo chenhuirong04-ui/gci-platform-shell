@@ -75,9 +75,10 @@ function StatCard({ label, value, sub, color }: { label: string; value: string |
 
 interface Props {
   lang: BSLang;
+  onGoToQuotes?: () => void;
 }
 
-export function BSFinancialDashboard({ lang }: Props) {
+export function BSFinancialDashboard({ lang, onGoToQuotes }: Props) {
   const isZh = lang === 'zh';
 
   const SUPA_URL = (import.meta as any).env.VITE_SUPABASE_URL as string;
@@ -237,9 +238,10 @@ export function BSFinancialDashboard({ lang }: Props) {
           <button
             key={v}
             onClick={() => setSubView(v)}
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors mr-2 ${
-              subView === v ? 'border-[#0c1b3a] text-[#0c1b3a]' : 'border-transparent text-gray-500 hover:text-gray-700'
+            className={`px-4 py-3 text-sm border-b-2 transition-colors mr-2 ${
+              subView === v ? 'border-[#C69A2D] font-bold' : 'border-transparent font-medium'
             }`}
+            style={{ color: subView === v ? '#0B1F44' : '#475569' }}
           >
             {v === 'dashboard' ? (isZh ? '经营看板' : 'Dashboard') : (isZh ? '财务汇总' : 'Summary')}
           </button>
@@ -382,9 +384,33 @@ export function BSFinancialDashboard({ lang }: Props) {
           )}
 
           {receivables.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
+            <div className="flex flex-col items-center justify-center py-16 text-center gap-4 px-6">
               <div className="text-4xl">📊</div>
-              <div className="text-sm text-gray-500">{isZh ? '暂无财务数据。请先在报价详情页生成应收记录。' : 'No financial data yet. Generate receivables from a quote detail page.'}</div>
+              <div className="text-sm font-semibold" style={{ color: NAVY }}>
+                {isZh ? '暂无财务数据' : 'No financial data yet'}
+              </div>
+              <div className="rounded-xl border p-5 text-left max-w-sm w-full" style={{ borderColor: '#e8e0d0', background: '#fff' }}>
+                <div className="text-xs font-bold mb-3" style={{ color: NAVY }}>
+                  {isZh ? '如何生成应收记录：' : 'How to generate receivables:'}
+                </div>
+                {[
+                  isZh ? '打开「报价记录」找到对应报价' : 'Go to "Quote Records" and find the quote',
+                  isZh ? '点击「标记已接受」将报价确认' : 'Click "Mark Accepted" to confirm the quote',
+                  isZh ? '点击「生成应收」创建应收记录' : 'Click "Generate Receivables" to create records',
+                ].map((step, i) => (
+                  <div key={i} className="flex items-start gap-3 mb-2 last:mb-0">
+                    <span className="flex-shrink-0 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center" style={{ background: GOLD + '22', color: NAVY }}>{i + 1}</span>
+                    <span className="text-xs text-gray-600">{step}</span>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={onGoToQuotes}
+                className="text-sm font-bold px-5 py-2.5 rounded-xl transition-all"
+                style={{ background: NAVY, color: 'white' }}
+              >
+                {isZh ? '前往报价记录生成应收 →' : 'Go to Quote Records →'}
+              </button>
             </div>
           )}
         </div>
