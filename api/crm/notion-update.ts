@@ -55,7 +55,7 @@ export default async function handler(request: Request): Promise<Response> {
   // Determine what to write to 行动状态
   let statusToWrite: string;
   if (action === 'restore_followup') {
-    statusToWrite = '跟进中';
+    statusToWrite = '新询盘';
   } else if (action === 'update_status') {
     // Caller supplies target status directly; validate it's non-empty
     if (!tradeStatus || typeof tradeStatus !== 'string') {

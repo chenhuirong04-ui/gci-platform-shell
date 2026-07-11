@@ -22,6 +22,9 @@ function json(body: unknown, status = 200) {
 const VALID_STATUS_SET = new Set([
   '合同待签', '新询盘', '需求整理中', '待报价', '已报价待确认', '执行中', '暂缓',
 ]);
+// Only maps old Chinese label variants to canonical Notion select names.
+// NEVER map app queue statuses (todo / archived) here — those are different
+// fields and must not implicitly overwrite 行动状态.
 const LEGACY_STATUS_MAP: Record<string, string> = {
   '已报价':       '已报价待确认',
   '等待客户回复': '已报价待确认',
@@ -29,13 +32,6 @@ const LEGACY_STATUS_MAP: Record<string, string> = {
   '已成交':       '执行中',
   '已完成':       '暂缓',
   '新建':         '新询盘',
-  // English / internal names
-  'pending':      '新询盘',
-  'todo':         '新询盘',
-  'in_progress':  '执行中',
-  'completed':    '暂缓',
-  'paused':       '暂缓',
-  'archived':     '暂缓',
 };
 function mapStatus(status?: string): string | null {
   if (!status) return null;

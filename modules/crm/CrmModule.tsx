@@ -395,24 +395,7 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
         ]);
 
         if (!alive) return;
-        // One-time recovery: if AHMED was accidentally archived by the close-drawer bug, restore it.
-        const rawTasks: FollowUpTask[] = Array.isArray(t) ? (t as any) : [];
-        const now = new Date().toISOString();
-        const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-        const recovered = rawTasks.map(task => {
-          const isAhmed = /ahmed/i.test(task.clientName || '');
-          if (isAhmed && task.status === 'archived') {
-            console.info('[RECOVERY] Restoring archived AHMED task:', task.id, task.clientName);
-            return {
-              ...task,
-              status: 'todo' as const,
-              updatedAt: now,
-              nextFollowUpAt: task.nextFollowUpAt || tomorrow,
-            };
-          }
-          return task;
-        });
-        setTasks(recovered);
+        setTasks(Array.isArray(t) ? (t as any) : []);
         setProjects(Array.isArray(p) ? (p as any) : []);
       } catch (e) {
         console.warn('Init load failed', e);
@@ -814,10 +797,30 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
 
+    const archiveAuditEntry = {
+      id: `AUDIT_${Date.now()}`,
+      timestamp: now,
+      type: 'STATUS_CHANGE' as const,
+      message: `关闭跟进：${task.tradeStatus ?? '—'} → 暂缓 (${task.status ?? '—'} → archived)`,
+      payload: {
+        customerName: task.clientName,
+        recordId: task.id,
+        notionPageId: task.leadId,
+        oldStatus: task.status,
+        newStatus: 'archived',
+        oldTradeStatus: task.tradeStatus,
+        newTradeStatus: '暂缓',
+        source: 'archive',
+        action: 'close_followup',
+        changedAt: now,
+        changedBy: 'user_action',
+      },
+    };
+
     // Optimistic update: status=archived + tradeStatus=暂缓
     setTasks(prev => prev.map(t =>
       t.id === id
-        ? { ...t, status: 'archived', tradeStatus: '暂缓', updatedAt: now }
+        ? { ...t, status: 'archived', tradeStatus: '暂缓', updatedAt: now, history: [...(t.history || []), archiveAuditEntry] }
         : t
     ));
 
@@ -862,16 +865,36 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
     }
   };
 
-  // ── 恢复归档记录 → status=todo + Notion 行动状态=跟进中 ──────────────
+  // ── 恢复归档记录 → status=todo + Notion 行动状态=新询盘 ──────────────
   const restoreTask = (id: string) => {
     const now = new Date().toISOString();
     const task = tasks.find(t => t.id === id);
     if (!task) return;
 
-    // Optimistic update: restore to todo + clear 暂缓 status
+    const auditEntry = {
+      id: `AUDIT_${Date.now()}`,
+      timestamp: now,
+      type: 'STATUS_CHANGE' as const,
+      message: `恢复跟进：${task.tradeStatus ?? '—'} → 新询盘 (${task.status ?? '—'} → todo)`,
+      payload: {
+        customerName: task.clientName,
+        recordId: task.id,
+        notionPageId: task.leadId,
+        oldStatus: task.status,
+        newStatus: 'todo',
+        oldTradeStatus: task.tradeStatus,
+        newTradeStatus: '新询盘',
+        source: 'restore',
+        action: 'restore_followup',
+        changedAt: now,
+        changedBy: 'user_action',
+      },
+    };
+
+    // Optimistic update: restore to todo + set active tradeStatus
     setTasks(prev => prev.map(t =>
       t.id === id
-        ? { ...t, status: 'todo', tradeStatus: '跟进中', updatedAt: now }
+        ? { ...t, status: 'todo', tradeStatus: '新询盘', updatedAt: now, history: [...(t.history || []), auditEntry] }
         : t
     ));
 

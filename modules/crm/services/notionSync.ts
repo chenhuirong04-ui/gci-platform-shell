@@ -3,6 +3,15 @@ import { compareByBusinessId } from '../utils/businessId';
 
 const STORAGE_KEY = 'ICARE_HISTORY_V1';
 
+// Single source of truth for which tradeStatuses map to 'archived'.
+// Keep in sync with api/crm/notion-sync.ts CLOSED_TRADE_STATUSES.
+const CLOSED_TRADE_STATUSES = new Set(['暂缓', '已归档', '已成交', '已关闭']);
+
+export function deriveQueueStatusFromTradeStatus(tradeStatus: string | undefined): 'todo' | 'archived' {
+  if (!tradeStatus) return 'todo';
+  return CLOSED_TRADE_STATUSES.has(tradeStatus) ? 'archived' : 'todo';
+}
+
 // Derive legacy businessId from old TASK-N-XXXXXXX IDs for upsert bridging
 function legacyBizIdFromTaskId(id: string): string {
   const raw = (id || '').replace(/^TASK-N-/, '').replace(/^LEAD-N-/, '');
@@ -129,8 +138,9 @@ export const notionSyncService = {
         }
 
         if (!local) {
-          // New task from Notion
-          merged.push({ ...incomingTask, status: 'todo' });
+          // New task from Notion — derive status from tradeStatus
+          const derivedStatus = deriveQueueStatusFromTradeStatus(incomingTask.tradeStatus);
+          merged.push({ ...incomingTask, status: derivedStatus });
           newCount++;
         } else {
           absorbedExistingIds.add(local.id); // prevent re-adding old entry later
@@ -153,6 +163,17 @@ export const notionSyncService = {
           // Preserve local fields explicitly (already on `updated` via spread of `local`)
           for (const field of LOCAL_PRESERVE_FIELDS) {
             (updated as any)[field] = (local as any)[field];
+          }
+
+          // Derive queue status from the (now-updated) tradeStatus.
+          // Prevents status=todo / tradeStatus=暂缓 contradictions after sync.
+          const prevStatus = local.status;
+          updated.status = deriveQueueStatusFromTradeStatus(updated.tradeStatus);
+          if (prevStatus !== updated.status) {
+            console.warn(
+              `[notionSync] status drift corrected for ${updated.clientName}: ` +
+              `${prevStatus} → ${updated.status} (tradeStatus=${updated.tradeStatus})`
+            );
           }
 
           merged.push(updated);
