@@ -143,19 +143,24 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
       {/* 数据概览 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* 成交漏斗 */}
+        {/* 客户跟进状态 */}
         <div className="rounded-[18px] border p-6 shadow-sm lg:col-span-1" style={{ backgroundColor: CARD, borderColor: BORDER }}>
-          <SectionHeader icon={<TrendingUp className="w-4 h-4" />} title="成交漏斗" />
+          <SectionHeader icon={<TrendingUp className="w-4 h-4" />} title="客户跟进状态" />
           {(() => {
-            const stages: { label: string; statuses: string[]; color: string }[] = [
-              { label: '新进入',   statuses: ['新询盘','新建','New Inquiry'],                              color: '#8FA6D4' },
-              { label: '跟进中',   statuses: ['跟进中','Following'],                                       color: GOLD },
-              { label: '报价阶段', statuses: ['寻价中','已报价','Sourcing','Quoted','已发客户','Sent'],     color: '#B69BD0' },
-              { label: '谈判确认', statuses: ['谈判中','已确认','Confirmed'],                              color: '#D9B45A' },
-              { label: '合同待签', statuses: ['合同待签'],                                                 color: '#B084C9' },
-              { label: '已成交',   statuses: ['已成交','已转订单','Converted'],                            color: '#6FBF8E' },
+            const stages: { label: string; status: string; color: string }[] = [
+              { label: '新询盘',       status: '新询盘',       color: '#8FA6D4' },
+              { label: '需求整理中',   status: '需求整理中',   color: '#A78BFA' },
+              { label: '待报价',       status: '待报价',       color: GOLD },
+              { label: '已报价待确认', status: '已报价待确认', color: '#D9B45A' },
+              { label: '合同待签',     status: '合同待签',     color: '#B084C9' },
+              { label: '执行中',       status: '执行中',       color: '#6FBF8E' },
+              { label: '已交付',       status: '已交付',       color: '#34D399' },
             ];
-            const counts = stages.map(s => activeTasks.filter(t => s.statuses.includes(t.tradeStatus)).length);
+            const allActive = tasks.filter(t =>
+              t.status !== 'deleted' && t.status !== 'archived' &&
+              (t as any).notionSource !== 'contact_only'
+            );
+            const counts = stages.map(s => allActive.filter(t => t.tradeStatus === s.status).length);
             const max = Math.max(...counts, 1);
             return (
               <div className="space-y-3 mt-2">
@@ -163,7 +168,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
                   <div key={s.label}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-bold" style={{ color: T2 }}>{s.label}</span>
-                      <span className="text-xs font-black" style={{ color: s.color }}>{counts[i]}</span>
+                      <span className="text-xs font-black" style={{ color: counts[i] > 0 ? s.color : T2 }}>{counts[i]}</span>
                     </div>
                     <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
                       <div className="h-full rounded-full transition-all duration-500"
