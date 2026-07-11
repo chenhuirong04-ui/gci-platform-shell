@@ -657,11 +657,19 @@ function ExpandedModal({
   );
 }
 
+// ── Dark card tokens ──────────────────────────────────────────────────────────
+const DARK_CARD_BG   = '#0E1A2E';
+const DARK_BORDER    = 'rgba(255,255,255,0.08)';
+const LIGHT_TEXT     = '#F7F1E3';
+const MUTED_LIGHT    = '#9AA8BC';
+const GOLD_ACCENT    = '#C7A24A';
+
 // ── Compact Summary Card (CEO dashboard view) ─────────────────────────────────
+// Returns null when count === 0 — empty cards do not render at all.
 
 function SummaryCard({
   status, icon, title, count, badge,
-  previewLines, emptyText,
+  previewLines,
   onExpand,
 }: {
   status: StatusKey;
@@ -673,65 +681,62 @@ function SummaryCard({
   emptyText: string;
   onExpand: () => void;
 }) {
+  // Hide empty cards entirely — no large blank space
+  if (count === 0) return null;
+
   const s = statusMap[status];
+  const accentColor = status === 'urgent' ? '#E07A5F' : s.color;
 
   return (
-    <Card
-      tone="light"
-      hoverable
-      className="p-5 flex flex-col gap-3 relative overflow-hidden"
-      style={{ cursor: count > 0 ? 'pointer' : 'default' }}
-      onClick={count > 0 ? onExpand : undefined}
+    <div
+      className="flex flex-col gap-2.5 relative overflow-hidden rounded-xl cursor-pointer select-none"
+      style={{
+        background: DARK_CARD_BG,
+        border: `1px solid ${DARK_BORDER}`,
+        padding: '14px 16px 12px 20px',
+      }}
+      onClick={onExpand}
     >
-      {/* Status shows up as a thin left bar only — card itself stays neutral white. */}
-      <div className="absolute left-0 top-0 bottom-0" style={{ width: 3, background: count > 0 ? s.color : '#E2E8F0' }} />
+      {/* Left accent bar */}
+      <div className="absolute left-0 top-0 bottom-0 rounded-l-xl" style={{ width: 3, background: accentColor }} />
 
       {/* Header row */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg" style={{ backgroundColor: s.bg }}>
-            <div style={{ color: s.color }}>{icon}</div>
-          </div>
-          <span className="text-[13px] font-black" style={{ color: NAVY }}>{title}</span>
+          <div style={{ color: accentColor }}>{icon}</div>
+          <span className="text-[13px] font-black" style={{ color: LIGHT_TEXT }}>{title}</span>
           {badge}
         </div>
-        <Badge
-          color={count > 0 ? s.color : colors.statusNeutral}
-          bg={count > 0 ? s.bg : '#F1F5F9'}
-          label={count}
-          className="rounded-lg text-sm px-2.5 py-0.5"
-        />
+        <span
+          className="text-[12px] font-black rounded-md px-2 py-0.5"
+          style={{ background: accentColor + '22', color: accentColor }}>
+          {count}
+        </span>
       </div>
 
-      {/* Preview lines */}
-      <div className="space-y-2 min-h-[44px]">
-        {count === 0 ? (
-          <p className="text-[13px] text-slate-300 italic">{emptyText}</p>
-        ) : (
-          previewLines.slice(0, 2).map(line => (
-            <div key={line.id} className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
-              <span className="text-[13px] font-bold truncate flex-1" style={{ color: NAVY }}>{line.label}</span>
-              <span className="text-[12px] font-bold flex-shrink-0"
-                style={{ color: line.urgent ? statusMap.urgent.color : colors.statusNeutral }}>
-                {line.meta}
-              </span>
-            </div>
-          ))
-        )}
+      {/* Preview lines — compact, no fixed min-height */}
+      <div className="space-y-1.5">
+        {previewLines.slice(0, 2).map(line => (
+          <div key={line.id} className="flex items-center gap-2">
+            <div className="w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: accentColor }} />
+            <span className="text-[13px] font-bold truncate flex-1" style={{ color: LIGHT_TEXT }}>{line.label}</span>
+            <span className="text-[12px] font-bold flex-shrink-0"
+              style={{ color: line.urgent ? '#E07A5F' : MUTED_LIGHT }}>
+              {line.meta}
+            </span>
+          </div>
+        ))}
       </div>
 
       {/* Footer */}
-      {count > 0 && (
-        <button
-          onClick={e => { e.stopPropagation(); onExpand(); }}
-          className="flex items-center gap-1 text-[13px] font-bold transition-colors hover:opacity-70"
-          style={{ color: s.color }}>
-          查看全部 {count} 条
-          <ChevronRight className="w-3 h-3" />
-        </button>
-      )}
-    </Card>
+      <button
+        onClick={e => { e.stopPropagation(); onExpand(); }}
+        className="flex items-center gap-1 text-[12px] font-bold transition-opacity hover:opacity-70 mt-0.5"
+        style={{ color: accentColor }}>
+        查看全部 {count} 条
+        <ChevronRight className="w-3 h-3" />
+      </button>
+    </div>
   );
 }
 
@@ -747,69 +752,85 @@ function AISummaryCard({
   onExpand: () => void;
   onRefresh: () => void;
 }) {
-  const previewText = aiLoading
-    ? null
-    : aiResult?.overallInsight || (aiError ? ruleSuggestions[0] : null);
+  const suggestions = aiResult
+    ? (aiResult.actions || []).slice(0, 3).map(a => a.title || a.reason).filter(Boolean)
+    : aiError
+    ? ruleSuggestions.slice(0, 3)
+    : [];
 
   return (
-    <Card tone="light" hoverable className="p-5 relative overflow-hidden">
-      {/* Status (gold = AI/brand highlight) shows up as a thin left bar only. */}
-      <div className="absolute left-0 top-0 bottom-0" style={{ width: 3, background: GOLD }} />
+    <div
+      className="relative overflow-hidden rounded-xl"
+      style={{
+        background: '#0D1B2E',
+        border: `1px solid ${DARK_BORDER}`,
+        padding: '14px 16px 14px 20px',
+      }}
+    >
+      {/* Gold left bar */}
+      <div className="absolute left-0 top-0 bottom-0 rounded-l-xl" style={{ width: 3, background: GOLD_ACCENT }} />
+
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg" style={{ backgroundColor: statusMap.ai.bg }}>
-            <Bot className="w-3.5 h-3.5" style={{ color: GOLD }} />
-          </div>
-          <span className="text-[13px] font-black" style={{ color: NAVY }}>OpenAI 智能建议</span>
+          <Bot className="w-3.5 h-3.5" style={{ color: GOLD_ACCENT }} />
+          <span className="text-[13px] font-black" style={{ color: LIGHT_TEXT }}>OpenAI 智能建议</span>
           {!aiLoading && !aiError && aiResult && (
-            <Badge color={colors.statusSuccess} bg="rgba(111,191,142,0.16)" label="GPT-4o" className="rounded-lg" />
+            <span className="text-[10px] font-black px-1.5 py-0.5 rounded"
+              style={{ background: 'rgba(111,191,142,0.15)', color: '#6FBF8E' }}>GPT-4o</span>
           )}
           {aiError && (
-            <Badge color={colors.statusNeutral} bg="#F1F5F9" label="规则引擎" className="rounded-lg" />
+            <span className="text-[10px] font-black px-1.5 py-0.5 rounded"
+              style={{ background: 'rgba(148,163,184,0.15)', color: MUTED_LIGHT }}>规则引擎</span>
           )}
         </div>
         <button onClick={e => { e.stopPropagation(); onRefresh(); }} disabled={aiLoading}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[13px] font-bold border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-bold disabled:opacity-40 transition-colors"
+          style={{ border: `1px solid ${DARK_BORDER}`, color: MUTED_LIGHT }}>
           <RefreshCw className={`w-3 h-3 ${aiLoading ? 'animate-spin' : ''}`} />
           {aiLoading ? '分析中' : '刷新'}
         </button>
       </div>
 
-      {/* Preview */}
-      <div className="min-h-[52px] mb-4">
-        {aiLoading && (
-          <div className="flex items-center gap-2 text-slate-400">
-            <RefreshCw className="w-3.5 h-3.5 animate-spin flex-shrink-0" style={{ color: GOLD }} />
-            <span className="text-[13px] font-bold">GPT-4o 正在分析业务数据…</span>
-          </div>
-        )}
-        {!aiLoading && previewText && (
-          <p className="text-[13px] font-bold leading-relaxed line-clamp-2" style={{ color: NAVY }}>
-            {previewText}
-          </p>
-        )}
-        {!aiLoading && !previewText && (
-          <p className="text-[13px] text-slate-300 italic">等待数据加载后自动分析…</p>
-        )}
-      </div>
+      {/* Content */}
+      {aiLoading && (
+        <div className="flex items-center gap-2 py-1">
+          <RefreshCw className="w-3.5 h-3.5 animate-spin flex-shrink-0" style={{ color: GOLD_ACCENT }} />
+          <span className="text-[13px] font-bold" style={{ color: MUTED_LIGHT }}>GPT-4o 正在分析业务数据…</span>
+        </div>
+      )}
 
-      {/* Footer row */}
-      <div className="flex items-center justify-between">
+      {!aiLoading && suggestions.length > 0 && (
+        <div className="space-y-1.5 mb-3">
+          {suggestions.map((s, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <Lightbulb className="w-3 h-3 flex-shrink-0 mt-0.5" style={{ color: GOLD_ACCENT }} />
+              <p className="text-[13px] leading-relaxed line-clamp-1" style={{ color: LIGHT_TEXT }}>{s}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!aiLoading && suggestions.length === 0 && (
+        <p className="text-[13px] py-1" style={{ color: MUTED_LIGHT }}>等待数据加载后自动分析…</p>
+      )}
+
+      {/* Footer */}
+      <div className="flex items-center justify-between mt-1">
         {(aiResult || aiError) && !aiLoading ? (
           <button onClick={onExpand}
-            className="flex items-center gap-1 text-[13px] font-bold hover:opacity-70 transition-opacity"
-            style={{ color: GOLD }}>
+            className="flex items-center gap-1 text-[12px] font-bold hover:opacity-70 transition-opacity"
+            style={{ color: GOLD_ACCENT }}>
             {aiResult ? `查看全部 ${(aiResult.actions || []).length} 条建议` : '查看规则分析'}
             <ChevronRight className="w-3 h-3" />
           </button>
         ) : <div />}
-        <div className="text-[13px] font-bold text-slate-300 flex items-center gap-1">
+        <div className="text-[11px] font-bold flex items-center gap-1" style={{ color: MUTED_LIGHT }}>
           <Shield className="w-2.5 h-2.5" />
           AI辅助建议，请以实际业务判断为准
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -1064,16 +1085,7 @@ export default function ActionCenter({ tasks, projects, followupTasks, pausedTas
           onExpand={() => setExpanded('client')}
         />
 
-        {/* Card 4 — 暂缓中 */}
-        <SummaryCard
-          status="paused" icon={<PauseCircle className="w-3.5 h-3.5" />}
-          title="暂缓中" count={pausedItems.length}
-          badge={<RuleEngineBadge />}
-          previewLines={pausedLines} emptyText="暂无暂缓记录"
-          onExpand={() => setExpanded('paused')}
-        />
-
-        {/* Card 5 — 新询盘 · 其他 */}
+        {/* Card 4 — 新询盘 · 其他 */}
         <SummaryCard
           status="otherInquiry" icon={<Sparkles className="w-3.5 h-3.5" />}
           title="新询盘 · 其他" count={others.length}
