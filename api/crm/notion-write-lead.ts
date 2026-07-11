@@ -143,7 +143,7 @@ function mapTradeStatus(status?: string): string {
     '等待客户回复': '已报价待确认',
     '待签合同':     '合同待签',
     '已成交':       '执行中',
-    '已完成':       '暂缓',
+    '已完成':       '已归档',
     '新建':         '新询盘',
   };
   return MAP[status] ?? '新询盘';

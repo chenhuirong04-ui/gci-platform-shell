@@ -40,13 +40,11 @@ const LEGACY_STATUS_MAP: Record<string, string> = {
   '等待客户回复': '已报价待确认',
   '待签合同': '合同待签',
   '已成交': '执行中',
-  '已完成': '暂缓',
+  '已完成': '已归档',
   '新建': '新询盘',
   'pending': '新询盘',
   'todo': '新询盘',
   'in_progress': '执行中',
-  'completed': '暂缓',
-  'paused': '暂缓',
 };
 function mapTradeStatus(status?: string): string {
   if (!status) return '新询盘';
