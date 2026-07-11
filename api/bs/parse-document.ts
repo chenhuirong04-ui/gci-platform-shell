@@ -1,4 +1,4 @@
-// /api/bs/parse-document
+﻿// /api/bs/parse-document
 // POST { mimeType: string, data: string (base64), documentType: string }
 // Uses Gemini Vision to extract structured fields from business documents.
 // Returns { ok: true, fields: {...} } or { ok: false, error: string }
@@ -17,11 +17,11 @@ function json(body: unknown, status = 200) {
   });
 }
 
-// ── Per-document-type prompts ──────────────────────────────────────────────
+// -- Per-document-type prompts -----------------------------------------------
 
 const PROMPTS: Record<string, string> = {
   TRADE_LICENSE: `You are a UAE/GCC trade license parser. Extract all visible fields from this document.
-Return ONLY valid JSON — no markdown, no explanation. Use this schema:
+Return ONLY valid JSON - no markdown, no explanation. Use this schema:
 {
   "license_number": "string or null",
   "licensee_name": "string or null",
@@ -34,7 +34,7 @@ Return ONLY valid JSON — no markdown, no explanation. Use this schema:
   "premises_number": "string or null",
   "building_name": "string or null",
   "area_name": "string or null",
-  "activities": ["list of business activities as strings — empty array if none found"],
+  "activities": ["list of business activities as strings - empty array if none found"],
   "confidence": "high | medium | low"
 }
 Rules: Convert all dates to YYYY-MM-DD. If a field is not visible, use null. Never guess.`,
@@ -177,11 +177,17 @@ export default async function handler(request: Request): Promise<Response> {
         { inline_data: { mime_type: mimeType, data: base64 } },
       ],
     }],
-    generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
+    generationConfig: {
+      temperature: 0.1,
+      maxOutputTokens: 2048,
+      responseMimeType: 'application/json',
+    },
   };
 
   let lastError = '';
   for (const model of GEMINI_MODELS) {
+    let geminiStatus = 0;
+    let rawText = '';
     try {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       const res = await fetch(endpoint, {
@@ -189,20 +195,35 @@ export default async function handler(request: Request): Promise<Response> {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(geminiBody),
       });
+      geminiStatus = res.status;
       if (!res.ok) {
-        lastError = `Gemini ${model} returned ${res.status}`;
+        const errBody = await res.text().catch(() => '');
+        lastError = `Gemini ${model} HTTP ${res.status}: ${errBody.slice(0, 300)}`;
         continue;
       }
       const geminiData: any = await res.json();
-      const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-      // Strip markdown fences if present
-      const cleaned = rawText.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+      // 1. Strip markdown fences
+      let cleaned = rawText.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+      // 2. Extract first {...} block as fallback
+      if (!cleaned.startsWith('{')) {
+        const match = cleaned.match(/\{[\s\S]*\}/);
+        if (match) cleaned = match[0];
+      }
+
       let fields: Record<string, unknown>;
       try {
         fields = JSON.parse(cleaned);
       } catch {
-        return json({ ok: false, error: 'AI returned non-JSON response', raw: rawText });
+        return json({
+          ok: false,
+          error: 'AI returned non-JSON response',
+          geminiStatus,
+          mimeType,
+          documentType,
+          rawPreview: rawText.slice(0, 500),
+        });
       }
       return json({ ok: true, fields, model });
     } catch (e: any) {
