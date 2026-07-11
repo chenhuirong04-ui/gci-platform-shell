@@ -1,4 +1,4 @@
-// /api/ai/inventory-table-alerts
+﻿// /api/ai/inventory-table-alerts
 // Reads Notion INVENTORY_DB for warehouse-level stock alerts.
 // Returns outOfStock / lowStock / anomaly items with adaptive field detection.
 // Read-only. Does NOT write to Notion.
@@ -230,7 +230,11 @@ export default async function handler(request: Request): Promise<Response> {
   const sortRank = (t: string) => t === 'outOfStock' ? 0 : t === 'anomaly' ? 1 : t === 'lowStock' ? 2 : 3;
   items.sort((a, b) => sortRank(a.alertType) - sortRank(b.alertType));
 
-  const alertItems     = items.filter(i => i.alertType !== 'normal');
+  // When a keyword filter is active, return ALL matching items so users see every coffee/tissue/etc.
+  // Without a filter (homepage alert mode), show only alert items.
+  const alertItems = productFilter
+    ? items
+    : items.filter(i => i.alertType !== 'normal');
   const outOfStockCount = alertItems.filter(i => i.alertType === 'outOfStock').length;
   const lowStockCount   = alertItems.filter(i => i.alertType === 'lowStock').length;
   const anomalyCount    = alertItems.filter(i => i.alertType === 'anomaly').length;
@@ -259,3 +263,4 @@ export default async function handler(request: Request): Promise<Response> {
 
   return json(result);
 }
+

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { DailyWorkbench } from '../components/DailyWorkbench';
 import { useSearchParams } from 'react-router-dom';
 import { colors } from '@gci/design-system';
@@ -37,6 +37,22 @@ function extractInventoryProduct(raw: string): string | null {
   if (m?.[1]) {
     const c = m[1].replace(/^.*(查|看|帮|我|请|一下)\s*/u, '').trim();
     if (c.length >= 2 && c.length <= 25) return c;
+  }
+
+  // Pattern 4: 有多少 <product> 库存 (e.g. "现在有多少咖啡库存", "还有多少纸巾库存")
+  m = s.match(/有多少(.+?)库存/u);
+  if (m?.[1]) {
+    const c = m[1].replace(/^[的\s]+|[的\s]+$/g, '').trim();
+    if (c.length >= 1 && c.length <= 25) return c;
+  }
+
+  // Pattern 5: <product>库存 / <product>库存多少 (e.g. "咖啡豆库存", "Palmjoy M 库存多少")
+  m = s.match(/^(?:现在|目前|今天|最近)?\s*(.+?)\s*库存(?:多少|怎么样|如何|情况)?$/u);
+  if (m?.[1]) {
+    const c = m[1]
+      .replace(/^(?:有多少|有没有|查一下|查看|查询|查|看|帮我|请|帮|还有多少)\s*/u, '')
+      .trim();
+    if (c.length >= 1 && c.length <= 25 && !/^(?:多少|有|没有|全部|所有|这个)$/.test(c)) return c;
   }
 
   return null;
@@ -3295,3 +3311,4 @@ export function AIPage() {
     </div>
   );
 }
+
