@@ -11,6 +11,21 @@ import { syncCustomerToNotion, syncQuoteToNotion } from '../lib/bsNotionSync';
 const GOLD = '#C9A84C';
 const NAVY = '#0c1b3a';
 
+// ── Shared form styles — matches the Quick-Add client form exactly ──────────
+const BS_LBL: React.CSSProperties = {
+  display: 'block', fontSize: 13, fontWeight: 700, color: NAVY, marginBottom: 6,
+};
+const BS_INP: React.CSSProperties = {
+  display: 'block', width: '100%', boxSizing: 'border-box',
+  padding: '11px 14px', borderRadius: 10,
+  border: '1.5px solid #b0bec5',
+  fontSize: 15, color: '#17233C', background: 'white', outline: 'none',
+};
+const BS_TA: React.CSSProperties = {
+  ...BS_INP, resize: 'none' as const, lineHeight: 1.6,
+};
+const BS_SEL: React.CSSProperties = { ...BS_INP };
+
 interface Props {
   lang: BSLang;
   customers: ServiceCustomer[];
@@ -699,47 +714,46 @@ export function BSNewQuotePage({
 
                   {/* Expanded editor */}
                   {expandedItemId === it.id && (
-                    <div className="px-3 pb-3 pt-1 space-y-2.5 border-t border-gray-100 bg-gray-50">
+                    <div className="px-3 pb-3 pt-1 space-y-2.5 border-t border-gray-100 bg-white">
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '服务名称' : 'Service Name'}</label>
-                          <input className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none bg-white" style={{ borderColor: '#cbd5e1' }}
+                          <label style={BS_LBL}>{isZh ? '服务名称' : 'Service Name'}</label>
+                          <input style={BS_INP}
                             value={it.service_name} onChange={e => updateItem(it.id, { service_name: e.target.value })} />
                         </div>
                         <div>
-                          <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '服务分类' : 'Category'}</label>
-                          <input className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none bg-white" style={{ borderColor: '#cbd5e1' }}
+                          <label style={BS_LBL}>{isZh ? '服务分类' : 'Category'}</label>
+                          <input style={BS_INP}
                             value={it.category_name} onChange={e => updateItem(it.id, { category_name: e.target.value })} />
                         </div>
                       </div>
                       <div>
-                        <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '服务说明' : 'Description'}</label>
-                        <textarea className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none resize-none bg-white" style={{ borderColor: '#cbd5e1' }}
+                        <label style={BS_LBL}>{isZh ? '服务说明' : 'Description'}</label>
+                        <textarea style={BS_TA}
                           rows={2} value={it.description} onChange={e => updateItem(it.id, { description: e.target.value })} />
                       </div>
                       <div>
-                        <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '服务范围' : 'Scope of Work'}</label>
-                        <textarea className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none resize-none bg-white" style={{ borderColor: '#cbd5e1' }}
+                        <label style={BS_LBL}>{isZh ? '服务范围' : 'Scope of Work'}</label>
+                        <textarea style={BS_TA}
                           rows={2} value={it.scope} onChange={e => updateItem(it.id, { scope: e.target.value })} />
                       </div>
                       <div>
-                        <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '交付内容' : 'Deliverables'}</label>
-                        <textarea className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none resize-none bg-white" style={{ borderColor: '#cbd5e1' }}
+                        <label style={BS_LBL}>{isZh ? '交付内容' : 'Deliverables'}</label>
+                        <textarea style={BS_TA}
                           rows={2} value={it.deliverables} onChange={e => updateItem(it.id, { deliverables: e.target.value })} />
                       </div>
                       <div>
-                        <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '不包含事项' : 'Exclusions'}</label>
-                        <textarea className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none resize-none bg-white" style={{ borderColor: '#cbd5e1' }}
+                        <label style={BS_LBL}>{isZh ? '不包含事项' : 'Exclusions'}</label>
+                        <textarea style={BS_TA}
                           rows={1} value={it.item_exclusions} onChange={e => updateItem(it.id, { item_exclusions: e.target.value })} />
                       </div>
                       {/* Periodic billing mode */}
                       <div>
-                        <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide" style={{ color: GOLD }}>
+                        <label style={{ ...BS_LBL, color: GOLD }}>
                           {isZh ? '周期收费方式' : 'Billing Period Mode'}
                         </label>
                         <select
-                          className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none bg-white"
-                          style={{ borderColor: '#cbd5e1', color: NAVY, fontWeight: 600 }}
+                          style={{ ...BS_SEL, color: NAVY, fontWeight: 600 }}
                           value={it.periodic_billing || 'auto'}
                           onChange={e => updateItem(it.id, { periodic_billing: e.target.value as PeriodicBilling })}
                         >
@@ -754,40 +768,40 @@ export function BSNewQuotePage({
                       {/* Three fee inputs */}
                       <div className="grid grid-cols-3 gap-2">
                         <div>
-                          <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '一次性费用' : 'One-time Fee'}</label>
-                          <input type="number" className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none text-right bg-white" style={{ borderColor: '#cbd5e1', color: '#17233C' }}
+                          <label style={BS_LBL}>{isZh ? '一次性费用' : 'One-time Fee'}</label>
+                          <input type="number" style={{ ...BS_INP, textAlign: 'right' as const }}
                             value={it.one_time_fee || ''} placeholder="0"
                             onChange={e => updateItem(it.id, { one_time_fee: parseFloat(e.target.value) || 0 })} />
                         </div>
                         <div>
-                          <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '月服务费' : 'Monthly Fee'}</label>
-                          <input type="number" className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none text-right bg-white" style={{ borderColor: '#cbd5e1', color: '#17233C' }}
+                          <label style={BS_LBL}>{isZh ? '月服务费' : 'Monthly Fee'}</label>
+                          <input type="number" style={{ ...BS_INP, textAlign: 'right' as const }}
                             value={it.monthly_fee || ''} placeholder="0"
                             onChange={e => updateItem(it.id, { monthly_fee: parseFloat(e.target.value) || 0 })} />
                         </div>
                         <div>
-                          <label className="text-[12px] font-semibold uppercase block mb-1.5 tracking-wide" style={{ color: GOLD }}>
+                          <label style={{ ...BS_LBL, color: GOLD }}>
                             {isZh ? '年服务费' : 'Annual Fee'}
                           </label>
-                          <input type="number" className="w-full px-3 py-[10px] rounded-lg border-2 text-[15px] text-[#0f172a] outline-none text-right bg-white" style={{ borderColor: GOLD, color: '#17233C', fontWeight: 600 }}
+                          <input type="number" style={{ ...BS_INP, textAlign: 'right' as const, border: `2px solid ${GOLD}`, fontWeight: 600 }}
                             value={it.annual_fee || ''} placeholder="0"
                             onChange={e => updateItem(it.id, { annual_fee: parseFloat(e.target.value) || 0 })} />
                         </div>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
                         <div>
-                          <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '数量' : 'Qty'}</label>
-                          <input type="number" min="1" className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none text-center bg-white" style={{ borderColor: '#cbd5e1' }}
+                          <label style={BS_LBL}>{isZh ? '数量' : 'Qty'}</label>
+                          <input type="number" min="1" style={{ ...BS_INP, textAlign: 'center' as const }}
                             value={it.quantity} onChange={e => updateItem(it.id, { quantity: parseInt(e.target.value) || 1 })} />
                         </div>
                         <div>
-                          <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '月数' : 'Months'}</label>
-                          <input type="number" min="1" className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none text-center bg-white" style={{ borderColor: '#cbd5e1' }}
+                          <label style={BS_LBL}>{isZh ? '月数' : 'Months'}</label>
+                          <input type="number" min="1" style={{ ...BS_INP, textAlign: 'center' as const }}
                             value={it.months} onChange={e => updateItem(it.id, { months: parseInt(e.target.value) || 1 })} />
                         </div>
                         <div>
-                          <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '交付周期' : 'Timeline'}</label>
-                          <input className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none bg-white" style={{ borderColor: '#cbd5e1' }}
+                          <label style={BS_LBL}>{isZh ? '交付周期' : 'Timeline'}</label>
+                          <input style={BS_INP}
                             value={it.timeline} placeholder={isZh ? '如: 2-4周' : 'e.g. 2-4 wks'}
                             onChange={e => updateItem(it.id, { timeline: e.target.value })} />
                         </div>
@@ -883,8 +897,8 @@ export function BSNewQuotePage({
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '币种' : 'Currency'}</label>
-                  <select className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none bg-white" style={{ borderColor: '#cbd5e1' }}
+                  <label style={BS_LBL}>{isZh ? '币种' : 'Currency'}</label>
+                  <select style={BS_SEL}
                     value={currency} onChange={e => setCurrency(e.target.value)}>
                     <option value="AED">AED</option>
                     <option value="USD">USD</option>
@@ -892,31 +906,31 @@ export function BSNewQuotePage({
                   </select>
                 </div>
                 <div>
-                  <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '有效期至' : 'Valid Until'}</label>
-                  <input type="date" className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none bg-white" style={{ borderColor: '#cbd5e1' }}
+                  <label style={BS_LBL}>{isZh ? '有效期至' : 'Valid Until'}</label>
+                  <input type="date" style={BS_INP}
                     value={validUntil} onChange={e => setValidUntil(e.target.value)} />
                 </div>
               </div>
               <div>
-                <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '付款方式' : 'Payment Terms'}</label>
-                <input className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none bg-white" style={{ borderColor: '#cbd5e1' }}
+                <label style={BS_LBL}>{isZh ? '付款方式' : 'Payment Terms'}</label>
+                <input style={BS_INP}
                   value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)}
                   placeholder={isZh ? '如: 50% 预付，完成后付 50%' : 'e.g. 50% upfront, 50% on completion'} />
               </div>
               <div>
-                <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '项目总周期' : 'Project Timeline'}</label>
-                <input className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none bg-white" style={{ borderColor: '#cbd5e1' }}
+                <label style={BS_LBL}>{isZh ? '项目总周期' : 'Project Timeline'}</label>
+                <input style={BS_INP}
                   value={deliveryPeriod} onChange={e => setDeliveryPeriod(e.target.value)}
                   placeholder={isZh ? '如: 60 个工作日' : 'e.g. 60 business days'} />
               </div>
               <div>
-                <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '总体不包含事项' : 'Exclusions'}</label>
-                <textarea className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none resize-none bg-white" style={{ borderColor: '#cbd5e1' }}
+                <label style={BS_LBL}>{isZh ? '总体不包含事项' : 'Exclusions'}</label>
+                <textarea style={BS_TA}
                   rows={2} value={quoteExclusions} onChange={e => setQuoteExclusions(e.target.value)} />
               </div>
               <div>
-                <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '总体备注' : 'Notes'}</label>
-                <textarea className="w-full px-3 py-[10px] rounded-lg border text-[15px] text-[#0f172a] outline-none resize-none bg-white" style={{ borderColor: '#cbd5e1' }}
+                <label style={BS_LBL}>{isZh ? '总体备注' : 'Notes'}</label>
+                <textarea style={BS_TA}
                   rows={2} value={quoteNotes} onChange={e => setQuoteNotes(e.target.value)} />
               </div>
             </div>
@@ -930,10 +944,9 @@ export function BSNewQuotePage({
           </label>
           <div className="space-y-3">
             <div>
-              <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '报价标题' : 'Quote Title'}</label>
+              <label style={BS_LBL}>{isZh ? '报价标题' : 'Quote Title'}</label>
               <input
-                className="w-full px-3 py-[11px] rounded-xl border text-[15px] text-[#0f172a] outline-none bg-white"
-                style={{ borderColor: '#cbd5e1' }}
+                style={BS_INP}
                 value={quoteTitle}
                 onChange={e => setQuoteTitle(e.target.value)}
                 placeholder={selectedCustomer
@@ -942,10 +955,9 @@ export function BSNewQuotePage({
               />
             </div>
             <div>
-              <label className="text-[12px] text-[#334155] font-semibold uppercase block mb-1.5 tracking-wide">{isZh ? '负责人' : 'Owner'}</label>
+              <label style={BS_LBL}>{isZh ? '负责人' : 'Owner'}</label>
               <input
-                className="w-full px-3 py-[11px] rounded-xl border text-[15px] text-[#0f172a] outline-none bg-white"
-                style={{ borderColor: '#cbd5e1' }}
+                style={BS_INP}
                 value={owner}
                 onChange={e => setOwner(e.target.value)}
                 placeholder="Chris / Lili / Novie"
