@@ -1,4 +1,4 @@
-// Vercel Edge Runtime — AI inventory query
+﻿// Vercel Edge Runtime — AI inventory query
 // Reads consignment_stock from Supabase.
 //
 // IMPORTANT: cloudDb wraps all business data into a fixed schema:
@@ -53,6 +53,22 @@ interface ProductSummary {
 
 export const LOW_STOCK_THRESHOLD = 5;
 
+// ── Product match helper ─────────────────────────────────────────────────────
+// Bidirectional + multi-field + multi-token matching.
+function matchStockItem(productName: string, keyword: string): boolean {
+  const kw = keyword.toLowerCase().trim();
+  if (!kw) return true;
+  const nameLower = (productName || '').toLowerCase().trim();
+  // 1. keyword is substring of name
+  if (nameLower.includes(kw)) return true;
+  // 2. name is substring of keyword (user typed brand+product, DB only has product part)
+  if (nameLower.length >= 2 && kw.includes(nameLower)) return true;
+  // 3. all space-separated tokens must appear in name
+  const tokens = kw.split(/\s+/).filter(t => t.length >= 1);
+  if (tokens.length > 1 && tokens.every(t => nameLower.includes(t))) return true;
+  return false;
+}
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
@@ -93,8 +109,7 @@ export default async function handler(request: Request): Promise<Response> {
     .filter(Boolean)
     .filter(p => {
       if (!productFilter) return true;
-      const name = (p.productName || '').toLowerCase();
-      return name.includes(productFilter);
+      return matchStockItem(p.productName, productFilter);
     });
 
   // Aggregate by productName
@@ -218,3 +233,4 @@ export default async function handler(request: Request): Promise<Response> {
     asOf: new Date().toISOString(),
   });
 }
+

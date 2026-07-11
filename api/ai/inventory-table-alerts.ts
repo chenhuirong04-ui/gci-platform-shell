@@ -78,6 +78,28 @@ function getSelect(page: any, field: string | null): string {
   return '';
 }
 
+// ── Product match helper ─────────────────────────────────────────────────────
+// Bidirectional + multi-field + multi-token matching.
+// Matches if: keyword is substring of fields, OR any field is substring of keyword,
+// OR every space-separated token appears somewhere in the combined field text.
+function matchItem(productName: string, sku: string, category: string, keyword: string): boolean {
+  const kw = keyword.toLowerCase().trim();
+  if (!kw) return true;
+  const nameLower = (productName || '').toLowerCase().trim();
+  const text = [nameLower, (sku || '').toLowerCase(), (category || '').toLowerCase()]
+    .filter(Boolean).join(' ');
+
+  // 1. keyword is substring of combined fields
+  if (text.includes(kw)) return true;
+  // 2. product name is substring of keyword (user typed brand+product, DB only has product part)
+  if (nameLower.length >= 2 && kw.includes(nameLower)) return true;
+  // 3. all space-separated tokens must appear somewhere in combined text
+  const tokens = kw.split(/\s+/).filter(t => t.length >= 1);
+  if (tokens.length > 1 && tokens.every(t => text.includes(t))) return true;
+
+  return false;
+}
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
@@ -221,9 +243,9 @@ export default async function handler(request: Request): Promise<Response> {
     return { pageId, productName, sku, category, warehouse, currentQty, minQty, threshold, statusVal, updatedAt, alertType, actionSuggestion };
   }).filter(Boolean) as NonNullable<ReturnType<typeof pages[0]>>[];
 
-  // Apply product filter if provided
+  // Apply product filter if provided (bidirectional + multi-field)
   const items = productFilter
-    ? allItems.filter(i => i.productName.toLowerCase().includes(productFilter))
+    ? allItems.filter(i => matchItem(i.productName, i.sku, i.category, productFilter))
     : allItems;
 
   // Sort: outOfStock → anomaly → lowStock → normal
@@ -263,4 +285,5 @@ export default async function handler(request: Request): Promise<Response> {
 
   return json(result);
 }
+
 

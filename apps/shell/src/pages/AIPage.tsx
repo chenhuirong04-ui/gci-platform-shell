@@ -9,53 +9,42 @@ import { detectAIIntent, getIntentSteps } from '../ai/aiRouter';
 import type { AIIntentMatch } from '../ai/aiRouter';
 import { readCRMTasks, getCRMBriefStats, getCRMCustomerData } from '../lib/crmLocalStore';
 
-// ── Product name extraction for inventory queries ─────────────────────────────
-// Extracts a product keyword from natural language input, e.g.:
-// "心相印的湿巾还有多少库存？" → "心相印的湿巾"
-// "请帮我查一下心想印的库存"   → "心想印"
-// "咖啡机的库存还有多少"        → "咖啡机"
-// "查一下库存"                  → null (no specific product)
-function extractInventoryProduct(raw: string): string | null {
-  const s = raw.replace(/[？?。！!，,]/g, '').trim();
+// ── Inventory query normalizer ────────────────────────────────────────────────
+// Strips command words, punctuation, and trailing "库存" to get the product term.
+// Returns null when the user is asking for full inventory (no specific product).
+//
+// Examples:
+//   "查，恒安七度空间卫生巾库存"   → "恒安七度空间卫生巾"
+//   "现在有多少咖啡库存"            → "咖啡"
+//   "帮我查一下 Palmjoy M 库存"    → "Palmjoy M"
+//   "现在有多少库存"                → null  (full list intended)
+//   "查询纸巾库存"                  → "纸巾"
+function normalizeInventoryQuery(raw: string): string | null {
+  // Step 1: strip punctuation (Chinese + ASCII)
+  let s = raw.replace(/[？?。！!，,、；;：:""''「」【】]/g, ' ').trim();
 
-  // Pattern 1: <product>还有多少/剩多少/有没有货 ... (product comes before quantity phrases)
-  let m = s.match(/^(.+?)(?:还有多少|剩多少|有没有货|是否有货|能不能出货|有货吗|有多少货|还有货)/u);
-  if (m?.[1]) {
-    const c = m[1].replace(/的$/, '').trim();
-    if (c.length >= 2 && c.length <= 25) return c;
+  // Step 2: multi-pass strip leading command / time / quantity noise words
+  const STRIPS: RegExp[] = [
+    /^(?:帮我|请帮我|帮|请)\s*/u,
+    /^(?:查询|查看|查一下|查|看一下|看|搜索|搜|找一下|找)\s*/u,
+    /^(?:现在|目前|今天|最近|当前)\s*/u,
+    /^(?:有多少|还有多少|剩多少|还有没有|有没有)\s*/u,
+  ];
+  for (let pass = 0; pass < 3; pass++) {
+    for (const re of STRIPS) s = s.replace(re, '').trim();
   }
 
-  // Pattern 2: 查/看 <product> 库存
-  m = s.match(/(?:查|看)(?:一下|查看|查询)?(.+?)(?:的)?库存/u);
-  if (m?.[1]) {
-    const c = m[1].replace(/^[帮我请一下\s]+/, '').trim();
-    if (c.length >= 2 && c.length <= 25) return c;
-  }
+  // Step 3: strip trailing inventory / quantity phrases
+  s = s
+    .replace(/\s*(?:还有多少|剩多少|有多少|有没有货|是否有货|能不能出货|有货吗|有多少货|还有货)\s*$/u, '')
+    .replace(/\s*(?:库存多少|库存怎么样|库存如何|库存情况|库存数量|的库存|库存|stock|inventory)\s*$/iu, '')
+    .trim();
 
-  // Pattern 3: <product>的库存
-  m = s.match(/(.+?)的库存/u);
-  if (m?.[1]) {
-    const c = m[1].replace(/^.*(查|看|帮|我|请|一下)\s*/u, '').trim();
-    if (c.length >= 2 && c.length <= 25) return c;
-  }
+  // Step 4: collapse internal whitespace
+  s = s.replace(/\s+/g, ' ').trim();
 
-  // Pattern 4: 有多少 <product> 库存 (e.g. "现在有多少咖啡库存", "还有多少纸巾库存")
-  m = s.match(/有多少(.+?)库存/u);
-  if (m?.[1]) {
-    const c = m[1].replace(/^[的\s]+|[的\s]+$/g, '').trim();
-    if (c.length >= 1 && c.length <= 25) return c;
-  }
-
-  // Pattern 5: <product>库存 / <product>库存多少 (e.g. "咖啡豆库存", "Palmjoy M 库存多少")
-  m = s.match(/^(?:现在|目前|今天|最近)?\s*(.+?)\s*库存(?:多少|怎么样|如何|情况)?$/u);
-  if (m?.[1]) {
-    const c = m[1]
-      .replace(/^(?:有多少|有没有|查一下|查看|查询|查|看|帮我|请|帮|还有多少)\s*/u, '')
-      .trim();
-    if (c.length >= 1 && c.length <= 25 && !/^(?:多少|有|没有|全部|所有|这个)$/.test(c)) return c;
-  }
-
-  return null;
+  if (!s || s.length < 1) return null;
+  return s;
 }
 
 // ── Customer name extraction for quotation history queries ────────────────────
@@ -2484,7 +2473,7 @@ export function AIPage() {
     const INVENTORY_RE = /库存|还有多少|剩多少|有没有货|是否有货|能不能出货|缺货|低库存|stock|inventory/i;
     if (INVENTORY_RE.test(t)) {
       console.log('[AI] inventory intent detected, raw:', raw);
-      const product = extractInventoryProduct(raw.trim());
+      const product = normalizeInventoryQuery(raw.trim());
       console.log('[AI] extracted product keyword:', product);
       // Build a minimal intent match inline (avoids importing the whole map)
       const inventoryMatch: AIIntentMatch = {
@@ -3173,7 +3162,7 @@ export function AIPage() {
           // For check_inventory, fetch both warehouse + consignment after animation completes
           if (intent.intentId === 'check_inventory') {
             const base = typeof window !== 'undefined' ? window.location.origin : '';
-            const product = extractInventoryProduct(raw.trim());
+            const product = normalizeInventoryQuery(raw.trim());
             const qs = product ? `?product=${encodeURIComponent(product)}` : '';
             Promise.allSettled([
               fetch(`${base}/api/ai/inventory-table-alerts${qs}`).then(r => r.json()),
@@ -3311,4 +3300,5 @@ export function AIPage() {
     </div>
   );
 }
+
 
