@@ -467,6 +467,27 @@ export async function listComplianceItems(customerId: string): Promise<Complianc
 }
 
 export async function saveComplianceItem(item: ComplianceItem): Promise<ComplianceItem | null> {
+  // Dedup: if document_id is provided, update existing record instead of inserting a duplicate
+  if (item.document_id) {
+    const existing = await sbFetch(
+      `/rest/v1/service_customer_compliance_items?document_id=eq.${encodeURIComponent(item.document_id)}&limit=1`,
+      { method: 'GET' },
+    );
+    if (existing) {
+      const rows = await existing.json().catch(() => []);
+      if (Array.isArray(rows) && rows.length > 0) {
+        const existingId = rows[0].id;
+        const patch = { ...item, updated_at: new Date().toISOString() };
+        const upRes = await sbFetch(
+          `/rest/v1/service_customer_compliance_items?id=eq.${encodeURIComponent(existingId)}`,
+          { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) },
+        );
+        if (!upRes) return null;
+        const d = await upRes.json().catch(() => null);
+        return Array.isArray(d) ? d[0] : d;
+      }
+    }
+  }
   const payload = { ...item, updated_at: new Date().toISOString() };
   const res = await sbFetch('/rest/v1/service_customer_compliance_items', {
     method: 'POST',

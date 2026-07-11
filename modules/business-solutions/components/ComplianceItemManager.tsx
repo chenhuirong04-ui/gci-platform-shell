@@ -91,17 +91,21 @@ function emptyItem(customerId: string, docId?: string, defaults?: Partial<Compli
 interface Props {
   customerId: string;
   lang: BSLang;
-  /** Pre-open form for a newly uploaded document */
+  /** Pre-open form for a newly uploaded document (manual flow only) */
   prefillFromDocument?: {
     documentId: string;
     documentType: string;
     documentName: string;
   };
   onPrefillHandled?: () => void;
+  /** Increment to trigger a list reload without opening the form */
+  reloadKey?: number;
+  /** Toast message to display after an external save */
+  savedToast?: string;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
-export function ComplianceItemManager({ customerId, lang, prefillFromDocument, onPrefillHandled }: Props) {
+export function ComplianceItemManager({ customerId, lang, prefillFromDocument, onPrefillHandled, reloadKey, savedToast }: Props) {
   const isZh = lang === 'zh';
 
   const [items, setItems]         = useState<ComplianceItem[]>([]);
@@ -112,8 +116,16 @@ export function ComplianceItemManager({ customerId, lang, prefillFromDocument, o
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState('');
   const [activityInput, setActivityInput] = useState('');
+  const [toast, setToast]         = useState<string | null>(null);
 
-  useEffect(() => { load(); }, [customerId]);
+  useEffect(() => { load(); }, [customerId, reloadKey]);
+
+  useEffect(() => {
+    if (!savedToast) return;
+    setToast(savedToast);
+    const timer = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [savedToast]);
 
   // Handle prefill from document upload
   useEffect(() => {
@@ -217,6 +229,14 @@ export function ComplianceItemManager({ customerId, lang, prefillFromDocument, o
 
   return (
     <div>
+      {/* Toast */}
+      {toast && (
+        <div className="mb-4 px-4 py-2.5 rounded-xl text-sm font-bold text-white text-center"
+          style={{ background: '#16a34a' }}>
+          ✓ {toast}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>

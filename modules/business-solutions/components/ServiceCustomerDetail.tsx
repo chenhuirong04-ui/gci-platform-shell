@@ -42,20 +42,17 @@ export function ServiceCustomerDetail({
   const isZh = lang === 'zh';
   const [activeTab, setActiveTab] = useState<DetailTab>('info');
 
-  // Bridge: compliance prefill from document upload
+  // Bridge: compliance prefill from document upload (manual flow only)
   const [compliancePrefill, setCompliancePrefill] = useState<
     { documentId: string; documentType: string; documentName: string; parsed?: Record<string, unknown> } | undefined
   >();
+  const [complianceReloadKey, setComplianceReloadKey] = useState(0);
+  const [complianceSavedMsg, setComplianceSavedMsg] = useState<string | null>(null);
 
   // Bridge: persons prefill from document upload
   const [personPrefill, setPersonPrefill] = useState<{
     documentId: string; documentType: string; documentName: string; parsed: Record<string, unknown>;
   } | null>(null);
-
-  const handleComplianceTrigger = (info: { documentId: string; documentType: string; documentName: string }) => {
-    setCompliancePrefill(info);
-    setActiveTab('compliance');
-  };
 
   const handlePersonTrigger = (info: { documentId: string; documentType: string; documentName: string; parsed: Record<string, unknown> }) => {
     setPersonPrefill(info);
@@ -202,8 +199,10 @@ export function ServiceCustomerDetail({
             customerId={customer.id}
             customerName={customer.customer_name}
             lang={lang}
-            onCreateComplianceItem={({ documentId, documentType, documentName, parsed }) => {
-              setCompliancePrefill({ documentId, documentType, documentName, parsed: parsed as Record<string, unknown> });
+            onCreateComplianceItem={() => {
+              // Record already saved by CustomerDocumentManager — just reload list and show toast
+              setComplianceReloadKey(k => k + 1);
+              setComplianceSavedMsg(isZh ? '营业执照已保存' : 'Trade license saved');
               setActiveTab('compliance');
             }}
             onCreatePerson={({ documentId, documentType, documentName, parsed }) => {
@@ -219,6 +218,8 @@ export function ServiceCustomerDetail({
             lang={lang}
             prefillFromDocument={compliancePrefill}
             onPrefillHandled={() => setCompliancePrefill(undefined)}
+            reloadKey={complianceReloadKey}
+            savedToast={complianceSavedMsg || undefined}
           />
         )}
 
