@@ -34,14 +34,24 @@ function normalizeInventoryQuery(raw: string): string | null {
     for (const re of STRIPS) s = s.replace(re, '').trim();
   }
 
-  // Step 3: strip trailing inventory / quantity phrases
-  s = s
-    .replace(/\s*(?:还有多少|剩多少|有多少|有没有货|是否有货|能不能出货|有货吗|有多少货|还有货)\s*$/u, '')
-    .replace(/\s*(?:库存多少|库存怎么样|库存如何|库存情况|库存数量|的库存|库存|stock|inventory)\s*$/iu, '')
-    .trim();
+  // Step 3: strip trailing inventory / quantity phrases (run twice: "有多少库存" → "有多少" → "")
+  for (let i = 0; i < 2; i++) {
+    s = s
+      .replace(/\s*(?:还有多少|剩多少|有多少|有没有货|是否有货|能不能出货|有货吗|有多少货|还有货)\s*$/u, '')
+      .replace(/\s*(?:库存多少|库存怎么样|库存如何|库存情况|库存数量|的库存|库存|stock|inventory)\s*$/iu, '')
+      .trim();
+  }
 
   // Step 4: collapse internal whitespace
   s = s.replace(/\s+/g, ' ').trim();
+
+  // Step 5: brand alias normalization (monihappy ≡ Moni Happy)
+  s = s.replace(/\bmonihappy\b/gi, 'Moni Happy');
+
+  // Step 6: insert spaces at Latin↔CJK boundaries so tokens split correctly
+  s = s.replace(/([A-Za-z0-9])([一-鿿])/g, '$1 $2')
+       .replace(/([一-鿿])([A-Za-z0-9])/g, '$1 $2')
+       .replace(/\s+/g, ' ').trim();
 
   if (!s || s.length < 1) return null;
   return s;
