@@ -27,6 +27,11 @@ const EMPTY_ITEM: Omit<ServiceCatalogItem, 'id'> = {
   description_en: '',
   one_time_fee: 0,
   monthly_fee: 0,
+  annual_fee: 0,
+  default_quantity: 1,
+  default_months: 1,
+  default_timeline: '',
+  allow_price_edit: false,
 };
 
 export function ServiceCatalogManager({ lang, categories, items, loading, onSaveCategory, onSaveItem, onUpdateItem, onDeleteItem }: Props) {
@@ -117,6 +122,13 @@ export function ServiceCatalogManager({ lang, categories, items, loading, onSave
                     <span className="text-xs text-gray-400">{t.billingType[it.default_billing_type] || it.default_billing_type}</span>
                     <button onClick={() => setEditItem({ ...it })} className="text-xs text-blue-600 hover:underline px-1">{t.buttons.editService}</button>
                     <button
+                      onClick={() => {
+                        const { id, ...rest } = it;
+                        setEditItem({ ...rest, name_cn: rest.name_cn + '（副本）', name_en: rest.name_en + ' (Copy)', sort_order: (rest.sort_order || 0) + 1 });
+                      }}
+                      className="text-xs text-gray-500 hover:underline px-1"
+                    >复制</button>
+                    <button
                       onClick={() => onUpdateItem(it.id!, { active: !it.active })}
                       className="text-xs text-gray-400 hover:underline px-1"
                     >
@@ -200,6 +212,30 @@ export function ServiceCatalogManager({ lang, categories, items, loading, onSave
                 </select>
               </div>
             </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">默认数量</div>
+                <input className={inp} type="number" min={1} value={editItem.default_quantity ?? 1} onChange={e => setEditItem(v => ({ ...v!, default_quantity: Number(e.target.value) || 1 }))} />
+              </div>
+              <div>
+                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">默认月数</div>
+                <input className={inp} type="number" min={1} value={editItem.default_months ?? 1} onChange={e => setEditItem(v => ({ ...v!, default_months: Number(e.target.value) || 1 }))} />
+              </div>
+              <div>
+                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">交付周期</div>
+                <input className={inp} placeholder="如: 2-4周" value={editItem.default_timeline || ''} onChange={e => setEditItem(v => ({ ...v!, default_timeline: e.target.value }))} />
+              </div>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={!!editItem.allow_price_edit}
+                onChange={e => setEditItem(v => ({ ...v!, allow_price_edit: e.target.checked }))}
+              />
+              <span className="text-[13px] text-[#334155] font-semibold">价格待定（报价时可修改金额）</span>
+            </label>
 
             <div className="flex gap-2 pt-2">
               <button onClick={handleSaveItem} disabled={saving} className="flex-1 bg-[#0c1b3a] text-white rounded px-4 py-2 text-sm disabled:opacity-50">
