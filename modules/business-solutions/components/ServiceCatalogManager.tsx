@@ -3,6 +3,23 @@ import { createPortal } from 'react-dom';
 import type { ServiceCatalogItem, ServiceCategory, BSLang, BillingType } from '../types';
 import { useT } from '../translations';
 
+// ── Visual tokens — all form color rules live here ───────────────────────────
+const BS_MODAL_TITLE: React.CSSProperties = { fontSize: 16, fontWeight: 700, color: '#0B1F44' };
+const BS_LABEL: React.CSSProperties       = { display: 'block', fontSize: 13, fontWeight: 600, color: '#0B1F44', marginBottom: 6 };
+const BS_INPUT: React.CSSProperties       = {
+  display: 'block', width: '100%', boxSizing: 'border-box',
+  padding: '10px 12px', borderRadius: 8, border: '1.5px solid #CBD5E1',
+  fontSize: 14, color: '#0F172A', background: '#fff', outline: 'none',
+};
+const BS_BTN_PRIMARY: React.CSSProperties = {
+  flex: 1, padding: '10px 0', borderRadius: 8, border: 'none',
+  background: '#0B1F44', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+};
+const BS_BTN_SECONDARY: React.CSSProperties = {
+  padding: '10px 20px', borderRadius: 8, border: '1.5px solid #CBD5E1',
+  background: '#fff', color: '#0B1F44', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+};
+
 interface Props {
   lang: BSLang;
   categories: ServiceCategory[];
@@ -153,96 +170,96 @@ export function ServiceCatalogManager({ lang, categories, items, loading, onSave
 
       {/* Edit item modal — portal to document.body to escape transformed ancestor */}
       {editItem && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40" onMouseDown={e => { if (e.target === e.currentTarget) setEditItem(null); }}>
-          <div className="bg-white rounded-lg shadow-xl w-[540px] max-h-[85vh] overflow-auto p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="font-semibold text-[#0c1b3a]">{editItem.id ? t.buttons.editService : t.buttons.addService2}</div>
-              <button onClick={() => setEditItem(null)} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)' }} onMouseDown={e => { if (e.target === e.currentTarget) setEditItem(null); }}>
+          <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', width: 540, maxHeight: '85vh', overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={BS_MODAL_TITLE}>{editItem.id ? t.buttons.editService : t.buttons.addService2}</span>
+              <button onClick={() => setEditItem(null)} style={{ background: 'none', border: 'none', fontSize: 22, color: '#64748B', cursor: 'pointer', lineHeight: 1 }}>×</button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">中文名称 *</div>
-                <input className={inp} value={editItem.name_cn || ''} onChange={e => setEditItem(v => ({ ...v!, name_cn: e.target.value }))} />
+                <label style={BS_LABEL}>中文名称 *</label>
+                <input style={BS_INPUT} value={editItem.name_cn || ''} onChange={e => setEditItem(v => ({ ...v!, name_cn: e.target.value }))} />
               </div>
               <div>
-                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">English Name *</div>
-                <input className={inp} value={editItem.name_en || ''} onChange={e => setEditItem(v => ({ ...v!, name_en: e.target.value }))} />
+                <label style={BS_LABEL}>English Name *</label>
+                <input style={BS_INPUT} value={editItem.name_en || ''} onChange={e => setEditItem(v => ({ ...v!, name_en: e.target.value }))} />
               </div>
             </div>
 
             <div>
-              <div className="text-[13px] text-[#334155] font-semibold mb-1.5">{t.fields.description} (中文)</div>
-              <textarea className={inp + ' resize-none'} rows={2} value={editItem.description_zh || ''} onChange={e => setEditItem(v => ({ ...v!, description_zh: e.target.value }))} />
+              <label style={BS_LABEL}>{t.fields.description} (中文)</label>
+              <textarea style={{ ...BS_INPUT, resize: 'none' }} rows={2} value={editItem.description_zh || ''} onChange={e => setEditItem(v => ({ ...v!, description_zh: e.target.value }))} />
             </div>
             <div>
-              <div className="text-[13px] text-[#334155] font-semibold mb-1.5">{t.fields.description} (EN)</div>
-              <textarea className={inp + ' resize-none'} rows={2} value={editItem.description_en || ''} onChange={e => setEditItem(v => ({ ...v!, description_en: e.target.value }))} />
+              <label style={BS_LABEL}>{t.fields.description} (EN)</label>
+              <textarea style={{ ...BS_INPUT, resize: 'none' }} rows={2} value={editItem.description_en || ''} onChange={e => setEditItem(v => ({ ...v!, description_en: e.target.value }))} />
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
               <div>
-                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">{t.fields.oneTimeFee}</div>
-                <input className={inp} type="number" min={0} value={editItem.one_time_fee || ''} onChange={e => setEditItem(v => ({ ...v!, one_time_fee: Number(e.target.value) }))} />
+                <label style={BS_LABEL}>{t.fields.oneTimeFee}</label>
+                <input style={BS_INPUT} type="number" min={0} value={editItem.one_time_fee || ''} onChange={e => setEditItem(v => ({ ...v!, one_time_fee: Number(e.target.value) }))} />
               </div>
               <div>
-                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">{t.fields.monthlyFee}</div>
-                <input className={inp} type="number" min={0} value={editItem.monthly_fee || ''} onChange={e => setEditItem(v => ({ ...v!, monthly_fee: Number(e.target.value) }))} />
+                <label style={BS_LABEL}>{t.fields.monthlyFee}</label>
+                <input style={BS_INPUT} type="number" min={0} value={editItem.monthly_fee || ''} onChange={e => setEditItem(v => ({ ...v!, monthly_fee: Number(e.target.value) }))} />
               </div>
               <div>
-                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">{t.fields.annualFee}</div>
-                <input className={inp} type="number" min={0} value={editItem.annual_fee || ''} onChange={e => setEditItem(v => ({ ...v!, annual_fee: Number(e.target.value) }))} />
+                <label style={BS_LABEL}>{t.fields.annualFee}</label>
+                <input style={BS_INPUT} type="number" min={0} value={editItem.annual_fee || ''} onChange={e => setEditItem(v => ({ ...v!, annual_fee: Number(e.target.value) }))} />
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
               <div>
-                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">Billing Type</div>
-                <select className={inp} value={editItem.default_billing_type || 'fixed'} onChange={e => setEditItem(v => ({ ...v!, default_billing_type: e.target.value as BillingType }))}>
+                <label style={BS_LABEL}>Billing Type</label>
+                <select style={BS_INPUT} value={editItem.default_billing_type || 'fixed'} onChange={e => setEditItem(v => ({ ...v!, default_billing_type: e.target.value as BillingType }))}>
                   {BILLING_TYPES.map(bt => <option key={bt} value={bt}>{t.billingType[bt]}</option>)}
                 </select>
               </div>
               <div>
-                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">{t.fields.unit}</div>
-                <input className={inp} value={editItem.default_unit || ''} onChange={e => setEditItem(v => ({ ...v!, default_unit: e.target.value }))} />
+                <label style={BS_LABEL}>{t.fields.unit}</label>
+                <input style={BS_INPUT} value={editItem.default_unit || ''} onChange={e => setEditItem(v => ({ ...v!, default_unit: e.target.value }))} />
               </div>
               <div>
-                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">Category</div>
-                <select className={inp} value={editItem.category_id || ''} onChange={e => setEditItem(v => ({ ...v!, category_id: e.target.value }))}>
+                <label style={BS_LABEL}>Category</label>
+                <select style={BS_INPUT} value={editItem.category_id || ''} onChange={e => setEditItem(v => ({ ...v!, category_id: e.target.value }))}>
                   {categories.map(c => <option key={c.id} value={c.id!}>{isZh ? c.name_cn : c.name_en}</option>)}
                 </select>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
               <div>
-                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">默认数量</div>
-                <input className={inp} type="number" min={1} value={editItem.default_quantity ?? 1} onChange={e => setEditItem(v => ({ ...v!, default_quantity: Number(e.target.value) || 1 }))} />
+                <label style={BS_LABEL}>默认数量</label>
+                <input style={BS_INPUT} type="number" min={1} value={editItem.default_quantity ?? 1} onChange={e => setEditItem(v => ({ ...v!, default_quantity: Number(e.target.value) || 1 }))} />
               </div>
               <div>
-                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">默认月数</div>
-                <input className={inp} type="number" min={1} value={editItem.default_months ?? 1} onChange={e => setEditItem(v => ({ ...v!, default_months: Number(e.target.value) || 1 }))} />
+                <label style={BS_LABEL}>默认月数</label>
+                <input style={BS_INPUT} type="number" min={1} value={editItem.default_months ?? 1} onChange={e => setEditItem(v => ({ ...v!, default_months: Number(e.target.value) || 1 }))} />
               </div>
               <div>
-                <div className="text-[13px] text-[#334155] font-semibold mb-1.5">交付周期</div>
-                <input className={inp} placeholder="如: 2-4周" value={editItem.default_timeline || ''} onChange={e => setEditItem(v => ({ ...v!, default_timeline: e.target.value }))} />
+                <label style={BS_LABEL}>交付周期</label>
+                <input style={BS_INPUT} placeholder="如: 2-4周" value={editItem.default_timeline || ''} onChange={e => setEditItem(v => ({ ...v!, default_timeline: e.target.value }))} />
               </div>
             </div>
 
-            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
               <input
                 type="checkbox"
                 checked={!!editItem.allow_price_edit}
                 onChange={e => setEditItem(v => ({ ...v!, allow_price_edit: e.target.checked }))}
               />
-              <span className="text-[13px] text-[#334155] font-semibold">价格待定（报价时可修改金额）</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#0B1F44' }}>价格待定（报价时可修改金额）</span>
             </label>
 
-            <div className="flex gap-2 pt-2">
-              <button onClick={handleSaveItem} disabled={saving} className="flex-1 bg-[#0c1b3a] text-white rounded px-4 py-2 text-sm disabled:opacity-50">
+            <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
+              <button onClick={handleSaveItem} disabled={saving} style={{ ...BS_BTN_PRIMARY, opacity: saving ? 0.5 : 1 }}>
                 {saving ? t.labels.saving : t.buttons.save}
               </button>
-              <button onClick={() => setEditItem(null)} className="px-4 py-2 border border-gray-200 rounded text-sm">{t.buttons.cancel}</button>
+              <button onClick={() => setEditItem(null)} style={BS_BTN_SECONDARY}>{t.buttons.cancel}</button>
             </div>
           </div>
         </div>,

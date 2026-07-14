@@ -11,6 +11,7 @@
 @source "../../../modules/trade/**/*.{ts,tsx}";
 @source "../../../modules/crm/**/*.{ts,tsx}";
 @source "../../../modules/quotation/**/*.{ts,tsx}";
+@source "../../../modules/business-solutions/**/*.{ts,tsx}";
 
 /* Trade module used a Tailwind CDN config (now removed) that set
    font-sans/font-mono to Inter/JetBrains Mono. Restoring the same
