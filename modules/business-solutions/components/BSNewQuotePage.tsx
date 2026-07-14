@@ -119,6 +119,7 @@ export function BSNewQuotePage({
   // ── Quote items ───────────────────────────────────────────────────────────
   const [items, setItems] = useState<ServiceQuoteLineItem[]>([]);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [expandedTermsId, setExpandedTermsId] = useState<string | null>(null);
 
   // ── Quote meta ────────────────────────────────────────────────────────────
   const year = new Date().getFullYear();
@@ -733,24 +734,9 @@ export function BSNewQuotePage({
                         </div>
                       </div>
                       <div>
-                        <label style={BS_LBL}>{isZh ? '服务说明' : 'Description'}</label>
+                        <label style={BS_LBL}>{isZh ? '简要说明' : 'Description'}</label>
                         <textarea style={BS_TA}
                           rows={2} value={it.description} onChange={e => updateItem(it.id, { description: e.target.value })} />
-                      </div>
-                      <div>
-                        <label style={BS_LBL}>{isZh ? '服务范围' : 'Scope of Work'}</label>
-                        <textarea style={BS_TA}
-                          rows={2} value={it.scope} onChange={e => updateItem(it.id, { scope: e.target.value })} />
-                      </div>
-                      <div>
-                        <label style={BS_LBL}>{isZh ? '交付内容' : 'Deliverables'}</label>
-                        <textarea style={BS_TA}
-                          rows={2} value={it.deliverables} onChange={e => updateItem(it.id, { deliverables: e.target.value })} />
-                      </div>
-                      <div>
-                        <label style={BS_LBL}>{isZh ? '不包含事项' : 'Exclusions'}</label>
-                        <textarea style={BS_TA}
-                          rows={1} value={it.item_exclusions} onChange={e => updateItem(it.id, { item_exclusions: e.target.value })} />
                       </div>
                       {/* Periodic billing mode */}
                       <div>
@@ -810,6 +796,37 @@ export function BSNewQuotePage({
                             value={it.timeline} placeholder={isZh ? '如: 2-4周' : 'e.g. 2-4 wks'}
                             onChange={e => updateItem(it.id, { timeline: e.target.value })} />
                         </div>
+                      </div>
+                      {/* 补充服务条款 — 默认收起 */}
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedTermsId(expandedTermsId === it.id ? null : it.id)}
+                          className="flex items-center gap-1.5 text-xs font-bold"
+                          style={{ color: expandedTermsId === it.id ? GOLD : '#64748B', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                        >
+                          <span>{expandedTermsId === it.id ? '▲' : '▶'}</span>
+                          {isZh ? '补充服务条款（选填）' : 'Additional Terms (optional)'}
+                        </button>
+                        {expandedTermsId === it.id && (
+                          <div className="mt-2 space-y-2.5 pl-3" style={{ borderLeft: `2px solid ${GOLD}40` }}>
+                            <div>
+                              <label style={BS_LBL}>{isZh ? '服务范围' : 'Scope of Work'}</label>
+                              <textarea style={BS_TA}
+                                rows={2} value={it.scope} onChange={e => updateItem(it.id, { scope: e.target.value })} />
+                            </div>
+                            <div>
+                              <label style={BS_LBL}>{isZh ? '交付内容' : 'Deliverables'}</label>
+                              <textarea style={BS_TA}
+                                rows={2} value={it.deliverables} onChange={e => updateItem(it.id, { deliverables: e.target.value })} />
+                            </div>
+                            <div>
+                              <label style={BS_LBL}>{isZh ? '不包含事项' : 'Exclusions'}</label>
+                              <textarea style={BS_TA}
+                                rows={1} value={it.item_exclusions} onChange={e => updateItem(it.id, { item_exclusions: e.target.value })} />
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
                         <input type="checkbox" checked={it.is_optional} onChange={e => updateItem(it.id, { is_optional: e.target.checked })} />
