@@ -863,7 +863,7 @@ export function BSNewQuotePage({
               <div className="flex items-center gap-2 pt-1 pb-1">
                 <select
                   className="border rounded-lg px-2 py-1 text-xs outline-none"
-                  style={{ borderColor: '#cbd5e1' }}
+                  style={{ borderColor: '#94a3b8', color: '#0F172A', fontWeight: 600 }}
                   value={discountType}
                   onChange={e => setDiscountType(e.target.value as any)}
                 >
@@ -875,7 +875,7 @@ export function BSNewQuotePage({
                   <input
                     type="number"
                     className="flex-1 border rounded-lg px-2 py-1 text-xs outline-none text-right"
-                    style={{ borderColor: '#cbd5e1' }}
+                    style={{ borderColor: '#94a3b8', color: '#0F172A', fontWeight: 600 }}
                     value={discountValue || ''}
                     onChange={e => setDiscountValue(parseFloat(e.target.value) || 0)}
                     placeholder={discountType === 'percent' ? '%' : currency}
@@ -890,17 +890,17 @@ export function BSNewQuotePage({
 
               {/* VAT row */}
               <div className="flex items-center gap-2 pb-1">
-                <span className="text-xs text-gray-400 flex-shrink-0">{isZh ? 'VAT 税率 %' : 'VAT Rate %'}</span>
+                <span className="text-xs font-semibold flex-shrink-0" style={{ color: '#0B1F44' }}>{isZh ? 'VAT 税率 %' : 'VAT Rate %'}</span>
                 <input
                   type="number" min="0" max="100" step="1"
                   className="w-20 border rounded-lg px-2 py-1 text-xs outline-none text-right"
-                  style={{ borderColor: '#cbd5e1' }}
+                  style={{ borderColor: '#94a3b8', color: '#0F172A', fontWeight: 600 }}
                   value={vatRate > 0 ? vatRate * 100 : ''}
                   placeholder="0"
                   onChange={e => setVatRate((parseFloat(e.target.value) || 0) / 100)}
                 />
                 {totals.vatAmount > 0 && (
-                  <span className="text-xs font-medium text-gray-500 flex-shrink-0">
+                  <span className="text-xs font-semibold flex-shrink-0" style={{ color: '#0B1F44' }}>
                     +{fmt(totals.vatAmount, currency)}
                   </span>
                 )}
@@ -914,7 +914,7 @@ export function BSNewQuotePage({
 
             {/* Commercial terms */}
             <div className="mt-5 pt-4 border-t border-gray-100 space-y-3">
-              <p className="text-[12px] font-bold uppercase tracking-widest text-[#334155]">
+              <p className="text-[12px] font-black uppercase tracking-widest" style={{ color: '#0B1F44' }}>
                 {isZh ? '商务条款' : 'Commercial Terms'}
               </p>
               <div className="grid grid-cols-2 gap-3">
