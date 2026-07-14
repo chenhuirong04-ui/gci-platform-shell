@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { ServiceCatalogItem, ServiceCategory, BSLang, BillingType } from '../types';
 import { useT } from '../translations';
 
@@ -150,10 +151,10 @@ export function ServiceCatalogManager({ lang, categories, items, loading, onSave
         </div>
       )}
 
-      {/* Edit item modal overlay */}
-      {editItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-lg shadow-xl w-[540px] max-h-[80vh] overflow-auto p-5 space-y-3">
+      {/* Edit item modal — portal to document.body to escape transformed ancestor */}
+      {editItem && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40" onMouseDown={e => { if (e.target === e.currentTarget) setEditItem(null); }}>
+          <div className="bg-white rounded-lg shadow-xl w-[540px] max-h-[85vh] overflow-auto p-5 space-y-3">
             <div className="flex items-center justify-between">
               <div className="font-semibold text-[#0c1b3a]">{editItem.id ? t.buttons.editService : t.buttons.addService2}</div>
               <button onClick={() => setEditItem(null)} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
@@ -244,7 +245,8 @@ export function ServiceCatalogManager({ lang, categories, items, loading, onSave
               <button onClick={() => setEditItem(null)} className="px-4 py-2 border border-gray-200 rounded text-sm">{t.buttons.cancel}</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
