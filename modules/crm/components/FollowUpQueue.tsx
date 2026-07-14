@@ -25,6 +25,7 @@ interface FollowUpQueueProps {
   onUpdateTradeStatus: (id: string, status: TradeStatus) => void;
   onArchiveTask?: (id: string) => void;
   lang: Language;
+  onFilteredTasksChange?: (tasks: FollowUpTask[]) => void;
 }
 
 const TRADE_STATUSES: TradeStatus[] = [
@@ -159,7 +160,7 @@ function KanbanView({ tasks, onAction, onUpdateTradeStatus }: {
 
 // ── Main ──────────────────────────────────────────────────────────────
 const FollowUpQueue: React.FC<FollowUpQueueProps> = ({
-  tasks, onAction, onUpdateStatus, onUpdateTradeStatus, onArchiveTask, lang,
+  tasks, onAction, onUpdateStatus, onUpdateTradeStatus, onArchiveTask, lang, onFilteredTasksChange,
 }) => {
   const _t = translations[lang]; void _t;
   const [view, setView]   = useState<'list'|'kanban'>('list');
@@ -180,6 +181,8 @@ const FollowUpQueue: React.FC<FollowUpQueueProps> = ({
       t.aiInsights?.nextActionSuggestion, t.aiInsights?.realNeed, t.businessType,
     ].some(v => v && String(v).toLowerCase().includes(q)));
   }, [tasks, chip, searchQ]);
+
+  useEffect(() => { onFilteredTasksChange?.(filtered); }, [filtered, onFilteredTasksChange]);
 
   // ── List view ─────────────────────────────────────────────────────
   const ListView = () => (

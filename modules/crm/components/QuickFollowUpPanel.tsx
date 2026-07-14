@@ -14,7 +14,7 @@ import React, { useState, useRef } from 'react';
 import { FollowUpTask, Proposal } from '../types';
 import { uploadFileToDrive } from '../services/driveService';
 import {
-  X, ChevronRight, MessageSquare, Calendar, Phone, Mail, MapPin,
+  X, ChevronLeft, ChevronRight, MessageSquare, Calendar, Phone, Mail, MapPin,
   User, Clock, CheckCircle2, Archive, Building2, Edit2, Save, XCircle,
   Paperclip, FileText, ChevronDown, ChevronUp, UploadCloud, ExternalLink,
 } from 'lucide-react';
@@ -45,6 +45,15 @@ const TYPE_LABEL: Record<string, string> = {
   TRADE: '贸易询盘', PROJECT: '项目推进', LOG_ONLY: '内部记录',
 };
 
+interface NavInfo {
+  current: number;
+  total: number;
+  hasPrev: boolean;
+  hasNext: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+}
+
 interface Props {
   task: FollowUpTask;
   onClose: () => void;
@@ -52,6 +61,7 @@ interface Props {
   onViewFull: () => void;
   onArchiveTask?: (id: string) => void;
   onUpdateTask?: (task: FollowUpTask) => void;
+  navInfo?: NavInfo;
 }
 
 // ── Shared input style
@@ -105,7 +115,7 @@ function InfoRow({
 }
 
 export default function QuickFollowUpPanel({
-  task, onClose, onSave, onViewFull, onArchiveTask, onUpdateTask,
+  task, onClose, onSave, onViewFull, onArchiveTask, onUpdateTask, navInfo,
 }: Props) {
   const bizId    = (task as any).businessId || getTaskBusinessId(task.id);
   const priority = task.priority || 'B';
@@ -368,6 +378,32 @@ export default function QuickFollowUpPanel({
                   <Edit2 className="w-3.5 h-3.5" />
                   编辑
                 </button>
+              )}
+              {/* Prev / Next navigation */}
+              {navInfo && (
+                <div className="flex items-center gap-0.5 ml-1">
+                  <button
+                    onClick={navInfo.onPrev}
+                    disabled={!navInfo.hasPrev}
+                    title="上一位客户"
+                    className="p-1.5 rounded-lg transition-colors hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                    style={{ color: T2 }}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-[10px] font-black px-1" style={{ color: T3 }}>
+                    {navInfo.current}/{navInfo.total}
+                  </span>
+                  <button
+                    onClick={navInfo.onNext}
+                    disabled={!navInfo.hasNext}
+                    title="下一位客户"
+                    className="p-1.5 rounded-lg transition-colors hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                    style={{ color: T2 }}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
               )}
               <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition-colors ml-1"
                 style={{ color: T2 }}>

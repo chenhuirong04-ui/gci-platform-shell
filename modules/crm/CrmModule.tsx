@@ -13,12 +13,16 @@ import HistoryView from './components/HistoryView';
 import ProjectProgress from './components/ProjectProgress';
 import InternalTasksView from './components/InternalTasksView';
 import ControlCenter from './components/ControlCenter';
+import AILeadAssistant from './components/AILeadAssistant';
+import { createDemoLeads } from './demo/demoMode';
 
 import {
   CheckCircle2,
   AlertCircle,
   Lock,
   RefreshCw,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 /* =========================
@@ -176,9 +180,9 @@ function PasswordGate({ onPass }: { onPass: () => void }) {
 type CrmTab = 'control' | 'dashboard' | 'history' | 'project' | 'internal';
 const _crmValidTabs = ['control', 'dashboard', 'history', 'project', 'internal'] as const;
 
-function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
+function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoMode?: boolean }) {
   const isAdminMode = new URLSearchParams(window.location.search).get('admin') === '1';
-  const [tasks, setTasks] = useState<FollowUpTask[]>([]);
+  const [tasks, setTasks] = useState<FollowUpTask[]>(() => demoMode ? createDemoLeads() : []);
   const [projects, setProjects] = useState<Project[]>([]);
   // Sidebar deep-links into a specific tab via ?tab=. Falls back to reading
   // the URL once on mount when no host shell prop is provided.
@@ -194,11 +198,16 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
     if (initialTab && _crmValidTabs.includes(initialTab)) setActiveTab(initialTab);
   }, [initialTab]);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error'>('idle');
-  const [lastSyncAt, setLastSyncAt] = useState<string | null>(notionSyncService.getLastSyncAt());
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(() => demoMode ? null : notionSyncService.getLastSyncAt());
   // Authoritative today-follow-up count from API (Follow-up Log only, before orphan merge)
   const [todayFollowupCount, setTodayFollowupCount] = useState<number | null>(null);
-  const [intakeOpen, setIntakeOpen] = useState(true); // default open — 客户跟进 is quick entry point
+  const [intakeOpen, setIntakeOpen] = useState(!demoMode); // Demo never opens the production intake workflow.
   const [selectedTask, setSelectedTask] = useState<FollowUpTask | null>(null);
+  // detailOpen: whether the slide-over panel is visible. Kept separate from
+  // selectedTask so closing the panel does not lose the current customer context.
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [navTasks, setNavTasks] = useState<FollowUpTask[]>([]);
+  const [demoAiOpen, setDemoAiOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
 
@@ -300,6 +309,18 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
     return Array.from(map.values());
   }, [tasks]);
 
+  // Navigation: use the list currently shown by FollowUpQueue (post-filter/search).
+  // Falls back to normalizedTasks until FollowUpQueue reports its first filtered set.
+  const effectiveNavTasks = navTasks.length > 0 ? navTasks : normalizedTasks;
+  const navIdx   = selectedTask ? effectiveNavTasks.findIndex(t => t.id === selectedTask.id) : -1;
+  const hasPrev  = navIdx > 0;
+  const hasNext  = navIdx >= 0 && navIdx < effectiveNavTasks.length - 1;
+  const goPrev   = () => { if (hasPrev)  setSelectedTask(effectiveNavTasks[navIdx - 1]); };
+  const goNext   = () => { if (hasNext)  setSelectedTask(effectiveNavTasks[navIdx + 1]); };
+  const navTotal = effectiveNavTasks.length;
+  // True when selected customer exists but is filtered out of the current view
+  const navNotInFilter = selectedTask !== null && navIdx === -1 && navTasks.length > 0;
+
   const combinedProjectsForView = useMemo((): Project[] => {
     /**
      * PLAN A — Notion businessType is authoritative.
@@ -352,6 +373,7 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
   };
 
   const syncFromNotion = async () => {
+    if (demoMode) return;
     setSyncStatus('syncing');
     try {
       const result = await notionSyncService.sync();
@@ -381,6 +403,13 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
   };
 
   useEffect(() => {
+    if (demoMode) {
+      setTasks(createDemoLeads());
+      setProjects([]);
+      setHydrated(true);
+      firstHydrateRef.current = false;
+      return;
+    }
     let alive = true;
     let intervalId: ReturnType<typeof setInterval> | null = null;
     (async () => {
@@ -415,22 +444,24 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
       if (intervalId) clearInterval(intervalId);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [demoMode]);
 
   useEffect(() => {
+    if (demoMode) return;
     if (!hydrated) return;
     if (firstHydrateRef.current) return;
     // Skip when Notion overwrite is in progress — overwriteFromNotion handles
     // the cloud write directly; a merge-push here would re-inflate to 68.
     if (notionOverwriteInProgressRef.current) return;
     PersistenceService.save(ICARE_HISTORY_V1, tasks);
-  }, [tasks, hydrated]);
+  }, [tasks, hydrated, demoMode]);
 
   useEffect(() => {
+    if (demoMode) return;
     if (!hydrated) return;
     if (firstHydrateRef.current) return;
     PersistenceService.save(ICARE_PROJECTS_V1, projects);
-  }, [projects, hydrated]);
+  }, [projects, hydrated, demoMode]);
 
   const handleAddTask = async (formData: Partial<FollowUpTask>) => {
     setIsGenerating(true);
@@ -744,6 +775,11 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
       setSelectedTask(updated);
     }
 
+    if (demoMode) {
+      showToast(`Demo状态已更新：${tradeStatus}（刷新后重置）`, 'success');
+      return;
+    }
+
     // 3. Notion write-back — update 行动状态 on the Follow-up Log page
     const pageId = task.notionFollowupPageId || task.leadId;
     const hasNotionPage = pageId &&
@@ -793,6 +829,10 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
   // ── 关闭本次跟进 — writes '暂缓' to Notion Follow-up Log ──────────
   // Optimistic: update local state immediately, then persist to Notion.
   const archiveTask = (id: string) => {
+    if (demoMode) {
+      showToast('Demo模式已禁用归档和真实写回', 'info');
+      return;
+    }
     const now = new Date().toISOString();
     const task = tasks.find(t => t.id === id);
     if (!task) return;
@@ -1030,6 +1070,10 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
   };
 
   const deleteTask = (id: string) => {
+    if (demoMode) {
+      showToast('Demo模式已禁用删除', 'info');
+      return;
+    }
     const now = new Date().toISOString();
     const task = tasks.find(t => t.id === id);
     setTasks(prev => prev.map(t =>
@@ -1107,7 +1151,7 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
     { id: 'project' as const,    label: '业务中心' },
     { id: 'history' as const,    label: '历史归档' },
     { id: 'internal' as const,   label: '内部事项' },
-  ];
+  ].filter(tab => !demoMode || tab.id === 'control' || tab.id === 'dashboard');
 
   return (
     <div className="min-h-screen font-sans pb-36" style={{ background: '#0A1628', color: '#E8F0FF' }}>
@@ -1132,7 +1176,7 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
             ))}
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            {lastSyncAt && (
+            {!demoMode && lastSyncAt && (
               <span className="text-[10px] font-bold whitespace-nowrap hidden md:inline" style={{ color: '#4A6080' }}>
                 最后同步: {(() => {
                   const diff = Math.floor((Date.now() - new Date(lastSyncAt).getTime()) / 60000);
@@ -1141,7 +1185,7 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
               </span>
             )}
             {/* 补写 Follow-up Log（partial 失败时） */}
-            {tasks.some(t => (t as any).notionSyncStatus === 'followup_failed') && (
+            {!demoMode && tasks.some(t => (t as any).notionSyncStatus === 'followup_failed') && (
               <button
                 onClick={retryFollowupLog}
                 disabled={retryFollowupSyncing}
@@ -1154,7 +1198,7 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
               </button>
             )}
             {/* 批量同步归档→Notion */}
-            {tasks.some(t => t.status === 'archived' && t.leadId?.includes('-') && !/^(LEAD_|HIST_|SYNTH_|INT_|NOTION-)/i.test(t.leadId)) && (
+            {!demoMode && tasks.some(t => t.status === 'archived' && t.leadId?.includes('-') && !/^(LEAD_|HIST_|SYNTH_|INT_|NOTION-)/i.test(t.leadId)) && (
               <button
                 onClick={syncArchivedToNotion}
                 disabled={batchSyncing}
@@ -1166,7 +1210,7 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
                 {batchSyncing ? '同步中…' : '↑ 归档→Notion'}
               </button>
             )}
-            <button
+            {!demoMode && <button
               onClick={() => syncFromNotion()}
               disabled={syncStatus === 'syncing'}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black text-white transition-all disabled:opacity-50"
@@ -1175,8 +1219,8 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
             >
               <RefreshCw className={`w-3 h-3 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
               {syncStatus === 'syncing' ? '同步中…' : '↻ 同步'}
-            </button>
-            {isAdminMode && (
+            </button>}
+            {!demoMode && isAdminMode && (
               <button
                 onClick={handleAdminImport}
                 className="px-3 py-1.5 rounded-xl text-[10px] font-black text-white"
@@ -1191,13 +1235,53 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
 
       <main className="max-w-7xl mx-auto px-6 py-8">
 
-        {activeTab === 'control' && (
+        {activeTab === 'control' && demoMode && (
+          <div className="space-y-6" data-testid="demo-control-center">
+            <div>
+              <div className="text-2xl font-black">客户执行总览</div>
+              <div className="mt-1 text-sm text-[#7A9CC5]">全部为虚构演示数据 · 刷新后恢复初始状态</div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              {[
+                ['客户总数', normalizedTasks.length],
+                ['今日待跟进', normalizedTasks.filter(t => t.nextFollowUpAt.slice(0, 10) <= '2026-07-12').length],
+                ['A级重点客户', normalizedTasks.filter(t => t.priority === 'A').length],
+                ['等待确认', normalizedTasks.filter(t => t.tradeStatus === '已报价待确认').length],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                  <div className="text-xs font-bold text-[#7A9CC5]">{label}</div>
+                  <div className="mt-2 text-3xl font-black text-[#D4AF37]">{value}</div>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="font-black">行动中心 · 待跟进客户</div>
+                <button onClick={() => setActiveTab('dashboard')} className="rounded-xl bg-[#B8960C] px-4 py-2 text-xs font-black text-white">查看客户列表</button>
+              </div>
+              <div className="space-y-2">
+                {normalizedTasks.slice(0, 4).map(task => (
+                  <button key={task.id} onClick={() => { setActiveTab('dashboard'); setSelectedTask(task); setDetailOpen(true); }} className="flex w-full items-center justify-between rounded-2xl bg-[#0D1E35] px-4 py-3 text-left">
+                    <span><span className="font-bold text-white">{task.clientName}</span><span className="ml-3 text-xs text-[#7A9CC5]">{task.suggestedAction}</span></span>
+                    <span className="text-xs font-bold text-[#D4AF37]">{task.owner} · {task.nextFollowUpAt.slice(0, 10)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'control' && !demoMode && (
           <ControlCenter
             tasks={normalizedTasks}
             projects={combinedProjectsForView.filter(p => !p.deleted && !p.archivedAt)}
             todayFollowupCount={todayFollowupCount}
             onTabSwitch={(tab) => setActiveTab(tab)}
-            onSelectTask={setSelectedTask}
+            onSelectTask={(task) => {
+              if (demoMode) setActiveTab('dashboard');
+              setSelectedTask(task);
+              setDetailOpen(true);
+            }}
           />
         )}
 
@@ -1208,13 +1292,13 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
                 <h2 className="text-2xl font-black" style={{ color: '#E8F0FF' }}>客户跟进</h2>
                 <p className="text-sm font-medium mt-0.5" style={{ color: '#7A9CC5' }}>AI 辅助跟进 · 所有待处理记录</p>
               </div>
-              <button
+              {!demoMode && <button
                 onClick={() => setIntakeOpen(v => !v)}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all"
                 style={{ background: 'rgba(255,255,255,0.07)', color: '#7A9CC5', border: '1px solid rgba(255,255,255,0.12)' }}
               >
                 {intakeOpen ? '收起录入 ↑' : '展开录入 ↓'}
-              </button>
+              </button>}
             </div>
 
             {intakeOpen && (
@@ -1230,12 +1314,28 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
 
             <FollowUpQueue
               tasks={normalizedTasks}
-              onAction={setSelectedTask}
+              onAction={(task) => { setSelectedTask(task); setDetailOpen(true); }}
               onUpdateStatus={updateTaskStatus}
               onUpdateTradeStatus={updateTradeStatus}
               onArchiveTask={archiveTask}
               lang={'zh'}
+              onFilteredTasksChange={setNavTasks}
             />
+            {demoMode && (
+              selectedTask ? (
+                <button
+                  data-testid="demo-ai-open"
+                  onClick={() => setDemoAiOpen(true)}
+                  className="w-full rounded-2xl border border-[#B8960C]/40 bg-[#B8960C]/10 px-5 py-4 text-sm font-black text-[#D4AF37]"
+                >
+                  打开 AI 客户助手 · {selectedTask.clientName}
+                </button>
+              ) : (
+                <div className="w-full rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-sm font-bold text-center" style={{ color: '#7A9CC5' }}>
+                  请先在列表中选择客户，再打开 AI 助手
+                </div>
+              )
+            )}
           </div>
         )}
 
@@ -1284,10 +1384,11 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
         )}
       </main>
 
-      {selectedTask && activeTab === 'dashboard' && (
+      {selectedTask && detailOpen && activeTab === 'dashboard' && (
         <QuickFollowUpPanel
           task={selectedTask}
-          onClose={() => setSelectedTask(null)}
+          onClose={() => setDetailOpen(false)}
+          navInfo={navIdx >= 0 ? { current: navIdx + 1, total: navTotal, hasPrev, hasNext, onPrev: goPrev, onNext: goNext } : undefined}
           onSave={(taskId, log) => {
             const now = new Date().toISOString();
             setTasks(prev => prev.map(t => {
@@ -1325,10 +1426,55 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
         />
       )}
 
-      {selectedTask && activeTab !== 'dashboard' && (
+      {demoMode && demoAiOpen && selectedTask && (
+        <div data-testid="demo-ai-panel" className="fixed inset-0 z-[4000] overflow-y-auto bg-slate-950/80 p-6 backdrop-blur-sm">
+          <div className="mx-auto max-w-2xl">
+            <div className="mb-3 flex items-center justify-between text-white">
+              <div className="flex items-center gap-3">
+                <div className="font-black">AI 客户助手 · {selectedTask.clientName}</div>
+                {navIdx >= 0 && (
+                  <span className="text-xs font-bold text-white/40">{navIdx + 1} / {navTotal}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={goPrev}
+                  disabled={!hasPrev}
+                  className="flex items-center gap-1 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/20"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />上一位
+                </button>
+                <button
+                  onClick={goNext}
+                  disabled={!hasNext}
+                  className="flex items-center gap-1 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/20"
+                >
+                  下一位<ChevronRight className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => setDemoAiOpen(false)} className="rounded-xl bg-white/10 px-4 py-2 text-xs font-bold hover:bg-white/20">关闭</button>
+              </div>
+            </div>
+            {navNotInFilter && (
+              <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-bold text-amber-400">
+                当前客户不在列表筛选结果内，上一位 / 下一位按当前筛选条件定位
+              </div>
+            )}
+            <AILeadAssistant
+              task={selectedTask}
+              demoMode
+              onUpdateTask={(updated) => {
+                setTasks(v => v.map(t => t.id === updated.id ? updated : t));
+                setSelectedTask(updated);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {selectedTask && detailOpen && activeTab !== 'dashboard' && (
         <LeadMasterDetail
           task={selectedTask}
-          onClose={() => setSelectedTask(null)}
+          onClose={() => setDetailOpen(false)}
           onUpdateTask={(u: any) => setTasks(v => v.map(t => (t.id === u.id ? u : t)))}
           onArchiveTask={archiveTask}
           onDeleteTask={deleteTask}
@@ -1356,10 +1502,10 @@ function CrmInner({ initialTab }: { initialTab?: CrmTab }) {
    Root — Gate + ErrorBoundary，与原 App() 完全一致，
    只是 AppInner 改名 CrmInner 且不再渲染 AppShell。
    ========================= */
-export default function CrmModule({ initialTab }: { initialTab?: CrmTab } = {}) {
+export default function CrmModule({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoMode?: boolean } = {}) {
   return (
     <ErrorBoundary>
-      <CrmInner initialTab={initialTab} />
+      <CrmInner initialTab={initialTab} demoMode={demoMode} />
     </ErrorBoundary>
   );
 }
