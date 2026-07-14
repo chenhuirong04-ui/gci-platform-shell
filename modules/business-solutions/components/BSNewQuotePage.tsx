@@ -13,13 +13,16 @@ const NAVY = '#0c1b3a';
 
 // ── Shared form styles — matches the Quick-Add client form exactly ──────────
 const BS_LBL: React.CSSProperties = {
-  display: 'block', fontSize: 13, fontWeight: 700, color: NAVY, marginBottom: 6,
+  display: 'block', fontSize: 13, fontWeight: 600, color: '#0B1F44', marginBottom: 6,
 };
 const BS_INP: React.CSSProperties = {
   display: 'block', width: '100%', boxSizing: 'border-box',
   padding: '11px 14px', borderRadius: 10,
   border: '1.5px solid #b0bec5',
-  fontSize: 15, color: '#17233C', background: 'white', outline: 'none',
+  fontSize: 15, color: '#0F172A', background: 'white', outline: 'none',
+};
+const BS_AMT: React.CSSProperties = {
+  ...BS_INP, color: '#0B1F44', fontWeight: 700,
 };
 const BS_TA: React.CSSProperties = {
   ...BS_INP, resize: 'none' as const, lineHeight: 1.6,
@@ -178,7 +181,9 @@ export function BSNewQuotePage({
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const addServiceItem = (item: ServiceCatalogItem) => {
-    setItems(prev => [...prev, makeItemFromCatalog(item, categories, lang, prev.length)]);
+    const newItem = makeItemFromCatalog(item, categories, lang, items.length);
+    setItems(prev => [...prev, newItem]);
+    setExpandedItemId(newItem.id);
   };
 
   const addCustomItem = () => {
@@ -690,7 +695,7 @@ export function BSNewQuotePage({
                   {/* Row */}
                   <div
                     className="flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-gray-50"
-                    onClick={() => setExpandedItemId(expandedItemId === it.id ? null : it.id)}
+                    onClick={() => items.length > 1 && setExpandedItemId(expandedItemId === it.id ? null : it.id)}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-gray-800 truncate">{it.service_name}</div>
@@ -709,11 +714,11 @@ export function BSNewQuotePage({
                       onClick={e => { e.stopPropagation(); removeItem(it.id); }}
                       className="text-gray-300 hover:text-red-400 flex-shrink-0 text-sm w-5 text-center"
                     >✕</button>
-                    <span className="text-gray-300 text-[10px]">{expandedItemId === it.id ? '▲' : '▼'}</span>
+                    {items.length > 1 && <span className="text-gray-300 text-[10px]">{expandedItemId === it.id ? '▲' : '▼'}</span>}
                   </div>
 
                   {/* Expanded editor */}
-                  {expandedItemId === it.id && (
+                  {(expandedItemId === it.id || items.length === 1) && (
                     <div className="px-3 pb-3 pt-1 space-y-2.5 border-t border-gray-100 bg-white">
                       <div className="grid grid-cols-2 gap-2">
                         <div>
@@ -769,13 +774,13 @@ export function BSNewQuotePage({
                       <div className="grid grid-cols-3 gap-2">
                         <div>
                           <label style={BS_LBL}>{isZh ? '一次性费用' : 'One-time Fee'}</label>
-                          <input type="number" style={{ ...BS_INP, textAlign: 'right' as const }}
+                          <input type="number" style={{ ...BS_AMT, textAlign: 'right' as const }}
                             value={it.one_time_fee || ''} placeholder="0"
                             onChange={e => updateItem(it.id, { one_time_fee: parseFloat(e.target.value) || 0 })} />
                         </div>
                         <div>
                           <label style={BS_LBL}>{isZh ? '月服务费' : 'Monthly Fee'}</label>
-                          <input type="number" style={{ ...BS_INP, textAlign: 'right' as const }}
+                          <input type="number" style={{ ...BS_AMT, textAlign: 'right' as const }}
                             value={it.monthly_fee || ''} placeholder="0"
                             onChange={e => updateItem(it.id, { monthly_fee: parseFloat(e.target.value) || 0 })} />
                         </div>
@@ -783,7 +788,7 @@ export function BSNewQuotePage({
                           <label style={{ ...BS_LBL, color: GOLD }}>
                             {isZh ? '年服务费' : 'Annual Fee'}
                           </label>
-                          <input type="number" style={{ ...BS_INP, textAlign: 'right' as const, border: `2px solid ${GOLD}`, fontWeight: 600 }}
+                          <input type="number" style={{ ...BS_AMT, textAlign: 'right' as const, border: `2px solid ${GOLD}` }}
                             value={it.annual_fee || ''} placeholder="0"
                             onChange={e => updateItem(it.id, { annual_fee: parseFloat(e.target.value) || 0 })} />
                         </div>
