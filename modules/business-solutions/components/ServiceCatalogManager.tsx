@@ -17,7 +17,7 @@ const BS_BTN_PRIMARY: React.CSSProperties = {
 };
 const BS_BTN_SECONDARY: React.CSSProperties = {
   padding: '10px 20px', borderRadius: 8, border: '1.5px solid #CBD5E1',
-  background: '#fff', color: '#0B1F44', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+  background: '#fff', color: '#475569', fontSize: 14, fontWeight: 600, cursor: 'pointer',
 };
 
 interface Props {
@@ -171,7 +171,8 @@ export function ServiceCatalogManager({ lang, categories, items, loading, onSave
       {/* Edit item modal — portal to document.body to escape transformed ancestor */}
       {editItem && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)' }} onMouseDown={e => { if (e.target === e.currentTarget) setEditItem(null); }}>
-          <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', width: 540, maxHeight: '85vh', overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <style>{`.gci-modal input::placeholder,.gci-modal textarea::placeholder{color:#64748B!important;opacity:1}`}</style>
+          <div className="gci-modal" style={{ background: '#fff', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', width: 540, maxHeight: '85vh', overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={BS_MODAL_TITLE}>{editItem.id ? t.buttons.editService : t.buttons.addService2}</span>
               <button onClick={() => setEditItem(null)} style={{ background: 'none', border: 'none', fontSize: 22, color: '#64748B', cursor: 'pointer', lineHeight: 1 }}>×</button>
