@@ -14,6 +14,9 @@ import TradeModule from '../../../modules/trade/TradeModule';
 import CrmModule from '../../../modules/crm/CrmModule';
 import QuotationModule from '../../../modules/quotation/QuotationModule';
 import { BusinessSolutionsModule } from '../../../modules/business-solutions/BusinessSolutionsModule';
+import SuppliersModule from '../../../modules/suppliers/SuppliersModule';
+import { DemoEntry } from './pages/DemoEntry';
+import { IS_DEMO_MODE } from '../../../modules/crm/demo/demoMode';
 
 // ── Inner shell (requires auth context already mounted) ──────────────────────
 function Shell() {
@@ -148,6 +151,14 @@ function Shell() {
             }
           />
           <Route
+            path="/suppliers/*"
+            element={
+              <ProtectedRoute module={['trade', 'quotation', 'crm']}>
+                <SuppliersModule />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/business-solutions/*"
             element={
               <ProtectedRoute module={['quotation', 'crm']}>
@@ -164,6 +175,12 @@ function Shell() {
 
 // ── Root — mounts AuthProvider outside BrowserRouter's routes ────────────────
 function App() {
+  if (IS_DEMO_MODE) {
+    return window.location.pathname === '/demo'
+      ? <DemoEntry />
+      : <Navigate to="/demo" replace />;
+  }
+
   return (
     <AuthProvider>
       <Shell />

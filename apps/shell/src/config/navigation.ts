@@ -21,7 +21,8 @@ export interface ModuleDef {
     | 'financeLedger'
     | 'invoiceManager'
     | 'aiAssistant'
-    | 'settings';
+    | 'settings'
+    | 'supplierLibrary';
   count?: string;
   badgeColor?: string;
   badgeBg?: string;
@@ -58,6 +59,7 @@ export const sections: SectionDef[] = [
   {
     labelKey: 'supplyChainSection',
     items: [
+      { code: 'VL', nameKey: 'supplierLibrary', path: '/suppliers' },
       { code: 'PQ', nameKey: 'piQuote', path: '/trade?tab=quote' },
       { code: 'EQ', nameKey: 'engineeringQuote', count: '4', badgeColor: '#A89878', badgeBg: 'rgba(255,255,255,0.07)', path: '/quotation?mode=customer-quote' },
       { code: 'SQ', nameKey: 'supplierQuote', path: '/quotation?mode=supplier-quote' },

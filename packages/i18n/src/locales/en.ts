@@ -25,6 +25,7 @@ export const en = {
     cashFlow: 'Cash Flow',
     financeLedger: 'Finance Ledger',
     invoiceManager: 'Invoice Manager',
+    supplierLibrary: 'Supplier Library',
     aiAssistant: 'AI Assistant',
     settings: 'Settings',
   },
