@@ -104,14 +104,12 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
       {/* Primary upload actions */}
       <div style={{ background: '#fffbf0', border: `1.5px dashed ${GOLD}`, borderRadius: 10, padding: '16px 20px', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em' }}>快速上传</span>
-        {supplier && (
-          <button
-            onClick={() => setShowLicenseUploader(true)}
-            style={{ padding: '9px 18px', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            📄 上传营业执照 / Upload Trade License
-          </button>
-        )}
+        <button
+          onClick={() => setShowLicenseUploader(true)}
+          style={{ padding: '9px 18px', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+        >
+          📄 上传营业执照 / Upload Trade License
+        </button>
         <button
           onClick={() => setEdit({ ...EMPTY(supplierId), document_type: '产品目录' as DocumentType })}
           style={{ padding: '9px 18px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, fontSize: 13, fontWeight: 600, color: NAVY, cursor: 'pointer' }}
