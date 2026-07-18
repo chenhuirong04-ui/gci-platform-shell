@@ -26,9 +26,10 @@ interface Props {
   onSelect: (s: Supplier) => void;
   onNew: () => void;
   onNotionImport: () => void;
+  onCleanup: () => void;
 }
 
-export default function SupplierList({ onSelect, onNew, onNotionImport }: Props) {
+export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanup }: Props) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQ, setSearchQ] = useState('');
@@ -107,6 +108,12 @@ export default function SupplierList({ onSelect, onNew, onNotionImport }: Props)
           style={{ padding: '9px 16px', borderRadius: 10, background: '#fff', color: NAVY, border: `1.5px solid ${GOLD}`, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
           从 Notion 导入
+        </button>
+        <button
+          onClick={onCleanup}
+          style={{ padding: '9px 16px', borderRadius: 10, background: '#fff', color: NAVY, border: `1.5px solid ${GOLD}`, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          数据概览与清洗
         </button>
         <button
           onClick={onNew}

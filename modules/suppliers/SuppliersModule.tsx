@@ -4,6 +4,7 @@ import SupplierList from './components/SupplierList';
 import SupplierForm from './components/SupplierForm';
 import SupplierDetail from './components/SupplierDetail';
 import NotionImportPage from './components/NotionImportPage';
+import SupplierCleanupPage from './components/SupplierCleanupPage';
 
 const GOLD = '#C9A84C';
 const NAVY = '#0c1b3a';
@@ -14,7 +15,8 @@ type SubView =
   | { kind: 'list' }
   | { kind: 'detail'; supplierId: string }
   | { kind: 'edit'; supplier: Supplier }
-  | { kind: 'notion-import' };
+  | { kind: 'notion-import' }
+  | { kind: 'cleanup' };
 
 const TOP_TABS: { key: TopTab; label: string }[] = [
   { key: 'list',   label: '供应商列表' },
@@ -71,11 +73,19 @@ export default function SuppliersModule() {
           onNew={() => setTopTab('new')}
           onSelect={s => goDetail(s.id!)}
           onNotionImport={() => setSub({ kind: 'notion-import' })}
+          onCleanup={() => setSub({ kind: 'cleanup' })}
         />
       )}
 
       {topTab === 'list' && sub.kind === 'notion-import' && (
         <NotionImportPage onBack={() => setSub({ kind: 'list' })} />
+      )}
+
+      {topTab === 'list' && sub.kind === 'cleanup' && (
+        <SupplierCleanupPage
+          onBack={() => setSub({ kind: 'list' })}
+          onOpenDetail={id => goDetail(id)}
+        />
       )}
 
       {topTab === 'list' && sub.kind === 'detail' && (
