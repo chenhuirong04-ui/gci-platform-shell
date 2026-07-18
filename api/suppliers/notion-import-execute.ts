@@ -60,31 +60,42 @@ const CN_PROVINCES = new Set([
 function parseCountryCity(raw: string | null | undefined) {
   if (!raw?.trim()) return { country: null, city: null, country_city_raw: raw ?? '' };
   const original = raw.trim();
-  const parts = original.split(/\s*[,，、\/]\s*/).map(p => p.trim()).filter(Boolean);
+
+  const wholeClean = original.toLowerCase().replace(/[()（）]/g, '').trim();
+  if (COUNTRY_ALIASES[wholeClean]) return { country: COUNTRY_ALIASES[wholeClean], city: null, country_city_raw: original };
+
+  const stripped = original.replace(/\s*\([^)]*\)/g, '').trim();
+  const parts = stripped.split(/\s*[,，、\/]\s*/).map(p => p.trim()).filter(Boolean);
 
   let matchedCountry: string | null = null;
   let matchedIdx = -1;
 
   for (let i = parts.length - 1; i >= 0; i--) {
-    const candidate = parts[i].toLowerCase();
-    if (COUNTRY_ALIASES[candidate]) {
-      matchedCountry = COUNTRY_ALIASES[candidate];
+    const candidate = parts[i].toLowerCase().replace(/[^a-z一-鿿]/g, '');
+    if (COUNTRY_ALIASES[candidate] || COUNTRY_ALIASES[parts[i].toLowerCase()]) {
+      matchedCountry = COUNTRY_ALIASES[candidate] ?? COUNTRY_ALIASES[parts[i].toLowerCase()];
       matchedIdx = i;
       break;
     }
   }
 
   if (!matchedCountry) {
-    const whole = original.toLowerCase().trim();
-    if (COUNTRY_ALIASES[whole]) return { country: COUNTRY_ALIASES[whole], city: null, country_city_raw: original };
+    for (let i = parts.length - 1; i >= 0; i--) {
+      if (parts[i] === '中国' || parts[i].toLowerCase() === 'china') {
+        matchedCountry = 'China'; matchedIdx = i; break;
+      }
+    }
+  }
+
+  if (!matchedCountry) {
     if (parts.length === 1 && CN_PROVINCES.has(parts[0])) {
       return { country: 'China', city: parts[0], country_city_raw: original };
     }
     return { country: null, city: null, country_city_raw: original };
   }
 
-  const cityParts = parts.filter((_, i) => i !== matchedIdx);
-  return { country: matchedCountry, city: cityParts[0] ?? null, country_city_raw: original };
+  const nonCountryParts = parts.filter((_, i) => i !== matchedIdx);
+  return { country: matchedCountry, city: nonCountryParts[0] ?? null, country_city_raw: original };
 }
 
 function splitWhatsAppWeChat(raw: string | null | undefined) {

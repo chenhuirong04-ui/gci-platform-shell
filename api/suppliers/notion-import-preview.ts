@@ -98,55 +98,56 @@ function parseCountryCity(raw: string | null | undefined): ParsedLocation {
     return { country: null, city: null, country_city_raw: raw ?? '' };
   }
   const original = raw.trim();
-  // Split on common separators
-  const parts = original.split(/\s*[,，、\/]\s*/).map(p => p.trim()).filter(Boolean);
 
-  // Try to find a country match in parts, scanning from the end
+  // 1. Try whole string first (single-value like "UAE", "China", "Malaysia")
+  const wholeClean = original.toLowerCase().replace(/[()（）]/g, '').trim();
+  if (COUNTRY_ALIASES[wholeClean]) {
+    return { country: COUNTRY_ALIASES[wholeClean], city: null, country_city_raw: original };
+  }
+
+  // 2. Strip parenthetical content before splitting
+  //    e.g. "中山, 广东, 中国 (Zhongshan, Guangdong, China)" → "中山, 广东, 中国"
+  const stripped = original.replace(/\s*\([^)]*\)/g, '').trim();
+
+  // 3. Split on separators
+  const parts = stripped.split(/\s*[,，、\/]\s*/).map(p => p.trim()).filter(Boolean);
+
+  // 4. Scan from the end for a country match (also try cleaning trailing punctuation)
   let matchedCountry: string | null = null;
   let matchedIdx = -1;
   for (let i = parts.length - 1; i >= 0; i--) {
-    const candidate = parts[i].toLowerCase();
-    if (COUNTRY_ALIASES[candidate]) {
-      matchedCountry = COUNTRY_ALIASES[candidate];
+    const candidate = parts[i].toLowerCase().replace(/[^a-z一-鿿]/g, '');
+    if (COUNTRY_ALIASES[candidate] || COUNTRY_ALIASES[parts[i].toLowerCase()]) {
+      matchedCountry = COUNTRY_ALIASES[candidate] ?? COUNTRY_ALIASES[parts[i].toLowerCase()];
       matchedIdx = i;
       break;
     }
-    // Try Chinese province as country hint for China
-    if (CN_PROVINCES.has(parts[i])) {
-      // Could be a city in China — don't mark as country here, continue looking
-    }
   }
 
-  // Also try the entire string (for cases like just "UAE" or "China")
+  // 5. If no country found, check if any part is a known CN province → infer China
   if (!matchedCountry) {
-    const whole = original.toLowerCase().trim();
-    if (COUNTRY_ALIASES[whole]) {
-      matchedCountry = COUNTRY_ALIASES[whole];
-      return { country: matchedCountry, city: null, country_city_raw: original };
+    for (let i = parts.length - 1; i >= 0; i--) {
+      if (parts[i] === '中国' || parts[i].toLowerCase() === 'china') {
+        matchedCountry = 'China';
+        matchedIdx = i;
+        break;
+      }
     }
   }
 
   if (!matchedCountry) {
-    // Cannot reliably determine; check if only one part and it's a known CN city
+    // Single part that is a known CN city/province → infer China
     if (parts.length === 1 && CN_PROVINCES.has(parts[0])) {
       return { country: 'China', city: parts[0], country_city_raw: original };
     }
-    // Give up — don't guess
     return { country: null, city: null, country_city_raw: original };
   }
 
-  // Build city from remaining parts (excluding the matched country part)
-  const cityParts = parts.filter((_, i) => i !== matchedIdx);
-
-  // Special: if matchedCountry is China and there are city parts, use first non-province city
-  let city: string | null = null;
-  if (cityParts.length > 0) {
-    // For China: prefer the most specific part (often first)
-    city = cityParts[0];
-  }
-
-  // Special case: Dubai → UAE auto-map (Dubai, UAE = country UAE, city Dubai)
-  // Already handled by split logic above
+  // 6. City = first part that is not the country and not a province/state
+  //    (province/state segments are skipped — not stored)
+  const nonCountryParts = parts.filter((_, i) => i !== matchedIdx);
+  // For China: first segment is the city, skip province/state segments
+  const city = nonCountryParts.length > 0 ? nonCountryParts[0] : null;
 
   return { country: matchedCountry, city: city || null, country_city_raw: original };
 }
@@ -367,26 +368,41 @@ export default async function handler(req: Request): Promise<Response> {
       continue;
     }
 
-    // Duplicate detection
+    // Duplicate detection — only runs when notion_page_id is NOT already in Supabase
     const normName = normalizeName(name);
-    let isDuplicate = false;
+    let matchedExisting: any = null;
     let duplicateReason = '';
-    let dupSupplierId: string | undefined;
 
     if (existingByNormName.has(normName)) {
-      isDuplicate = true;
+      matchedExisting = existingByNormName.get(normName);
       duplicateReason = '名称相似';
-      dupSupplierId = existingByNormName.get(normName)?.id;
     } else if (supplierCode && existingByCode.has(supplierCode.toLowerCase())) {
-      isDuplicate = true;
+      matchedExisting = existingByCode.get(supplierCode.toLowerCase());
       duplicateReason = '供应商编码相同';
-      dupSupplierId = existingByCode.get(supplierCode.toLowerCase())?.id;
     } else if (websiteRaw) {
       const cleanWebsite = websiteRaw.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
       if (existingByWebsite.has(cleanWebsite)) {
-        isDuplicate = true;
+        matchedExisting = existingByWebsite.get(cleanWebsite);
         duplicateReason = '网站相同';
-        dupSupplierId = existingByWebsite.get(cleanWebsite)?.id;
+      }
+    }
+
+    // If the matched Supabase record was itself imported from Notion (has notion_page_id),
+    // this is a Notion-internal duplicate page — treat as exists (skip), not a data conflict.
+    let finalStatus: 'new' | 'exists' | 'duplicate_suspect' = 'new';
+    let finalDupReason: string | null = null;
+    let dupSupplierId: string | undefined;
+
+    if (matchedExisting) {
+      dupSupplierId = matchedExisting.id;
+      if (matchedExisting.notion_page_id) {
+        // Matched record was imported from Notion → this Notion page is a duplicate in Notion itself
+        finalStatus = 'exists';
+        finalDupReason = `Notion页面重复（${duplicateReason}）`;
+      } else {
+        // Matched record was NOT from Notion → genuine cross-source duplicate, needs human review
+        finalStatus = 'duplicate_suspect';
+        finalDupReason = duplicateReason;
       }
     }
 
@@ -410,8 +426,8 @@ export default async function handler(req: Request): Promise<Response> {
       strengthNotes,
       certificates: certifications,
       attachmentCount: attachments.length,
-      importStatus: isDuplicate ? ('duplicate_suspect' as const) : ('new' as const),
-      duplicateReason: isDuplicate ? duplicateReason : null,
+      importStatus: finalStatus,
+      duplicateReason: finalDupReason,
       existingSupplierId: dupSupplierId,
     });
   }
