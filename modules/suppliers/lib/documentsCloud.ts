@@ -12,7 +12,7 @@ const SUPA_KEY =
 
 // Document types that must always use the private bucket
 const PRIVATE_DOC_TYPES = new Set([
-  '营业执照', '公司注册文件', 'VAT文件', '税务文件', '合同', 'NDA', '银行资料',
+  '营业执照', '公司注册文件', 'VAT文件', '税务文件', '合同', 'NDA', '银行资料', '认证证书',
 ]);
 
 export function resolveStorageBucket(documentType: string): string {
@@ -123,6 +123,44 @@ export async function getDocumentUrl(doc: SupplierDocument): Promise<string | nu
     return getSignedUrl(doc.storage_bucket, doc.storage_path);
   }
   return doc.file_url ?? null;
+}
+
+// ── Actual file upload to Supabase Storage ───────────────────────────────────
+
+/** Upload a supplier file to the correct private or public bucket.
+ *  Returns { path, bucket, url } or null on failure. */
+export async function uploadSupplierFile(
+  supplierId: string,
+  file: File,
+  documentType: string,
+): Promise<{ path: string; bucket: string; url: string } | null> {
+  const bucket = resolveStorageBucket(documentType);
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `suppliers/${supplierId}/${Date.now()}-${safeName}`;
+  const uploadUrl = `${SUPA_URL}/storage/v1/object/${bucket}/${path}`;
+  try {
+    const res = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        apikey: SUPA_KEY,
+        Authorization: `Bearer ${SUPA_KEY}`,
+        'Content-Type': file.type || 'application/octet-stream',
+        'x-upsert': 'true',
+      },
+      body: file,
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      console.error('[documentsCloud] Storage upload failed:', res.status, txt);
+      return null;
+    }
+    // Build a signed URL (private) or public URL
+    const signedUrl = await getSignedUrl(bucket, path, 3600);
+    return { path, bucket, url: signedUrl ?? '' };
+  } catch (e) {
+    console.error('[documentsCloud] upload exception', e);
+    return null;
+  }
 }
 
 // ── File upload (record only — upload via Supabase Storage SDK on client) ────

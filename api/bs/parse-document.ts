@@ -136,6 +136,47 @@ Return ONLY valid JSON:
   "visa_expiry_date": "YYYY-MM-DD or null",
   "confidence": "high | medium | low"
 }`,
+
+  SUPPLIER_TRADE_LICENSE: `You are an expert document parser for business registration documents worldwide (China, UAE, Hong Kong, UK, EU, US, and other jurisdictions).
+Extract all visible fields from this business license, business registration certificate, or trade license.
+Return ONLY valid JSON - no markdown, no explanation. Use this schema:
+{
+  "legal_name": "official registered company name in original language or null",
+  "name_en": "English company name or null",
+  "name_cn": "Chinese company name or null",
+  "document_number": "license/registration number or null",
+  "registration_number": "separate company registration number if different from license number or null",
+  "country": "country of registration (English) or null",
+  "city": "city of registration or null",
+  "registered_address": "full registered address or null",
+  "legal_representative": "legal representative / director / owner name or null",
+  "business_activities": ["list of business activities or scope - empty array if not found"],
+  "issuing_authority": "issuing government body or null",
+  "issue_date": "YYYY-MM-DD or null",
+  "expire_date": "YYYY-MM-DD or null",
+  "vat_number": "VAT/tax registration number if visible or null",
+  "capital": "registered capital if shown or null",
+  "confidence": "high | medium | low"
+}
+Rules: Convert all dates to YYYY-MM-DD format. For Chinese 营业执照: legal_name = 名称, document_number = 统一社会信用代码/注册号, legal_representative = 法定代表人, expire_date = 营业期限. Never guess missing fields - use null.`,
+
+  SUPPLIER_CERTIFICATION: `You are an expert certification document parser. Extract all visible fields from this certification, test report, compliance certificate, or quality standard document.
+Return ONLY valid JSON - no markdown, no explanation. Use this schema:
+{
+  "certification_type": "one of: CE | FDA | ISO9001 | ISO14001 | ISO22000 | HACCP | Halal | SGS | RoHS | REACH | SASO | ESMA | EAC | GSO | BSCI | SEDEX | GMP | Other",
+  "standard_number": "specific standard reference e.g. EN 71, ISO 9001:2015 or null",
+  "certification_number": "certificate number/ID or null",
+  "supplier_name": "certified company/supplier name or null",
+  "issuing_body": "certification body e.g. SGS, Bureau Veritas, TUV, INTERTEK or null",
+  "issue_date": "YYYY-MM-DD or null",
+  "expire_date": "YYYY-MM-DD or null",
+  "market_scope": "geographic scope e.g. EU, UAE, China, US or null",
+  "covered_products": ["list of product names or categories covered - empty array if not found"],
+  "covered_models": ["list of specific model numbers covered - empty array if not found"],
+  "scope_description": "brief description of what is covered or null",
+  "confidence": "high | medium | low"
+}
+Rules: Convert all dates to YYYY-MM-DD format. For CE mark: market_scope = EU. For SASO: market_scope = Saudi Arabia. Pick the MOST SPECIFIC certification_type that matches; use Other only if none match. Never guess missing fields - use null.`,
 };
 
 const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];

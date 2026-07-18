@@ -184,7 +184,7 @@ export default function SupplierDetail({ supplierId, onBack, onEdit }: Props) {
                 </div>
               </div>
             )}
-            {tab === 'documents' && <DocumentCenter supplierId={supplierId} />}
+            {tab === 'documents' && <DocumentCenter supplierId={supplierId} supplier={supplier} />}
             {tab === 'certifications' && <CertificationManager supplierId={supplierId} />}
             {tab === 'quotes' && <QuoteHistory supplierId={supplierId} />}
             {tab === 'rating' && <RatingNotes supplier={supplier} onUpdated={setSupplier} />}

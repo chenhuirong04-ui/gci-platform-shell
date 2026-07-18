@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import type { SupplierDocument, DocumentType, DocumentVerificationStatus } from '../types';
+import type { Supplier, SupplierDocument, DocumentType, DocumentVerificationStatus } from '../types';
 import {
   createDocument, deleteDocument, listDocuments, updateDocument,
   getDocumentUrl, resolveStorageBucket,
 } from '../lib/documentsCloud';
+import TradeLicenseUploader from './TradeLicenseUploader';
 
 const NAVY = '#0B1F44';
 const GOLD = '#C9A84C';
@@ -16,7 +17,7 @@ const LBL: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 7
 const DOC_TYPES: DocumentType[] = [
   '营业执照','公司注册文件','VAT文件','税务文件','公司简介',
   '产品目录','产品规格书','检测报告','报价原件','合同','NDA',
-  '银行资料','工厂照片','审厂报告','其他',
+  '银行资料','工厂照片','审厂报告','认证证书','其他',
 ];
 
 const VSTATUS_LABEL: Record<DocumentVerificationStatus, string> = {
@@ -32,15 +33,16 @@ const EMPTY = (sid: string): Omit<SupplierDocument, 'id'> => ({
   issue_date: '', expire_date: '', verification_status: 'unverified', notes: '',
 });
 
-interface Props { supplierId: string; }
+interface Props { supplierId: string; supplier?: Supplier; }
 
-export default function DocumentCenter({ supplierId }: Props) {
+export default function DocumentCenter({ supplierId, supplier }: Props) {
   const [docs, setDocs] = useState<SupplierDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [edit, setEdit] = useState<Partial<SupplierDocument> | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const [showLicenseUploader, setShowLicenseUploader] = useState(false);
 
   const load = async () => { setLoading(true); setDocs(await listDocuments(supplierId)); setLoading(false); };
   useEffect(() => { load(); }, [supplierId]);
@@ -83,8 +85,41 @@ export default function DocumentCenter({ supplierId }: Props) {
   const soonStr = soon.toISOString().slice(0, 10);
   const expiryColor = (d: string | undefined) => !d ? '' : d < today ? '#dc2626' : d < soonStr ? '#d97706' : '';
 
+  // If license uploader is active, show it full-width
+  if (showLicenseUploader && supplier) {
+    return (
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: NAVY, marginBottom: 16 }}>上传营业执照 / Upload Trade License</div>
+        <TradeLicenseUploader
+          supplier={supplier}
+          onSaved={() => { setShowLicenseUploader(false); load(); }}
+          onCancel={() => setShowLicenseUploader(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div>
+      {/* Primary upload actions */}
+      <div style={{ background: '#fffbf0', border: `1.5px dashed ${GOLD}`, borderRadius: 10, padding: '16px 20px', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em' }}>快速上传</span>
+        {supplier && (
+          <button
+            onClick={() => setShowLicenseUploader(true)}
+            style={{ padding: '9px 18px', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            📄 上传营业执照 / Upload Trade License
+          </button>
+        )}
+        <button
+          onClick={() => setEdit({ ...EMPTY(supplierId), document_type: '产品目录' as DocumentType })}
+          style={{ padding: '9px 18px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, fontSize: 13, fontWeight: 600, color: NAVY, cursor: 'pointer' }}
+        >
+          📁 上传其他文件
+        </button>
+      </div>
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <span style={{ fontSize: 13, color: T2 }}>{docs.length} 份文件</span>
         <button onClick={() => setEdit(EMPTY(supplierId))} style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>+ 添加文件记录</button>

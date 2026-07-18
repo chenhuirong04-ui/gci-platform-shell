@@ -5,6 +5,7 @@ import {
   createCertification, deleteCertification, listCertifications, updateCertification,
 } from '../lib/certificationsCloud';
 import { listDocuments } from '../lib/documentsCloud';
+import CertificationUploader from './CertificationUploader';
 
 const NAVY = '#0B1F44';
 const BORDER = '#e2e8f0';
@@ -46,6 +47,7 @@ export default function CertificationManager({ supplierId }: Props) {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [docCountMap, setDocCountMap] = useState<Record<string, number>>({});
+  const [showUploader, setShowUploader] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -75,11 +77,41 @@ export default function CertificationManager({ supplierId }: Props) {
   const soon = new Date(); soon.setDate(soon.getDate() + 30);
   const soonStr = soon.toISOString().slice(0, 10);
 
+  // Uploader panel
+  if (showUploader) {
+    return (
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: NAVY, marginBottom: 16 }}>上传认证证书 / Upload Certification</div>
+        <CertificationUploader
+          supplierId={supplierId}
+          onSaved={() => { setShowUploader(false); load(); }}
+          onCancel={() => setShowUploader(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div>
+      {/* Primary upload action */}
+      <div style={{ background: '#fffbf0', border: `1.5px dashed #C9A84C`, borderRadius: 10, padding: '14px 20px', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em' }}>快速上传</span>
+        <button
+          onClick={() => setShowUploader(true)}
+          style={{ padding: '9px 18px', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+        >
+          🏅 上传认证证书 / Upload Certification
+        </button>
+        <button
+          onClick={() => setEdit(EMPTY(supplierId))}
+          style={{ padding: '9px 18px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, fontSize: 13, fontWeight: 600, color: NAVY, cursor: 'pointer' }}
+        >
+          ＋ 手动新增认证（无文件）
+        </button>
+      </div>
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <span style={{ fontSize: 13, color: T2 }}>{certs.length} 项认证</span>
-        <button onClick={() => setEdit(EMPTY(supplierId))} style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>+ 新增认证</button>
       </div>
 
       {loading ? <div style={{ color: T3, textAlign: 'center', padding: 40 }}>加载中…</div>

@@ -122,7 +122,7 @@ export interface SupplierService {
 export type DocumentType =
   | '营业执照' | '公司注册文件' | 'VAT文件' | '税务文件' | '公司简介'
   | '产品目录' | '产品规格书' | '检测报告' | '报价原件' | '合同' | 'NDA'
-  | '银行资料' | '工厂照片' | '审厂报告' | '其他';
+  | '银行资料' | '工厂照片' | '审厂报告' | '认证证书' | '其他';
 
 export type DocumentVerificationStatus = 'unverified' | 'verified' | 'rejected' | 'pending_reupload';
 
