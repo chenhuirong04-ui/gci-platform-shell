@@ -27,10 +27,9 @@ const CERT_TYPES = [
 
 const EMPTY = (sid: string): Omit<SupplierCertification, 'id'> => ({
   supplier_id: sid,
-  certification_name: '',
   certification_type: '',
   status: 'pending_verification',
-  certificate_number: '',
+  certification_number: '',
   issuing_body: '',
   market_scope: '',
   issue_date: '',
@@ -63,7 +62,7 @@ export default function CertificationManager({ supplierId }: Props) {
   useEffect(() => { load(); }, [supplierId]);
 
   const handleSave = async () => {
-    if (!edit?.certification_name?.trim()) return;
+    if (!edit?.certification_type?.trim()) return;
     setSaving(true);
     try {
       if (edit.id) await updateCertification(edit.id, edit);
@@ -96,16 +95,16 @@ export default function CertificationManager({ supplierId }: Props) {
               <div key={cert.id} style={{ background: '#f8fafc', border: `1px solid ${BORDER}`, borderRadius: 10, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontWeight: 700, color: NAVY, fontSize: 14 }}>{cert.certification_name}</span>
+                    <span style={{ fontWeight: 700, color: NAVY, fontSize: 14 }}>{cert.certification_type}</span>
                     <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: st.bg, color: st.text }}>
                       {CERT_STATUS_LABEL[cert.status as CertificationStatus] ?? cert.status}
                     </span>
                   </div>
                   <div style={{ fontSize: 12, color: T2 }}>
-                    {[cert.certification_type, cert.issuing_body, cert.market_scope && `适用：${cert.market_scope}`].filter(Boolean).join(' · ')}
+                    {[cert.issuing_body, cert.market_scope && `适用：${cert.market_scope}`].filter(Boolean).join(' · ')}
                   </div>
                   <div style={{ fontSize: 11, color: T3, marginTop: 3, display: 'flex', gap: 10 }}>
-                    {cert.certificate_number && <span>证书号：{cert.certificate_number}</span>}
+                    {cert.certification_number && <span>证书号：{cert.certification_number}</span>}
                     {cert.expire_date && <span style={{ color: expColor || T3, fontWeight: expColor ? 700 : undefined }}>到期：{cert.expire_date}{expColor && ' ⚠'}</span>}
                     {cert.id && docCountMap[cert.id] ? <span>📎 {docCountMap[cert.id]} 份文件</span> : null}
                   </div>
@@ -129,11 +128,10 @@ export default function CertificationManager({ supplierId }: Props) {
           <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 540, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: NAVY }}>{edit.id ? '编辑认证' : '新增认证'}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              <F label="认证名称 *"><input style={INP} value={edit.certification_name ?? ''} onChange={e => setEdit(v => ({ ...v!, certification_name: e.target.value }))} placeholder="如：CE、ISO 9001" /></F>
-              <F label="认证类型">
+              <F label="认证名称 *">
                 <select style={INP} value={edit.certification_type ?? ''} onChange={e => setEdit(v => ({ ...v!, certification_type: e.target.value }))}>
-                  <option value="">请选择</option>
-                  {CERT_TYPES.map(t => <option key={t}>{t}</option>)}
+                  <option value="">请选择或输入</option>
+                  {CERT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </F>
               <F label="认证状态">
@@ -141,7 +139,7 @@ export default function CertificationManager({ supplierId }: Props) {
                   {Object.entries(CERT_STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </F>
-              <F label="证书号"><input style={INP} value={edit.certificate_number ?? ''} onChange={e => setEdit(v => ({ ...v!, certificate_number: e.target.value }))} /></F>
+              <F label="证书号"><input style={INP} value={edit.certification_number ?? ''} onChange={e => setEdit(v => ({ ...v!, certification_number: e.target.value }))} /></F>
               <F label="颁发机构"><input style={INP} value={edit.issuing_body ?? ''} onChange={e => setEdit(v => ({ ...v!, issuing_body: e.target.value }))} /></F>
               <F label="适用市场"><input style={INP} value={edit.market_scope ?? ''} onChange={e => setEdit(v => ({ ...v!, market_scope: e.target.value }))} placeholder="中东、欧盟…" /></F>
               <F label="签发日期"><input style={INP} type="date" value={edit.issue_date ?? ''} onChange={e => setEdit(v => ({ ...v!, issue_date: e.target.value }))} /></F>
