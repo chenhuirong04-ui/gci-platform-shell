@@ -69,7 +69,7 @@ export default async function handler(req: Request) {
     // ── 1. Fetch all required tables ──────────────────────────────────────
     const [suppliers, contacts, documents, certifications, quotes] = await Promise.all([
       supaGet('/rest/v1/suppliers?select=id,supplier_name_display,short_code,country,city,website,product_categories,is_preferred,import_source,notion_page_id,status,notes,created_at&limit=1000'),
-      supaGet('/rest/v1/supplier_contacts?select=supplier_id,contact_name,whatsapp,email&limit=2000'),
+      supaGet('/rest/v1/supplier_contacts?select=supplier_id,full_name,whatsapp,email&limit=2000'),
       supaGet('/rest/v1/supplier_documents?select=supplier_id,document_type&limit=2000'),
       supaGet('/rest/v1/supplier_certifications?select=supplier_id&limit=2000'),
       supaGet('/rest/v1/supplier_quotes?select=supplier_id&limit=2000').catch(() => [] as any[]),
@@ -79,7 +79,7 @@ export default async function handler(req: Request) {
     const contactsBySup = new Map<string, Array<{ contact_name: string; whatsapp: string; email: string }>>();
     for (const c of contacts) {
       if (!contactsBySup.has(c.supplier_id)) contactsBySup.set(c.supplier_id, []);
-      contactsBySup.get(c.supplier_id)!.push(c);
+      contactsBySup.get(c.supplier_id)!.push({ ...c, contact_name: c.full_name });
     }
 
     const docsBySup = new Map<string, Set<string>>();
