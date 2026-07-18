@@ -24,6 +24,8 @@ export interface SupplierSearchResultItem {
   supplierType: string | null;
   isPreferred: boolean;
   currentRating: string | null;
+  /** 'confirmed' = cert found in DB; 'not_recorded' = cert requested but not in DB; 'na' = no cert intent */
+  certStatus: 'confirmed' | 'not_recorded' | 'na';
   primaryContact: {
     name: string | null;
     whatsapp: string | null;
@@ -52,15 +54,20 @@ export interface SupplierSearchResponse {
   query: string;
   extractedIntent: {
     keywords: string[];
+    matchedSynonym: string | null;
+    expandedCategories: string[];
+    primaryCategory: string | null;
     country: string | null;
-    category: string | null;
     certificationKeyword: string | null;
     preferredOnly: boolean;
     requiresContact: boolean;
+    supplierTypePreference: string | null;
   };
+  /** true when cert was requested but no supplier in results has that cert confirmed */
+  certFallback: boolean;
   total: number;
   results: SupplierSearchResultItem[];
-  notes: string[];           // e.g. "supplier_products 表暂无记录，仅按品类匹配"
+  notes: string[];
 }
 
 export interface SupplierSearchError {

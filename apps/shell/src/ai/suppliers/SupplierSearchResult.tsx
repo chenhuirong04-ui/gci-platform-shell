@@ -77,6 +77,12 @@ function SupplierCard({ item, onOpenDetail }: { item: SupplierSearchResultItem; 
             {item.currentRating && (
               <span style={{ fontSize: 10, fontWeight: 800, color: item.currentRating === 'A' ? '#6FBF8E' : GOLD }}>评级 {item.currentRating}</span>
             )}
+            {item.certStatus === 'confirmed' && (
+              <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: 'rgba(111,191,142,0.15)', color: '#6FBF8E', border: '1px solid rgba(111,191,142,0.3)' }}>✓ 认证已录</span>
+            )}
+            {item.certStatus === 'not_recorded' && (
+              <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: 'rgba(224,160,96,0.1)', color: '#E0A060', border: '1px solid rgba(224,160,96,0.3)' }}>认证待核实</span>
+            )}
           </div>
           <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>{item.matchReason}</div>
         </div>
@@ -170,6 +176,7 @@ interface Props {
 export default function SupplierSearchResult({ data, onOpenDetail, onClose }: Props) {
   const [showAll, setShowAll] = useState(false);
   const visibleResults = showAll ? data.results : data.results.slice(0, 10);
+  const intent = data.extractedIntent;
 
   return (
     <div>
@@ -178,17 +185,23 @@ export default function SupplierSearchResult({ data, onOpenDetail, onClose }: Pr
         <div style={{ fontSize: 13, color: TEXT, fontWeight: 600, marginBottom: 4 }}>
           供应商搜索结果 · 共找到 <span style={{ color: GOLD }}>{data.total}</span> 家
         </div>
-        {data.extractedIntent.keywords.length > 0 && (
-          <div style={{ fontSize: 11, color: MUTED }}>
-            识别关键词：{data.extractedIntent.keywords.join('、')}
-            {data.extractedIntent.country && ` · 国家：${data.extractedIntent.country}`}
-            {data.extractedIntent.category && ` · 品类：${data.extractedIntent.category}`}
-            {data.extractedIntent.certificationKeyword && ` · 认证：${data.extractedIntent.certificationKeyword}`}
-            {data.extractedIntent.preferredOnly && ' · 仅常用'}
-            {data.extractedIntent.requiresContact && ' · 需有联系人'}
+        <div style={{ fontSize: 11, color: MUTED, lineHeight: 1.7 }}>
+          {intent.matchedSynonym && <span>产品：{intent.matchedSynonym}　</span>}
+          {intent.expandedCategories.length > 0 && <span>匹配品类：{intent.expandedCategories.join(' / ')}　</span>}
+          {intent.keywords.length > 0 && !intent.matchedSynonym && <span>关键词：{intent.keywords.join('、')}　</span>}
+          {intent.country && <span>国家：{intent.country}　</span>}
+          {intent.certificationKeyword && <span>认证要求：{intent.certificationKeyword}　</span>}
+          {intent.supplierTypePreference && <span>类型偏好：{intent.supplierTypePreference}　</span>}
+          {intent.preferredOnly && <span>仅常用　</span>}
+          {intent.requiresContact && <span>需有联系人　</span>}
+        </div>
+        {/* Cert fallback banner */}
+        {data.certFallback && intent.certificationKeyword && (
+          <div style={{ marginTop: 8, padding: '8px 12px', background: 'rgba(224,160,96,0.1)', border: '1px solid rgba(224,160,96,0.3)', borderRadius: 8, fontSize: 12, color: '#E0A060' }}>
+            ⚠ 数据库中暂无已记录 <strong>{intent.certificationKeyword}</strong> 认证的供应商。以下为产品/品类相关候选，认证状态待核实，请直接向供应商确认。
           </div>
         )}
-        {data.notes.map((n, i) => (
+        {data.notes.filter(n => !n.includes('没有找到已记录')).map((n, i) => (
           <div key={i} style={{ fontSize: 11, color: '#E0A060', marginTop: 4 }}>ℹ {n}</div>
         ))}
       </div>
