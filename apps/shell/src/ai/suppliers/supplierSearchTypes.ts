@@ -22,6 +22,8 @@ export interface SupplierSearchResultItem {
   country: string | null;
   city: string | null;
   supplierType: string | null;
+  /** 'exact' = supplier_type=Factory; 'unknown' = null/Unknown; 'non_factory' = Trading/Integrated/etc. */
+  typeMatchStatus: 'exact' | 'unknown' | 'non_factory';
   isPreferred: boolean;
   currentRating: string | null;
   /** 'confirmed' = cert found in DB; 'not_recorded' = cert requested but not in DB; 'na' = no cert intent */
@@ -65,7 +67,14 @@ export interface SupplierSearchResponse {
   };
   /** true when cert was requested but no supplier in results has that cert confirmed */
   certFallback: boolean;
+  /** true when user explicitly asked for factory/厂家/厂 */
+  hasFactoryIntent: boolean;
+  /** supplier_type = Factory only — empty when hasFactoryIntent=false */
+  exactTypeMatches: SupplierSearchResultItem[];
+  /** Unknown / non-factory candidates — empty when hasFactoryIntent=false */
+  relatedTypeCandidates: SupplierSearchResultItem[];
   total: number;
+  /** flat results for non-factory queries; empty when hasFactoryIntent=true */
   results: SupplierSearchResultItem[];
   notes: string[];
 }

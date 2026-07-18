@@ -102,7 +102,13 @@ function SupplierCard({ item, onOpenDetail }: { item: SupplierSearchResultItem; 
         {(item.country || item.city) && (
           <span>📍 {[item.country, item.city].filter(Boolean).join(' / ')}</span>
         )}
-        {item.supplierType && <span>🏭 {item.supplierType}</span>}
+        {/* Always show supplier type with status label */}
+        <span style={{ color: item.typeMatchStatus === 'exact' ? '#6FBF8E' : item.typeMatchStatus === 'non_factory' ? '#E07070' : MUTED }}>
+          🏭 {item.supplierType ?? '类型未知'}{' '}
+          <span style={{ fontSize: 10 }}>
+            {item.typeMatchStatus === 'exact' ? '（已记录为工厂）' : item.typeMatchStatus === 'unknown' ? '（类型待确认）' : '（非工厂）'}
+          </span>
+        </span>
         {item.profileCompleteness > 0 && (
           <span style={{ color: item.profileCompleteness >= 70 ? '#6FBF8E' : item.profileCompleteness >= 40 ? GOLD : '#E07070' }}>
             档案完整度 {item.profileCompleteness}%
@@ -173,56 +179,109 @@ interface Props {
   onClose: () => void;
 }
 
+function SectionHeader({ title, count, color }: { title: string; count: number; color: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '14px 0 8px' }}>
+      <span style={{ fontSize: 11, fontWeight: 700, color, letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>{title}</span>
+      <span style={{ fontSize: 10, color, background: `${color}22`, borderRadius: 10, padding: '1px 8px' }}>{count} 家</span>
+      <div style={{ flex: 1, height: 1, background: `${color}33` }} />
+    </div>
+  );
+}
+
+function ResultList({ items, onOpenDetail, showAllDefault }: { items: SupplierSearchResultItem[]; onOpenDetail: (id: string) => void; showAllDefault?: boolean }) {
+  const [showAll, setShowAll] = useState(!!showAllDefault);
+  const visible = showAll ? items : items.slice(0, 10);
+  if (items.length === 0) return null;
+  return (
+    <>
+      {visible.map(item => <SupplierCard key={item.supplierId} item={item} onOpenDetail={onOpenDetail} />)}
+      {items.length > 10 && !showAll && (
+        <button onClick={() => setShowAll(true)} style={{ width: '100%', padding: '9px', background: 'rgba(255,255,255,0.04)', border: `1px solid ${CARD_BORDER}`, borderRadius: 10, color: MUTED, fontSize: 12, cursor: 'pointer', marginTop: 4 }}>
+          显示更多（剩余 {items.length - 10} 家）
+        </button>
+      )}
+    </>
+  );
+}
+
 export default function SupplierSearchResult({ data, onOpenDetail, onClose }: Props) {
-  const [showAll, setShowAll] = useState(false);
-  const visibleResults = showAll ? data.results : data.results.slice(0, 10);
   const intent = data.extractedIntent;
+
+  const totalShown = data.hasFactoryIntent
+    ? data.exactTypeMatches.length + data.relatedTypeCandidates.length
+    : data.results.length;
 
   return (
     <div>
       {/* Header */}
-      <div style={{ marginBottom: 14 }}>
+      <div style={{ marginBottom: 10 }}>
         <div style={{ fontSize: 13, color: TEXT, fontWeight: 600, marginBottom: 4 }}>
           供应商搜索结果 · 共找到 <span style={{ color: GOLD }}>{data.total}</span> 家
         </div>
         <div style={{ fontSize: 11, color: MUTED, lineHeight: 1.7 }}>
           {intent.matchedSynonym && <span>产品：{intent.matchedSynonym}　</span>}
-          {intent.expandedCategories.length > 0 && <span>匹配品类：{intent.expandedCategories.join(' / ')}　</span>}
+          {intent.expandedCategories.length > 0 && <span>品类：{intent.expandedCategories.join(' / ')}　</span>}
           {intent.keywords.length > 0 && !intent.matchedSynonym && <span>关键词：{intent.keywords.join('、')}　</span>}
           {intent.country && <span>国家：{intent.country}　</span>}
           {intent.certificationKeyword && <span>认证要求：{intent.certificationKeyword}　</span>}
-          {intent.supplierTypePreference && <span>类型偏好：{intent.supplierTypePreference}　</span>}
+          {intent.supplierTypePreference && <span>类型筛选：{intent.supplierTypePreference}　</span>}
           {intent.preferredOnly && <span>仅常用　</span>}
           {intent.requiresContact && <span>需有联系人　</span>}
         </div>
+
         {/* Cert fallback banner */}
         {data.certFallback && intent.certificationKeyword && (
           <div style={{ marginTop: 8, padding: '8px 12px', background: 'rgba(224,160,96,0.1)', border: '1px solid rgba(224,160,96,0.3)', borderRadius: 8, fontSize: 12, color: '#E0A060' }}>
-            ⚠ 数据库中暂无已记录 <strong>{intent.certificationKeyword}</strong> 认证的供应商。以下为产品/品类相关候选，认证状态待核实，请直接向供应商确认。
+            ⚠ 数据库暂无已记录 <strong>{intent.certificationKeyword}</strong> 认证的供应商。以下为品类相关候选，认证状态待核实，请直接向供应商确认。
           </div>
         )}
-        {data.notes.filter(n => !n.includes('没有找到已记录')).map((n, i) => (
-          <div key={i} style={{ fontSize: 11, color: '#E0A060', marginTop: 4 }}>ℹ {n}</div>
+
+        {/* Notes (filter out the cert fallback note — shown in banner above) */}
+        {data.notes.filter(n => !n.startsWith('没有找到已记录')).map((n, i) => (
+          <div key={i} style={{ fontSize: 11, color: '#8A97B0', marginTop: 4 }}>ℹ {n}</div>
         ))}
       </div>
 
-      {/* Results */}
-      {data.results.length === 0 ? (
-        <div style={{ fontSize: 13, color: MUTED, padding: '24px 0' }}>
-          暂无匹配供应商。建议放宽筛选条件，或在供应商档案中补充产品资料。
-        </div>
-      ) : (
+      {/* ── Factory intent: two-section layout ── */}
+      {data.hasFactoryIntent ? (
         <>
-          {visibleResults.map(item => (
-            <SupplierCard key={item.supplierId} item={item} onOpenDetail={onOpenDetail} />
-          ))}
-          {data.results.length > 10 && !showAll && (
-            <button
-              onClick={() => setShowAll(true)}
-              style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.04)', border: `1px solid ${CARD_BORDER}`, borderRadius: 10, color: MUTED, fontSize: 12, cursor: 'pointer', marginTop: 4 }}
-            >
-              显示更多（剩余 {data.results.length - 10} 家）
-            </button>
+          {/* Section 1: confirmed Factory */}
+          <SectionHeader title="✓ 已确认工厂（supplier_type = Factory）" count={data.exactTypeMatches.length} color="#6FBF8E" />
+          {data.exactTypeMatches.length === 0 ? (
+            <div style={{ fontSize: 12, color: MUTED, padding: '10px 0 6px', fontStyle: 'italic' }}>
+              暂无已确认类型为 Factory 的供应商。如需确认，请在供应商档案中更新 supplier_type 字段。
+            </div>
+          ) : (
+            <ResultList items={data.exactTypeMatches} onOpenDetail={onOpenDetail} />
+          )}
+
+          {/* Section 2: Unknown / non-factory candidates */}
+          {data.relatedTypeCandidates.length > 0 && (
+            <>
+              <SectionHeader title="相关候选（类型待确认或非工厂）" count={data.relatedTypeCandidates.length} color="#E0A060" />
+              <div style={{ fontSize: 11, color: MUTED, marginBottom: 8, fontStyle: 'italic' }}>
+                以下供应商产品或品类相关，但供应商类型尚未确认或当前记录不是工厂。请核实后再采购。
+              </div>
+              <ResultList items={data.relatedTypeCandidates} onOpenDetail={onOpenDetail} />
+            </>
+          )}
+
+          {totalShown === 0 && (
+            <div style={{ fontSize: 13, color: MUTED, padding: '24px 0' }}>
+              暂无匹配供应商。建议在供应商档案中补充产品资料或供应商类型。
+            </div>
+          )}
+        </>
+      ) : (
+        /* ── Non-factory intent: flat list ── */
+        <>
+          {data.results.length === 0 ? (
+            <div style={{ fontSize: 13, color: MUTED, padding: '24px 0' }}>
+              暂无匹配供应商。建议放宽筛选条件，或在供应商档案中补充产品资料。
+            </div>
+          ) : (
+            <ResultList items={data.results} onOpenDetail={onOpenDetail} />
           )}
         </>
       )}

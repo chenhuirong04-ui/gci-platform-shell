@@ -528,6 +528,13 @@ export default async function handler(req: Request) {
 
       const completeness = calcCompleteness(s, supContacts.length > 0, hasContactMethod, hasBizLicense, hasCatalog, hasCert || hasQuote);
 
+      // ── typeMatchStatus: strict classification, never conflate Unknown with Factory ──
+      const rawType = s.supplier_type ?? null;
+      const typeMatchStatus: 'exact' | 'unknown' | 'non_factory' =
+        rawType === 'Factory' ? 'exact'
+        : (!rawType || rawType === 'Unknown') ? 'unknown'
+        : 'non_factory';
+
       // ── Per-result warnings ───────────────────────────────────────────────
       const warnings: string[] = [];
       const cats: string[] = Array.isArray(s.product_categories) ? s.product_categories : [];
@@ -535,7 +542,6 @@ export default async function handler(req: Request) {
       if (result.matchType === 'category_only' && result.matchedProducts.length === 0) {
         warnings.push('仅按品类标签匹配，暂无具体产品记录，请联系供应商确认是否有该产品');
       }
-      // Cert requested but this supplier doesn't have it
       if (intent.certificationKeyword && !result.certMatched) {
         warnings.push(`${intent.certificationKeyword} 认证：暂无记录，状态待核实`);
       }
@@ -544,9 +550,10 @@ export default async function handler(req: Request) {
         warnings.push('存在已过期认证，请核实');
       }
       if (cats.length === 0) warnings.push('品类信息未完善，搜索准确度受影响');
-      // Supplier type mismatch
-      if (intent.supplierTypePreference === 'Factory' && s.supplier_type && s.supplier_type !== 'Factory') {
-        warnings.push(`供应商类型为 ${s.supplier_type}，非工厂直供`);
+      // Type mismatch warnings — only when factory was explicitly requested
+      if (intent.supplierTypePreference === 'Factory') {
+        if (typeMatchStatus === 'unknown') warnings.push('供应商类型未确认（Unknown），需核实是否为工厂');
+        else if (typeMatchStatus === 'non_factory') warnings.push(`供应商类型为 ${rawType}，非工厂直供`);
       }
 
       scored.push({
@@ -559,9 +566,12 @@ export default async function handler(req: Request) {
         matchedProducts: result.matchedProducts,
         matchedServices: result.matchedServices,
         matchedCategories: result.matchedCategories,
-        country: s.country ?? null,
+        country: rawType === null ? null : s.country ?? null, // keep country always
+        // (re-assign correctly)
+        country2: s.country ?? null,
         city: s.city ?? null,
-        supplierType: s.supplier_type ?? null,
+        supplierType: rawType,
+        typeMatchStatus,
         isPreferred: !!s.is_preferred,
         currentRating: s.current_rating ?? null,
         certStatus: result.certMatched ? 'confirmed' : (intent.certificationKeyword ? 'not_recorded' : 'na'),
@@ -589,24 +599,52 @@ export default async function handler(req: Request) {
       });
     }
 
-    // Sort: certMatched first (when cert intent), then Factory (when factory intent), then score
-    scored.sort((a, b) => {
-      // Cert confirmed suppliers first
-      if (intent.certificationKeyword) {
-        const aCert = a.certStatus === 'confirmed' ? 1 : 0;
-        const bCert = b.certStatus === 'confirmed' ? 1 : 0;
-        if (bCert !== aCert) return bCert - aCert;
-      }
-      // Factory preferred suppliers when factory intent
-      if (intent.supplierTypePreference === 'Factory') {
-        const aFac = a.supplierType === 'Factory' ? 1 : 0;
-        const bFac = b.supplierType === 'Factory' ? 1 : 0;
-        if (bFac !== aFac) return bFac - aFac;
-      }
-      if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
-      if (a.isPreferred !== b.isPreferred) return a.isPreferred ? -1 : 1;
-      const ratingOrder: Record<string, number> = { A: 4, B: 3, C: 2, D: 1 };
-      return (ratingOrder[b.currentRating ?? ''] ?? 0) - (ratingOrder[a.currentRating ?? ''] ?? 0);
+    // ── Sort by score within each tier ───────────────────────────────────────
+    function sortItems(items: any[]) {
+      items.sort((a, b) => {
+        if (intent.certificationKeyword) {
+          const ac = a.certStatus === 'confirmed' ? 1 : 0;
+          const bc = b.certStatus === 'confirmed' ? 1 : 0;
+          if (bc !== ac) return bc - ac;
+        }
+        if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+        if (a.isPreferred !== b.isPreferred) return a.isPreferred ? -1 : 1;
+        const rO: Record<string, number> = { A: 4, B: 3, C: 2, D: 1 };
+        return (rO[b.currentRating ?? ''] ?? 0) - (rO[a.currentRating ?? ''] ?? 0);
+      });
+    }
+
+    // ── Split into exact / related when factory intent is present ─────────────
+    // exactTypeMatches: only supplier_type === 'Factory'
+    // relatedTypeCandidates: Unknown / non-factory but product/category relevant
+    const hasFactoryIntent = intent.supplierTypePreference === 'Factory';
+    let exactTypeMatches: any[] = [];
+    let relatedTypeCandidates: any[] = [];
+
+    if (hasFactoryIntent) {
+      exactTypeMatches = scored.filter(r => r.typeMatchStatus === 'exact');
+      // relatedTypeCandidates sorted: Unknown first, then Integrated, then Trading, then others
+      const typeOrder: Record<string, number> = { unknown: 0, non_factory: 1 };
+      relatedTypeCandidates = scored
+        .filter(r => r.typeMatchStatus !== 'exact')
+        .sort((a, b) => {
+          const ao = typeOrder[a.typeMatchStatus] ?? 2;
+          const bo = typeOrder[b.typeMatchStatus] ?? 2;
+          if (ao !== bo) return ao - bo;
+          if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+          return 0;
+        });
+      sortItems(exactTypeMatches);
+    } else {
+      // No factory intent: flat results sorted by score
+      sortItems(scored);
+      exactTypeMatches = scored;
+      relatedTypeCandidates = [];
+    }
+
+    // Fix country2 → country typo from the push above
+    [...exactTypeMatches, ...relatedTypeCandidates].forEach(r => {
+      if ('country2' in r) { r.country = r.country2; delete r.country2; }
     });
 
     // ── Notes ────────────────────────────────────────────────────────────────
@@ -614,11 +652,10 @@ export default async function handler(req: Request) {
     if (productTableEmpty) {
       notes.push('supplier_products 表暂无产品记录，仅按品类标签、档案信息和关键词匹配。如需精准产品搜索，请在供应商详情中添加产品目录。');
     }
-    // Cert fallback note
-    if (intent.certificationKeyword && !anyCertMatched && scored.length > 0) {
-      notes.unshift(`没有找到已记录 ${intent.certificationKeyword} 认证的供应商。以下为产品/品类相关候选，但 ${intent.certificationKeyword} 状态尚未录入或待核实，请直接向供应商确认。`);
+    if (intent.certificationKeyword && !anyCertMatched && (exactTypeMatches.length + relatedTypeCandidates.length) > 0) {
+      notes.unshift(`没有找到已记录 ${intent.certificationKeyword} 认证的供应商。以下为产品/品类相关候选，认证状态尚未录入或待核实，请直接向供应商确认。`);
     }
-    if (intent.certificationKeyword && !anyCertMatched && scored.length === 0) {
+    if (intent.certificationKeyword && !anyCertMatched && (exactTypeMatches.length + relatedTypeCandidates.length) === 0) {
       notes.unshift(`没有找到符合条件的供应商。${intent.certificationKeyword} 认证：数据库暂无记录。`);
     }
 
@@ -637,8 +674,14 @@ export default async function handler(req: Request) {
         supplierTypePreference: intent.supplierTypePreference,
       },
       certFallback: !!intent.certificationKeyword && !anyCertMatched,
-      total: scored.length,
-      results: scored,
+      hasFactoryIntent,
+      // exactTypeMatches: supplier_type = Factory only (empty when no factory intent)
+      exactTypeMatches,
+      // relatedTypeCandidates: Unknown / non-factory candidates (empty when no factory intent)
+      relatedTypeCandidates,
+      // results: flat list for non-factory queries (same as exactTypeMatches when no factory intent)
+      total: hasFactoryIntent ? (exactTypeMatches.length + relatedTypeCandidates.length) : exactTypeMatches.length,
+      results: hasFactoryIntent ? [] : exactTypeMatches,
       notes,
     });
 
