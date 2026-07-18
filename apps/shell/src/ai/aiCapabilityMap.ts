@@ -322,6 +322,26 @@ export const AI_CAPABILITY_MAP: AIIntent[] = [
     fallbackBehavior: '显示"部分接入"提示，附直接链接到 /trade?tab=quote。',
   },
 
+  // ── 13. Supplier Text Search ──────────────────────────────────────────────
+  {
+    intentId: 'search_suppliers_text',
+    intentNameZh: '供应商搜索',
+    intentNameEn: 'Supplier Text Search',
+    category: 'query',
+    triggerKeywordsZh: ['供应商', '哪家', '谁有', '谁能', '哪些供应商', '找供应商', '供货商', '厂家', '工厂', '谁做', '哪家公司做', '有没有供应'],
+    triggerKeywordsEn: ['supplier', 'vendor', 'who has', 'find supplier', 'manufacturer', 'factory', 'which supplier', 'suppliers for'],
+    targetTab: 'chat',
+    targetModule: 'Suppliers',
+    targetRoute: '/suppliers',
+    readSources: ['suppliers', 'supplier_contacts', 'supplier_certifications', 'supplier_quotes', 'supplier_products'],
+    writeTargets: [],
+    requiredFields: [],
+    approvalRequired: false,
+    resultPanel: 'SupplierSearchResult',
+    implementationStatus: 'real',
+    fallbackBehavior: '按关键词、品类、国家搜索活跃供应商，展示匹配结果。',
+  },
+
   // ── 12. Check Cashflow / Finance ──────────────────────────────────────────
   {
     intentId: 'check_cashflow',

@@ -160,6 +160,10 @@ export function getIntentSteps(intent: AIIntent): string[] {
       '正在识别指令…', '正在读取财务流水…',
       '正在计算收支汇总…',
     ],
+    search_suppliers_text: [
+      '正在识别搜索意图…', '正在提取关键词与条件…',
+      '正在查询供应商数据库…', '正在评分与排序…',
+    ],
   };
 
   return stepMap[intent.intentId] ?? [

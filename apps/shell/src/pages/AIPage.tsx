@@ -8,6 +8,8 @@ import { BillingProfileDraftPanel } from '../components/invoice/BillingProfileDr
 import { detectAIIntent, getIntentSteps } from '../ai/aiRouter';
 import type { AIIntentMatch } from '../ai/aiRouter';
 import { readCRMTasks, getCRMBriefStats, getCRMCustomerData } from '../lib/crmLocalStore';
+import SupplierSearchResult from '../ai/suppliers/SupplierSearchResult';
+import { searchSuppliers } from '../ai/suppliers/supplierSearchClient';
 
 // ── Inventory query normalizer ────────────────────────────────────────────────
 // Strips command words, punctuation, and trailing "库存" to get the product term.
@@ -1740,6 +1742,26 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
             </div>
           )}
 
+          {/* ── Supplier Search Result ── */}
+          {intent.intentId === 'search_suppliers_text' && state.resultData?.ok && (
+            <SupplierSearchResult
+              data={state.resultData}
+              onOpenDetail={(supplierId) => {
+                window.location.href = `/suppliers/${supplierId}`;
+              }}
+              onClose={onCancel}
+            />
+          )}
+          {intent.intentId === 'search_suppliers_text' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查询供应商数据库…</div>
+          )}
+          {intent.intentId === 'search_suppliers_text' && state.resultData && !state.resultData.ok && (
+            <div style={{ fontSize: 13, color: '#E0846A', marginBottom: 12, padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>供应商搜索失败</div>
+              <div style={{ color: MUTED, fontSize: 12 }}>{state.resultData.error || '未知错误'}</div>
+            </div>
+          )}
+
           {/* ── Update follow-up status panel ── */}
           {intent.intentId === 'update_followup_status' && state.resultData && (() => {
             const d = state.resultData;
@@ -2148,7 +2170,7 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
           })()}
 
           {/* ── Default: show intent name for non-result done states ── */}
-          {intent.intentId !== 'check_inventory' && intent.intentId !== 'check_quotation_followups' && intent.intentId !== 'check_quotation_history' && intent.intentId !== 'check_receivables' && intent.intentId !== 'check_consignment' && intent.intentId !== 'check_sales' && intent.intentId !== 'generate_daily_brief' && intent.intentId !== 'customer_overview' && intent.intentId !== 'update_followup_status' && intent.intentId !== 'create_customer_from_ai' && intent.intentId !== 'register_existing_quotation' && (
+          {intent.intentId !== 'check_inventory' && intent.intentId !== 'check_quotation_followups' && intent.intentId !== 'check_quotation_history' && intent.intentId !== 'check_receivables' && intent.intentId !== 'check_consignment' && intent.intentId !== 'check_sales' && intent.intentId !== 'generate_daily_brief' && intent.intentId !== 'customer_overview' && intent.intentId !== 'update_followup_status' && intent.intentId !== 'create_customer_from_ai' && intent.intentId !== 'register_existing_quotation' && intent.intentId !== 'search_suppliers_text' && (
             <div style={{ fontSize: 14, color: TEXT, marginBottom: intent.approvalRequired ? 14 : 0 }}>
               {intent.intentNameZh}{intent.approvalRequired ? dict.ai.panel.readyLabel : ''}
             </div>
@@ -3166,6 +3188,51 @@ export function AIPage() {
               dupCheck: { hasDup: !!dup, dupName: dup?.clientName || null },
             },
           } : prev);
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Supplier search intent — regex pre-check before generic router.
+    const SUPPLIER_SEARCH_RE = /供应商|供货商|厂家|工厂|谁有|谁做|哪家|哪些.*做|supplier|vendor|manufacturer|factory|who has|find supplier/i;
+    if (SUPPLIER_SEARCH_RE.test(t)) {
+      const supMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'search_suppliers_text',
+          intentNameZh: '供应商搜索',
+          intentNameEn: 'Supplier Text Search',
+          category: 'query',
+          triggerKeywordsZh: [],
+          triggerKeywordsEn: [],
+          targetTab: 'chat',
+          targetModule: 'Suppliers',
+          targetRoute: '/suppliers',
+          readSources: ['suppliers', 'supplier_contacts', 'supplier_certifications', 'supplier_quotes'],
+          writeTargets: [],
+          requiredFields: [],
+          approvalRequired: false,
+          resultPanel: 'SupplierSearchResult',
+          implementationStatus: 'real',
+          fallbackBehavior: '',
+        },
+        confidence: 1,
+        raw: raw.trim(),
+        detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: supMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别搜索意图…', '正在提取关键词与条件…', '正在查询供应商数据库…', '正在评分与排序…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          searchSuppliers(raw.trim())
+            .then(data => setCmdState(prev => prev ? { ...prev, resultData: data } : prev))
+            .catch(e => {
+              console.error('[search_suppliers] fetch failed', e);
+              setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: '网络错误，请重试' } } : prev);
+            });
         },
       );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
