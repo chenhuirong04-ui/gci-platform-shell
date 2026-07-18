@@ -70,6 +70,7 @@ export default function SupplierList({ onSelect, onNew }: Props) {
     setFilters(f => ({ ...f, [key]: val }));
 
   const countries = [...new Set(suppliers.map(s => s.country).filter(Boolean))] as string[];
+  const categories = [...new Set(suppliers.flatMap(s => s.product_categories ?? []).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
@@ -86,6 +87,9 @@ export default function SupplierList({ onSelect, onNew }: Props) {
         </Select>
         <Select value={filters.country} onChange={v => filt('country', v)} placeholder="全部国家">
           {countries.map(c => <option key={c} value={c}>{c}</option>)}
+        </Select>
+        <Select value={filters.category} onChange={v => filt('category', v)} placeholder="全部品类">
+          {categories.map(c => <option key={c} value={c}>{c}</option>)}
         </Select>
         <Select value={filters.status} onChange={v => filt('status', v)} placeholder="全部状态">
           {STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
