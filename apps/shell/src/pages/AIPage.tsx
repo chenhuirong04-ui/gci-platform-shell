@@ -1747,7 +1747,7 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
             <SupplierSearchResult
               data={state.resultData}
               onOpenDetail={(supplierId) => {
-                window.location.href = `/suppliers/${supplierId}`;
+                window.location.href = `/suppliers?open=${encodeURIComponent(supplierId)}`;
               }}
               onClose={onCancel}
             />

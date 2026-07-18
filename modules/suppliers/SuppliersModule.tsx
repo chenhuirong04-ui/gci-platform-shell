@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { Supplier } from './types';
 import SupplierList from './components/SupplierList';
 import SupplierForm from './components/SupplierForm';
@@ -28,11 +29,22 @@ const TOP_TABS: { key: TopTab; label: string }[] = [
 export default function SuppliersModule() {
   const [topTab, setTopTab] = useState<TopTab>('list');
   const [sub, setSub] = useState<SubView>({ kind: 'list' });
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const goDetail = (supplierId: string) => {
     setSub({ kind: 'detail', supplierId });
     setTopTab('list');
   };
+
+  // Support ?open=<supplierId> deep-link from AI assistant
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (openId) {
+      setSearchParams({}, { replace: true });
+      goDetail(openId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div style={{ minHeight: '100vh', background: '#f5f3ef' }}>
