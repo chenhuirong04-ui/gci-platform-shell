@@ -199,13 +199,19 @@ function getTitle(prop: any): string {
   return prop?.title?.map((r: any) => r.plain_text).join('') ?? '';
 }
 function getSelect(prop: any): string {
-  return prop?.select?.name ?? '';
+  // status type uses different structure
+  return prop?.select?.name ?? prop?.status?.name ?? '';
 }
 function getMultiSelect(prop: any): string[] {
   return prop?.multi_select?.map((s: any) => s.name) ?? [];
 }
 function getCheckbox(prop: any): boolean {
   return prop?.checkbox ?? false;
+}
+// WhatsApp/WeChat field is stored as number in Notion
+function getNumber(prop: any): string {
+  if (prop?.number == null) return '';
+  return String(prop.number);
 }
 function getFiles(prop: any): Array<{ name: string; url: string }> {
   if (!prop?.files) return [];
@@ -312,17 +318,19 @@ export default async function handler(req: Request): Promise<Response> {
     const name = getTitle(props['Supplier name'] ?? props['Name'] ?? props['名称'] ?? props['供应商名称']);
     if (!name) continue; // skip nameless records
 
-    const supplierCode = getRichText(props['Supplier Code'] ?? props['代码'] ?? props['编码']);
+    const supplierCode = getRichText(props['Supplier Code（供应商编码）'] ?? props['Supplier Code'] ?? props['代码'] ?? props['编码']);
     const countryRaw = getRichText(props['Country / City'] ?? props['Country'] ?? props['国家/城市'] ?? props['国家城市']);
     const loc = parseCountryCity(countryRaw);
-    const whatsappRaw = getRichText(props['WhatsApp / WeChat'] ?? props['WhatsApp'] ?? props['WeChat'] ?? props['联系方式']);
+    // WhatsApp/WeChat is stored as a number field in this database
+    const whatsappNum = getNumber(props['WhatsApp / WeChat']);
+    const whatsappRaw = whatsappNum || getRichText(props['WhatsApp / WeChat'] ?? props['WhatsApp'] ?? props['WeChat'] ?? props['联系方式']);
     const contact = splitWhatsAppWeChat(whatsappRaw);
-    const supplierType = getSelect(props['Supplier Type'] ?? props['类型']);
-    const categories = getMultiSelect(props['Product Categories'] ?? props['品类'] ?? props['产品品类']);
-    const isPreferred = getCheckbox(props['常用'] ?? props['Preferred']);
+    const supplierType = getSelect(props['Supplier Type（供应商类型）'] ?? props['Supplier Type'] ?? props['类型']);
+    const categories = getMultiSelect(props['Product Categories（供应品类）'] ?? props['Product Categories'] ?? props['品类'] ?? props['产品品类']);
+    const isPreferred = getCheckbox(props['常用(Yes/No)'] ?? props['常用'] ?? props['Preferred']);
     const status = getSelect(props['状态'] ?? props['Status']) || 'under_review';
     const strengthNotes = getRichText(props['Strength / Notes'] ?? props['优势'] ?? props['备注']);
-    const contactPerson = getRichText(props['Contact Person'] ?? props['联系人']);
+    const contactPerson = getRichText(props['Contact Person（联系人）'] ?? props['Contact Person'] ?? props['联系人']);
     const email = getRichText(props['电子邮件'] ?? props['Email'] ?? props['邮件']);
     const certifications = getMultiSelect(props['Certificates'] ?? props['认证'] ?? props['证书']);
     const attachments = getFiles(props['简介/产品目录'] ?? props['Attachment'] ?? props['附件'] ?? props['文件']);

@@ -1,0 +1,10 @@
+tests/
+outputs/
+tools/
+Guanzhong-Factory-Video/
+coolhome-gcc-app/
+coolhome-gcc-app-backups/
+.uae-app-staging/
+.uae-cache-v6/
+.uae-conflict-fix/
+.uae-prod-fix/
