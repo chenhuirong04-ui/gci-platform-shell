@@ -131,7 +131,8 @@ function scoreSupplier(
   const strengthNotes = (s.strength_notes ?? '').toLowerCase();
   const allKeywordsLower = intent.keywords.map(k => k.toLowerCase());
 
-  let score = 0;
+  let semanticScore = 0; // score from actual content match (product/category/cert/keyword/name)
+  let countryScore = 0;  // country match — boosts rank but does not satisfy category/cert intent alone
   let matchType = 'profile_match';
   const reasons: string[] = [];
   const matchedCategories: string[] = [];
@@ -148,13 +149,12 @@ function scoreSupplier(
     if (hitCount > 0) {
       const displayName = p.product_name_cn || p.product_name_en || p.model || '';
       if (displayName && !matchedProducts.includes(displayName)) matchedProducts.push(displayName);
-      // Exact multi-keyword product match
       if (hitCount >= 2 || (hitCount >= 1 && allKeywordsLower.length <= 2)) {
-        score += 40;
+        semanticScore += 40;
         matchType = 'exact_product';
         reasons.push(`产品记录匹配：${displayName}`);
       } else {
-        score += 20;
+        semanticScore += 20;
         if (matchType === 'profile_match') matchType = 'similar_product';
         reasons.push(`产品相关：${displayName}`);
       }
@@ -168,7 +168,7 @@ function scoreSupplier(
       if (kw.length >= 2 && svText.includes(kw)) {
         const sName = sv.service_name || sv.service_category || '';
         if (sName && !matchedServices.includes(sName)) matchedServices.push(sName);
-        score += 18;
+        semanticScore += 18;
         if (matchType === 'profile_match') matchType = 'service_match';
         reasons.push(`服务匹配：${sName}`);
         break;
@@ -182,7 +182,7 @@ function scoreSupplier(
     for (const cat of cats) {
       if (cat.toLowerCase() === catLower || cat.toLowerCase().includes(catLower) || catLower.includes(cat.toLowerCase())) {
         matchedCategories.push(cat);
-        score += 25;
+        semanticScore += 25;
         if (matchType === 'profile_match') matchType = 'category_only';
         reasons.push(`品类：${cat}`);
       }
@@ -193,7 +193,7 @@ function scoreSupplier(
       for (const cat of cats) {
         if (cat.toLowerCase().includes(kw) || kw.includes(cat.toLowerCase())) {
           if (!matchedCategories.includes(cat)) matchedCategories.push(cat);
-          score += 15;
+          semanticScore += 15;
           if (matchType === 'profile_match') matchType = 'category_only';
           if (!reasons.some(r => r.includes(cat))) reasons.push(`品类：${cat}`);
         }
@@ -206,9 +206,8 @@ function scoreSupplier(
     const certLower = intent.certificationKeyword.toLowerCase();
     for (const c of certs) {
       if ((c.certification_type ?? '').toLowerCase().includes(certLower)) {
-        score += 30;
-        if (score > 30 && matchType === 'profile_match') matchType = 'certification_match';
-        else if (matchType === 'profile_match') matchType = 'certification_match';
+        semanticScore += 30;
+        if (matchType === 'profile_match') matchType = 'certification_match';
         reasons.push(`认证：${c.certification_type}`);
         break;
       }
@@ -219,41 +218,49 @@ function scoreSupplier(
   if (allKeywordsLower.length > 0) {
     for (const kw of allKeywordsLower) {
       if (kw.length >= 2 && nameFull.includes(kw)) {
-        score += 10;
+        semanticScore += 10;
         reasons.push(`名称匹配：${kw}`);
       }
       if (kw.length >= 2 && strengthNotes.includes(kw)) {
-        score += 8;
+        semanticScore += 8;
         reasons.push(`优势描述：${kw}`);
       }
     }
   }
 
-  // ── Country match ─────────────────────────────────────────────────────────
+  // ── Country match (additive boost, not a standalone semantic qualifier) ───
   if (intent.country && s.country === intent.country) {
-    score += 12;
+    countryScore = 12;
     reasons.push(`国家：${s.country}`);
   }
 
-  // ── Bonus factors ─────────────────────────────────────────────────────────
-  if (s.is_preferred) score += 8;
-  const rating = s.current_rating;
-  if (rating === 'A') score += 6;
-  else if (rating === 'B') score += 3;
-
-  // Contact completeness bonus
-  if (contacts.length > 0) {
-    const primary = contacts[0];
-    if (primary.whatsapp || primary.email) score += 4;
+  // ── Semantic intent guard ─────────────────────────────────────────────────
+  // When the query has a category/cert/keyword intent, a supplier must have at
+  // least one semantic match to be included. Country match alone is not enough.
+  const hasSemanticIntent = intent.keywords.length > 0 || intent.category || intent.certificationKeyword;
+  if (hasSemanticIntent && semanticScore === 0) {
+    // Zero out completely — this supplier will be filtered by the caller
+    return { score: 0, matchType: 'profile_match', matchReason: '', matchedProducts: [], matchedServices: [], matchedCategories: [] };
   }
 
-  // Require contact filter
-  if (intent.requiresContact && contacts.length === 0) score = 0;
+  // ── Bonus factors (ranking only, not for inclusion) ───────────────────────
+  let bonusScore = 0;
+  if (s.is_preferred) bonusScore += 8;
+  const rating = s.current_rating;
+  if (rating === 'A') bonusScore += 6;
+  else if (rating === 'B') bonusScore += 3;
+  if (contacts.length > 0) {
+    const primary = contacts[0];
+    if (primary.whatsapp || primary.email) bonusScore += 4;
+  }
 
-  // Cap at 100
-  score = Math.min(100, Math.round(score));
+  // ── Require-contact hard filter ───────────────────────────────────────────
+  if (intent.requiresContact && contacts.length === 0) {
+    return { score: 0, matchType: 'profile_match', matchReason: '', matchedProducts: [], matchedServices: [], matchedCategories: [] };
+  }
 
-  const matchReason = reasons.slice(0, 3).join('，') || '档案关键词匹配';
+  const score = Math.min(100, Math.round(semanticScore + countryScore + bonusScore));
+  const matchReason = reasons.slice(0, 3).join('，') || (intent.requiresContact ? '有联系方式' : '档案匹配');
 
   return { score, matchType, matchReason, matchedProducts, matchedServices, matchedCategories };
 }
