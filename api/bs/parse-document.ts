@@ -160,6 +160,25 @@ Return ONLY valid JSON - no markdown, no explanation. Use this schema:
 }
 Rules: Convert all dates to YYYY-MM-DD format. For Chinese 营业执照: legal_name = 名称, document_number = 统一社会信用代码/注册号, legal_representative = 法定代表人, expire_date = 营业期限. Never guess missing fields - use null.`,
 
+  SUPPLIER_COMPANY_PROFILE: `You are an expert parser for company profile documents, product catalogs, brochures, and introduction materials. Extract all visible company information.
+Return ONLY valid JSON - no markdown, no explanation. Use this schema:
+{
+  "legal_name": "official company name or null",
+  "name_cn": "Chinese company name or null",
+  "name_en": "English company name or null",
+  "country": "country (English) or null",
+  "city": "city or null",
+  "website": "website URL or null",
+  "established_year": "4-digit year string or null",
+  "main_products": ["list of main products or categories - empty array if not found"],
+  "product_categories": ["list of product categories - empty array if not found"],
+  "contact_name": "primary contact person name or null",
+  "phone": "phone number or null",
+  "email": "email address or null",
+  "confidence": "high | medium | low"
+}
+Rules: For Chinese companies: legal_name = 公司名称, established_year = 成立年份. Extract website from any visible URL. Never guess missing fields - use null.`,
+
   SUPPLIER_CERTIFICATION: `You are an expert certification document parser. Extract all visible fields from this certification, test report, compliance certificate, or quality standard document.
 Return ONLY valid JSON - no markdown, no explanation. Use this schema:
 {

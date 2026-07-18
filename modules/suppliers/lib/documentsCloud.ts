@@ -163,6 +163,46 @@ export async function uploadSupplierFile(
   }
 }
 
+// ── Storage file move (copy + delete) ────────────────────────────────────────
+
+/** Copy a file to a new path, then delete the source. Returns new path or null. */
+export async function moveStorageFile(
+  bucket: string,
+  srcPath: string,
+  destPath: string,
+): Promise<string | null> {
+  // 1. Copy
+  const copyRes = await fetch(`${SUPA_URL}/storage/v1/object/copy`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPA_KEY,
+      Authorization: `Bearer ${SUPA_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      bucketId: bucket,
+      sourceKey: srcPath,
+      destinationBucket: bucket,
+      destinationKey: destPath,
+    }),
+  });
+  if (!copyRes.ok) {
+    console.error('[documentsCloud] copy failed', copyRes.status, await copyRes.text().catch(() => ''));
+    return null;
+  }
+  // 2. Delete source
+  await fetch(`${SUPA_URL}/storage/v1/object/${bucket}`, {
+    method: 'DELETE',
+    headers: {
+      apikey: SUPA_KEY,
+      Authorization: `Bearer ${SUPA_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ prefixes: [srcPath] }),
+  });
+  return destPath;
+}
+
 // ── File upload (record only — upload via Supabase Storage SDK on client) ────
 
 export async function recordUploadedDocument(
