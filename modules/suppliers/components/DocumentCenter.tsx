@@ -7,10 +7,10 @@ import {
 
 const NAVY = '#0B1F44';
 const GOLD = '#C9A84C';
-const BORDER = '#CBD5E1';
-const T2 = '#475569';
-const T3 = '#94a3b8';
-const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${BORDER}`, fontSize: 13, color: NAVY, background: '#fff', outline: 'none' };
+const BORDER = '#e2e8f0';
+const T2 = '#374151';
+const T3 = '#6b7280';
+const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1.5px solid #CBD5E1`, fontSize: 13, color: NAVY, background: '#fff', outline: 'none' };
 const LBL: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: T2, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' };
 
 const DOC_TYPES: DocumentType[] = [
@@ -96,7 +96,7 @@ export default function DocumentCenter({ supplierId }: Props) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {Object.entries(groups).map(([type, items]) => (
             <div key={type}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{type}</div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{type}</div>
               {items.map(doc => {
                 const ec = expiryColor(doc.expire_date);
                 return (

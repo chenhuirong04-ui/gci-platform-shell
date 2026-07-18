@@ -4,8 +4,8 @@ import { listSuppliers, searchSuppliers } from '../lib/suppliersCloud';
 
 const NAVY = '#0B1F44';
 const GOLD = '#C9A84C';
-const T2 = '#475569';
-const T3 = '#94a3b8';
+const T2 = '#374151';
+const T3 = '#6b7280';
 const BORDER = '#e2e8f0';
 
 const RATING_COLOR: Record<string, string> = { A: '#16a34a', B: '#2563eb', C: '#d97706', D: '#dc2626' };
