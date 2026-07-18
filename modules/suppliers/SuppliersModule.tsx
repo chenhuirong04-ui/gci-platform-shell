@@ -3,6 +3,7 @@ import type { Supplier } from './types';
 import SupplierList from './components/SupplierList';
 import SupplierForm from './components/SupplierForm';
 import SupplierDetail from './components/SupplierDetail';
+import NotionImportPage from './components/NotionImportPage';
 
 const GOLD = '#C9A84C';
 const NAVY = '#0c1b3a';
@@ -12,7 +13,8 @@ type TopTab = 'list' | 'new' | 'docs' | 'quotes';
 type SubView =
   | { kind: 'list' }
   | { kind: 'detail'; supplierId: string }
-  | { kind: 'edit'; supplier: Supplier };
+  | { kind: 'edit'; supplier: Supplier }
+  | { kind: 'notion-import' };
 
 const TOP_TABS: { key: TopTab; label: string }[] = [
   { key: 'list',   label: '供应商列表' },
@@ -68,7 +70,12 @@ export default function SuppliersModule() {
         <SupplierList
           onNew={() => setTopTab('new')}
           onSelect={s => goDetail(s.id!)}
+          onNotionImport={() => setSub({ kind: 'notion-import' })}
         />
+      )}
+
+      {topTab === 'list' && sub.kind === 'notion-import' && (
+        <NotionImportPage onBack={() => setSub({ kind: 'list' })} />
       )}
 
       {topTab === 'list' && sub.kind === 'detail' && (

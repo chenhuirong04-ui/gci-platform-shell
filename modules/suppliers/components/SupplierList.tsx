@@ -25,9 +25,10 @@ const STATUSES = ['active', 'inactive', 'blacklisted', 'under_review', 'archived
 interface Props {
   onSelect: (s: Supplier) => void;
   onNew: () => void;
+  onNotionImport: () => void;
 }
 
-export default function SupplierList({ onSelect, onNew }: Props) {
+export default function SupplierList({ onSelect, onNew, onNotionImport }: Props) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQ, setSearchQ] = useState('');
@@ -101,6 +102,12 @@ export default function SupplierList({ onSelect, onNew }: Props) {
         <Sel value={filters.is_preferred} onChange={v => filt('is_preferred', v)} placeholder="常用">
           <option value="true">仅常用</option>
         </Sel>
+        <button
+          onClick={onNotionImport}
+          style={{ padding: '9px 16px', borderRadius: 10, background: '#fff', color: NAVY, border: `1.5px solid ${GOLD}`, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          从 Notion 导入
+        </button>
         <button
           onClick={onNew}
           style={{ padding: '9px 20px', borderRadius: 10, background: NAVY, color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
