@@ -46,7 +46,7 @@ export default function SuppliersModule() {
     <div style={{ background: '#f8fafc', minHeight: '100vh', padding: 20 }}>
       <SupplierList
         onNew={() => setView({ kind: 'new' })}
-        onSelect={id => setView({ kind: 'detail', supplierId: id })}
+        onSelect={s => setView({ kind: 'detail', supplierId: s.id! })}
       />
     </div>
   );
