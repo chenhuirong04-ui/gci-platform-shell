@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { Supplier, SupplierType, SupplierStatus, SupplierRating, DocumentType } from '../types';
 import { createSupplier, generateShortCode, updateSupplier } from '../lib/suppliersCloud';
 import { createDocument, moveStorageFile, resolveStorageBucket } from '../lib/documentsCloud';
@@ -162,6 +162,14 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
   const [aiFilledKeys, setAiFilledKeys] = useState<Set<string>>(new Set());
   const [pendingBtn, setPendingBtn]     = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
+  const nameDisplayRef = useRef<HTMLInputElement>(null);
+
+  // On mount, reset scroll so long names show from the start (not the end)
+  useEffect(() => {
+    if (nameDisplayRef.current) {
+      nameDisplayRef.current.scrollLeft = 0;
+    }
+  }, []);
 
   // ── Form state ────────────────────────────────────────────────────────────
   const [form, setForm] = useState<FormState>(() => FORM_INIT(supplier));
@@ -527,8 +535,13 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
               <div style={SEC}>{isEdit ? '基础信息' : '1. 基础信息'}</div>
               <div style={R3}>
                 <FLD label="主显示名称 *" ai={aiFilledKeys.has('supplier_name_display')}>
-                  <input style={{ ...INP, ...aiInp(aiFilledKeys.has('supplier_name_display')), borderColor: !form.supplier_name_display ? '#e53e3e' : undefined }}
-                    value={form.supplier_name_display} onChange={e => setF('supplier_name_display', e.target.value)} placeholder="供应商主显示名称" />
+                  <input
+                    ref={nameDisplayRef}
+                    style={{ ...INP, ...aiInp(aiFilledKeys.has('supplier_name_display')), borderColor: !form.supplier_name_display ? '#e53e3e' : undefined, textAlign: 'left', textIndent: 0 }}
+                    value={form.supplier_name_display}
+                    onChange={e => setF('supplier_name_display', e.target.value)}
+                    onFocus={e => { e.currentTarget.scrollLeft = 0; }}
+                    placeholder="供应商主显示名称" />
                 </FLD>
                 <FLD label="中文名称" ai={aiFilledKeys.has('name_cn')}>
                   <input style={{ ...INP, ...aiInp(aiFilledKeys.has('name_cn')) }} value={form.name_cn} onChange={e => setF('name_cn', e.target.value)} placeholder="中文名称" />
