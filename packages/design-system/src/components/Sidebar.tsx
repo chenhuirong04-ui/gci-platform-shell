@@ -53,7 +53,8 @@ function NavRow({ item }: { item: NavModItem }) {
   const inner = (
     <>
       <span
-        className="font-mono-label flex items-center justify-center shrink-0"
+        translate="no"
+        className="notranslate font-mono-label flex items-center justify-center shrink-0"
         style={{
           width: 24,
           height: 24,
@@ -141,7 +142,8 @@ export function Sidebar({ navTop, workspaceLabel, sections, userName, userRole, 
   }
   return (
     <aside
-      className={`shrink-0 hidden md:flex md:flex-col relative sticky top-0 overflow-y-auto gci-sidebar${className ? ` ${className}` : ''}`}
+      translate="no"
+      className={`notranslate shrink-0 hidden md:flex md:flex-col relative sticky top-0 overflow-y-auto gci-sidebar${className ? ` ${className}` : ''}`}
       style={{
         width: 'var(--sidebar-w)',
         height: '100vh',
@@ -208,7 +210,8 @@ export function Sidebar({ navTop, workspaceLabel, sections, userName, userRole, 
         }}
       >
         <span
-          className="font-mono-label flex items-center justify-center shrink-0"
+          translate="no"
+          className="notranslate font-mono-label flex items-center justify-center shrink-0"
           style={{
             width: 24,
             height: 24,
