@@ -20,7 +20,14 @@ import { IS_DEMO_MODE } from '../../../modules/crm/demo/demoMode';
 
 // ── Inner shell (requires auth context already mounted) ──────────────────────
 function Shell() {
-  const [lang, setLang] = useState<Lang>('zh');
+  const [lang, setLangState] = useState<Lang>(() => {
+    const saved = localStorage.getItem('gci_platform_language_v1');
+    return saved === 'en' || saved === 'zh' ? saved : 'zh';
+  });
+  const setLang = (l: Lang) => {
+    localStorage.setItem('gci_platform_language_v1', l);
+    setLangState(l);
+  };
   const [toast, setToast] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const dict = dictionaries[lang];
