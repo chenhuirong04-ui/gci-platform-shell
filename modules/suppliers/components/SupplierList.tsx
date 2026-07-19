@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useI18n } from '@gci/i18n';
 import type { Supplier } from '../types';
 import {
   listSuppliersPage, searchSuppliersPage, listFilterOptions,
@@ -36,6 +37,7 @@ interface Props {
 }
 
 export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanup, initialFilters }: Props) {
+  const { lang } = useI18n();
   const [paged, setPaged] = useState<PagedSuppliers>({ items: [], total: 0, page: 1, pageSize: 100 });
   const [loading, setLoading] = useState(true);
   const [searchQ, setSearchQ] = useState('');
@@ -116,7 +118,7 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
           {SUPPLIER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
         </Sel>
         <Sel value={filters.country} onChange={v => filt('country', v)} placeholder="全部国家">
-          {filterOptions.countries.map(c => <option key={c} value={c}>{getCountryLabel(c)}</option>)}
+          {filterOptions.countries.map(c => <option key={c} value={c}>{getCountryLabel(c, lang)}</option>)}
         </Sel>
         <Sel value={filters.category} onChange={v => filt('category', v)} placeholder="全部品类">
           {filterOptions.categories.map(c => <option key={c} value={c}>{getCategoryLabel(c)}</option>)}

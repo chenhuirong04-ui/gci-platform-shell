@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n } from '@gci/i18n';
 import { getCategoryLabel } from '../lib/labelMaps';
 
 const NAVY = '#0c1b3a';
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export default function CategoryDistributionChart({ data, selectedCategory, onSelect }: Props) {
+  const { lang } = useI18n();
   const maxCount = Math.max(...data.bars.map(b => b.count), 1);
 
   const barColor = (bar: CategoryBar, isSelected: boolean) => {
@@ -62,9 +64,9 @@ export default function CategoryDistributionChart({ data, selectedCategory, onSe
               onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
               onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
             >
-              {/* Label */}
+              {/* Label — display only, filter key stays as DB value */}
               <div style={{ width: 130, textAlign: 'right', fontSize: 12, fontWeight: isSelected ? 700 : 500, color: isSelected ? NAVY : '#475569', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                {bar.isUnclassified ? '未分类' : getCategoryLabel(bar.category)}
+                {bar.isUnclassified ? '未分类' : getCategoryLabel(bar.category, lang)}
               </div>
 
               {/* Bar track */}

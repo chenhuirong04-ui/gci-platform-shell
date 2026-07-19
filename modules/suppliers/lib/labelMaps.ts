@@ -1,5 +1,8 @@
 // Display-layer label mapping for supplier module.
 // DB values are never changed — only the rendered text is translated.
+// Language must be passed explicitly from APP context (useI18n().lang).
+
+import type { Lang } from '@gci/i18n';
 
 export const COUNTRY_LABEL_MAP_ZH: Record<string, string> = {
   'China':          '中国',
@@ -42,18 +45,14 @@ export const CATEGORY_LABEL_MAP_ZH: Record<string, string> = {
   '未分类':              '未分类',
 };
 
-function isZh(): boolean {
-  return typeof navigator !== 'undefined' && navigator.language.startsWith('zh');
-}
-
-/** Translate a country DB value to the current UI language. */
-export function getCountryLabel(value: string): string {
-  if (!isZh()) return value;
+/** Translate a country DB value using the APP's current language. */
+export function getCountryLabel(value: string, lang: Lang): string {
+  if (lang !== 'zh') return value;
   return COUNTRY_LABEL_MAP_ZH[value] ?? value;
 }
 
-/** Translate a category DB value to the current UI language. */
-export function getCategoryLabel(value: string): string {
-  if (!isZh()) return value;
+/** Translate a category DB value using the APP's current language. */
+export function getCategoryLabel(value: string, lang: Lang): string {
+  if (lang !== 'zh') return value;
   return CATEGORY_LABEL_MAP_ZH[value] ?? value;
 }

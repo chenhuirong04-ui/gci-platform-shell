@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useI18n } from '@gci/i18n';
 import { getCountryLabel } from '../lib/labelMaps';
 
 const NAVY = '#0c1b3a';
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export default function CountryDistributionChart({ data, selectedCountry, onSelect }: Props) {
+  const { lang } = useI18n();
   const [otherExpanded, setOtherExpanded] = useState(false);
 
   const maxCount = Math.max(...data.bars.map(b => b.count), 1);
@@ -72,9 +74,9 @@ export default function CountryDistributionChart({ data, selectedCountry, onSele
                 onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
                 onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
               >
-                {/* Label */}
+                {/* Label — display only, filter key stays as DB value */}
                 <div style={{ width: 130, textAlign: 'right', fontSize: 12, fontWeight: isSelected ? 700 : 500, color: isSelected ? NAVY : '#475569', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  {bar.isBlank ? '未填写' : bar.isOther ? '其他' : getCountryLabel(bar.country)}
+                  {bar.isBlank ? '未填写' : bar.isOther ? (lang === 'zh' ? '其他' : 'Other') : getCountryLabel(bar.country, lang)}
                   {bar.isOther && <span style={{ marginLeft: 4, fontSize: 10, color: '#94a3b8' }}>{otherExpanded ? '▲' : '▼'}</span>}
                 </div>
 
@@ -107,7 +109,7 @@ export default function CountryDistributionChart({ data, selectedCountry, onSele
                       onClick={() => onSelect(selectedCountry === d.country ? null : d.country)}
                       style={{ fontSize: 12, color: '#475569', cursor: 'pointer', padding: '2px 6px', borderRadius: 4, background: selectedCountry === d.country ? '#e8f0fa' : 'transparent', fontWeight: selectedCountry === d.country ? 700 : 400 }}
                     >
-                      {getCountryLabel(d.country)} <span style={{ color: '#94a3b8' }}>{d.count}</span>
+                      {getCountryLabel(d.country, lang)} <span style={{ color: '#94a3b8' }}>{d.count}</span>
                     </div>
                   ))}
                 </div>
