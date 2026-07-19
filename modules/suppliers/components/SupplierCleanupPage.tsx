@@ -59,6 +59,27 @@ interface DuplicateGroup {
   records: DuplicateRecord[];
 }
 
+interface CountryTableRow {
+  country: string;
+  supplierCount: number;
+  percentage: number;
+  preferredCount: number;
+  contactCount: number;
+  missingCategoryCount: number;
+  missingBizLicenseCount: number;
+  missingCatalogCount: number;
+}
+
+interface CategoryTableRow {
+  category: string;
+  supplierCount: number;
+  preferredCount: number;
+  contactCount: number;
+  catalogCount: number;
+  certificationCount: number;
+  missingCountryCount: number;
+}
+
 interface SummaryData {
   stats: {
     total: number;
@@ -72,6 +93,8 @@ interface SummaryData {
   categoryDistribution: any;
   duplicates: DuplicateGroup[];
   pendingCleanup: PendingSupplier[];
+  countryTable: CountryTableRow[];
+  categoryTable: CategoryTableRow[];
 }
 
 // ── Completeness bar ──────────────────────────────────────────────────────────
@@ -140,9 +163,10 @@ const FLAG_CHIPS: { key: keyof SupplierFlags; label: string }[] = [
 interface Props {
   onBack: () => void;
   onOpenDetail: (id: string) => void;
+  onGoToFilteredList?: (filters: { country?: string; category?: string }) => void;
 }
 
-export default function SupplierCleanupPage({ onBack, onOpenDetail }: Props) {
+export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilteredList }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<SummaryData | null>(null);
@@ -153,6 +177,18 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail }: Props) {
   const [preferredFirst, setPreferredFirst] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  // Analysis table state
+  const [analysisTab, setAnalysisTab] = useState<'country' | 'category'>('country');
+  type CtyKey = keyof CountryTableRow;
+  type CatKey = keyof CategoryTableRow;
+  const [ctySort, setCtySort] = useState<{ key: CtyKey; dir: 'asc' | 'desc' }>({ key: 'supplierCount', dir: 'desc' });
+  const [catSort, setCatSort] = useState<{ key: CatKey; dir: 'asc' | 'desc' }>({ key: 'supplierCount', dir: 'desc' });
+
+  const toggleCtySort = (key: CtyKey) =>
+    setCtySort(s => s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' });
+  const toggleCatSort = (key: CatKey) =>
+    setCatSort(s => s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' });
 
   // Archive state
   const [archivingId, setArchivingId] = useState<string | null>(null);
@@ -318,7 +354,155 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail }: Props) {
           />
         </div>
 
-        {/* ── 区域4：数据清洗 ───────────────────────────────────────────── */}
+        {/* ── 区域4：分析表格 ───────────────────────────────────────────── */}
+        {(data.countryTable?.length > 0 || data.categoryTable?.length > 0) && (
+          <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${CARD_BORDER}`, boxShadow: '0 1px 4px rgba(12,27,58,0.05)', overflow: 'hidden' }}>
+            {/* Tab switcher */}
+            <div style={{ display: 'flex', borderBottom: `1px solid ${CARD_BORDER}`, padding: '0 24px' }}>
+              {([
+                { key: 'country' as const,  label: `按国家（${data.countryTable?.length ?? 0}）` },
+                { key: 'category' as const, label: `按行业（${data.categoryTable?.length ?? 0}）` },
+              ]).map(t => (
+                <button key={t.key} onClick={() => setAnalysisTab(t.key)} style={{
+                  padding: '12px 20px', fontSize: 13,
+                  fontWeight: analysisTab === t.key ? 700 : 500,
+                  color: analysisTab === t.key ? NAVY : '#64748b',
+                  border: 'none',
+                  borderBottom: analysisTab === t.key ? `2px solid ${GOLD}` : '2px solid transparent',
+                  background: 'none', cursor: 'pointer', marginBottom: -1,
+                }}>{t.label}</button>
+              ))}
+            </div>
+
+            {/* 按国家 */}
+            {analysisTab === 'country' && (() => {
+              const sorted = [...(data.countryTable ?? [])].sort((a, b) => {
+                if (a.country === '未填写') return 1;
+                if (b.country === '未填写') return -1;
+                const av = a[ctySort.key]; const bv = b[ctySort.key];
+                if (typeof av === 'string') return ctySort.dir === 'asc' ? av.localeCompare(bv as string) : (bv as string).localeCompare(av);
+                return ctySort.dir === 'asc' ? (av as number) - (bv as number) : (bv as number) - (av as number);
+              });
+              const SH = ({ col, label }: { col: CtyKey; label: string }) => (
+                <th onClick={() => toggleCtySort(col)} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none' }}>
+                  {label}{ctySort.key === col ? (ctySort.dir === 'desc' ? ' ↓' : ' ↑') : ''}
+                </th>
+              );
+              return (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ background: '#f5f3ef' }}>
+                        <SH col="country" label="国家" />
+                        <SH col="supplierCount" label="供应商数" />
+                        <SH col="percentage" label="占比" />
+                        <SH col="preferredCount" label="常用" />
+                        <SH col="contactCount" label="有联系人" />
+                        <SH col="missingCategoryCount" label="缺品类" />
+                        <SH col="missingBizLicenseCount" label="缺营业执照" />
+                        <SH col="missingCatalogCount" label="缺产品目录" />
+                        <th style={{ padding: '10px 14px', fontSize: 11, color: '#64748b', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap' }}>操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sorted.map(row => (
+                        <tr key={row.country} style={{ borderBottom: `1px solid ${CARD_BORDER}` }}
+                          onMouseEnter={e => (e.currentTarget.style.background = '#faf8f5')}
+                          onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                          <td style={{ padding: '11px 14px', fontWeight: 700, color: row.country === '未填写' ? '#94a3b8' : NAVY }}>
+                            <span translate="no" className="notranslate">{row.country}</span>
+                          </td>
+                          <td style={{ padding: '11px 14px', fontWeight: 700, color: NAVY }}>{row.supplierCount}</td>
+                          <td style={{ padding: '11px 14px', color: '#475569' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <div style={{ width: 48, height: 5, background: '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
+                                <div style={{ width: `${row.percentage}%`, height: '100%', background: GOLD, borderRadius: 3 }} />
+                              </div>
+                              <span>{row.percentage}%</span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '11px 14px', color: row.preferredCount > 0 ? GOLD : '#94a3b8', fontWeight: row.preferredCount > 0 ? 700 : 400 }}>{row.preferredCount}</td>
+                          <td style={{ padding: '11px 14px', color: '#475569' }}>{row.contactCount}</td>
+                          <td style={{ padding: '11px 14px', color: row.missingCategoryCount > 0 ? '#dc2626' : '#94a3b8', fontWeight: row.missingCategoryCount > 0 ? 700 : 400 }}>{row.missingCategoryCount}</td>
+                          <td style={{ padding: '11px 14px', color: row.missingBizLicenseCount > 0 ? '#d97706' : '#94a3b8', fontWeight: row.missingBizLicenseCount > 0 ? 700 : 400 }}>{row.missingBizLicenseCount}</td>
+                          <td style={{ padding: '11px 14px', color: row.missingCatalogCount > 0 ? '#d97706' : '#94a3b8', fontWeight: row.missingCatalogCount > 0 ? 700 : 400 }}>{row.missingCatalogCount}</td>
+                          <td style={{ padding: '11px 14px' }}>
+                            <button
+                              onClick={() => onGoToFilteredList?.({ country: row.country })}
+                              style={{ fontSize: 11, padding: '5px 12px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}
+                            >
+                              查看供应商 →
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+
+            {/* 按行业 */}
+            {analysisTab === 'category' && (() => {
+              const sorted = [...(data.categoryTable ?? [])].sort((a, b) => {
+                const av = a[catSort.key]; const bv = b[catSort.key];
+                if (typeof av === 'string') return catSort.dir === 'asc' ? av.localeCompare(bv as string) : (bv as string).localeCompare(av);
+                return catSort.dir === 'asc' ? (av as number) - (bv as number) : (bv as number) - (av as number);
+              });
+              const SH = ({ col, label }: { col: CatKey; label: string }) => (
+                <th onClick={() => toggleCatSort(col)} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none' }}>
+                  {label}{catSort.key === col ? (catSort.dir === 'desc' ? ' ↓' : ' ↑') : ''}
+                </th>
+              );
+              return (
+                <div style={{ overflowX: 'auto' }}>
+                  <div style={{ padding: '8px 24px 0', fontSize: 11, color: '#94a3b8' }}>
+                    注：同一供应商可属多个行业，行业合计可大于供应商总数
+                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ background: '#f5f3ef' }}>
+                        <SH col="category" label="行业/产品类别" />
+                        <SH col="supplierCount" label="供应商数" />
+                        <SH col="preferredCount" label="常用" />
+                        <SH col="contactCount" label="有联系人" />
+                        <SH col="catalogCount" label="有产品目录" />
+                        <SH col="certificationCount" label="有认证" />
+                        <SH col="missingCountryCount" label="缺国家" />
+                        <th style={{ padding: '10px 14px', fontSize: 11, color: '#64748b', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap' }}>操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sorted.map(row => (
+                        <tr key={row.category} style={{ borderBottom: `1px solid ${CARD_BORDER}` }}
+                          onMouseEnter={e => (e.currentTarget.style.background = '#faf8f5')}
+                          onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                          <td style={{ padding: '11px 14px', fontWeight: 700, color: NAVY }}>{row.category}</td>
+                          <td style={{ padding: '11px 14px', fontWeight: 700, color: NAVY }}>{row.supplierCount}</td>
+                          <td style={{ padding: '11px 14px', color: row.preferredCount > 0 ? GOLD : '#94a3b8', fontWeight: row.preferredCount > 0 ? 700 : 400 }}>{row.preferredCount}</td>
+                          <td style={{ padding: '11px 14px', color: '#475569' }}>{row.contactCount}</td>
+                          <td style={{ padding: '11px 14px', color: '#475569' }}>{row.catalogCount}</td>
+                          <td style={{ padding: '11px 14px', color: '#475569' }}>{row.certificationCount}</td>
+                          <td style={{ padding: '11px 14px', color: row.missingCountryCount > 0 ? '#d97706' : '#94a3b8', fontWeight: row.missingCountryCount > 0 ? 700 : 400 }}>{row.missingCountryCount}</td>
+                          <td style={{ padding: '11px 14px' }}>
+                            <button
+                              onClick={() => onGoToFilteredList?.({ category: row.category })}
+                              style={{ fontSize: 11, padding: '5px 12px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}
+                            >
+                              查看供应商 →
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* ── 区域5：数据清洗 ───────────────────────────────────────────── */}
         <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${CARD_BORDER}`, boxShadow: '0 1px 4px rgba(12,27,58,0.05)', overflow: 'hidden' }}>
           {/* Tab switcher */}
           <div style={{ display: 'flex', borderBottom: `1px solid ${CARD_BORDER}`, padding: '0 24px' }}>

@@ -98,7 +98,8 @@ export async function listSuppliersPage(opts: {
 
   const params = new URLSearchParams();
   params.set('order', 'created_at.desc');
-  if (opts.country) params.set('country', `eq.${opts.country}`);
+  if (opts.country === '未填写') params.set('country', 'is.null');
+  else if (opts.country) params.set('country', `eq.${opts.country}`);
   if (opts.supplier_type) params.set('supplier_type', `eq.${opts.supplier_type}`);
   if (opts.status) params.set('status', `eq.${opts.status}`);
   if (opts.rating) params.set('current_rating', `eq.${opts.rating}`);

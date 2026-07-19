@@ -296,6 +296,62 @@ export default async function handler(req: Request) {
         return a.completeness - b.completeness;
       });
 
+    // ── 9. Country analysis table ─────────────────────────────────────────────
+    const ctyMap = new Map<string, {
+      supplierCount: number; preferredCount: number; contactCount: number;
+      missingCategoryCount: number; missingBizLicenseCount: number; missingCatalogCount: number;
+    }>();
+    for (const s of activeSuppliers) {
+      const key = s.country ?? '未填写';
+      if (!ctyMap.has(key)) ctyMap.set(key, { supplierCount: 0, preferredCount: 0, contactCount: 0, missingCategoryCount: 0, missingBizLicenseCount: 0, missingCatalogCount: 0 });
+      const e = ctyMap.get(key)!;
+      e.supplierCount++;
+      if (s.is_preferred) e.preferredCount++;
+      if (s.primaryContact) e.contactCount++;
+      if (s.flags.missingCategory) e.missingCategoryCount++;
+      if (s.flags.missingBizLicense) e.missingBizLicenseCount++;
+      if (s.flags.missingCatalog) e.missingCatalogCount++;
+    }
+    const totalActive = activeSuppliers.length;
+    const countryTable = [...ctyMap.entries()]
+      .map(([country, d]) => ({
+        country,
+        supplierCount: d.supplierCount,
+        percentage: totalActive > 0 ? Math.round((d.supplierCount / totalActive) * 100) : 0,
+        preferredCount: d.preferredCount,
+        contactCount: d.contactCount,
+        missingCategoryCount: d.missingCategoryCount,
+        missingBizLicenseCount: d.missingBizLicenseCount,
+        missingCatalogCount: d.missingCatalogCount,
+      }))
+      .sort((a, b) => {
+        if (a.country === '未填写') return 1;
+        if (b.country === '未填写') return -1;
+        return b.supplierCount - a.supplierCount;
+      });
+
+    // ── 10. Category analysis table ───────────────────────────────────────────
+    const catAnalMap = new Map<string, {
+      supplierCount: number; preferredCount: number; contactCount: number;
+      catalogCount: number; certificationCount: number; missingCountryCount: number;
+    }>();
+    for (const s of activeSuppliers) {
+      for (const cat of s.product_categories) {
+        if (!cat) continue;
+        if (!catAnalMap.has(cat)) catAnalMap.set(cat, { supplierCount: 0, preferredCount: 0, contactCount: 0, catalogCount: 0, certificationCount: 0, missingCountryCount: 0 });
+        const e = catAnalMap.get(cat)!;
+        e.supplierCount++;
+        if (s.is_preferred) e.preferredCount++;
+        if (s.primaryContact) e.contactCount++;
+        if (!s.flags.missingCatalog) e.catalogCount++;
+        if (!s.flags.missingCertification) e.certificationCount++;
+        if (s.flags.missingCountry) e.missingCountryCount++;
+      }
+    }
+    const categoryTable = [...catAnalMap.entries()]
+      .map(([category, d]) => ({ category, ...d }))
+      .sort((a, b) => b.supplierCount - a.supplierCount);
+
     return json({
       ok: true,
       stats,
@@ -303,6 +359,8 @@ export default async function handler(req: Request) {
       categoryDistribution,
       duplicates,
       pendingCleanup,
+      countryTable,
+      categoryTable,
     });
 
   } catch (err: any) {

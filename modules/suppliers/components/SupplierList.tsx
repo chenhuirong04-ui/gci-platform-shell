@@ -31,16 +31,22 @@ interface Props {
   onNew: () => void;
   onNotionImport: () => void;
   onCleanup: () => void;
+  initialFilters?: { country?: string; category?: string };
 }
 
-export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanup }: Props) {
+export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanup, initialFilters }: Props) {
   const [paged, setPaged] = useState<PagedSuppliers>({ items: [], total: 0, page: 1, pageSize: 100 });
   const [loading, setLoading] = useState(true);
   const [searchQ, setSearchQ] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(100);
   const [filters, setFilters] = useState({
-    country: '', supplier_type: '', category: '', status: '', rating: '', is_preferred: '',
+    country: initialFilters?.country ?? '',
+    supplier_type: '',
+    category: initialFilters?.category ?? '',
+    status: '',
+    rating: '',
+    is_preferred: '',
   });
   const [filterOptions, setFilterOptions] = useState<{ countries: string[]; categories: string[] }>({
     countries: [], categories: [],

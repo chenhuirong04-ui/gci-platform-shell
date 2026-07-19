@@ -29,6 +29,7 @@ const TOP_TABS: { key: TopTab; label: string }[] = [
 export default function SuppliersModule() {
   const [topTab, setTopTab] = useState<TopTab>('list');
   const [sub, setSub] = useState<SubView>({ kind: 'list' });
+  const [listInitFilters, setListInitFilters] = useState<{ country?: string; category?: string }>({});
   const [searchParams, setSearchParams] = useSearchParams();
 
   const goDetail = (supplierId: string) => {
@@ -85,7 +86,8 @@ export default function SuppliersModule() {
           onNew={() => setTopTab('new')}
           onSelect={s => goDetail(s.id!)}
           onNotionImport={() => setSub({ kind: 'notion-import' })}
-          onCleanup={() => setSub({ kind: 'cleanup' })}
+          onCleanup={() => { setListInitFilters({}); setSub({ kind: 'cleanup' }); }}
+          initialFilters={listInitFilters}
         />
       )}
 
@@ -97,6 +99,7 @@ export default function SuppliersModule() {
         <SupplierCleanupPage
           onBack={() => setSub({ kind: 'list' })}
           onOpenDetail={id => goDetail(id)}
+          onGoToFilteredList={filters => { setListInitFilters(filters); setSub({ kind: 'list' }); }}
         />
       )}
 
