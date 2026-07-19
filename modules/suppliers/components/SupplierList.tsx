@@ -121,7 +121,7 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
           {filterOptions.countries.map(c => <option key={c} value={c}>{getCountryLabel(c, lang)}</option>)}
         </Sel>
         <Sel value={filters.category} onChange={v => filt('category', v)} placeholder="全部品类">
-          {filterOptions.categories.map(c => <option key={c} value={c}>{getCategoryLabel(c)}</option>)}
+          {filterOptions.categories.map(c => <option key={c} value={c}>{getCategoryLabel(c, lang)}</option>)}
         </Sel>
         <Sel value={filters.status} onChange={v => filt('status', v)} placeholder="全部状态">
           {STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
@@ -133,16 +133,18 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
           <option value="true">仅常用</option>
         </Sel>
         <button
+          translate="no"
+          className="notranslate"
           onClick={onNotionImport}
           style={{ padding: '9px 16px', borderRadius: 10, background: '#fff', color: NAVY, border: `1.5px solid ${GOLD}`, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
-          从概念导入
+          {lang === 'zh' ? '从 Notion 导入' : 'Import from Notion'}
         </button>
         <button
           onClick={onCleanup}
           style={{ padding: '9px 16px', borderRadius: 10, background: '#fff', color: NAVY, border: `1.5px solid ${GOLD}`, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
-          数据概览与清理
+          {lang === 'zh' ? '供应商数据看板' : 'Supplier Dashboard'}
         </button>
         <button
           onClick={onNew}

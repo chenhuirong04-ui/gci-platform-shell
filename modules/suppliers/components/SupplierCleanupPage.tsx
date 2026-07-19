@@ -195,6 +195,9 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
   const toggleCatSort = (key: CatKey) =>
     setCatSort(s => s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' });
 
+  // Data maintenance section
+  const [dupSectionOpen, setDupSectionOpen] = useState(false);
+
   // Archive state
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [confirmArchiveId, setConfirmArchiveId] = useState<string | null>(null);
@@ -249,8 +252,6 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
     setActiveTab('pending');
     setActiveFlags(new Set([flag]));
   };
-  const jumpToDuplicates = () => setActiveTab('duplicates');
-
   // ── Archive handler ────────────────────────────────────────────────────────
   const handleArchive = async (id: string) => {
     setArchivingId(id);
@@ -321,7 +322,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
         >
           ← 返回列表
         </button>
-        <div style={{ fontWeight: 800, fontSize: 16, color: NAVY }}>供应商数据概览与清洗</div>
+        <div style={{ fontWeight: 800, fontSize: 16, color: NAVY }}>{lang === 'zh' ? '供应商数据看板' : 'Supplier Dashboard'}</div>
         <div style={{ fontSize: 11, color: '#94a3b8', marginLeft: 4 }}>
           资料完整度只代表档案资料，不代表供应商质量
         </div>
@@ -342,7 +343,6 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
           <StatCard label="缺国家" value={stats.missingCountry} accent onClick={() => jumpToFlag('missingCountry')} active={activeTab === 'pending' && activeFlags.has('missingCountry')} />
           <StatCard label="缺产品类别" value={stats.missingCategory} accent onClick={() => jumpToFlag('missingCategory')} active={activeTab === 'pending' && activeFlags.has('missingCategory')} />
           <StatCard label="缺联系人" value={stats.missingContact} accent onClick={() => jumpToFlag('missingContact')} active={activeTab === 'pending' && activeFlags.has('missingContact')} />
-          <StatCard label="重复供应商组" value={activeDuplicates.length} accent={activeDuplicates.length > 0} onClick={jumpToDuplicates} active={activeTab === 'duplicates'} sub="点击查看详情" />
         </div>
 
         {/* ── 区域2+3：两栏图表 ─────────────────────────────────────────── */}
@@ -537,32 +537,26 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
           </div>
         )}
 
-        {/* ── 区域5：数据清洗 ───────────────────────────────────────────── */}
+        {/* ── 区域5：待补资料 ───────────────────────────────────────────── */}
         <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${CARD_BORDER}`, boxShadow: '0 1px 4px rgba(12,27,58,0.05)', overflow: 'hidden' }}>
-          {/* Tab switcher */}
+          {/* Tab switcher — only pending tab shown as primary */}
           <div style={{ display: 'flex', borderBottom: `1px solid ${CARD_BORDER}`, padding: '0 24px' }}>
-            {([
-              { key: 'pending',    label: `待补资料（${filteredPending.length}）` },
-              { key: 'duplicates', label: `重复供应商（${activeDuplicates.length}组）` },
-            ] as const).map(t => (
-              <button
-                key={t.key}
-                onClick={() => setActiveTab(t.key)}
-                style={{
-                  padding: '12px 20px',
-                  fontSize: 13,
-                  fontWeight: activeTab === t.key ? 700 : 500,
-                  color: activeTab === t.key ? NAVY : '#64748b',
-                  border: 'none',
-                  borderBottom: activeTab === t.key ? `2px solid ${GOLD}` : '2px solid transparent',
-                  background: 'none',
-                  cursor: 'pointer',
-                  marginBottom: -1,
-                }}
-              >
-                {t.label}
-              </button>
-            ))}
+            <button
+              onClick={() => setActiveTab('pending')}
+              style={{
+                padding: '12px 20px',
+                fontSize: 13,
+                fontWeight: 700,
+                color: NAVY,
+                border: 'none',
+                borderBottom: `2px solid ${GOLD}`,
+                background: 'none',
+                cursor: 'pointer',
+                marginBottom: -1,
+              }}
+            >
+              {lang === 'zh' ? `待补资料（${filteredPending.length}）` : `Pending（${filteredPending.length}）`}
+            </button>
 
             {/* Active chart filter indicators */}
             {(selectedCountry || selectedCategory) && (
@@ -583,89 +577,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
             )}
           </div>
 
-          {/* ── Tab①: 重复供应商 ────────────────────────────────────────── */}
-          {activeTab === 'duplicates' && (
-            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {activeDuplicates.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '48px 0', color: '#94a3b8', fontSize: 14 }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>✓</div>
-                  暂无重复供应商
-                </div>
-              ) : activeDuplicates.map(group => (
-                <div key={group.groupId} style={{ border: `1px solid ${CARD_BORDER}`, borderRadius: 12, overflow: 'hidden' }}>
-                  <div style={{ background: '#fef9ec', padding: '10px 16px', fontSize: 12, color: '#92400e', fontWeight: 600, borderBottom: `1px solid ${CARD_BORDER}` }}>
-                    重复组 · {group.reason} · {group.records.length} 条记录
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${group.records.length}, 1fr)`, gap: 0 }}>
-                    {group.records.map((rec, idx) => (
-                      <div
-                        key={rec.id}
-                        style={{
-                          padding: '16px 20px',
-                          borderLeft: idx > 0 ? `1px solid ${CARD_BORDER}` : 'none',
-                        }}
-                      >
-                        <div style={{ fontWeight: 800, fontSize: 14, color: NAVY, marginBottom: 10 }}>{rec.supplier_name_display}</div>
-                        <table style={{ fontSize: 12, color: '#475569', width: '100%', borderCollapse: 'collapse' }}>
-                          <tbody>
-                            {[
-                              ['编码', rec.short_code],
-                              ['国家', rec.country ?? '—'],
-                              ['来源', rec.import_source],
-                              ['联系人', rec.hasContact ? (rec.contactName ?? '有') : '无'],
-                              ['品类', rec.categories.join(', ') || '—'],
-                              ['备注', rec.notes ?? '—'],
-                              ['创建时间', rec.created_at ? rec.created_at.slice(0, 10) : '—'],
-                            ].map(([k, v]) => (
-                              <tr key={k}>
-                                <td style={{ padding: '3px 0', color: '#94a3b8', width: 60, verticalAlign: 'top' }}>{k}</td>
-                                <td style={{ padding: '3px 0', fontWeight: 500 }}>{v}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        <div style={{ marginTop: 14, display: 'flex', gap: 8 }}>
-                          <button
-                            onClick={() => onOpenDetail(rec.id)}
-                            style={{ fontSize: 12, padding: '6px 14px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, cursor: 'pointer', fontWeight: 600 }}
-                          >
-                            查看详情
-                          </button>
-                          {confirmArchiveId === rec.id ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <span style={{ fontSize: 11, color: '#dc2626' }}>确认归档？</span>
-                              <button
-                                onClick={() => handleArchive(rec.id)}
-                                disabled={archivingId === rec.id}
-                                style={{ fontSize: 11, padding: '5px 10px', borderRadius: 6, background: '#dc2626', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700 }}
-                              >
-                                {archivingId === rec.id ? '…' : '确认'}
-                              </button>
-                              <button
-                                onClick={() => setConfirmArchiveId(null)}
-                                style={{ fontSize: 11, padding: '5px 10px', borderRadius: 6, background: '#f1f5f9', color: '#475569', border: 'none', cursor: 'pointer' }}
-                              >
-                                取消
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => setConfirmArchiveId(rec.id)}
-                              style={{ fontSize: 12, padding: '6px 14px', borderRadius: 8, border: '1px solid #fca5a5', background: '#fff', color: '#dc2626', cursor: 'pointer', fontWeight: 600 }}
-                            >
-                              归档此条
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ── Tab②: 待补资料 ──────────────────────────────────────────── */}
+          {/* ── 待补资料 ──────────────────────────────────────────────── */}
           {activeTab === 'pending' && (
             <div>
               {/* Filter chips */}
@@ -782,6 +694,66 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
             </div>
           )}
         </div>
+        {/* ── 区域6：数据维护（重复供应商，折叠，低优先级）─────────── */}
+        {activeDuplicates.length > 0 && (
+            <div style={{ border: `1px solid ${CARD_BORDER}`, borderRadius: 16, background: '#fff', overflow: 'hidden' }}>
+              <button
+                onClick={() => setDupSectionOpen(o => !o)}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 24px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+              >
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#64748b' }}>
+                  {lang === 'zh' ? `数据维护 · 重复记录（${activeDuplicates.length} 组）` : `Data Maintenance · Duplicate Records (${activeDuplicates.length})`}
+                </span>
+                <span style={{ fontSize: 11, color: '#94a3b8' }}>{dupSectionOpen ? '▲ 收起' : '▼ 展开'}</span>
+              </button>
+              {dupSectionOpen && (
+                <div style={{ padding: '0 24px 20px', display: 'flex', flexDirection: 'column', gap: 16, borderTop: `1px solid ${CARD_BORDER}`, paddingTop: 16 }}>
+                  {activeDuplicates.map(group => (
+                    <div key={group.groupId} style={{ border: `1px solid ${CARD_BORDER}`, borderRadius: 12, overflow: 'hidden' }}>
+                      <div style={{ background: '#f8fafc', padding: '8px 16px', fontSize: 11, color: '#64748b', fontWeight: 600, borderBottom: `1px solid ${CARD_BORDER}` }}>
+                        {group.reason} · {group.records.length} 条记录
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${group.records.length}, 1fr)`, gap: 0 }}>
+                        {group.records.map((rec, idx) => (
+                          <div key={rec.id} style={{ padding: '14px 18px', borderLeft: idx > 0 ? `1px solid ${CARD_BORDER}` : 'none' }}>
+                            <div style={{ fontWeight: 700, fontSize: 13, color: NAVY, marginBottom: 8 }}>{rec.supplier_name_display}</div>
+                            <table style={{ fontSize: 11, color: '#475569', width: '100%', borderCollapse: 'collapse' }}>
+                              <tbody>
+                                {[
+                                  ['编码', rec.short_code],
+                                  ['国家', rec.country ?? '—'],
+                                  ['来源', rec.import_source],
+                                  ['联系人', rec.hasContact ? (rec.contactName ?? '有') : '无'],
+                                  ['创建时间', rec.created_at ? rec.created_at.slice(0, 10) : '—'],
+                                ].map(([k, v]) => (
+                                  <tr key={k}>
+                                    <td style={{ padding: '2px 0', color: '#94a3b8', width: 56, verticalAlign: 'top' }}>{k}</td>
+                                    <td style={{ padding: '2px 0', fontWeight: 500 }}>{v}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                              <button onClick={() => onOpenDetail(rec.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, cursor: 'pointer', fontWeight: 600 }}>查看</button>
+                              {confirmArchiveId === rec.id ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                  <span style={{ fontSize: 10, color: '#dc2626' }}>确认归档？</span>
+                                  <button onClick={() => handleArchive(rec.id)} disabled={archivingId === rec.id} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 5, background: '#dc2626', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700 }}>{archivingId === rec.id ? '…' : '确认'}</button>
+                                  <button onClick={() => setConfirmArchiveId(null)} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 5, background: '#f1f5f9', color: '#475569', border: 'none', cursor: 'pointer' }}>取消</button>
+                                </div>
+                              ) : (
+                                <button onClick={() => setConfirmArchiveId(rec.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7, border: '1px solid #fca5a5', background: '#fff', color: '#dc2626', cursor: 'pointer', fontWeight: 600 }}>归档</button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+        )}
       </div>
 
       {/* Archive confirmation dialog */}
