@@ -187,9 +187,9 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
                         onMouseLeave={e => (e.currentTarget.style.background = '')}
                       >
                         <td style={{ padding: '13px 14px', fontWeight: 700, color: NAVY, maxWidth: 220 }}>
-                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.supplier_name_display}</div>
+                          <div translate="no" className="notranslate" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.supplier_name_display}</div>
                           {(s.name_cn || s.name_en) && (
-                            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name_cn || s.name_en}</div>
+                            <div translate="no" className="notranslate" style={{ fontSize: 11, color: '#94a3b8', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name_cn || s.name_en}</div>
                           )}
                         </td>
                         <td style={{ padding: '13px 14px', color: '#64748b', fontSize: 12 }}>{s.short_code}</td>

@@ -88,7 +88,7 @@ export default function SupplierDetail({ supplierId, onBack, onEdit }: Props) {
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
-                  <h1 style={{ fontSize: 22, fontWeight: 800, color: NAVY, margin: 0 }}>{supplier.supplier_name_display}</h1>
+                  <h1 translate="no" className="notranslate" style={{ fontSize: 22, fontWeight: 800, color: NAVY, margin: 0 }}>{supplier.supplier_name_display}</h1>
                   {supplier.is_preferred && <span style={{ fontSize: 16 }} title="常用供应商">⭐</span>}
                   <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: NAVY + '14', color: NAVY }}>{supplier.supplier_type ?? '—'}</span>
                   <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: statusStyle.bg, color: statusStyle.text }}>

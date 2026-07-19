@@ -47,7 +47,7 @@ export default function SuppliersModule() {
   }, []);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f3ef' }}>
+    <div translate="no" className="notranslate" style={{ minHeight: '100vh', background: '#f5f3ef' }}>
 
       {/* ── Top secondary navigation ─────────────────────────────────── */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e8e0d0', display: 'flex', alignItems: 'center', paddingLeft: 16, overflowX: 'auto' }}>
