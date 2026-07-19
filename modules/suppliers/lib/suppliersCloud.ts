@@ -74,6 +74,91 @@ export async function listSuppliers(opts: {
   return res.json().catch(() => []);
 }
 
+export interface PagedSuppliers {
+  items: Supplier[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export async function listSuppliersPage(opts: {
+  country?: string;
+  supplier_type?: string;
+  category?: string;
+  status?: string;
+  rating?: string;
+  is_preferred?: boolean;
+  page?: number;
+  pageSize?: number;
+} = {}): Promise<PagedSuppliers> {
+  const pageSize = opts.pageSize ?? 100;
+  const page = Math.max(1, opts.page ?? 1);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  const params = new URLSearchParams();
+  params.set('order', 'created_at.desc');
+  if (opts.country) params.set('country', `eq.${opts.country}`);
+  if (opts.supplier_type) params.set('supplier_type', `eq.${opts.supplier_type}`);
+  if (opts.status) params.set('status', `eq.${opts.status}`);
+  if (opts.rating) params.set('current_rating', `eq.${opts.rating}`);
+  if (opts.is_preferred !== undefined) params.set('is_preferred', `eq.${opts.is_preferred}`);
+  if (opts.category) params.set('product_categories', `cs.{"${opts.category}"}`);
+
+  const res = await sb(`/rest/v1/suppliers?${params}`, {
+    method: 'GET',
+    headers: {
+      Prefer: 'count=exact',
+      Range: `${from}-${to}`,
+      'Range-Unit': 'items',
+    },
+  });
+  if (!res) return { items: [], total: 0, page, pageSize };
+
+  const contentRange = res.headers.get('Content-Range') ?? '';
+  // format: "0-99/357"
+  const total = parseInt(contentRange.split('/')[1] ?? '0', 10) || 0;
+  const items: Supplier[] = await res.json().catch(() => []);
+  return { items, total, page, pageSize };
+}
+
+export async function searchSuppliersPage(q: string, opts: {
+  page?: number;
+  pageSize?: number;
+} = {}): Promise<PagedSuppliers> {
+  if (q.length < 2) return { items: [], total: 0, page: 1, pageSize: opts.pageSize ?? 100 };
+  const pageSize = opts.pageSize ?? 100;
+  const page = Math.max(1, opts.page ?? 1);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const encoded = encodeURIComponent(q);
+  const res = await sb(
+    `/rest/v1/suppliers?or=(supplier_name_display.ilike.*${encoded}*,name_cn.ilike.*${encoded}*,name_en.ilike.*${encoded}*,short_code.ilike.*${encoded}*)&order=is_preferred.desc,supplier_name_display.asc`,
+    {
+      method: 'GET',
+      headers: {
+        Prefer: 'count=exact',
+        Range: `${from}-${to}`,
+        'Range-Unit': 'items',
+      },
+    },
+  );
+  if (!res) return { items: [], total: 0, page, pageSize };
+  const contentRange = res.headers.get('Content-Range') ?? '';
+  const total = parseInt(contentRange.split('/')[1] ?? '0', 10) || 0;
+  const items: Supplier[] = await res.json().catch(() => []);
+  return { items, total, page, pageSize };
+}
+
+export async function listFilterOptions(): Promise<{ countries: string[]; categories: string[] }> {
+  const res = await sb('/rest/v1/suppliers?select=country,product_categories&limit=500&order=created_at.desc', { method: 'GET' });
+  if (!res) return { countries: [], categories: [] };
+  const rows: Pick<Supplier, 'country' | 'product_categories'>[] = await res.json().catch(() => []);
+  const countries = [...new Set(rows.map(r => r.country).filter(Boolean))].sort() as string[];
+  const categories = [...new Set(rows.flatMap(r => r.product_categories ?? []).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+  return { countries, categories };
+}
+
 export async function searchSuppliers(q: string, limit = 20): Promise<Supplier[]> {
   if (q.length < 2) return [];
   const encoded = encodeURIComponent(q);

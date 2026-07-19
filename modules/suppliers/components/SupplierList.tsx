@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Supplier } from '../types';
-import { listSuppliers, searchSuppliers } from '../lib/suppliersCloud';
+import {
+  listSuppliersPage, searchSuppliersPage, listFilterOptions,
+  type PagedSuppliers,
+} from '../lib/suppliersCloud';
 
 const GOLD = '#C9A84C';
 const NAVY = '#0c1b3a';
@@ -21,6 +24,7 @@ const STATUS_LABEL: Record<string, string> = {
 const SUPPLIER_TYPES = ['Factory', 'Trading', 'Integrated', 'Service', 'Agent', 'Unknown'];
 const RATINGS = ['A', 'B', 'C', 'D'];
 const STATUSES = ['active', 'inactive', 'blacklisted', 'under_review', 'archived'];
+const PAGE_SIZES = [50, 100, 200];
 
 interface Props {
   onSelect: (s: Supplier) => void;
@@ -30,50 +34,66 @@ interface Props {
 }
 
 export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanup }: Props) {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [paged, setPaged] = useState<PagedSuppliers>({ items: [], total: 0, page: 1, pageSize: 100 });
   const [loading, setLoading] = useState(true);
   const [searchQ, setSearchQ] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(100);
   const [filters, setFilters] = useState({
     country: '', supplier_type: '', category: '', status: '', rating: '', is_preferred: '',
   });
+  const [filterOptions, setFilterOptions] = useState<{ countries: string[]; categories: string[] }>({
+    countries: [], categories: [],
+  });
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const load = useCallback(async (q?: string) => {
+  // Load filter dropdown options once on mount
+  useEffect(() => {
+    listFilterOptions().then(setFilterOptions);
+  }, []);
+
+  const load = useCallback(async (q: string, pg: number, pgSize: number) => {
     setLoading(true);
     try {
-      let data: Supplier[];
+      let result: PagedSuppliers;
       if (q && q.length >= 2) {
-        data = await searchSuppliers(q, 50);
+        result = await searchSuppliersPage(q, { page: pg, pageSize: pgSize });
       } else {
-        data = await listSuppliers({
+        result = await listSuppliersPage({
           country: filters.country || undefined,
           supplier_type: filters.supplier_type || undefined,
           category: filters.category || undefined,
           status: filters.status || undefined,
           rating: filters.rating || undefined,
           is_preferred: filters.is_preferred === 'true' ? true : undefined,
-          limit: 100,
+          page: pg,
+          pageSize: pgSize,
         });
       }
-      setSuppliers(data);
+      setPaged(result);
     } finally {
       setLoading(false);
     }
   }, [filters]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(searchQ, page, pageSize); }, [load, page, pageSize]);
 
   const handleSearch = (v: string) => {
     setSearchQ(v);
+    setPage(1);
     clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => load(v), 300);
+    debounceRef.current = setTimeout(() => load(v, 1, pageSize), 300);
   };
 
-  const filt = (key: string, val: string) =>
+  const filt = (key: string, val: string) => {
     setFilters(f => ({ ...f, [key]: val }));
+    setPage(1);
+  };
 
-  const countries = [...new Set(suppliers.map(s => s.country).filter(Boolean))] as string[];
-  const categories = [...new Set(suppliers.flatMap(s => s.product_categories ?? []).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+  const { items, total } = paged;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const fromItem = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const toItem = Math.min(page * pageSize, total);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 49px)', background: '#f5f3ef' }}>
@@ -89,10 +109,10 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
           {SUPPLIER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
         </Sel>
         <Sel value={filters.country} onChange={v => filt('country', v)} placeholder="全部国家">
-          {countries.map(c => <option key={c} value={c}>{c}</option>)}
+          {filterOptions.countries.map(c => <option key={c} value={c}>{c}</option>)}
         </Sel>
         <Sel value={filters.category} onChange={v => filt('category', v)} placeholder="全部品类">
-          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+          {filterOptions.categories.map(c => <option key={c} value={c}>{c}</option>)}
         </Sel>
         <Sel value={filters.status} onChange={v => filt('status', v)} placeholder="全部状态">
           {STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
@@ -100,20 +120,20 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
         <Sel value={filters.rating} onChange={v => filt('rating', v)} placeholder="全部评级">
           {RATINGS.map(r => <option key={r} value={r}>评级 {r}</option>)}
         </Sel>
-        <Sel value={filters.is_preferred} onChange={v => filt('is_preferred', v)} placeholder="常用">
+        <Sel value={filters.is_preferred} onChange={v => filt('is_preferred', v)} placeholder="用过的">
           <option value="true">仅常用</option>
         </Sel>
         <button
           onClick={onNotionImport}
           style={{ padding: '9px 16px', borderRadius: 10, background: '#fff', color: NAVY, border: `1.5px solid ${GOLD}`, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
-          从 Notion 导入
+          从概念导入
         </button>
         <button
           onClick={onCleanup}
           style={{ padding: '9px 16px', borderRadius: 10, background: '#fff', color: NAVY, border: `1.5px solid ${GOLD}`, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
-          数据概览与清洗
+          数据概览与清理
         </button>
         <button
           onClick={onNew}
@@ -123,14 +143,23 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
         </button>
       </div>
 
-      {/* Count */}
-      <div style={{ padding: '12px 24px', fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>
-        {loading ? '加载中…' : `共 ${suppliers.length} 家供应商`}
+      {/* Count info */}
+      <div style={{ padding: '12px 24px', fontSize: 12, color: '#94a3b8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 16 }}>
+        {loading ? '加载中…' : (
+          <>
+            <span>共 <strong style={{ color: NAVY }}>{total}</strong> 家供应商</span>
+            {total > 0 && (
+              <span style={{ color: '#b0bec5' }}>
+                第 {fromItem}–{toItem} 条 · 第 {page} / {totalPages} 页
+              </span>
+            )}
+          </>
+        )}
       </div>
 
       {/* Table card */}
-      <div style={{ flex: 1, padding: '0 24px 24px' }}>
-        {!loading && suppliers.length === 0 ? (
+      <div style={{ flex: 1, padding: '0 24px 8px' }}>
+        {!loading && items.length === 0 ? (
           <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${CARD_BORDER}`, textAlign: 'center', padding: '80px 0', color: '#94a3b8', fontSize: 14 }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🏭</div>
             暂无供应商数据
@@ -141,13 +170,13 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f5f3ef' }}>
-                    {['供应商名称', '编码', '类型', '国家', '评级', '状态', '常用', ''].map(h => (
+                    {['供应商名称', '编码', '类型', '国家', '评级', '状态', '用过的', ''].map(h => (
                       <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {suppliers.map(s => {
+                  {items.map(s => {
                     const st = STATUS_COLOR[s.status ?? 'active'] ?? { bg: '#f1f5f9', text: '#475569' };
                     return (
                       <tr
@@ -194,8 +223,94 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
           </div>
         )}
       </div>
+
+      {/* Pagination bar */}
+      {total > 0 && (
+        <div style={{ padding: '16px 24px 24px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page <= 1 || loading}
+            style={{ padding: '7px 16px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: page <= 1 ? '#f5f3ef' : '#fff', color: page <= 1 ? '#b0bec5' : NAVY, fontWeight: 600, fontSize: 13, cursor: page <= 1 ? 'default' : 'pointer' }}
+          >
+            上一页
+          </button>
+
+          {/* Page number pills — show at most 7 pages */}
+          {pageNumbers(page, totalPages).map((n, i) =>
+            n === '…' ? (
+              <span key={`ellipsis-${i}`} style={{ color: '#b0bec5', fontSize: 13, padding: '0 4px' }}>…</span>
+            ) : (
+              <button
+                key={n}
+                onClick={() => setPage(Number(n))}
+                disabled={loading}
+                style={{
+                  padding: '7px 13px', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                  border: n === page ? 'none' : `1px solid ${CARD_BORDER}`,
+                  background: n === page ? NAVY : '#fff',
+                  color: n === page ? '#fff' : NAVY,
+                }}
+              >
+                {n}
+              </button>
+            )
+          )}
+
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages || loading}
+            style={{ padding: '7px 16px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: page >= totalPages ? '#f5f3ef' : '#fff', color: page >= totalPages ? '#b0bec5' : NAVY, fontWeight: 600, fontSize: 13, cursor: page >= totalPages ? 'default' : 'pointer' }}
+          >
+            下一页
+          </button>
+
+          <span style={{ color: '#b0bec5', fontSize: 13, marginLeft: 8 }}>每页</span>
+          <select
+            value={pageSize}
+            onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+            style={{ padding: '7px 10px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, fontSize: 13, color: NAVY, background: '#fff', cursor: 'pointer' }}
+          >
+            {PAGE_SIZES.map(n => <option key={n} value={n}>{n} 条</option>)}
+          </select>
+
+          <span style={{ color: '#b0bec5', fontSize: 13, marginLeft: 4 }}>
+            跳至第
+          </span>
+          <input
+            type="number"
+            min={1}
+            max={totalPages}
+            defaultValue={page}
+            key={page}
+            onBlur={e => {
+              const v = parseInt(e.target.value, 10);
+              if (!isNaN(v)) setPage(Math.max(1, Math.min(totalPages, v)));
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                const v = parseInt((e.target as HTMLInputElement).value, 10);
+                if (!isNaN(v)) setPage(Math.max(1, Math.min(totalPages, v)));
+              }
+            }}
+            style={{ width: 56, padding: '7px 8px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, fontSize: 13, color: NAVY, textAlign: 'center' }}
+          />
+          <span style={{ color: '#b0bec5', fontSize: 13 }}>页</span>
+        </div>
+      )}
     </div>
   );
+}
+
+function pageNumbers(current: number, total: number): (number | '…')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | '…')[] = [];
+  const add = (n: number) => { if (!pages.includes(n)) pages.push(n); };
+  add(1);
+  if (current > 3) pages.push('…');
+  for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) add(i);
+  if (current < total - 2) pages.push('…');
+  add(total);
+  return pages;
 }
 
 function Sel({ value, onChange, placeholder, children }: {
