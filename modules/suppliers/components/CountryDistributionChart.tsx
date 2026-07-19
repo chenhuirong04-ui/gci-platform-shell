@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getCountryLabel } from '../lib/labelMaps';
 
 const NAVY = '#0c1b3a';
 const GOLD = '#C9A84C';
@@ -73,7 +74,7 @@ export default function CountryDistributionChart({ data, selectedCountry, onSele
               >
                 {/* Label */}
                 <div style={{ width: 130, textAlign: 'right', fontSize: 12, fontWeight: isSelected ? 700 : 500, color: isSelected ? NAVY : '#475569', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  {bar.isBlank ? '未填写' : bar.country}
+                  {bar.isBlank ? '未填写' : bar.isOther ? '其他' : getCountryLabel(bar.country)}
                   {bar.isOther && <span style={{ marginLeft: 4, fontSize: 10, color: '#94a3b8' }}>{otherExpanded ? '▲' : '▼'}</span>}
                 </div>
 
@@ -106,7 +107,7 @@ export default function CountryDistributionChart({ data, selectedCountry, onSele
                       onClick={() => onSelect(selectedCountry === d.country ? null : d.country)}
                       style={{ fontSize: 12, color: '#475569', cursor: 'pointer', padding: '2px 6px', borderRadius: 4, background: selectedCountry === d.country ? '#e8f0fa' : 'transparent', fontWeight: selectedCountry === d.country ? 700 : 400 }}
                     >
-                      {d.country} <span style={{ color: '#94a3b8' }}>{d.count}</span>
+                      {getCountryLabel(d.country)} <span style={{ color: '#94a3b8' }}>{d.count}</span>
                     </div>
                   ))}
                 </div>

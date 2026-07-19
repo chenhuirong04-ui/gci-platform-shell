@@ -1,4 +1,5 @@
 import React from 'react';
+import { getCategoryLabel } from '../lib/labelMaps';
 
 const NAVY = '#0c1b3a';
 const GOLD = '#C9A84C';
@@ -63,7 +64,7 @@ export default function CategoryDistributionChart({ data, selectedCategory, onSe
             >
               {/* Label */}
               <div style={{ width: 130, textAlign: 'right', fontSize: 12, fontWeight: isSelected ? 700 : 500, color: isSelected ? NAVY : '#475569', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                {bar.isUnclassified ? '未分类' : bar.category}
+                {bar.isUnclassified ? '未分类' : getCategoryLabel(bar.category)}
               </div>
 
               {/* Bar track */}

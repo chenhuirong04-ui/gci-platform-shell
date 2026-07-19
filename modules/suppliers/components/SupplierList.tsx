@@ -4,6 +4,7 @@ import {
   listSuppliersPage, searchSuppliersPage, listFilterOptions,
   type PagedSuppliers,
 } from '../lib/suppliersCloud';
+import { getCountryLabel, getCategoryLabel } from '../lib/labelMaps';
 
 const GOLD = '#C9A84C';
 const NAVY = '#0c1b3a';
@@ -115,10 +116,10 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
           {SUPPLIER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
         </Sel>
         <Sel value={filters.country} onChange={v => filt('country', v)} placeholder="全部国家">
-          {filterOptions.countries.map(c => <option key={c} value={c}>{c}</option>)}
+          {filterOptions.countries.map(c => <option key={c} value={c}>{getCountryLabel(c)}</option>)}
         </Sel>
         <Sel value={filters.category} onChange={v => filt('category', v)} placeholder="全部品类">
-          {filterOptions.categories.map(c => <option key={c} value={c}>{c}</option>)}
+          {filterOptions.categories.map(c => <option key={c} value={c}>{getCategoryLabel(c)}</option>)}
         </Sel>
         <Sel value={filters.status} onChange={v => filt('status', v)} placeholder="全部状态">
           {STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}

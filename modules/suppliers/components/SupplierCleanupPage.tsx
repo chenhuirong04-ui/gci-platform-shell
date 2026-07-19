@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import CountryDistributionChart from './CountryDistributionChart';
 import CategoryDistributionChart from './CategoryDistributionChart';
+import { getCountryLabel, getCategoryLabel } from '../lib/labelMaps';
 
 const GOLD = '#C9A84C';
 const NAVY = '#0c1b3a';
@@ -427,7 +428,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                           onMouseEnter={e => (e.currentTarget.style.background = '#faf8f5')}
                           onMouseLeave={e => (e.currentTarget.style.background = '')}>
                           <td style={{ padding: '11px 14px', fontWeight: 700, color: row.country === '未填写' ? '#94a3b8' : NAVY }}>
-                            <span translate="no" className="notranslate">{row.country}</span>
+                            {getCountryLabel(row.country)}
                           </td>
                           <td style={{ padding: '11px 14px', fontWeight: 700, color: NAVY }}>{row.supplierCount}</td>
                           <td style={{ padding: '11px 14px', color: '#475569' }}>
@@ -509,7 +510,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                         <tr key={row.category} style={{ borderBottom: `1px solid ${CARD_BORDER}` }}
                           onMouseEnter={e => (e.currentTarget.style.background = '#faf8f5')}
                           onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                          <td style={{ padding: '11px 14px', fontWeight: 700, color: NAVY }}>{row.category}</td>
+                          <td style={{ padding: '11px 14px', fontWeight: 700, color: NAVY }}>{getCategoryLabel(row.category)}</td>
                           <td style={{ padding: '11px 14px', fontWeight: 700, color: NAVY }}>{row.supplierCount}</td>
                           <td style={{ padding: '11px 14px', color: row.preferredCount > 0 ? GOLD : '#94a3b8', fontWeight: row.preferredCount > 0 ? 700 : 400 }}>{row.preferredCount}</td>
                           <td style={{ padding: '11px 14px', color: '#475569' }}>{row.contactCount}</td>
