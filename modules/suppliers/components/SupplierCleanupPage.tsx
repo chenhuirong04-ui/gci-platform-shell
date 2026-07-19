@@ -83,6 +83,8 @@ interface CategoryTableRow {
 interface SummaryData {
   stats: {
     total: number;
+    dbTotal?: number;
+    archivedCount?: number;
     preferred: number;
     missingCountry: number;
     missingCategory: number;
@@ -358,7 +360,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
         {(data.countryTable?.length > 0 || data.categoryTable?.length > 0) && (
           <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${CARD_BORDER}`, boxShadow: '0 1px 4px rgba(12,27,58,0.05)', overflow: 'hidden' }}>
             {/* Tab switcher */}
-            <div style={{ display: 'flex', borderBottom: `1px solid ${CARD_BORDER}`, padding: '0 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', borderBottom: `1px solid ${CARD_BORDER}`, padding: '0 24px' }}>
               {([
                 { key: 'country' as const,  label: `按国家（${data.countryTable?.length ?? 0}）` },
                 { key: 'category' as const, label: `按行业（${data.categoryTable?.length ?? 0}）` },
@@ -372,6 +374,12 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                   background: 'none', cursor: 'pointer', marginBottom: -1,
                 }}>{t.label}</button>
               ))}
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                当前统计范围：{stats.total} 家活跃供应商
+                {stats.dbTotal != null && stats.archivedCount != null && stats.archivedCount > 0
+                  ? `（数据库共 ${stats.dbTotal} 家，已归档 ${stats.archivedCount} 家不纳入分析）`
+                  : ''}
+              </span>
             </div>
 
             {/* 按国家 */}
@@ -388,10 +396,19 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                   {label}{ctySort.key === col ? (ctySort.dir === 'desc' ? ' ↓' : ' ↑') : ''}
                 </th>
               );
+              const totals = {
+                countryCount: sorted.length,
+                supplierCount: sorted.reduce((s, r) => s + r.supplierCount, 0),
+                preferredCount: sorted.reduce((s, r) => s + r.preferredCount, 0),
+                contactCount: sorted.reduce((s, r) => s + r.contactCount, 0),
+                missingCategoryCount: sorted.reduce((s, r) => s + r.missingCategoryCount, 0),
+                missingBizLicenseCount: sorted.reduce((s, r) => s + r.missingBizLicenseCount, 0),
+                missingCatalogCount: sorted.reduce((s, r) => s + r.missingCatalogCount, 0),
+              };
               return (
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                    <thead>
+                    <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
                       <tr style={{ background: '#f5f3ef' }}>
                         <SH col="country" label="国家" />
                         <SH col="supplierCount" label="供应商数" />
@@ -401,7 +418,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                         <SH col="missingCategoryCount" label="缺品类" />
                         <SH col="missingBizLicenseCount" label="缺营业执照" />
                         <SH col="missingCatalogCount" label="缺产品目录" />
-                        <th style={{ padding: '10px 14px', fontSize: 11, color: '#64748b', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap' }}>操作</th>
+                        <th style={{ padding: '10px 14px', fontSize: 11, color: '#64748b', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap', background: '#f5f3ef' }}>操作</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -437,6 +454,21 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot>
+                      <tr style={{ background: '#f0f4ff', borderTop: `2px solid ${NAVY}` }}>
+                        <td style={{ padding: '10px 14px', fontWeight: 800, color: NAVY, fontSize: 12 }}>
+                          合计（{totals.countryCount} 个国家/地区）
+                        </td>
+                        <td style={{ padding: '10px 14px', fontWeight: 800, color: NAVY }}>{totals.supplierCount}</td>
+                        <td style={{ padding: '10px 14px', color: '#64748b' }}>100%</td>
+                        <td style={{ padding: '10px 14px', fontWeight: 700, color: GOLD }}>{totals.preferredCount}</td>
+                        <td style={{ padding: '10px 14px', fontWeight: 700, color: '#475569' }}>{totals.contactCount}</td>
+                        <td style={{ padding: '10px 14px', fontWeight: 700, color: totals.missingCategoryCount > 0 ? '#dc2626' : '#94a3b8' }}>{totals.missingCategoryCount}</td>
+                        <td style={{ padding: '10px 14px', fontWeight: 700, color: totals.missingBizLicenseCount > 0 ? '#d97706' : '#94a3b8' }}>{totals.missingBizLicenseCount}</td>
+                        <td style={{ padding: '10px 14px', fontWeight: 700, color: totals.missingCatalogCount > 0 ? '#d97706' : '#94a3b8' }}>{totals.missingCatalogCount}</td>
+                        <td style={{ padding: '10px 14px' }} />
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               );
@@ -460,7 +492,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                     注：同一供应商可属多个行业，行业合计可大于供应商总数
                   </div>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                    <thead>
+                    <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
                       <tr style={{ background: '#f5f3ef' }}>
                         <SH col="category" label="行业/产品类别" />
                         <SH col="supplierCount" label="供应商数" />
@@ -469,7 +501,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                         <SH col="catalogCount" label="有产品目录" />
                         <SH col="certificationCount" label="有认证" />
                         <SH col="missingCountryCount" label="缺国家" />
-                        <th style={{ padding: '10px 14px', fontSize: 11, color: '#64748b', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap' }}>操作</th>
+                        <th style={{ padding: '10px 14px', fontSize: 11, color: '#64748b', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap', background: '#f5f3ef' }}>操作</th>
                       </tr>
                     </thead>
                     <tbody>

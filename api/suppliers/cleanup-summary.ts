@@ -196,6 +196,8 @@ export default async function handler(req: Request) {
     // ── 4. Core stats ─────────────────────────────────────────────────────
     const stats = {
       total: activeSuppliers.length,
+      dbTotal: enriched.length,
+      archivedCount: enriched.length - activeSuppliers.length,
       preferred: activeSuppliers.filter(s => s.is_preferred).length,
       missingCountry: activeSuppliers.filter(s => s.flags.missingCountry).length,
       missingCategory: activeSuppliers.filter(s => s.flags.missingCategory).length,
