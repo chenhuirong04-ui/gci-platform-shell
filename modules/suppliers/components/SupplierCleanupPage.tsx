@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useI18n } from '@gci/i18n';
+import { useI18n, type Dictionary } from '@gci/i18n';
 import CountryDistributionChart from './CountryDistributionChart';
 import CategoryDistributionChart from './CategoryDistributionChart';
 import { getCountryLabel, getCategoryLabel } from '../lib/labelMaps';
@@ -149,18 +149,20 @@ function StatCard({ label, value, sub, accent, onClick, active }: {
 
 // ── Filter chips ──────────────────────────────────────────────────────────────
 
-const FLAG_CHIPS: { key: keyof SupplierFlags; label: string }[] = [
-  { key: 'missingCountry',       label: '缺国家' },
-  { key: 'missingCity',          label: '缺城市' },
-  { key: 'missingCategory',      label: '缺产品类别' },
-  { key: 'missingContact',       label: '缺联系人' },
-  { key: 'missingContactMethod', label: '缺联系方式' },
-  { key: 'missingWebsite',       label: '缺网站' },
-  { key: 'missingBizLicense',    label: '缺营业执照' },
-  { key: 'missingCatalog',       label: '缺产品目录' },
-  { key: 'missingQuotation',     label: '缺报价' },
-  { key: 'missingCertification', label: '缺认证' },
-];
+function buildFlagChips(t: Dictionary['suppliers']['dashboard']): { key: keyof SupplierFlags; label: string }[] {
+  return [
+    { key: 'missingCountry',       label: t.flagMissingCountry },
+    { key: 'missingCity',          label: t.flagMissingCity },
+    { key: 'missingCategory',      label: t.flagMissingCategory },
+    { key: 'missingContact',       label: t.flagMissingContact },
+    { key: 'missingContactMethod', label: t.flagMissingContactMethod },
+    { key: 'missingWebsite',       label: t.flagMissingWebsite },
+    { key: 'missingBizLicense',    label: t.flagMissingBizLicense },
+    { key: 'missingCatalog',       label: t.flagMissingCatalog },
+    { key: 'missingQuotation',     label: t.flagMissingQuotation },
+    { key: 'missingCertification', label: t.flagMissingCertification },
+  ];
+}
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -171,7 +173,9 @@ interface Props {
 }
 
 export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilteredList }: Props) {
-  const { lang } = useI18n();
+  const { lang, dict } = useI18n();
+  const t = dict.suppliers.dashboard;
+  const FLAG_CHIPS = buildFlagChips(t);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<SummaryData | null>(null);
@@ -269,7 +273,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
         data.stats.duplicateGroups = Math.max(0, data.stats.duplicateGroups - 1);
       }
     } catch (e: any) {
-      alert(`归档失败：${e.message}`);
+      alert(t.archiveFailed(e.message));
     } finally {
       setArchivingId(null);
     }
@@ -289,7 +293,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
     return (
       <div style={{ padding: '80px 32px', textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
         <div style={{ fontSize: 28, marginBottom: 12 }}>⏳</div>
-        加载数据中…
+        {t.loadingText}
       </div>
     );
   }
@@ -297,8 +301,8 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
   if (error) {
     return (
       <div style={{ padding: '80px 32px', textAlign: 'center' }}>
-        <div style={{ color: '#dc2626', fontWeight: 700, marginBottom: 12 }}>加载失败：{error}</div>
-        <button onClick={load} style={{ padding: '8px 20px', borderRadius: 8, background: NAVY, color: '#fff', border: 'none', cursor: 'pointer' }}>重试</button>
+        <div style={{ color: '#dc2626', fontWeight: 700, marginBottom: 12 }}>{t.loadFailed(error)}</div>
+        <button onClick={load} style={{ padding: '8px 20px', borderRadius: 8, background: NAVY, color: '#fff', border: 'none', cursor: 'pointer' }}>{t.retry}</button>
       </div>
     );
   }
@@ -320,17 +324,17 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
           onClick={onBack}
           style={{ fontSize: 13, color: '#64748b', background: 'none', border: `1px solid ${CARD_BORDER}`, borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 600 }}
         >
-          ← 返回列表
+          {dict.suppliers.common.back}
         </button>
-        <div style={{ fontWeight: 800, fontSize: 16, color: NAVY }}>{lang === 'zh' ? '供应商数据看板' : 'Supplier Dashboard'}</div>
+        <div style={{ fontWeight: 800, fontSize: 16, color: NAVY }}>{t.title}</div>
         <div style={{ fontSize: 11, color: '#94a3b8', marginLeft: 4 }}>
-          资料完整度只代表档案资料，不代表供应商质量
+          {t.scopeNote}
         </div>
         <button
           onClick={load}
           style={{ marginLeft: 'auto', fontSize: 12, color: '#64748b', background: 'none', border: `1px solid ${CARD_BORDER}`, borderRadius: 8, padding: '6px 12px', cursor: 'pointer' }}
         >
-          刷新
+          {t.refresh}
         </button>
       </div>
 
@@ -338,11 +342,11 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
 
         {/* ── 区域1：核心数据卡 ─────────────────────────────────────────── */}
         <div style={{ display: 'flex', gap: 12 }}>
-          <StatCard label="供应商总数" value={stats.total} />
-          <StatCard label="常用供应商" value={stats.preferred} sub="is_preferred = true" onClick={() => { setActiveTab('pending'); setPreferredFirst(true); }} active={preferredFirst && activeTab === 'pending'} />
-          <StatCard label="缺国家" value={stats.missingCountry} accent onClick={() => jumpToFlag('missingCountry')} active={activeTab === 'pending' && activeFlags.has('missingCountry')} />
-          <StatCard label="缺产品类别" value={stats.missingCategory} accent onClick={() => jumpToFlag('missingCategory')} active={activeTab === 'pending' && activeFlags.has('missingCategory')} />
-          <StatCard label="缺联系人" value={stats.missingContact} accent onClick={() => jumpToFlag('missingContact')} active={activeTab === 'pending' && activeFlags.has('missingContact')} />
+          <StatCard label={t.statTotal} value={stats.total} />
+          <StatCard label={t.statPreferred} value={stats.preferred} sub="is_preferred = true" onClick={() => { setActiveTab('pending'); setPreferredFirst(true); }} active={preferredFirst && activeTab === 'pending'} />
+          <StatCard label={t.statMissingCountry} value={stats.missingCountry} accent onClick={() => jumpToFlag('missingCountry')} active={activeTab === 'pending' && activeFlags.has('missingCountry')} />
+          <StatCard label={t.statMissingCategory} value={stats.missingCategory} accent onClick={() => jumpToFlag('missingCategory')} active={activeTab === 'pending' && activeFlags.has('missingCategory')} />
+          <StatCard label={t.statMissingContact} value={stats.missingContact} accent onClick={() => jumpToFlag('missingContact')} active={activeTab === 'pending' && activeFlags.has('missingContact')} />
         </div>
 
         {/* ── 区域2+3：两栏图表 ─────────────────────────────────────────── */}
@@ -365,22 +369,22 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
             {/* Tab switcher */}
             <div style={{ display: 'flex', alignItems: 'center', borderBottom: `1px solid ${CARD_BORDER}`, padding: '0 24px' }}>
               {([
-                { key: 'country' as const,  label: `按国家（${data.countryTable?.length ?? 0}）` },
-                { key: 'category' as const, label: `按行业（${data.categoryTable?.length ?? 0}）` },
-              ]).map(t => (
-                <button key={t.key} onClick={() => setAnalysisTab(t.key)} style={{
+                { key: 'country' as const,  label: `${t.analysisByCountry}（${data.countryTable?.length ?? 0}）` },
+                { key: 'category' as const, label: `${t.analysisByCategory}（${data.categoryTable?.length ?? 0}）` },
+              ]).map(tb => (
+                <button key={tb.key} onClick={() => setAnalysisTab(tb.key)} style={{
                   padding: '12px 20px', fontSize: 13,
-                  fontWeight: analysisTab === t.key ? 700 : 500,
-                  color: analysisTab === t.key ? NAVY : '#64748b',
+                  fontWeight: analysisTab === tb.key ? 700 : 500,
+                  color: analysisTab === tb.key ? NAVY : '#64748b',
                   border: 'none',
-                  borderBottom: analysisTab === t.key ? `2px solid ${GOLD}` : '2px solid transparent',
+                  borderBottom: analysisTab === tb.key ? `2px solid ${GOLD}` : '2px solid transparent',
                   background: 'none', cursor: 'pointer', marginBottom: -1,
-                }}>{t.label}</button>
+                }}>{tb.label}</button>
               ))}
               <span style={{ marginLeft: 'auto', fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap' }}>
-                当前统计范围：{stats.total} 家活跃供应商
+                {t.scopeRangeLabel(stats.total)}
                 {stats.dbTotal != null && stats.archivedCount != null && stats.archivedCount > 0
-                  ? `（数据库共 ${stats.dbTotal} 家，已归档 ${stats.archivedCount} 家不纳入分析）`
+                  ? t.archivedNote(stats.dbTotal, stats.archivedCount)
                   : ''}
               </span>
             </div>
@@ -413,15 +417,15 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                     <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
                       <tr style={{ background: '#f5f3ef' }}>
-                        <SH col="country" label="国家" />
-                        <SH col="supplierCount" label="供应商数" />
-                        <SH col="percentage" label="占比" />
-                        <SH col="preferredCount" label="常用" />
-                        <SH col="contactCount" label="有联系人" />
-                        <SH col="missingCategoryCount" label="缺品类" />
-                        <SH col="missingBizLicenseCount" label="缺营业执照" />
-                        <SH col="missingCatalogCount" label="缺产品目录" />
-                        <th style={{ padding: '10px 14px', fontSize: 11, color: '#64748b', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap', background: '#f5f3ef' }}>操作</th>
+                        <SH col="country" label={t.colCountry} />
+                        <SH col="supplierCount" label={t.colSupplierCount} />
+                        <SH col="percentage" label={t.colPercentage} />
+                        <SH col="preferredCount" label={t.colPreferred} />
+                        <SH col="contactCount" label={t.colWithContact} />
+                        <SH col="missingCategoryCount" label={t.colMissingCategory} />
+                        <SH col="missingBizLicenseCount" label={t.colMissingBizLicense} />
+                        <SH col="missingCatalogCount" label={t.colMissingCatalog} />
+                        <th style={{ padding: '10px 14px', fontSize: 11, color: '#64748b', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap', background: '#f5f3ef' }}>{t.colAction}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -430,7 +434,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                           onMouseEnter={e => (e.currentTarget.style.background = '#faf8f5')}
                           onMouseLeave={e => (e.currentTarget.style.background = '')}>
                           <td style={{ padding: '11px 14px', fontWeight: 700, color: row.country === '未填写' ? '#94a3b8' : NAVY }}>
-                            {getCountryLabel(row.country, lang)}
+                            {row.country === '未填写' ? t.notSpecified : getCountryLabel(row.country, lang)}
                           </td>
                           <td style={{ padding: '11px 14px', fontWeight: 700, color: NAVY }}>{row.supplierCount}</td>
                           <td style={{ padding: '11px 14px', color: '#475569' }}>
@@ -451,7 +455,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                               onClick={() => onGoToFilteredList?.({ country: row.country })}
                               style={{ fontSize: 11, padding: '5px 12px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}
                             >
-                              查看供应商 →
+                              {t.viewSuppliers}
                             </button>
                           </td>
                         </tr>
@@ -460,7 +464,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                     <tfoot>
                       <tr style={{ background: '#f0f4ff', borderTop: `2px solid ${NAVY}` }}>
                         <td style={{ padding: '10px 14px', fontWeight: 800, color: NAVY, fontSize: 12 }}>
-                          合计（{totals.countryCount} 个国家/地区）
+                          {t.totalRowLabel(totals.countryCount)}
                         </td>
                         <td style={{ padding: '10px 14px', fontWeight: 800, color: NAVY }}>{totals.supplierCount}</td>
                         <td style={{ padding: '10px 14px', color: '#64748b' }}>100%</td>
@@ -492,19 +496,19 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
               return (
                 <div style={{ overflowX: 'auto' }}>
                   <div style={{ padding: '8px 24px 0', fontSize: 11, color: '#94a3b8' }}>
-                    注：同一供应商可属多个行业，行业合计可大于供应商总数
+                    {t.categoryNote}
                   </div>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                     <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
                       <tr style={{ background: '#f5f3ef' }}>
-                        <SH col="category" label="行业/产品类别" />
-                        <SH col="supplierCount" label="供应商数" />
-                        <SH col="preferredCount" label="常用" />
-                        <SH col="contactCount" label="有联系人" />
-                        <SH col="catalogCount" label="有产品目录" />
-                        <SH col="certificationCount" label="有认证" />
-                        <SH col="missingCountryCount" label="缺国家" />
-                        <th style={{ padding: '10px 14px', fontSize: 11, color: '#64748b', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap', background: '#f5f3ef' }}>操作</th>
+                        <SH col="category" label={t.colCategory} />
+                        <SH col="supplierCount" label={t.colSupplierCount} />
+                        <SH col="preferredCount" label={t.colPreferred} />
+                        <SH col="contactCount" label={t.colWithContact} />
+                        <SH col="catalogCount" label={t.colWithCatalog} />
+                        <SH col="certificationCount" label={t.colWithCertification} />
+                        <SH col="missingCountryCount" label={t.colMissingCountry} />
+                        <th style={{ padding: '10px 14px', fontSize: 11, color: '#64748b', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap', background: '#f5f3ef' }}>{t.colAction}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -512,7 +516,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                         <tr key={row.category} style={{ borderBottom: `1px solid ${CARD_BORDER}` }}
                           onMouseEnter={e => (e.currentTarget.style.background = '#faf8f5')}
                           onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                          <td style={{ padding: '11px 14px', fontWeight: 700, color: NAVY }}>{getCategoryLabel(row.category, lang)}</td>
+                          <td style={{ padding: '11px 14px', fontWeight: 700, color: NAVY }}>{row.category === '未分类' ? t.uncategorized : getCategoryLabel(row.category, lang)}</td>
                           <td style={{ padding: '11px 14px', fontWeight: 700, color: NAVY }}>{row.supplierCount}</td>
                           <td style={{ padding: '11px 14px', color: row.preferredCount > 0 ? GOLD : '#94a3b8', fontWeight: row.preferredCount > 0 ? 700 : 400 }}>{row.preferredCount}</td>
                           <td style={{ padding: '11px 14px', color: '#475569' }}>{row.contactCount}</td>
@@ -524,7 +528,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                               onClick={() => onGoToFilteredList?.({ category: row.category })}
                               style={{ fontSize: 11, padding: '5px 12px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}
                             >
-                              查看供应商 →
+                              {t.viewSuppliers}
                             </button>
                           </td>
                         </tr>
@@ -555,7 +559,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                 marginBottom: -1,
               }}
             >
-              {lang === 'zh' ? `待补资料（${filteredPending.length}）` : `Pending（${filteredPending.length}）`}
+              {t.pendingTabLabel(filteredPending.length)}
             </button>
 
             {/* Active chart filter indicators */}
@@ -563,13 +567,13 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, fontSize: 11 }}>
                 {selectedCountry && (
                   <span style={{ background: '#e8f0fa', color: NAVY, borderRadius: 20, padding: '3px 10px', fontWeight: 600 }}>
-                    国家: {selectedCountry}
+                    {t.countryFilterChip(selectedCountry === '未填写' ? t.notSpecified : selectedCountry)}
                     <button onClick={() => setSelectedCountry(null)} style={{ marginLeft: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontWeight: 700 }}>✕</button>
                   </span>
                 )}
                 {selectedCategory && (
                   <span style={{ background: '#e8f0fa', color: NAVY, borderRadius: 20, padding: '3px 10px', fontWeight: 600 }}>
-                    行业: {selectedCategory}
+                    {t.categoryFilterChip(selectedCategory === '未分类' ? t.uncategorized : selectedCategory)}
                     <button onClick={() => setSelectedCategory(null)} style={{ marginLeft: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontWeight: 700 }}>✕</button>
                   </span>
                 )}
@@ -605,14 +609,14 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <label style={{ fontSize: 12, color: '#475569', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
                     <input type="checkbox" checked={preferredFirst} onChange={e => setPreferredFirst(e.target.checked)} style={{ accentColor: GOLD }} />
-                    常用优先
+                    {t.preferredFirst}
                   </label>
                   {(activeFlags.size > 0 || preferredFirst) && (
                     <button
                       onClick={() => { setActiveFlags(new Set()); setPreferredFirst(false); }}
                       style={{ fontSize: 11, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer' }}
                     >
-                      清除筛选
+                      {t.clearFilters}
                     </button>
                   )}
                 </div>
@@ -623,7 +627,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                   <thead>
                     <tr style={{ background: '#f5f3ef' }}>
-                      {['供应商名称', '编码', '国家/城市', '产品类别', '主联系人', '常用', '完整度', '缺失项', ''].map(h => (
+                      {[t.pendingColName, t.pendingColCode, t.pendingColLocation, t.pendingColCategory, t.pendingColContact, t.pendingColPreferred, t.pendingColCompleteness, t.pendingColMissing, t.pendingColAction].map(h => (
                         <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
@@ -632,7 +636,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                     {filteredPending.length === 0 ? (
                       <tr>
                         <td colSpan={9} style={{ padding: '48px', textAlign: 'center', color: '#94a3b8' }}>
-                          无符合条件的供应商
+                          {t.noMatchingSuppliers}
                         </td>
                       </tr>
                     ) : filteredPending.map(s => (
@@ -650,16 +654,16 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                         </td>
                         <td style={{ padding: '12px 14px', color: '#64748b' }}>{s.short_code}</td>
                         <td style={{ padding: '12px 14px', color: s.country ? '#475569' : '#dc2626' }}>
-                          {s.country ?? <span style={{ fontStyle: 'italic' }}>缺国家</span>}
+                          {s.country ?? <span style={{ fontStyle: 'italic' }}>{t.missingCountryInline}</span>}
                           {s.city && <span style={{ color: '#94a3b8' }}> / {s.city}</span>}
                         </td>
                         <td style={{ padding: '12px 14px', color: '#475569', maxWidth: 160 }}>
                           <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {s.product_categories.length > 0 ? s.product_categories.join(', ') : <span style={{ color: '#dc2626', fontStyle: 'italic' }}>缺品类</span>}
+                            {s.product_categories.length > 0 ? s.product_categories.join(', ') : <span style={{ color: '#dc2626', fontStyle: 'italic' }}>{t.missingCategoryInline}</span>}
                           </div>
                         </td>
                         <td style={{ padding: '12px 14px', color: s.primaryContact ? '#475569' : '#dc2626' }}>
-                          {s.primaryContact?.name ?? (s.primaryContact ? '—' : <span style={{ fontStyle: 'italic' }}>缺联系人</span>)}
+                          {s.primaryContact?.name ?? (s.primaryContact ? '—' : <span style={{ fontStyle: 'italic' }}>{t.missingContactInline}</span>)}
                         </td>
                         <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                           {s.is_preferred ? <span style={{ color: GOLD, fontWeight: 700 }}>★</span> : <span style={{ color: '#e2e8f0' }}>—</span>}
@@ -677,7 +681,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                             onClick={() => onOpenDetail(s.id)}
                             style={{ fontSize: 11, padding: '5px 12px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}
                           >
-                            补资料
+                            {t.fixInfoBtn}
                           </button>
                         </td>
                       </tr>
@@ -688,7 +692,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
 
               {filteredPending.length > 0 && (
                 <div style={{ padding: '10px 24px', fontSize: 11, color: '#94a3b8', borderTop: `1px solid ${CARD_BORDER}` }}>
-                  显示 {filteredPending.length} / {pendingCleanup.length} 家供应商
+                  {t.showingCountLabel(filteredPending.length, pendingCleanup.length)}
                 </div>
               )}
             </div>
@@ -702,16 +706,16 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                 style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 24px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
               >
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#64748b' }}>
-                  {lang === 'zh' ? `数据维护 · 重复记录（${activeDuplicates.length} 组）` : `Data Maintenance · Duplicate Records (${activeDuplicates.length})`}
+                  {t.dupSectionTitle(activeDuplicates.length)}
                 </span>
-                <span style={{ fontSize: 11, color: '#94a3b8' }}>{dupSectionOpen ? '▲ 收起' : '▼ 展开'}</span>
+                <span style={{ fontSize: 11, color: '#94a3b8' }}>{dupSectionOpen ? t.dupCollapse : t.dupExpand}</span>
               </button>
               {dupSectionOpen && (
                 <div style={{ padding: '0 24px 20px', display: 'flex', flexDirection: 'column', gap: 16, borderTop: `1px solid ${CARD_BORDER}`, paddingTop: 16 }}>
                   {activeDuplicates.map(group => (
                     <div key={group.groupId} style={{ border: `1px solid ${CARD_BORDER}`, borderRadius: 12, overflow: 'hidden' }}>
                       <div style={{ background: '#f8fafc', padding: '8px 16px', fontSize: 11, color: '#64748b', fontWeight: 600, borderBottom: `1px solid ${CARD_BORDER}` }}>
-                        {group.reason} · {group.records.length} 条记录
+                        {group.reason} · {t.dupRecordsLabel(group.records.length)}
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${group.records.length}, 1fr)`, gap: 0 }}>
                         {group.records.map((rec, idx) => (
@@ -720,11 +724,11 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                             <table style={{ fontSize: 11, color: '#475569', width: '100%', borderCollapse: 'collapse' }}>
                               <tbody>
                                 {[
-                                  ['编码', rec.short_code],
-                                  ['国家', rec.country ?? '—'],
-                                  ['来源', rec.import_source],
-                                  ['联系人', rec.hasContact ? (rec.contactName ?? '有') : '无'],
-                                  ['创建时间', rec.created_at ? rec.created_at.slice(0, 10) : '—'],
+                                  [t.dupColCode, rec.short_code],
+                                  [t.dupColCountry, rec.country ?? '—'],
+                                  [t.dupColSource, rec.import_source],
+                                  [t.dupColContact, rec.hasContact ? (rec.contactName ?? t.contactHas) : t.contactNone],
+                                  [t.dupColCreatedAt, rec.created_at ? rec.created_at.slice(0, 10) : '—'],
                                 ].map(([k, v]) => (
                                   <tr key={k}>
                                     <td style={{ padding: '2px 0', color: '#94a3b8', width: 56, verticalAlign: 'top' }}>{k}</td>
@@ -734,15 +738,15 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                               </tbody>
                             </table>
                             <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-                              <button onClick={() => onOpenDetail(rec.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, cursor: 'pointer', fontWeight: 600 }}>查看</button>
+                              <button onClick={() => onOpenDetail(rec.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, cursor: 'pointer', fontWeight: 600 }}>{t.viewBtn}</button>
                               {confirmArchiveId === rec.id ? (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                                  <span style={{ fontSize: 10, color: '#dc2626' }}>确认归档？</span>
-                                  <button onClick={() => handleArchive(rec.id)} disabled={archivingId === rec.id} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 5, background: '#dc2626', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700 }}>{archivingId === rec.id ? '…' : '确认'}</button>
-                                  <button onClick={() => setConfirmArchiveId(null)} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 5, background: '#f1f5f9', color: '#475569', border: 'none', cursor: 'pointer' }}>取消</button>
+                                  <span style={{ fontSize: 10, color: '#dc2626' }}>{t.confirmArchiveQ}</span>
+                                  <button onClick={() => handleArchive(rec.id)} disabled={archivingId === rec.id} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 5, background: '#dc2626', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700 }}>{archivingId === rec.id ? t.archiving : t.confirmBtn}</button>
+                                  <button onClick={() => setConfirmArchiveId(null)} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 5, background: '#f1f5f9', color: '#475569', border: 'none', cursor: 'pointer' }}>{t.cancelBtn}</button>
                                 </div>
                               ) : (
-                                <button onClick={() => setConfirmArchiveId(rec.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7, border: '1px solid #fca5a5', background: '#fff', color: '#dc2626', cursor: 'pointer', fontWeight: 600 }}>归档</button>
+                                <button onClick={() => setConfirmArchiveId(rec.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 7, border: '1px solid #fca5a5', background: '#fff', color: '#dc2626', cursor: 'pointer', fontWeight: 600 }}>{t.archiveBtn}</button>
                               )}
                             </div>
                           </div>
@@ -760,18 +764,18 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
       {confirmArchiveId && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: '#fff', borderRadius: 16, padding: '28px 32px', maxWidth: 420, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
-            <div style={{ fontWeight: 800, fontSize: 16, color: NAVY, marginBottom: 10 }}>确认归档？</div>
+            <div style={{ fontWeight: 800, fontSize: 16, color: NAVY, marginBottom: 10 }}>{t.archiveDialogTitle}</div>
             <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.6, marginBottom: 20 }}>
-              此操作将把该供应商状态设为 <strong>archived（封存）</strong>，不删除数据，随时可在供应商详情中恢复。
+              {t.archiveDialogDesc}
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button onClick={() => setConfirmArchiveId(null)} style={{ padding: '8px 20px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: '#475569', cursor: 'pointer', fontWeight: 600 }}>取消</button>
+              <button onClick={() => setConfirmArchiveId(null)} style={{ padding: '8px 20px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: '#475569', cursor: 'pointer', fontWeight: 600 }}>{t.cancelBtn}</button>
               <button
                 onClick={() => handleArchive(confirmArchiveId)}
                 disabled={!!archivingId}
                 style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', cursor: 'pointer', fontWeight: 700 }}
               >
-                {archivingId ? '归档中…' : '确认归档'}
+                {archivingId ? t.archiving : t.confirmArchiveBtn}
               </button>
             </div>
           </div>

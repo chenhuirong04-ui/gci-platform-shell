@@ -24,7 +24,8 @@ interface Props {
 }
 
 export default function CategoryDistributionChart({ data, selectedCategory, onSelect }: Props) {
-  const { lang } = useI18n();
+  const { lang, dict } = useI18n();
+  const t = dict.suppliers.dashboard;
   const maxCount = Math.max(...data.bars.map(b => b.count), 1);
 
   const barColor = (bar: CategoryBar, isSelected: boolean) => {
@@ -41,13 +42,13 @@ export default function CategoryDistributionChart({ data, selectedCategory, onSe
   return (
     <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${CARD_BORDER}`, padding: '20px 24px', boxShadow: '0 1px 4px rgba(12,27,58,0.05)' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
-        <div style={{ fontWeight: 700, fontSize: 14, color: NAVY }}>按行业分布</div>
+        <div style={{ fontWeight: 700, fontSize: 14, color: NAVY }}>{t.chartByCategoryTitle}</div>
         <div style={{ fontSize: 12, color: '#64748b' }}>
-          未分类 <strong style={{ color: '#e53e3e' }}>{data.noCategory}</strong> 家
+          {t.uncategorized} <strong style={{ color: '#e53e3e' }}>{data.noCategory}</strong>
         </div>
       </div>
       <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 14 }}>
-        按品类标签统计，同一供应商可能计入多个行业
+        {t.categoryNote}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -66,7 +67,7 @@ export default function CategoryDistributionChart({ data, selectedCategory, onSe
             >
               {/* Label — display only, filter key stays as DB value */}
               <div style={{ width: 130, textAlign: 'right', fontSize: 12, fontWeight: isSelected ? 700 : 500, color: isSelected ? NAVY : '#475569', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                {bar.isUnclassified ? '未分类' : getCategoryLabel(bar.category, lang)}
+                {bar.isUnclassified ? t.uncategorized : getCategoryLabel(bar.category, lang)}
               </div>
 
               {/* Bar track */}
@@ -98,7 +99,7 @@ export default function CategoryDistributionChart({ data, selectedCategory, onSe
             onClick={() => onSelect(null)}
             style={{ fontSize: 11, color: GOLD, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
           >
-            ✕ 清除行业筛选
+            {t.clearCategoryFilter}
           </button>
         </div>
       )}

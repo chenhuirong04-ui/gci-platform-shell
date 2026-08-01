@@ -28,7 +28,8 @@ interface Props {
 }
 
 export default function CountryDistributionChart({ data, selectedCountry, onSelect }: Props) {
-  const { lang } = useI18n();
+  const { lang, dict } = useI18n();
+  const t = dict.suppliers.dashboard;
   const [otherExpanded, setOtherExpanded] = useState(false);
 
   const maxCount = Math.max(...data.bars.map(b => b.count), 1);
@@ -52,11 +53,11 @@ export default function CountryDistributionChart({ data, selectedCountry, onSele
   return (
     <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${CARD_BORDER}`, padding: '20px 24px', boxShadow: '0 1px 4px rgba(12,27,58,0.05)' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
-        <div style={{ fontWeight: 700, fontSize: 14, color: NAVY }}>按国家分布</div>
+        <div style={{ fontWeight: 700, fontSize: 14, color: NAVY }}>{t.chartByCountryTitle}</div>
         <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#64748b' }}>
-          <span>已填写 <strong style={{ color: NAVY }}>{data.hasCountryCount}</strong></span>
-          <span>未填写 <strong style={{ color: '#e53e3e' }}>{data.noCountryCount}</strong></span>
-          <span>覆盖国家 <strong style={{ color: NAVY }}>{data.countryCount}</strong> 个</span>
+          <span>{t.filledLabel} <strong style={{ color: NAVY }}>{data.hasCountryCount}</strong></span>
+          <span>{t.notFilledLabel} <strong style={{ color: '#e53e3e' }}>{data.noCountryCount}</strong></span>
+          <span>{t.countriesCoveredLabel(data.countryCount)}</span>
         </div>
       </div>
 
@@ -76,7 +77,7 @@ export default function CountryDistributionChart({ data, selectedCountry, onSele
               >
                 {/* Label — display only, filter key stays as DB value */}
                 <div style={{ width: 130, textAlign: 'right', fontSize: 12, fontWeight: isSelected ? 700 : 500, color: isSelected ? NAVY : '#475569', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  {bar.isBlank ? '未填写' : bar.isOther ? (lang === 'zh' ? '其他' : 'Other') : getCountryLabel(bar.country, lang)}
+                  {bar.isBlank ? t.notSpecified : bar.isOther ? t.other : getCountryLabel(bar.country, lang)}
                   {bar.isOther && <span style={{ marginLeft: 4, fontSize: 10, color: '#94a3b8' }}>{otherExpanded ? '▲' : '▼'}</span>}
                 </div>
 
@@ -125,7 +126,7 @@ export default function CountryDistributionChart({ data, selectedCountry, onSele
             onClick={() => { onSelect(null); setOtherExpanded(false); }}
             style={{ fontSize: 11, color: GOLD, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
           >
-            ✕ 清除国家筛选
+            {t.clearCountryFilter}
           </button>
         </div>
       )}

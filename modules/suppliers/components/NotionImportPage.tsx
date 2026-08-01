@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useI18n } from '@gci/i18n';
 
 const GOLD = '#C9A84C';
 const NAVY = '#0c1b3a';
@@ -79,10 +80,12 @@ function StatCard({ label, value, color }: { label: string; value: number; color
 }
 
 function StatusBadge({ status }: { status: ImportStatus }) {
+  const { dict } = useI18n();
+  const t = dict.suppliers.notionImport;
   const map: Record<ImportStatus, { label: string; bg: string; text: string }> = {
-    new:               { label: '可导入', bg: '#dcfce7', text: '#166534' },
-    exists:            { label: '已存在', bg: '#f1f5f9', text: '#475569' },
-    duplicate_suspect: { label: '疑似重复', bg: '#fef9ec', text: '#92400e' },
+    new:               { label: t.statusNew, bg: '#dcfce7', text: '#166534' },
+    exists:            { label: t.statusExists, bg: '#f1f5f9', text: '#475569' },
+    duplicate_suspect: { label: t.statusDuplicate, bg: '#fef9ec', text: '#92400e' },
   };
   const s = map[status];
   return (
@@ -95,6 +98,8 @@ function StatusBadge({ status }: { status: ImportStatus }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function NotionImportPage({ onBack }: Props) {
+  const { dict } = useI18n();
+  const t = dict.suppliers.notionImport;
   const [phase, setPhase] = useState<'idle' | 'loading' | 'preview' | 'importing' | 'done'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<PreviewStats | null>(null);
@@ -140,10 +145,10 @@ export default function NotionImportPage({ onBack }: Props) {
       setDupActions(defaultDupActions);
       setPhase('preview');
     } catch (e: any) {
-      setError(e?.message ?? '加载失败');
+      setError(e?.message ?? t.loadFailed);
       setPhase('idle');
     }
-  }, []);
+  }, [t.loadFailed]);
 
   // ── Toggle selection ─────────────────────────────────────────────────────────
   const toggleItem = (pageId: string, status: ImportStatus) => {
@@ -264,11 +269,11 @@ export default function NotionImportPage({ onBack }: Props) {
           onClick={onBack}
           style={{ padding: '7px 14px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, fontSize: 13, cursor: 'pointer', fontWeight: 600 }}
         >
-          ← 返回列表
+          ← {t.backToList}
         </button>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: NAVY }}>从 Notion 导入供应商</div>
-          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>读取 Notion 供应商数据库，与现有记录比对，按需导入</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: NAVY }}>{t.title}</div>
+          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{t.subtitle}</div>
         </div>
       </div>
 
@@ -281,15 +286,15 @@ export default function NotionImportPage({ onBack }: Props) {
             </div>
           )}
           <div style={{ fontSize: 32, marginBottom: 12 }}>📥</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: NAVY, marginBottom: 6 }}>读取 Notion 供应商数据库</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: NAVY, marginBottom: 6 }}>{t.idleTitle}</div>
           <div style={{ fontSize: 13, color: '#64748b', marginBottom: 24, maxWidth: 400, margin: '0 auto 24px' }}>
-            将读取全部 Notion 供应商记录，与现有数据库比对幂等性，返回分类预览。不会自动写入任何数据。
+            {t.idleDesc}
           </div>
           <button
             onClick={loadPreview}
             style={{ padding: '11px 32px', borderRadius: 10, background: NAVY, color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
           >
-            读取 Notion 数据
+            {t.loadBtn}
           </button>
         </div>
       )}
@@ -297,7 +302,7 @@ export default function NotionImportPage({ onBack }: Props) {
       {/* Loading */}
       {phase === 'loading' && (
         <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${CARD_BORDER}`, padding: '48px', textAlign: 'center' }}>
-          <div style={{ fontSize: 13, color: '#64748b' }}>正在读取 Notion 数据库（含分页）…</div>
+          <div style={{ fontSize: 13, color: '#64748b' }}>{t.loadingText}</div>
           <div style={{ marginTop: 16, height: 4, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
             <div style={{ height: '100%', background: GOLD, width: '60%', animation: 'pulse 1.5s ease-in-out infinite' }} />
           </div>
@@ -307,15 +312,19 @@ export default function NotionImportPage({ onBack }: Props) {
       {/* Preview */}
       {(phase === 'preview' || phase === 'done') && stats && (
         <>
+          {/* Preview section title */}
+          <div style={{ fontSize: 14, fontWeight: 800, color: NAVY, marginBottom: 10 }}>{t.previewSectionTitle}</div>
+
           {/* Stats row */}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-            <StatCard label="Notion 总记录" value={stats.total} />
-            <StatCard label="可新增" value={stats.toCreate} color="#166534" />
-            <StatCard label="已存在（跳过）" value={stats.alreadyExists} color="#475569" />
-            <StatCard label="疑似重复" value={stats.suspectDuplicate} color="#92400e" />
-            <StatCard label="有附件" value={stats.hasAttachments} />
-            <StatCard label="有证书" value={stats.hasCertificates} />
-            <StatCard label="缺联系方式" value={stats.missingContact} color={stats.missingContact > 0 ? '#dc2626' : undefined} />
+            <StatCard label={t.statTotal} value={stats.total} />
+            <StatCard label={t.statNew} value={stats.toCreate} color="#166534" />
+            <StatCard label={t.statExists} value={stats.alreadyExists} color="#475569" />
+            <StatCard label={t.statDuplicate} value={stats.suspectDuplicate} color="#92400e" />
+            <StatCard label={t.statMissingCategory} value={stats.missingCategory} color={stats.missingCategory > 0 ? '#d97706' : undefined} />
+            <StatCard label={t.statHasAttachments} value={stats.hasAttachments} />
+            <StatCard label={t.statHasCertificates} value={stats.hasCertificates} />
+            <StatCard label={t.statMissingContact} value={stats.missingContact} color={stats.missingContact > 0 ? '#dc2626' : undefined} />
           </div>
 
           {/* Filter bar */}
@@ -330,7 +339,7 @@ export default function NotionImportPage({ onBack }: Props) {
                   fontSize: 12, fontWeight: 600, cursor: 'pointer',
                 }}
               >
-                {s === 'all' ? '全部' : s === 'new' ? '可新增' : s === 'exists' ? '已存在' : '疑似重复'}
+                {s === 'all' ? t.filterAll : s === 'new' ? t.filterNew : s === 'exists' ? t.filterExists : t.filterDuplicate}
               </button>
             ))}
             <select
@@ -338,7 +347,7 @@ export default function NotionImportPage({ onBack }: Props) {
               onChange={e => setFilterCountry(e.target.value)}
               style={{ padding: '5px 10px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, fontSize: 12, color: NAVY }}
             >
-              <option value="">全部国家</option>
+              <option value="">{t.allCountries}</option>
               {countries.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             <select
@@ -346,15 +355,15 @@ export default function NotionImportPage({ onBack }: Props) {
               onChange={e => setFilterCategory(e.target.value)}
               style={{ padding: '5px 10px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, fontSize: 12, color: NAVY }}
             >
-              <option value="">全部品类</option>
+              <option value="">{t.allCategories}</option>
               {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             <label style={{ fontSize: 12, color: '#475569', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
               <input type="checkbox" checked={filterPreferred} onChange={e => setFilterPreferred(e.target.checked)} />
-              仅常用
+              {t.preferredOnly}
             </label>
             <div style={{ marginLeft: 'auto', fontSize: 12, color: '#94a3b8' }}>
-              已选 <strong style={{ color: NAVY }}>{selected.size}</strong> 家
+              {t.selectedCount(selected.size)}
             </div>
           </div>
 
@@ -364,14 +373,17 @@ export default function NotionImportPage({ onBack }: Props) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f5f3ef' }}>
-                    <th style={{ padding: '10px 14px', textAlign: 'left', borderBottom: `1px solid ${CARD_BORDER}` }}>
-                      <input
-                        type="checkbox"
-                        checked={selectableInView > 0 && selectedInView === selectableInView}
-                        onChange={e => toggleAll(e.target.checked)}
-                      />
+                    <th style={{ padding: '10px 14px', textAlign: 'left', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectableInView > 0 && selectedInView === selectableInView}
+                          onChange={e => toggleAll(e.target.checked)}
+                        />
+                        {t.selectAll}
+                      </label>
                     </th>
-                    {['供应商名称', '编码', '类型', '位置', '品类', '联系人', '证书', '附件', '状态', '操作'].map(h => (
+                    {[t.colName, t.colCode, t.colType, t.colLocation, t.colCategory, t.colContact, t.colCert, t.colAttachment, t.colStatus, t.colAction].map(h => (
                       <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap' }}>
                         {h}
                       </th>
@@ -404,7 +416,7 @@ export default function NotionImportPage({ onBack }: Props) {
                         </td>
                         <td style={{ padding: '10px 12px', fontWeight: 700, color: NAVY, maxWidth: 200 }}>
                           <div>{item.name}</div>
-                          {item.isPreferred && <span style={{ fontSize: 10, color: GOLD, fontWeight: 700 }}>★ 常用</span>}
+                          {item.isPreferred && <span style={{ fontSize: 10, color: GOLD, fontWeight: 700 }}>★ {t.preferredTag}</span>}
                         </td>
                         <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 12 }}>{item.supplierCode || '—'}</td>
                         <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 12 }}>{item.supplierType || '—'}</td>
@@ -451,13 +463,13 @@ export default function NotionImportPage({ onBack }: Props) {
                                 onClick={() => setDupAction(item.notionPageId, 'skip')}
                                 style={{ padding: '3px 8px', borderRadius: 6, border: `1px solid ${dupAction === 'skip' ? '#dc2626' : CARD_BORDER}`, background: dupAction === 'skip' ? '#fee2e2' : '#fff', color: dupAction === 'skip' ? '#dc2626' : '#475569', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
                               >
-                                跳过
+                                {t.dupSkip}
                               </button>
                               <button
                                 onClick={() => setDupAction(item.notionPageId, 'create_new')}
                                 style={{ padding: '3px 8px', borderRadius: 6, border: `1px solid ${dupAction === 'create_new' ? GOLD : CARD_BORDER}`, background: dupAction === 'create_new' ? '#fef9ec' : '#fff', color: dupAction === 'create_new' ? '#92400e' : '#475569', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
                               >
-                                仍新增
+                                {t.dupCreateNew}
                               </button>
                             </div>
                           )}
@@ -468,7 +480,7 @@ export default function NotionImportPage({ onBack }: Props) {
                   {filteredItems.length === 0 && (
                     <tr>
                       <td colSpan={11} style={{ padding: '40px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
-                        当前筛选条件下无记录
+                        {t.noRecordsForFilter}
                       </td>
                     </tr>
                   )}
@@ -481,21 +493,21 @@ export default function NotionImportPage({ onBack }: Props) {
           {phase === 'preview' && (
             <div style={{ background: '#fff', border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ fontSize: 13, color: '#475569' }}>
-                已勾选 <strong style={{ color: NAVY }}>{selected.size}</strong> 家供应商，将分 {Math.ceil(selected.size / 5)} 批导入（每批最多5家）
+                {t.batchInfo(selected.size, Math.ceil(selected.size / 5))}
               </div>
               <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
                 <button
                   onClick={loadPreview}
                   style={{ padding: '9px 18px', borderRadius: 10, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
                 >
-                  重新读取
+                  {t.reload}
                 </button>
                 <button
                   onClick={runImport}
                   disabled={selected.size === 0}
                   style={{ padding: '9px 24px', borderRadius: 10, background: selected.size === 0 ? '#94a3b8' : NAVY, color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: selected.size === 0 ? 'not-allowed' : 'pointer' }}
                 >
-                  开始导入 ({selected.size} 家)
+                  {t.importSelected(selected.size)}
                 </button>
               </div>
             </div>
@@ -507,34 +519,34 @@ export default function NotionImportPage({ onBack }: Props) {
       {phase === 'importing' && (
         <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${CARD_BORDER}`, padding: '32px' }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: NAVY, marginBottom: 12 }}>
-            正在导入… {importProgress} / {importTotal}
+            {t.importingProgress(importProgress, importTotal)}
           </div>
           <div style={{ height: 8, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden', marginBottom: 20 }}>
             <div style={{ height: '100%', background: GOLD, width: `${importTotal > 0 ? (importProgress / importTotal) * 100 : 0}%`, transition: 'width 0.4s ease', borderRadius: 4 }} />
           </div>
-          <div style={{ fontSize: 12, color: '#64748b' }}>每批最多5家，分批完成后汇总报告。请勿关闭页面。</div>
+          <div style={{ fontSize: 12, color: '#64748b' }}>{t.importingNote}</div>
         </div>
       )}
 
       {/* Done — Report */}
       {phase === 'done' && (
         <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${CARD_BORDER}`, padding: '24px', marginTop: 16 }}>
-          <div style={{ fontSize: 16, fontWeight: 800, color: NAVY, marginBottom: 16 }}>导入报告</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: NAVY, marginBottom: 16 }}>{t.reportTitle}</div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
-            <StatCard label="成功新增" value={reportCreated} color="#166534" />
-            <StatCard label="已跳过" value={reportSkipped} color="#475569" />
-            <StatCard label="失败" value={reportFailed} color={reportFailed > 0 ? '#dc2626' : undefined} />
-            <StatCard label="联系人" value={importResults.reduce((s, r) => s + r.contactsCreated, 0)} />
-            <StatCard label="认证记录" value={importResults.reduce((s, r) => s + r.certsCreated, 0)} />
-            <StatCard label="文件记录" value={importResults.reduce((s, r) => s + r.docsCreated, 0)} />
-            <StatCard label="附件待上传" value={importResults.reduce((s, r) => s + r.docsFailedDownload, 0)} color="#92400e" />
+            <StatCard label={t.reportCreated} value={reportCreated} color="#166534" />
+            <StatCard label={t.reportSkipped} value={reportSkipped} color="#475569" />
+            <StatCard label={t.reportFailed} value={reportFailed} color={reportFailed > 0 ? '#dc2626' : undefined} />
+            <StatCard label={t.reportContacts} value={importResults.reduce((s, r) => s + r.contactsCreated, 0)} />
+            <StatCard label={t.reportCerts} value={importResults.reduce((s, r) => s + r.certsCreated, 0)} />
+            <StatCard label={t.reportDocs} value={importResults.reduce((s, r) => s + r.docsCreated, 0)} />
+            <StatCard label={t.reportPendingUpload} value={importResults.reduce((s, r) => s + r.docsFailedDownload, 0)} color="#92400e" />
           </div>
 
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr style={{ background: '#f5f3ef' }}>
-                  {['供应商名称', '结果', '联系人', '认证', '文件', '警告'].map(h => (
+                  {[t.reportColName, t.reportColResult, t.reportColContacts, t.reportColCerts, t.reportColDocs, t.reportColWarnings].map(h => (
                     <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, borderBottom: `1px solid ${CARD_BORDER}` }}>{h}</th>
                   ))}
                 </tr>
@@ -549,7 +561,7 @@ export default function NotionImportPage({ onBack }: Props) {
                         background: r.result === 'created' ? '#dcfce7' : r.result === 'skipped' ? '#f1f5f9' : '#fee2e2',
                         color: r.result === 'created' ? '#166534' : r.result === 'skipped' ? '#475569' : '#991b1b',
                       }}>
-                        {r.result === 'created' ? '✓ 已新增' : r.result === 'skipped' ? '— 跳过' : '✗ 失败'}
+                        {r.result === 'created' ? t.resultCreated : r.result === 'skipped' ? t.resultSkipped : t.resultFailed}
                       </span>
                       {r.error && <div style={{ fontSize: 10, color: '#dc2626', marginTop: 2 }}>{r.error}</div>}
                     </td>
@@ -570,13 +582,13 @@ export default function NotionImportPage({ onBack }: Props) {
               onClick={onBack}
               style={{ padding: '9px 20px', borderRadius: 10, background: NAVY, color: '#fff', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
             >
-              返回供应商列表
+              {t.backToList}
             </button>
             <button
               onClick={loadPreview}
               style={{ padding: '9px 18px', borderRadius: 10, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
             >
-              重新读取 Notion
+              {t.reloadNotion}
             </button>
           </div>
         </div>
