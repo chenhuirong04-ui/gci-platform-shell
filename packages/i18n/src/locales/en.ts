@@ -704,18 +704,21 @@ export const en = {
       select: 'Select →',
       backToProjectInfo: '← Back to Project Info',
       custom: {
+        tag: 'Path 1',
         title: 'Custom Item Quote',
         description: 'Quote a single custom-made furniture item with full BOM & engineering calculation.',
         examples: ['Sofa', 'Bed', 'Wardrobe', 'Table / Chair', 'TV Unit'],
         flow: ['Configure Item', 'BOM Auto Calculation', 'Set Margin', 'PDF + Send to Trade'],
       },
       trade: {
+        tag: 'Path 2',
         title: 'Trade & Sourcing Quote',
         description: 'Upload supplier costs, input your selling price, system calculates profit & VAT automatically.',
         examples: ['Furniture Projects', 'Tissue', 'Coffee', 'Sanitary', 'Building Materials', 'AI Devices'],
         flow: ['Upload Supplier Quote', 'AI Cost Recognition', 'Input Selling Price', 'PDF + Send to Trade'],
       },
       boq: {
+        tag: 'Path 3',
         title: 'BOQ & AI Analysis',
         description: 'Upload BOQ, drawings or requirement PDFs. AI extracts item list — then route to Trade & Sourcing for pricing.',
         examples: ['BOQ', 'Drawings', 'Project PDF', 'Requirement List'],

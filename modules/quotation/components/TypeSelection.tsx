@@ -16,9 +16,9 @@ export const TypeSelection: React.FC<TypeSelectionProps> = ({ onSelect, onBack, 
   const s = dict.quotation.typeSelection;
 
   const CARDS = [
-    { type: 'custom' as const, icon: Ruler, tag: 'Path 1', ...s.custom },
-    { type: 'trade' as const, icon: ShoppingCart, tag: 'Path 2', ...s.trade },
-    { type: 'boq' as const, icon: FileSearch, tag: 'Path 3', ...s.boq },
+    { type: 'custom' as const, icon: Ruler, ...s.custom },
+    { type: 'trade' as const, icon: ShoppingCart, ...s.trade },
+    { type: 'boq' as const, icon: FileSearch, ...s.boq },
   ];
 
   return (

@@ -705,18 +705,21 @@ export const zh: typeof en = {
       select: '选择 →',
       backToProjectInfo: '← 返回项目信息',
       custom: {
+        tag: '路径 1',
         title: '定制产品报价',
         description: '为单一定制产品生成工程报价，含BOM材料计算',
         examples: ['沙发', '床', '衣柜', '桌椅', '电视柜'],
         flow: ['配置产品', 'BOM 自动计算', '设置利润', 'PDF + 发送至贸易报价'],
       },
       trade: {
+        tag: '路径 2',
         title: '贸易采购报价',
         description: '上传供应商报价，手工定价，系统自动计算利润',
         examples: ['家具项目', '纸巾', '咖啡', '卫生用品', '建材', 'AI设备'],
         flow: ['上传供应商报价', 'AI 成本识别', '输入销售价格', 'PDF + 发送至贸易报价'],
       },
       boq: {
+        tag: '路径 3',
         title: 'BOQ 与 AI 分析',
         description: '上传BOQ/图纸/需求文件，AI提取清单，转入Trade报价流程',
         examples: ['工程量清单', '图纸', '项目 PDF', '需求清单'],
