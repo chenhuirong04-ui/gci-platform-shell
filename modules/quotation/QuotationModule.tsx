@@ -2150,38 +2150,38 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
           {/* SUPPLY CHAIN 分区页面标题 */}
-          <h1 className="text-2xl font-semibold" style={{ fontFamily: "'Space Grotesk',sans-serif", color: '#0C1B3A' }}>套餐报价</h1>
+          <h1 className="text-2xl font-semibold" style={{ fontFamily: "'Space Grotesk',sans-serif", color: '#0C1B3A' }}>{t('Package Quote Page Title')}</h1>
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-[12px] font-black uppercase tracking-widest flex-wrap">
             <button onClick={() => { setAppMode('landing'); setPqProject(null); setPqParseStatus('idle'); setPqPhase('upload'); }}
-              className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">Workflow Home</button>
+              className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">{t('Workflow Home')}</button>
             <span className="text-[#0C1B3A]/20">›</span>
-            <button onClick={() => setPqPhase('upload')} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">Package Quote</button>
+            <button onClick={() => setPqPhase('upload')} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">{t('Package Quote Page Title')}</button>
             <span className="text-[#0C1B3A]/20">›</span>
             <span className="text-[#0C1B3A]/50">{pqProject.projectName}</span>
             <span className="text-[#0C1B3A]/20">›</span>
-            <span className="text-[#C9A84C]">GCI Package Quote</span>
+            <span className="text-[#C9A84C]">{t('GCI Package Quote')}</span>
           </div>
 
           {/* Quote Settings: internal pricing + customer info */}
           <div className="bg-[#0C1B3A]/3 rounded-[24px] p-6 space-y-6">
-            <h3 className="text-[11px] font-black uppercase tracking-[0.25em] text-[#0C1B3A]/50">Quote Settings</h3>
+            <h3 className="text-[11px] font-black uppercase tracking-[0.25em] text-[#0C1B3A]/50">{t('Quote Settings')}</h3>
 
             {/* Row 1: Project info + Currency + Exchange Rate (internal) */}
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">Project</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Project')}</label>
                 <input
                   type="text"
                   value={pqProjectName}
                   onChange={e => setPqProjectName(e.target.value)}
-                  placeholder="Enter project name (English)"
+                  placeholder={t('Enter project name (English)')}
                   className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-bold text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors placeholder:text-[#0C1B3A]/20"
                 />
                 <p className="text-[11px] text-[#0C1B3A]/40 mt-1">{pqProject.supplierName}</p>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">Quote Currency</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Quote Currency')}</label>
                 <div className="flex gap-2">
                   {(['AED','USD'] as const).map(c => (
                     <button key={c} onClick={() => {
@@ -2201,7 +2201,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">
-                  Exchange Rate&nbsp;<span className="normal-case font-medium text-[#0C1B3A]/30">1 {baseCur} =</span>
+                  {t('Exchange Rate')}&nbsp;<span className="normal-case font-medium text-[#0C1B3A]/30">1 {baseCur} =</span>
                 </label>
                 <div className="flex items-center gap-2">
                   <input type="number" min={0} step={0.0001} value={pqExchangeRate}
@@ -2211,7 +2211,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">Reference / Quote No</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Reference / Quote No')}</label>
                 <input type="text" value={pqQuoteNo} onChange={e => setPqQuoteNo(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-mono font-bold text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
               </div>
@@ -2222,31 +2222,31 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
             {/* Row 2: Customer info */}
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#C9A84C]/70 mb-3">Customer Information <span className="text-[#0C1B3A]/30 normal-case font-medium tracking-normal">(for PDF only — not shown in cost view)</span></p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#C9A84C]/70 mb-3">{t('Customer Information')} <span className="text-[#0C1B3A]/30 normal-case font-medium tracking-normal">{t('(for PDF only — not shown in cost view)')}</span></p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">Customer Name</label>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Customer Name')}</label>
                   <input type="text" value={pqCustomer} onChange={e => setPqCustomer(e.target.value)}
                     placeholder="e.g. Al Futtaim Group"
                     className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-bold text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors placeholder:text-[#0C1B3A]/20" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">Quote Date</label>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Quote Date')}</label>
                   <input type="date" value={pqQuoteDate} onChange={e => setPqQuoteDate(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-bold text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">Valid Until</label>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Valid Until')}</label>
                   <input type="date" value={pqValidUntil} onChange={e => setPqValidUntil(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-bold text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">Payment Terms</label>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Payment Terms')}</label>
                   <input type="text" value={pqPaymentTerms} onChange={e => setPqPaymentTerms(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
                 </div>
                 <div className="sm:col-span-2 space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">Delivery Terms</label>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Delivery Terms')}</label>
                   <input type="text" value={pqDeliveryTerms} onChange={e => setPqDeliveryTerms(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
                 </div>
@@ -2284,21 +2284,21 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                         {isSelected && <svg className="w-3 h-3 text-[#C9A84C]" fill="none" viewBox="0 0 12 12"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                       </button>
                       <span className={`font-black truncate ${isSelected ? 'text-[#0C1B3A]' : 'text-[#0C1B3A]/50'}`}>{pqTranslate(pkg.packageName)}</span>
-                      <span className="text-[11px] text-[#0C1B3A]/30 shrink-0">{pkg.items.length} items</span>
+                      <span className="text-[11px] text-[#0C1B3A]/30 shrink-0">{t('{n} items').replace('{n}', String(pkg.items.length))}</span>
                     </div>
                     {/* Cost columns */}
                     <div className="flex items-center gap-6 text-right">
                       <div>
-                        <p className="text-[9px] font-black uppercase tracking-wider text-[#0C1B3A]/30">Original</p>
+                        <p className="text-[9px] font-black uppercase tracking-wider text-[#0C1B3A]/30">{t('Original Amount')}</p>
                         <p className="text-[13px] font-mono font-bold text-[#0C1B3A]/60">{baseCur} {pkg.totalCost.toLocaleString()}</p>
                       </div>
                       <div>
-                        <p className="text-[9px] font-black uppercase tracking-wider text-[#0C1B3A]/30">Converted</p>
+                        <p className="text-[9px] font-black uppercase tracking-wider text-[#0C1B3A]/30">{t('Converted')}</p>
                         <p className="text-[13px] font-mono font-bold text-[#0C1B3A]">{pqQuoteCurrency} {convertedCost.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
                       </div>
                       {/* Markup input */}
                       <div className="flex items-center gap-1.5">
-                        <p className="text-[9px] font-black uppercase tracking-wider text-[#0C1B3A]/30 w-12">Markup</p>
+                        <p className="text-[9px] font-black uppercase tracking-wider text-[#0C1B3A]/30 w-12">{t('Markup')}</p>
                         <input
                           type="number" min={0} max={999} step={1}
                           value={markup}
@@ -2308,7 +2308,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                         <span className="text-sm text-[#0C1B3A]/40">%</span>
                       </div>
                       <div>
-                        <p className="text-[9px] font-black uppercase tracking-wider text-[#C9A84C]">GCI Price</p>
+                        <p className="text-[9px] font-black uppercase tracking-wider text-[#C9A84C]">{t('GCI Price')}</p>
                         <p className="text-[15px] font-mono font-black text-[#0C1B3A]">{pqQuoteCurrency} {gciPrice.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
                       </div>
                       <button onClick={toggle} className="text-[#0C1B3A]/25 hover:text-[#C9A84C] transition-colors text-lg ml-2">
@@ -2322,8 +2322,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                     <div className="px-6 pb-5 pt-3 space-y-2">
                       {/* Column labels */}
                       <div className="grid grid-cols-[48px_1fr_1fr_1fr_80px_60px_90px] gap-2 px-3 py-1">
-                        {['Photo','Item Name (EN)','Material (EN)','Size / Spec (EN)','Qty / Unit',`GCI ${pqQuoteCurrency}`,''].map(h => (
-                          <p key={h} className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/30">{h}</p>
+                        {[t('Photo'),t('Item Name (EN)'),t('Material (EN)'),t('Size / Spec (EN)'),t('Qty / Unit'),`GCI ${pqQuoteCurrency}`,''].map((h, i) => (
+                          <p key={i} className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/30">{h}</p>
                         ))}
                       </div>
                       {pkg.items.map((it, i) => {
@@ -2346,13 +2346,13 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                                 <input
                                   value={en.nameEN}
                                   onChange={e => updateItemEN(it.id, 'nameEN', e.target.value)}
-                                  placeholder="Item name in English"
+                                  placeholder={t('Item name in English')}
                                   className="w-full text-[11px] font-bold text-[#0C1B3A] bg-transparent border-b border-[#0C1B3A]/10 focus:border-[#C9A84C] outline-none py-0.5 transition-colors placeholder:text-[#0C1B3A]/15"
                                 />
                                 <input
                                   value={en.areaEN}
                                   onChange={e => updateItemEN(it.id, 'areaEN', e.target.value)}
-                                  placeholder="Area"
+                                  placeholder={t('Area')}
                                   className="w-full text-[10px] text-[#0C1B3A]/50 bg-transparent border-b border-[#0C1B3A]/6 focus:border-[#C9A84C] outline-none py-0.5 transition-colors placeholder:text-[#0C1B3A]/15"
                                 />
                               </div>
@@ -2362,7 +2362,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                                 <textarea
                                   value={en.materialEN}
                                   onChange={e => updateItemEN(it.id, 'materialEN', e.target.value)}
-                                  placeholder="Material in English"
+                                  placeholder={t('Material in English')}
                                   rows={2}
                                   className="w-full text-[11px] text-[#0C1B3A]/80 bg-transparent border border-[#0C1B3A]/10 focus:border-[#C9A84C] outline-none rounded-lg p-1.5 resize-none transition-colors placeholder:text-[#0C1B3A]/15"
                                 />
@@ -2373,7 +2373,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                                 <input
                                   value={en.specEN}
                                   onChange={e => updateItemEN(it.id, 'specEN', e.target.value)}
-                                  placeholder="Size / spec"
+                                  placeholder={t('Size / spec')}
                                   className="w-full text-[11px] font-mono text-[#0C1B3A]/70 bg-transparent border-b border-[#0C1B3A]/10 focus:border-[#C9A84C] outline-none py-0.5 transition-colors placeholder:text-[#0C1B3A]/15"
                                 />
                               </div>
@@ -2415,13 +2415,13 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             return (
               <div className="flex justify-end pt-2">
                 <div className="bg-[#0C1B3A] text-white rounded-[24px] px-8 py-5 space-y-2 text-right min-w-[280px]">
-                  <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Total Cost ({baseCur} → {pqQuoteCurrency})</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-40">{t('Total Cost')} ({baseCur} → {pqQuoteCurrency})</p>
                   <p className="text-sm font-mono text-white/60">{pqQuoteCurrency} {totalConverted.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
                   <div className="border-t border-white/10 pt-2">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-[#C9A84C]">GCI Total Selling Price</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[#C9A84C]">{t('GCI Total Selling Price')}</p>
                     <p className="text-2xl font-black text-[#C9A84C]">{pqQuoteCurrency} {totalGCI.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
                   </div>
-                  <p className="text-[10px] opacity-30">{selectedPkgs.length} / {pqProject.packages.length} packages selected · {selectedPkgs.reduce((s,p)=>s+p.items.length,0)} items</p>
+                  <p className="text-[10px] opacity-30">{t('{n} / {total} packages selected · {m} items').replace('{n}', String(selectedPkgs.length)).replace('{total}', String(pqProject.packages.length)).replace('{m}', String(selectedPkgs.reduce((s,p)=>s+p.items.length,0)))}</p>
                 </div>
               </div>
             );
@@ -2438,7 +2438,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
               className="flex items-center gap-2 bg-[#0C1B3A] hover:bg-[#162a52] text-[#C9A84C] font-black text-[12px] uppercase tracking-widest px-6 py-3 rounded-2xl transition-all shadow-lg hover:shadow-xl active:scale-95"
             >
               <Download className="w-4 h-4" />
-              Download Customer PDF
+              {t('Download Customer PDF')}
             </button>
           </div>
         </div>
@@ -2449,15 +2449,15 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
       {/* SUPPLY CHAIN 分区页面标题 */}
-      <h1 className="text-2xl font-semibold" style={{ fontFamily: "'Space Grotesk',sans-serif", color: '#0C1B3A' }}>套餐报价</h1>
+      <h1 className="text-2xl font-semibold" style={{ fontFamily: "'Space Grotesk',sans-serif", color: '#0C1B3A' }}>{t('Package Quote Page Title')}</h1>
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-[12px] font-black uppercase tracking-widest">
         <button onClick={() => { setAppMode('landing'); setPqProject(null); setPqParseStatus('idle'); setPqParseError(''); setPqPhase('upload'); }}
           className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">
-          Workflow Home
+          {t('Workflow Home')}
         </button>
         <span className="text-[#0C1B3A]/20">›</span>
-        <span className="text-[#C9A84C]">Package Quote</span>
+        <span className="text-[#C9A84C]">{t('Package Quote Page Title')}</span>
         {pqProject && (
           <>
             <span className="text-[#0C1B3A]/20">›</span>
@@ -2470,28 +2470,28 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       {pqParseStatus !== 'done' && (
         <div className="max-w-2xl mx-auto space-y-6">
           <div className="text-center space-y-2">
-            <h2 className="text-3xl font-serif italic text-[#0C1B3A]">Package Quote</h2>
-            <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#C9A84C]">Project · Package · Items</p>
+            <h2 className="text-3xl font-serif italic text-[#0C1B3A]">{t('Package Quote Page Title')}</h2>
+            <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#C9A84C]">{t('Project · Package · Items')}</p>
           </div>
 
           {/* Meta fields */}
           <div className="bg-[#0C1B3A]/3 rounded-[24px] p-6 space-y-4">
-            <h3 className="text-[11px] font-black uppercase tracking-[0.25em] text-[#0C1B3A]/50">Project Info</h3>
+            <h3 className="text-[11px] font-black uppercase tracking-[0.25em] text-[#0C1B3A]/50">{t('Project Info')}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">Project Name</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Project Name')}</label>
                 <input value={pqMeta.projectName} onChange={e => setPqMeta(p => ({ ...p, projectName: e.target.value }))}
                   placeholder="e.g. Morocco Apartment"
                   className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-medium text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">Supplier Name</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Supplier Name')}</label>
                 <input value={pqMeta.supplierName} onChange={e => setPqMeta(p => ({ ...p, supplierName: e.target.value }))}
                   placeholder="e.g. COOL HOME"
                   className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-medium text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">Base Currency</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Base Currency')}</label>
                 <select value={pqMeta.currency} onChange={e => setPqMeta(p => ({ ...p, currency: e.target.value }))}
                   className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-medium text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors">
                   {['CNY','AED','USD','EUR','GBP'].map(c => <option key={c}>{c}</option>)}
@@ -2502,7 +2502,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
           {/* Upload area */}
           <div className="space-y-3">
-            <h3 className="text-[11px] font-black uppercase tracking-[0.25em] text-[#0C1B3A]/50">Upload Multi-Sheet Excel</h3>
+            <h3 className="text-[11px] font-black uppercase tracking-[0.25em] text-[#0C1B3A]/50">{t('Upload Multi-Sheet Excel')}</h3>
             {(() => {
               const pqFileInputRef = { current: null as HTMLInputElement | null };
               const handlePqDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -2535,15 +2535,15 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                     <div className="w-10 h-10 rounded-2xl bg-[#C9A84C]/10 flex items-center justify-center mx-auto">
                       <Upload className="w-5 h-5 text-[#C9A84C]" />
                     </div>
-                    <p className="text-sm font-bold text-[#0C1B3A]/60">Drag & drop or click to select</p>
-                    <p className="text-[11px] text-[#0C1B3A]/30">Excel with multiple sheets. Each sheet = one Package.</p>
-                    <p className="text-[10px] text-[#0C1B3A]/25">Sheets named 总表 / Summary / Total will be skipped automatically.</p>
+                    <p className="text-sm font-bold text-[#0C1B3A]/60">{t('Drag & drop or click to select')}</p>
+                    <p className="text-[11px] text-[#0C1B3A]/30">{t('Excel with multiple sheets. Each sheet = one Package.')}</p>
+                    <p className="text-[10px] text-[#0C1B3A]/25">{t('Sheets named 总表 / Summary / Total will be skipped automatically.')}</p>
                   </div>
                 </div>
               );
             })()}
             {pqParseStatus === 'parsing' && (
-              <p className="text-center text-[12px] font-bold text-[#C9A84C] animate-pulse">Parsing Excel...</p>
+              <p className="text-center text-[12px] font-bold text-[#C9A84C] animate-pulse">{t('Parsing Excel...')}</p>
             )}
             {pqParseStatus === 'error' && (
               <p className="text-center text-[12px] font-bold text-red-500">❌ {pqParseError}</p>
@@ -2561,12 +2561,12 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
               <h2 className="text-2xl font-black text-[#0C1B3A]">{pqProject.projectName}</h2>
               <p className="text-[11px] text-[#0C1B3A]/40 font-bold mt-0.5">
                 {pqProject.supplierName && `${pqProject.supplierName} · `}
-                {pqProject.packages.length} packages · {pqProject.sourceFileName}
+                {t('{n} packages').replace('{n}', String(pqProject.packages.length))} · {pqProject.sourceFileName}
               </p>
             </div>
             <button onClick={() => { setPqProject(null); setPqParseStatus('idle'); setPqParseError(''); }}
               className="text-[11px] font-black uppercase tracking-widest text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">
-              ↑ Upload New File
+              {t('↑ Upload New File')}
             </button>
           </div>
 
@@ -2593,7 +2593,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                     <div className="w-2 h-2 rounded-full bg-[#C9A84C]" />
                     <div>
                       <span className="text-base font-black text-[#0C1B3A]">{pkg.packageName}</span>
-                      <span className="ml-3 text-[11px] text-[#0C1B3A]/40 font-bold">{pkg.items.length} items</span>
+                      <span className="ml-3 text-[11px] text-[#0C1B3A]/40 font-bold">{t('{n} items').replace('{n}', String(pkg.items.length))}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
@@ -2616,8 +2616,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                           <table className="w-full text-[12px]">
                             <thead>
                               <tr className="bg-[#0C1B3A] text-white">
-                                {['#','Photo','Name','Material / Spec','Qty','Unit','Unit Cost','Subtotal'].map(h => (
-                                  <th key={h} className="px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-wider first:rounded-tl-[16px] last:rounded-tr-[16px]">{h}</th>
+                                {['#',t('Photo'),t('Name'),t('Material / Spec'),t('Qty'),t('Unit'),t('Unit Cost'),t('Subtotal')].map((h, i) => (
+                                  <th key={i} className="px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-wider first:rounded-tl-[16px] last:rounded-tr-[16px]">{h}</th>
                                 ))}
                               </tr>
                             </thead>
@@ -2645,7 +2645,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                             </tbody>
                             <tfoot>
                               <tr className="bg-[#0C1B3A]/5 border-t border-[#0C1B3A]/8">
-                                <td colSpan={7} className="px-3 py-2 text-[10px] font-black uppercase tracking-wider text-[#0C1B3A]/40 text-right">Area Total</td>
+                                <td colSpan={7} className="px-3 py-2 text-[10px] font-black uppercase tracking-wider text-[#0C1B3A]/40 text-right">{t('Area Total')}</td>
                                 <td className="px-3 py-2 text-right font-mono font-black text-[#0C1B3A]">
                                   {areaItems.reduce((s, it) => s + it.subtotal, 0).toLocaleString()}
                                 </td>
@@ -2658,7 +2658,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                     {/* Package total */}
                     <div className="flex justify-end">
                       <div className="bg-[#0C1B3A] text-white rounded-[16px] px-6 py-3 flex items-center gap-4">
-                        <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Package Total</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest opacity-60">{t('Package Total')}</span>
                         <span className="text-lg font-black">{pkg.currency} {pkg.totalCost.toLocaleString()}</span>
                       </div>
                     </div>
@@ -2671,11 +2671,11 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           {/* Grand summary */}
           <div className="flex justify-end pt-2">
             <div className="border border-[#C9A84C]/30 rounded-[20px] px-8 py-4 space-y-1 text-right">
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">All Packages Combined</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('All Packages Combined')}</p>
               <p className="text-2xl font-black text-[#0C1B3A]">
                 {pqProject.currency} {pqProject.packages.reduce((s, p) => s + p.totalCost, 0).toLocaleString()}
               </p>
-              <p className="text-[10px] text-[#0C1B3A]/30">{pqProject.packages.length} packages · {pqProject.packages.reduce((s, p) => s + p.items.length, 0)} items total</p>
+              <p className="text-[10px] text-[#0C1B3A]/30">{t('{n} packages · {m} items total').replace('{n}', String(pqProject.packages.length)).replace('{m}', String(pqProject.packages.reduce((s, p) => s + p.items.length, 0)))}</p>
             </div>
           </div>
 
@@ -2712,7 +2712,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
               }}
               className="px-10 py-4 rounded-[20px] bg-[#0C1B3A] text-white text-[13px] font-black uppercase tracking-widest hover:bg-[#C9A84C] transition-colors shadow-lg"
             >
-              Generate GCI Package Quote →
+              {t('Generate GCI Package Quote →')}
             </button>
           </div>
         </div>
