@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useI18n } from '@gci/i18n';
 import { supabase } from '../../../apps/shell/src/lib/supabase';
 
 const NAVY = '#0B1F44';
@@ -22,6 +23,8 @@ interface QuoteRow {
 interface Props { supplierId: string; }
 
 export default function QuoteHistory({ supplierId }: Props) {
+  const { dict } = useI18n();
+  const t = dict.suppliers.quotes;
   const [quotes, setQuotes] = useState<QuoteRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -40,9 +43,9 @@ export default function QuoteHistory({ supplierId }: Props) {
   }, [supplierId]);
 
   const matchBadge = (s?: string) => {
-    if (s === 'matched') return { bg: '#dcfce7', text: '#166534', label: '已匹配' };
-    if (s === 'manually_skipped') return { bg: '#f1f5f9', text: '#64748b', label: '已跳过' };
-    return { bg: '#fef9ec', text: '#92400e', label: '待确认' };
+    if (s === 'matched') return { bg: '#dcfce7', text: '#166534', label: t.matchMatched };
+    if (s === 'manually_skipped') return { bg: '#f1f5f9', text: '#64748b', label: t.matchSkipped };
+    return { bg: '#fef9ec', text: '#92400e', label: t.matchPending };
   };
 
   const handleUploadQuote = () => {
@@ -53,25 +56,25 @@ export default function QuoteHistory({ supplierId }: Props) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ fontSize: 13, color: T2 }}>来自 Trade 模块与该供应商关联的报价记录</span>
+        <span style={{ fontSize: 13, color: T2 }}>{t.subtitle}</span>
         <button
           onClick={handleUploadQuote}
           style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
         >
-          + 上传供应商报价
+          {t.upload}
         </button>
       </div>
 
       {loading ? (
-        <div style={{ color: T3, textAlign: 'center', padding: 40 }}>加载中…</div>
+        <div style={{ color: T3, textAlign: 'center', padding: 40 }}>{dict.suppliers.common.loading}</div>
       ) : quotes.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '48px 0' }}>
-          <div style={{ color: T3, fontSize: 14, marginBottom: 12 }}>暂无关联报价记录</div>
+          <div style={{ color: T3, fontSize: 14, marginBottom: 12 }}>{t.empty}</div>
           <button
             onClick={handleUploadQuote}
             style={{ padding: '9px 20px', background: GOLD, color: NAVY, border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
           >
-            前往上传供应商报价
+            {t.uploadCta}
           </button>
         </div>
       ) : (
@@ -79,7 +82,7 @@ export default function QuoteHistory({ supplierId }: Props) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: `2px solid ${BORDER}` }}>
-                {['报价单号', '主题', '状态', '金额', '有效期', '匹配状态', '日期'].map(h => (
+                {[t.colNumber, t.colSubject, t.colStatus, t.colAmount, t.colValidUntil, t.colMatch, t.colDate].map(h => (
                   <th key={h} style={{ textAlign: 'left', padding: '8px 10px', fontSize: 11, fontWeight: 700, color: T2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
                 ))}
               </tr>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useI18n } from '@gci/i18n';
 import type { SupplierProduct } from '../types';
 import { createProduct, deleteProduct, listProducts, updateProduct } from '../lib/suppliersCloud';
 
@@ -21,6 +22,9 @@ const EMPTY = (sid: string): Omit<SupplierProduct, 'id'> => ({
 interface Props { supplierId: string; }
 
 export default function ProductManager({ supplierId }: Props) {
+  const { dict } = useI18n();
+  const t = dict.suppliers.products;
+  const c0 = dict.suppliers.common;
   const [products, setProducts] = useState<SupplierProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [edit, setEdit] = useState<Partial<SupplierProduct> | null>(null);
@@ -43,32 +47,32 @@ export default function ProductManager({ supplierId }: Props) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ fontSize: 13, color: T2 }}>{products.length} 个产品</span>
-        <button onClick={() => setEdit(EMPTY(supplierId))} style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>+ 新增产品</button>
+        <span style={{ fontSize: 13, color: T2 }}>{t.count(products.length)}</span>
+        <button onClick={() => setEdit(EMPTY(supplierId))} style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{t.add}</button>
       </div>
-      {loading ? <div style={{ color: T3, textAlign: 'center', padding: 40 }}>加载中…</div>
-       : products.length === 0 ? <div style={{ color: T3, textAlign: 'center', padding: 40 }}>暂无产品，请新增</div>
+      {loading ? <div style={{ color: T3, textAlign: 'center', padding: 40 }}>{c0.loading}</div>
+       : products.length === 0 ? <div style={{ color: T3, textAlign: 'center', padding: 40 }}>{t.empty}</div>
        : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {products.map(p => (
             <div key={p.id} style={{ background: '#f8fafc', border: `1px solid ${BORDER}`, borderRadius: 10, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <div style={{ fontWeight: 700, color: NAVY, fontSize: 14 }}>{p.product_name_cn || p.product_name_en || '—'}</div>
+                <div style={{ fontWeight: 700, color: NAVY, fontSize: 14 }}>{p.product_name_cn || p.product_name_en || c0.notSet}</div>
                 <div style={{ fontSize: 12, color: T2, marginTop: 3 }}>
-                  {[p.category, p.model, p.unit && `单位：${p.unit}`, p.moq && `MOQ：${p.moq}`].filter(Boolean).join(' · ')}
+                  {[p.category, p.model, p.unit && t.unit(p.unit), p.moq && t.moq(p.moq)].filter(Boolean).join(' · ')}
                 </div>
                 {(p.indicative_price_min || p.indicative_price_max) && (
                   <div style={{ fontSize: 12, color: T3, marginTop: 2 }}>
-                    参考价：{p.indicative_price_min}–{p.indicative_price_max} {p.default_currency}
+                    {t.refPrice}：{p.indicative_price_min}–{p.indicative_price_max} {p.default_currency}
                   </div>
                 )}
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => setEdit({ ...p })} style={{ fontSize: 12, color: NAVY, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>编辑</button>
+                <button onClick={() => setEdit({ ...p })} style={{ fontSize: 12, color: NAVY, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.edit}</button>
                 {deleteId === p.id
-                  ? <><button onClick={async () => { await deleteProduct(p.id!); setDeleteId(null); load(); }} style={{ fontSize: 12, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>确认</button>
-                      <button onClick={() => setDeleteId(null)} style={{ fontSize: 12, color: T2, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>取消</button></>
-                  : <button onClick={() => setDeleteId(p.id!)} style={{ fontSize: 12, color: '#dc2626', background: 'none', border: `1px solid #fca5a5`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>删除</button>
+                  ? <><button onClick={async () => { await deleteProduct(p.id!); setDeleteId(null); load(); }} style={{ fontSize: 12, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.confirm}</button>
+                      <button onClick={() => setDeleteId(null)} style={{ fontSize: 12, color: T2, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.cancel}</button></>
+                  : <button onClick={() => setDeleteId(p.id!)} style={{ fontSize: 12, color: '#dc2626', background: 'none', border: `1px solid #fca5a5`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.delete}</button>
                 }
               </div>
             </div>
@@ -79,32 +83,32 @@ export default function ProductManager({ supplierId }: Props) {
       {edit && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => { if (e.target === e.currentTarget) setEdit(null); }}>
           <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 580, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: NAVY }}>{edit.id ? '编辑产品' : '新增产品'}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: NAVY }}>{edit.id ? t.modalEdit : t.modalNew}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              <F label="中文品名"><input style={INP} value={edit.product_name_cn ?? ''} onChange={e => setEdit(v => ({ ...v!, product_name_cn: e.target.value }))} /></F>
-              <F label="英文品名"><input style={INP} value={edit.product_name_en ?? ''} onChange={e => setEdit(v => ({ ...v!, product_name_en: e.target.value }))} /></F>
-              <F label="品类"><input style={INP} value={edit.category ?? ''} onChange={e => setEdit(v => ({ ...v!, category: e.target.value }))} /></F>
-              <F label="型号"><input style={INP} value={edit.model ?? ''} onChange={e => setEdit(v => ({ ...v!, model: e.target.value }))} /></F>
-              <F label="单位"><input style={INP} value={edit.unit ?? '件'} onChange={e => setEdit(v => ({ ...v!, unit: e.target.value }))} /></F>
-              <F label="MOQ"><input style={INP} type="number" value={edit.moq ?? ''} onChange={e => setEdit(v => ({ ...v!, moq: Number(e.target.value) || undefined }))} /></F>
-              <F label="参考价最低"><input style={INP} type="number" value={edit.indicative_price_min ?? ''} onChange={e => setEdit(v => ({ ...v!, indicative_price_min: Number(e.target.value) || undefined }))} /></F>
-              <F label="参考价最高"><input style={INP} type="number" value={edit.indicative_price_max ?? ''} onChange={e => setEdit(v => ({ ...v!, indicative_price_max: Number(e.target.value) || undefined }))} /></F>
-              <F label="价格基准"><select style={INP} value={edit.price_basis ?? 'EXW'} onChange={e => setEdit(v => ({ ...v!, price_basis: e.target.value }))}><option>EXW</option><option>FOB</option><option>CIF</option></select></F>
-              <F label="币种"><input style={INP} value={edit.default_currency ?? 'CNY'} onChange={e => setEdit(v => ({ ...v!, default_currency: e.target.value }))} /></F>
-              <F label="交期（天）"><input style={INP} type="number" value={edit.lead_time_days ?? ''} onChange={e => setEdit(v => ({ ...v!, lead_time_days: Number(e.target.value) || undefined }))} /></F>
-              <F label="HS Code"><input style={INP} value={edit.hs_code ?? ''} onChange={e => setEdit(v => ({ ...v!, hs_code: e.target.value }))} /></F>
+              <F label={t.fNameCn}><input style={INP} value={edit.product_name_cn ?? ''} onChange={e => setEdit(v => ({ ...v!, product_name_cn: e.target.value }))} /></F>
+              <F label={t.fNameEn}><input style={INP} value={edit.product_name_en ?? ''} onChange={e => setEdit(v => ({ ...v!, product_name_en: e.target.value }))} /></F>
+              <F label={t.fCategory}><input style={INP} value={edit.category ?? ''} onChange={e => setEdit(v => ({ ...v!, category: e.target.value }))} /></F>
+              <F label={t.fModel}><input style={INP} value={edit.model ?? ''} onChange={e => setEdit(v => ({ ...v!, model: e.target.value }))} /></F>
+              <F label={t.fUnit}><input style={INP} value={edit.unit ?? '件'} onChange={e => setEdit(v => ({ ...v!, unit: e.target.value }))} /></F>
+              <F label={t.fMoq}><input style={INP} type="number" value={edit.moq ?? ''} onChange={e => setEdit(v => ({ ...v!, moq: Number(e.target.value) || undefined }))} /></F>
+              <F label={t.fPriceMin}><input style={INP} type="number" value={edit.indicative_price_min ?? ''} onChange={e => setEdit(v => ({ ...v!, indicative_price_min: Number(e.target.value) || undefined }))} /></F>
+              <F label={t.fPriceMax}><input style={INP} type="number" value={edit.indicative_price_max ?? ''} onChange={e => setEdit(v => ({ ...v!, indicative_price_max: Number(e.target.value) || undefined }))} /></F>
+              <F label={t.fPriceBasis}><select style={INP} value={edit.price_basis ?? 'EXW'} onChange={e => setEdit(v => ({ ...v!, price_basis: e.target.value }))}><option>EXW</option><option>FOB</option><option>CIF</option></select></F>
+              <F label={t.fCurrency}><input style={INP} value={edit.default_currency ?? 'CNY'} onChange={e => setEdit(v => ({ ...v!, default_currency: e.target.value }))} /></F>
+              <F label={t.fLeadTime}><input style={INP} type="number" value={edit.lead_time_days ?? ''} onChange={e => setEdit(v => ({ ...v!, lead_time_days: Number(e.target.value) || undefined }))} /></F>
+              <F label={t.fHsCode}><input style={INP} value={edit.hs_code ?? ''} onChange={e => setEdit(v => ({ ...v!, hs_code: e.target.value }))} /></F>
             </div>
             <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-              {([['oem_available','OEM'],['odm_available','ODM'],['private_label_available','私标']] as [keyof SupplierProduct, string][]).map(([k, l]) => (
+              {([['oem_available',t.fOem],['odm_available',t.fOdm],['private_label_available',t.fPrivateLabel]] as [keyof SupplierProduct, string][]).map(([k, l]) => (
                 <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: NAVY, cursor: 'pointer' }}>
                   <input type="checkbox" checked={!!(edit as any)[k]} onChange={e => setEdit(v => ({ ...v!, [k]: e.target.checked }))} />{l}
                 </label>
               ))}
             </div>
-            <F label="备注"><textarea style={{ ...INP, resize: 'vertical', minHeight: 60 }} value={edit.notes ?? ''} onChange={e => setEdit(v => ({ ...v!, notes: e.target.value }))} /></F>
+            <F label={t.fNotes}><textarea style={{ ...INP, resize: 'vertical', minHeight: 60 }} value={edit.notes ?? ''} onChange={e => setEdit(v => ({ ...v!, notes: e.target.value }))} /></F>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '10px 0', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>{saving ? '保存中…' : '保存'}</button>
-              <button onClick={() => setEdit(null)} style={{ padding: '10px 20px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T2, fontWeight: 600, cursor: 'pointer' }}>取消</button>
+              <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '10px 0', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>{saving ? c0.saving : c0.save}</button>
+              <button onClick={() => setEdit(null)} style={{ padding: '10px 20px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T2, fontWeight: 600, cursor: 'pointer' }}>{c0.cancel}</button>
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useI18n } from '@gci/i18n';
 import type { Supplier, SupplierRating } from '../types';
 import { updateSupplier } from '../lib/suppliersCloud';
 
@@ -11,9 +12,6 @@ const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: '
 const LBL: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: T2, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' };
 
 const RATINGS: SupplierRating[] = ['A', 'B', 'C', 'D'];
-const RATING_DESC: Record<SupplierRating, string> = {
-  A: '优质供应商', B: '合格供应商', C: '待改进', D: '风险供应商',
-};
 
 interface Props {
   supplier: Supplier;
@@ -21,6 +19,11 @@ interface Props {
 }
 
 export default function RatingNotes({ supplier, onUpdated }: Props) {
+  const { dict } = useI18n();
+  const t = dict.suppliers.rating;
+  const RATING_DESC: Record<SupplierRating, string> = {
+    A: t.descA, B: t.descB, C: t.descC, D: t.descD,
+  };
   const [rating, setRating] = useState<SupplierRating>(supplier.current_rating ?? 'B');
   const [score, setScore] = useState(supplier.current_score ?? '');
   const [owner, setOwner] = useState(supplier.internal_owner ?? '');
@@ -67,22 +70,22 @@ export default function RatingNotes({ supplier, onUpdated }: Props) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
         <div>
-          <label style={LBL}>综合评分（0–100）</label>
-          <input style={INP} type="number" min={0} max={100} value={score} onChange={e => setScore(e.target.value)} placeholder="可选" />
+          <label style={LBL}>{t.fScore}</label>
+          <input style={INP} type="number" min={0} max={100} value={score} onChange={e => setScore(e.target.value)} />
         </div>
         <div>
-          <label style={LBL}>GCI 内部对接人</label>
-          <input style={INP} value={owner} onChange={e => setOwner(e.target.value)} placeholder="Chris / Lili / Novie" />
+          <label style={LBL}>{t.fOwner}</label>
+          <input style={INP} value={owner} onChange={e => setOwner(e.target.value)} placeholder={t.fOwnerPlaceholder} />
         </div>
       </div>
 
       <div style={{ marginBottom: 20 }}>
-        <label style={LBL}>内部备注</label>
+        <label style={LBL}>{t.fNotes}</label>
         <textarea
           style={{ ...INP, resize: 'vertical', minHeight: 100 }}
           value={notes}
           onChange={e => setNotes(e.target.value)}
-          placeholder="合作历史、注意事项、供应商特点…"
+          placeholder={t.fNotesPlaceholder}
         />
       </div>
 
@@ -91,7 +94,7 @@ export default function RatingNotes({ supplier, onUpdated }: Props) {
         disabled={saving}
         style={{ padding: '10px 32px', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
       >
-        {saving ? '保存中…' : saved ? '已保存 ✓' : '保存'}
+        {saving ? dict.suppliers.common.saving : saved ? dict.suppliers.common.saved : t.save}
       </button>
     </div>
   );

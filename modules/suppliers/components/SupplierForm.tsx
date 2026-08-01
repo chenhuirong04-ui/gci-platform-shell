@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useI18n } from '@gci/i18n';
 import type { Supplier, SupplierType, SupplierStatus, SupplierRating, DocumentType } from '../types';
 import { createSupplier, generateShortCode, updateSupplier } from '../lib/suppliersCloud';
 import { createDocument, moveStorageFile, resolveStorageBucket } from '../lib/documentsCloud';
+import { getStatusLabel, getDocTypeLabel } from '../lib/labelMaps';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const GOLD    = '#C9A84C';
@@ -109,17 +111,8 @@ async function callParse(
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const TYPES: SupplierType[] = ['Factory', 'Trading', 'Integrated', 'Service', 'Agent', 'Unknown'];
-const STATUSES: { v: SupplierStatus; l: string }[] = [
-  { v: 'active', l: '正常' }, { v: 'inactive', l: '停用' },
-  { v: 'blacklisted', l: '黑名单' }, { v: 'under_review', l: '审核中' }, { v: 'archived', l: '封存' },
-];
+const STATUS_VALUES: SupplierStatus[] = ['active', 'inactive', 'blacklisted', 'under_review', 'archived'];
 const RATINGS: SupplierRating[] = ['A', 'B', 'C', 'D'];
-
-const UPLOAD_BTNS: { label: string; docType: DocumentType; parseType: string | null }[] = [
-  { label: '📄 上传营业执照',           docType: '营业执照',    parseType: 'SUPPLIER_TRADE_LICENSE'    },
-  { label: '🏛 上传公司注册文件',         docType: '公司注册文件', parseType: 'SUPPLIER_TRADE_LICENSE'    },
-  { label: '📁 上传公司简介 / 产品目录',  docType: '公司简介',    parseType: 'SUPPLIER_COMPANY_PROFILE'  },
-];
 
 const FORM_INIT = (s?: Supplier) => ({
   supplier_name_display: s?.supplier_name_display ?? '',
@@ -149,6 +142,14 @@ interface Props {
 
 // ════════════════════════════════════════════════════════════════════════════
 export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
+  const { lang, dict } = useI18n();
+  const t = dict.suppliers.form;
+  const c0 = dict.suppliers.common;
+  const UPLOAD_BTNS: { label: string; docType: DocumentType; parseType: string | null }[] = [
+    { label: t.btnUploadLicense,      docType: '营业执照',    parseType: 'SUPPLIER_TRADE_LICENSE'    },
+    { label: t.btnUploadRegistration, docType: '公司注册文件', parseType: 'SUPPLIER_TRADE_LICENSE'    },
+    { label: t.btnUploadProfile,      docType: '公司简介',    parseType: 'SUPPLIER_COMPANY_PROFILE'  },
+  ];
   const isEdit = !!supplier?.id;
 
   // ── Upload / parse state ──────────────────────────────────────────────────
@@ -198,7 +199,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
     const bucket = resolveStorageBucket(btn.docType);
     const up = await uploadTemp(file, bucket);
     if (!up) {
-      setUploadError('文件上传失败，请检查网络后重试');
+      setUploadError(dict.suppliers.documents.errUploadFailed);
       setUploadStage('failed');
       return;
     }
@@ -266,11 +267,14 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
           }
           // Extra info → notes
           const extras: string[] = [];
+          const L = lang === 'zh'
+            ? { products: '主要产品', contact: '联系人', phone: '电话', email: '邮箱' }
+            : { products: 'Main Products', contact: 'Contact', phone: 'Phone', email: 'Email' };
           if (Array.isArray(f.main_products) && f.main_products.length)
-            extras.push(`主要产品: ${(f.main_products as string[]).join('、')}`);
-          if (f.contact_name) extras.push(`联系人: ${f.contact_name}`);
-          if (f.phone)        extras.push(`电话: ${f.phone}`);
-          if (f.email)        extras.push(`邮箱: ${f.email}`);
+            extras.push(`${L.products}: ${(f.main_products as string[]).join(lang === 'zh' ? '、' : ', ')}`);
+          if (f.contact_name) extras.push(`${L.contact}: ${f.contact_name}`);
+          if (f.phone)        extras.push(`${L.phone}: ${f.phone}`);
+          if (f.email)        extras.push(`${L.email}: ${f.email}`);
           if (extras.length && !prev.notes) {
             next.notes = extras.join('\n');
             filled.add('notes');
@@ -280,14 +284,14 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
         setAiFilledKeys(filled);
       }
     } else {
-      setUploadError('AI 解析失败，文件已上传，请手工填写');
+      setUploadError(t.errAiParseFailed);
     }
     setUploadStage('ready');
   };
 
   // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = async () => {
-    if (!form.supplier_name_display.trim()) { setSaveError('供应商名称不能为空'); return; }
+    if (!form.supplier_name_display.trim()) { setSaveError(t.errNameRequired); return; }
     setSaving(true); setSaveError('');
     try {
       const cats = form.categoriesRaw.split(',').map(s => s.trim()).filter(Boolean);
@@ -315,12 +319,12 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
 
       if (isEdit && supplier?.id) {
         const ok = await updateSupplier(supplier.id, payload);
-        if (!ok) { setSaveError('保存失败，请重试'); return; }
+        if (!ok) { setSaveError(t.errSaveFailed); return; }
         saved = { ...supplier, ...payload };
       } else {
         const code = await generateShortCode('SUP-AUTO');
         saved = await createSupplier({ ...payload, short_code: code, import_source: 'manual' });
-        if (!saved?.id) { setSaveError('创建供应商失败，请重试'); return; }
+        if (!saved?.id) { setSaveError(t.errCreateFailed); return; }
       }
 
       // Step 2: archive file + create document
@@ -334,12 +338,15 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
         const storagePath = finalPath ?? uploadedFile.origPath;
 
         // Build notes for supplier_document from license fields that have no dedicated column
+        const NL = lang === 'zh'
+          ? { reg: '注册号', legalRep: '法定代表人', address: '注册地址', vat: 'VAT/税号', activities: '经营范围' }
+          : { reg: 'Reg. No.', legalRep: 'Legal Rep.', address: 'Registered Address', vat: 'VAT/Tax No.', activities: 'Business Activities' };
         const docNoteLines = [
-          licenseFields.registration_number  && `注册号: ${licenseFields.registration_number}`,
-          licenseFields.legal_representative && `法定代表人: ${licenseFields.legal_representative}`,
-          licenseFields.registered_address   && `注册地址: ${licenseFields.registered_address}`,
-          licenseFields.vat_number           && `VAT/税号: ${licenseFields.vat_number}`,
-          licenseFields.business_activities  && `经营范围: ${licenseFields.business_activities}`,
+          licenseFields.registration_number  && `${NL.reg}: ${licenseFields.registration_number}`,
+          licenseFields.legal_representative && `${NL.legalRep}: ${licenseFields.legal_representative}`,
+          licenseFields.registered_address   && `${NL.address}: ${licenseFields.registered_address}`,
+          licenseFields.vat_number           && `${NL.vat}: ${licenseFields.vat_number}`,
+          licenseFields.business_activities  && `${NL.activities}: ${licenseFields.business_activities}`,
         ].filter(Boolean);
 
         await createDocument({
@@ -359,7 +366,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
 
       onSaved(saved!);
     } catch (e: any) {
-      setSaveError(e?.message ?? '保存时出现未知错误');
+      setSaveError(e?.message ?? t.errUnknown);
     } finally {
       setSaving(false);
     }
@@ -367,13 +374,13 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
 
   // ── Completeness ──────────────────────────────────────────────────────────
   const checks = [
-    { label: '供应商名称',          done: !!form.supplier_name_display },
-    { label: '中文或英文名称',        done: !!(form.name_cn || form.name_en) },
-    { label: '供应商类型',           done: !!form.supplier_type && form.supplier_type !== 'Unknown' },
-    { label: '国家',                 done: !!form.country },
-    { label: '付款条款',             done: !!form.payment_terms },
-    { label: '内部对接人',           done: !!form.internal_owner },
-    { label: '营业执照 / 公司文件',   done: !!uploadedFile },
+    { label: t.checkName,          done: !!form.supplier_name_display },
+    { label: t.checkNameCnEn,      done: !!(form.name_cn || form.name_en) },
+    { label: t.checkType,          done: !!form.supplier_type && form.supplier_type !== 'Unknown' },
+    { label: t.checkCountry,       done: !!form.country },
+    { label: t.checkPaymentTerms,  done: !!form.payment_terms },
+    { label: t.checkOwner,         done: !!form.internal_owner },
+    { label: t.checkLicense,       done: !!uploadedFile },
   ];
   const pct = Math.round(checks.filter(c => c.done).length / checks.length * 100);
 
@@ -384,7 +391,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
     <div style={{ background: BG, minHeight: '100vh' }}>
       <div style={{ padding: '24px 28px 64px', maxWidth: 1200, margin: '0 auto' }}>
         <button onClick={onCancel} style={{ fontSize: 12, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 18 }}>
-          ← 返回列表
+          {c0.back}
         </button>
 
         <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
@@ -395,10 +402,10 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
             {/* Title card */}
             <div style={CARD}>
               <h2 style={{ fontSize: 20, fontWeight: 800, color: NAVY, margin: '0 0 4px' }}>
-                {isEdit ? '编辑供应商档案' : '新增供应商'}
+                {isEdit ? t.titleEdit : t.titleNew}
               </h2>
               <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
-                {isEdit ? '修改后保存即可更新档案' : '上传营业执照 / 公司简介可自动识别信息，或手工填写'}
+                {isEdit ? t.subtitleEdit : t.subtitleNew}
               </p>
             </div>
 
@@ -407,11 +414,10 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
               <div style={{ ...CARD, border: uploadedFile ? `1.5px solid ${GOLD}60` : `1.5px solid ${NAVY}25` }}>
                 <div style={{ height: 4, background: `linear-gradient(90deg, ${NAVY}, ${GOLD})`, margin: '-28px -28px 24px', borderRadius: '24px 24px 0 0' }} />
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{ ...SEC, marginBottom: 4 }}>AI 智能创建</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: NAVY }}>上传供应商资料，自动识别公司信息</div>
+                  <div style={{ ...SEC, marginBottom: 4 }}>{t.aiSectionLabel}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: NAVY }}>{t.aiUploadTitle}</div>
                   <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-                    营业执照 / 公司注册文件 → 自动填表 + 可编辑确认区 &nbsp;·&nbsp;
-                    公司简介 / 产品目录 → 自动填表（名称/地区/产品等）&nbsp;·&nbsp; PDF · PNG · JPG
+                    {t.aiUploadDesc}
                   </div>
                 </div>
 
@@ -433,13 +439,13 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                   </div>
                 )}
 
-                {uploadStage === 'uploading' && <Spinner label="上传文件中…" sub="正在上传到 Supabase Storage" />}
-                {uploadStage === 'parsing'   && <Spinner label="AI 解析中…" sub="Gemini Vision 正在识别文件内容，通常约 10 秒" icon="🔍" />}
+                {uploadStage === 'uploading' && <Spinner label={t.uploadingFile} sub={t.uploadingSub} />}
+                {uploadStage === 'parsing'   && <Spinner label={t.aiParsing} sub={t.aiParsingSub} icon="🔍" />}
 
                 {uploadStage === 'failed' && !uploadedFile && (
                   <div>
-                    <Alert type="error">{uploadError || '上传失败，请重试'}</Alert>
-                    <button onClick={resetUpload} style={{ marginTop: 10, fontSize: 13, color: NAVY, background: 'none', border: `1px solid ${CBORDER}`, borderRadius: 8, padding: '6px 14px', cursor: 'pointer' }}>重新选择文件</button>
+                    <Alert type="error">{uploadError || t.uploadFailedRetry}</Alert>
+                    <button onClick={resetUpload} style={{ marginTop: 10, fontSize: 13, color: NAVY, background: 'none', border: `1px solid ${CBORDER}`, borderRadius: 8, padding: '6px 14px', cursor: 'pointer' }}>{t.reselectFile}</button>
                   </div>
                 )}
 
@@ -449,19 +455,19 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                       ? <Alert type="warn">{uploadError}</Alert>
                       : showLicenseEdit
                         ? <Alert type="ok">
-                            ✓ AI 解析完成（{parseModel}）— 已自动填入表单，执照详情请在下方确认区核对
+                            {t.aiDoneLicense(parseModel)}
                             {parseConf && <ConfBadge v={parseConf} />}
                           </Alert>
                         : aiFilledKeys.size > 0
                           ? <Alert type="ok">
-                              ✓ 公司资料解析完成（{parseModel}）— 已自动填入表单
+                              {t.aiDoneProfile(parseModel)}
                               {parseConf && <ConfBadge v={parseConf} />}
                             </Alert>
-                          : <Alert type="ok">✓ 文件已上传（未解析结构化数据，请手工填写）</Alert>
+                          : <Alert type="ok">{t.aiDoneNoData}</Alert>
                     }
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 12, color: '#64748b' }}>📎 {uploadedFile.origName} · {uploadedFile.docType}</span>
-                      <button onClick={resetUpload} style={{ fontSize: 12, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>重新上传</button>
+                      <span style={{ fontSize: 12, color: '#64748b' }}>📎 {uploadedFile.origName} · {getDocTypeLabel(uploadedFile.docType, lang)}</span>
+                      <button onClick={resetUpload} style={{ fontSize: 12, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>{t.reupload}</button>
                     </div>
                   </div>
                 )}
@@ -471,50 +477,49 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
             {/* ── License confirmation (9 editable fields) ──────────────────── */}
             {!isEdit && showLicenseEdit && (
               <div style={{ ...CARD, border: `1.5px solid ${GOLD}50`, background: '#fffdf6' }}>
-                <div style={SEC}>营业执照识别结果 — 核对后可直接编辑</div>
+                <div style={SEC}>{t.licenseConfirmTitle}</div>
                 <div style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>
-                  保存后这些字段将写入「营业执照与公司文件」Tab，在供应商详情页可见 ↓
+                  {t.licenseConfirmDesc}
                 </div>
 
                 <div style={R3}>
-                  <FLD label="执照号 / 统一社会信用代码">
+                  <FLD label={t.fLicenseNumber}>
                     <input style={INP} value={licenseFields.document_number} onChange={e => setL('document_number', e.target.value)} placeholder="91xxxxxxxxxxxxxxxxxx" />
                   </FLD>
-                  <FLD label="注册号（与执照号不同时填）">
+                  <FLD label={t.fRegNumber}>
                     <input style={INP} value={licenseFields.registration_number} onChange={e => setL('registration_number', e.target.value)} />
                   </FLD>
-                  <FLD label="法定代表人">
+                  <FLD label={t.fLegalRep}>
                     <input style={INP} value={licenseFields.legal_representative} onChange={e => setL('legal_representative', e.target.value)} />
                   </FLD>
                 </div>
                 <div style={R3}>
-                  <FLD label="颁发机构">
-                    <input style={INP} value={licenseFields.issuing_authority} onChange={e => setL('issuing_authority', e.target.value)} placeholder="广州市市场监督管理局" />
+                  <FLD label={t.fIssuingAuthority}>
+                    <input style={INP} value={licenseFields.issuing_authority} onChange={e => setL('issuing_authority', e.target.value)} />
                   </FLD>
-                  <FLD label="签发日期">
+                  <FLD label={t.fIssueDate}>
                     <input style={INP} type="date" value={licenseFields.issue_date} onChange={e => setL('issue_date', e.target.value)} />
                   </FLD>
-                  <FLD label="到期日期">
+                  <FLD label={t.fExpireDate}>
                     <input style={INP} type="date" value={licenseFields.expire_date} onChange={e => setL('expire_date', e.target.value)} />
                   </FLD>
                 </div>
                 <div style={R2}>
-                  <FLD label="VAT / 税号">
+                  <FLD label={t.fVat}>
                     <input style={INP} value={licenseFields.vat_number} onChange={e => setL('vat_number', e.target.value)} />
                   </FLD>
-                  <FLD label="注册地址">
+                  <FLD label={t.fRegisteredAddress}>
                     <input style={INP} value={licenseFields.registered_address} onChange={e => setL('registered_address', e.target.value)} />
                   </FLD>
                 </div>
-                <FLD label="经营范围（多项用分号分隔）">
+                <FLD label={t.fActivities}>
                   <textarea style={{ ...INP, resize: 'vertical', minHeight: 64 }}
                     value={licenseFields.business_activities}
-                    onChange={e => setL('business_activities', e.target.value)}
-                    placeholder="经营范围 A; 经营范围 B; …" />
+                    onChange={e => setL('business_activities', e.target.value)} />
                 </FLD>
 
                 <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 12, lineHeight: 1.6 }}>
-                  写入规则：执照号 → document_number · 颁发机构/签发/到期 → 对应字段 · 注册号/法定代表人/地址/VAT/经营范围 → 文件备注（notes 字段，详情页可见）
+                  {t.writeRuleNote}
                 </div>
               </div>
             )}
@@ -524,7 +529,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ flex: 1, height: 1, background: CBORDER }} />
                 <span style={{ fontSize: 12, color: '#94a3b8', whiteSpace: 'nowrap', fontWeight: 600 }}>
-                  {uploadedFile ? '核对并补充以下供应商资料' : '没有文件？手工填写供应商资料'}
+                  {uploadedFile ? t.dividerWithFile : t.dividerNoFile}
                 </span>
                 <div style={{ flex: 1, height: 1, background: CBORDER }} />
               </div>
@@ -532,51 +537,51 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
 
             {/* ── 1. Basic info ─────────────────────────────────────────────── */}
             <div style={CARD}>
-              <div style={SEC}>{isEdit ? '基础信息' : '1. 基础信息'}</div>
+              <div style={SEC}>{isEdit ? t.section1Edit : t.section1}</div>
               <div style={R3}>
-                <FLD label="主显示名称 *" ai={aiFilledKeys.has('supplier_name_display')}>
+                <FLD label={t.fDisplayName} ai={aiFilledKeys.has('supplier_name_display')}>
                   <input
                     ref={nameDisplayRef}
                     style={{ ...INP, ...aiInp(aiFilledKeys.has('supplier_name_display')), borderColor: !form.supplier_name_display ? '#e53e3e' : undefined, textAlign: 'left', textIndent: 0 }}
                     value={form.supplier_name_display}
                     onChange={e => setF('supplier_name_display', e.target.value)}
                     onFocus={e => { e.currentTarget.scrollLeft = 0; }}
-                    placeholder="供应商主显示名称" />
+                    placeholder={t.fDisplayNamePlaceholder} />
                 </FLD>
-                <FLD label="中文名称" ai={aiFilledKeys.has('name_cn')}>
-                  <input style={{ ...INP, ...aiInp(aiFilledKeys.has('name_cn')) }} value={form.name_cn} onChange={e => setF('name_cn', e.target.value)} placeholder="中文名称" />
+                <FLD label={t.fNameCn} ai={aiFilledKeys.has('name_cn')}>
+                  <input style={{ ...INP, ...aiInp(aiFilledKeys.has('name_cn')) }} value={form.name_cn} onChange={e => setF('name_cn', e.target.value)} />
                 </FLD>
-                <FLD label="英文名称" ai={aiFilledKeys.has('name_en')}>
+                <FLD label={t.fNameEn} ai={aiFilledKeys.has('name_en')}>
                   <input style={{ ...INP, ...aiInp(aiFilledKeys.has('name_en')) }} value={form.name_en} onChange={e => setF('name_en', e.target.value)} placeholder="English Name" />
                 </FLD>
               </div>
               <div style={R3}>
-                <FLD label="供应商类型">
+                <FLD label={t.fSupplierType}>
                   <select style={SEL} value={form.supplier_type} onChange={e => setF('supplier_type', e.target.value as SupplierType)}>
-                    {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    {TYPES.map(ty => <option key={ty} value={ty}>{ty}</option>)}
                   </select>
                 </FLD>
-                <FLD label="供应品类（逗号分隔）" ai={aiFilledKeys.has('categoriesRaw')}>
-                  <input style={{ ...INP, ...aiInp(aiFilledKeys.has('categoriesRaw')) }} value={form.categoriesRaw} onChange={e => setF('categoriesRaw', e.target.value)} placeholder="卫生用品, 家居, FF&E" />
+                <FLD label={t.fCategories} ai={aiFilledKeys.has('categoriesRaw')}>
+                  <input style={{ ...INP, ...aiInp(aiFilledKeys.has('categoriesRaw')) }} value={form.categoriesRaw} onChange={e => setF('categoriesRaw', e.target.value)} placeholder={t.fCategoriesPlaceholder} />
                 </FLD>
-                <FLD label="成立年份" ai={aiFilledKeys.has('established_year')}>
+                <FLD label={t.fEstablishedYear} ai={aiFilledKeys.has('established_year')}>
                   <input style={{ ...INP, ...aiInp(aiFilledKeys.has('established_year')) }} value={form.established_year} onChange={e => setF('established_year', e.target.value)} placeholder="2010" />
                 </FLD>
               </div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#334155', fontWeight: 600 }}>
                 <input type="checkbox" checked={form.is_preferred} onChange={e => setF('is_preferred', e.target.checked)} style={{ width: 16, height: 16 }} />
-                常用供应商（标星 ⭐）
+                {t.preferredCheckbox}
               </label>
             </div>
 
             {/* ── 2. Location ───────────────────────────────────────────────── */}
             <div style={CARD}>
-              <div style={SEC}>{isEdit ? '地区' : '2. 地区'}</div>
+              <div style={SEC}>{isEdit ? t.section2Edit : t.section2}</div>
               <div style={R2}>
-                <FLD label="国家" ai={aiFilledKeys.has('country')}>
+                <FLD label={t.fCountry} ai={aiFilledKeys.has('country')}>
                   <input style={{ ...INP, ...aiInp(aiFilledKeys.has('country')) }} value={form.country} onChange={e => setF('country', e.target.value)} placeholder="China / UAE" />
                 </FLD>
-                <FLD label="城市" ai={aiFilledKeys.has('city')}>
+                <FLD label={t.fCity} ai={aiFilledKeys.has('city')}>
                   <input style={{ ...INP, ...aiInp(aiFilledKeys.has('city')) }} value={form.city} onChange={e => setF('city', e.target.value)} placeholder="Guangzhou" />
                 </FLD>
               </div>
@@ -584,24 +589,24 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
 
             {/* ── 3. Cooperation ────────────────────────────────────────────── */}
             <div style={CARD}>
-              <div style={SEC}>{isEdit ? '合作信息' : '3. 合作信息'}</div>
+              <div style={SEC}>{isEdit ? t.section3Edit : t.section3}</div>
               <div style={R3}>
-                <FLD label="付款条款"><input style={INP} value={form.payment_terms} onChange={e => setF('payment_terms', e.target.value)} placeholder="30%+70% TT" /></FLD>
-                <FLD label="默认交期（天）"><input style={INP} type="number" min={0} value={form.default_lead_time_days} onChange={e => setF('default_lead_time_days', e.target.value)} /></FLD>
-                <FLD label="GCI 内部对接人"><input style={INP} value={form.internal_owner} onChange={e => setF('internal_owner', e.target.value)} placeholder="Chris / Lili" /></FLD>
+                <FLD label={t.fPaymentTerms}><input style={INP} value={form.payment_terms} onChange={e => setF('payment_terms', e.target.value)} placeholder="30%+70% TT" /></FLD>
+                <FLD label={t.fDefaultLeadTime}><input style={INP} type="number" min={0} value={form.default_lead_time_days} onChange={e => setF('default_lead_time_days', e.target.value)} /></FLD>
+                <FLD label={t.fInternalOwner}><input style={INP} value={form.internal_owner} onChange={e => setF('internal_owner', e.target.value)} placeholder="Chris / Lili" /></FLD>
               </div>
               <div style={R3}>
-                <FLD label="状态">
+                <FLD label={t.fStatus}>
                   <select style={SEL} value={form.status} onChange={e => setF('status', e.target.value as SupplierStatus)}>
-                    {STATUSES.map(s => <option key={s.v} value={s.v}>{s.l}</option>)}
+                    {STATUS_VALUES.map(s => <option key={s} value={s}>{getStatusLabel(s, lang)}</option>)}
                   </select>
                 </FLD>
-                <FLD label="评级">
+                <FLD label={t.fRating}>
                   <select style={SEL} value={form.current_rating} onChange={e => setF('current_rating', e.target.value as SupplierRating)}>
                     {RATINGS.map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </FLD>
-                <FLD label="网站" ai={aiFilledKeys.has('website')}>
+                <FLD label={t.fWebsite} ai={aiFilledKeys.has('website')}>
                   <input style={{ ...INP, ...aiInp(aiFilledKeys.has('website')) }} value={form.website} onChange={e => setF('website', e.target.value)} placeholder="https://..." />
                 </FLD>
               </div>
@@ -609,13 +614,13 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
 
             {/* ── 4. Notes ──────────────────────────────────────────────────── */}
             <div style={CARD}>
-              <div style={SEC}>{isEdit ? '内部备注' : '4. 内部备注'}</div>
+              <div style={SEC}>{isEdit ? t.section4Edit : t.section4}</div>
               {aiFilledKeys.has('notes') && (
-                <Alert type="ok" style={{ marginBottom: 10 }}>✓ AI 已从公司资料提取：主要产品 / 联系人 / 电话 / 邮箱，已填入备注</Alert>
+                <Alert type="ok" style={{ marginBottom: 10 }}>{t.aiNotesExtracted}</Alert>
               )}
               <textarea style={{ ...INP, ...aiInp(aiFilledKeys.has('notes')), resize: 'vertical', minHeight: 80 }}
                 value={form.notes} onChange={e => setF('notes', e.target.value)}
-                placeholder="内部备注（主要产品、联系人信息、合作说明等）…" />
+                placeholder={t.fNotesPlaceholder} />
             </div>
 
             {saveError && <Alert type="error">✗ {saveError}</Alert>}
@@ -629,18 +634,18 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                   color: '#fff', fontSize: 15, fontWeight: 700,
                   cursor: savingDisabled ? 'not-allowed' : 'pointer',
                 }}>
-                {saving ? '保存中…'
-                  : uploadedFile ? '确认创建供应商 + 归档文件 + 写入执照信息 →'
-                  : isEdit ? '保存修改' : '创建供应商 →'}
+                {saving ? t.saving
+                  : uploadedFile ? t.saveWithFile
+                  : isEdit ? t.saveEdit : t.saveNew}
               </button>
               <button onClick={onCancel} style={{ padding: '13px 28px', borderRadius: 10, border: `1.5px solid ${CBORDER}`, background: '#fff', color: '#475569', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-                取消
+                {t.cancel}
               </button>
             </div>
 
             {aiFilledKeys.size > 0 && (
               <div style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center' }}>
-                🟢 绿色高亮字段 = AI 自动识别填入，保存前请核对
+                {t.aiHighlightNote}
               </div>
             )}
           </div>
@@ -648,11 +653,11 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
           {/* ═══ RIGHT — summary ════════════════════════════════════════════ */}
           <div style={{ width: 280, flexShrink: 0, position: 'sticky', top: 24 }}>
             <div style={{ ...CARD, display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <div style={SEC}>档案完整度</div>
+              <div style={SEC}>{t.completenessTitle}</div>
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
-                  <span style={{ color: '#334155', fontWeight: 600 }}>整体进度</span>
+                  <span style={{ color: '#334155', fontWeight: 600 }}>{t.overallProgress}</span>
                   <span style={{ color: NAVY, fontWeight: 700 }}>{pct}%</span>
                 </div>
                 <div style={{ height: 6, borderRadius: 99, background: '#e8e0d0', overflow: 'hidden' }}>
@@ -673,38 +678,38 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
               {showLicenseEdit && (
                 <div style={{ borderTop: `1px solid ${CBORDER}`, paddingTop: 16 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
-                    营业执照识别
+                    {t.licensePreviewTitle}
                   </div>
                   {([
-                    ['执照号', licenseFields.document_number],
-                    ['注册号', licenseFields.registration_number],
-                    ['法定代表人', licenseFields.legal_representative],
-                    ['颁发机构', licenseFields.issuing_authority],
-                    ['签发', licenseFields.issue_date],
-                    ['到期', licenseFields.expire_date],
-                    ['VAT', licenseFields.vat_number],
+                    [t.licenseNumber, licenseFields.document_number],
+                    [t.regNumber, licenseFields.registration_number],
+                    [t.legalRep, licenseFields.legal_representative],
+                    [t.issuingAuthority, licenseFields.issuing_authority],
+                    [t.issued, licenseFields.issue_date],
+                    [t.expires, licenseFields.expire_date],
+                    [t.vat, licenseFields.vat_number],
                   ] as [string, string][]).filter(([, v]) => v).map(([l, v]) => (
                     <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 5 }}>
                       <span style={{ color: '#94a3b8' }}>{l}</span>
                       <span style={{ color: '#334155', fontWeight: 600, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span>
                     </div>
                   ))}
-                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 8 }}>↑ 保存后写入 supplier_documents</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 8 }}>{t.savedToNote}</div>
                 </div>
               )}
 
               {!uploadedFile && !isEdit && (
                 <div style={{ borderTop: `1px solid ${CBORDER}`, paddingTop: 14 }}>
                   <div style={{ background: `${GOLD}15`, borderRadius: 10, padding: '12px 14px', fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
-                    💡 保存后可在详情页继续上传认证证书、新增联系人和产品
+                    {t.noFileTip}
                   </div>
                 </div>
               )}
 
               {uploadedFile && (
                 <div style={{ borderTop: `1px solid ${CBORDER}`, paddingTop: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 8 }}>保存后执行顺序</div>
-                  {['① createSupplier', '② 归档文件到 suppliers/{id}/...', '③ createDocument', '④ 跳转详情页'].map((s, i) => (
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 8 }}>{t.afterSaveOrderTitle}</div>
+                  {t.afterSaveSteps.map((s, i) => (
                     <div key={i} style={{ fontSize: 11, color: '#334155', marginBottom: 4 }}>{s}</div>
                   ))}
                 </div>
@@ -752,11 +757,12 @@ function Alert({ type, children, style: extra }: { type: 'ok' | 'warn' | 'error'
 }
 
 function ConfBadge({ v }: { v: string }) {
+  const { dict } = useI18n();
   const isHigh = v === 'high';
   return (
     <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, fontWeight: 700,
       background: isHigh ? '#dcfce7' : '#fef9ec', color: isHigh ? '#166534' : '#92400e' }}>
-      置信度 {v}
+      {dict.suppliers.form.confidence(v)}
     </span>
   );
 }

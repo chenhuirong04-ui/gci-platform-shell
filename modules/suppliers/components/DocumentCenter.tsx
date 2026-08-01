@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useI18n } from '@gci/i18n';
 import type { Supplier, SupplierDocument, DocumentType, DocumentVerificationStatus } from '../types';
 import {
   createDocument, deleteDocument, listDocuments, updateDocument,
   getDocumentUrl, resolveStorageBucket, uploadSupplierFile,
 } from '../lib/documentsCloud';
+import { getDocStatusLabel, getDocTypeLabel } from '../lib/labelMaps';
 import TradeLicenseUploader from './TradeLicenseUploader';
 
 const GOLD = '#C9A84C';
@@ -31,9 +33,6 @@ const ALLOWED_TYPES = [
 ];
 const ALLOWED_EXT = ['.pdf','.xls','.xlsx','.doc','.docx','.jpg','.jpeg','.png'];
 
-const VSTATUS_LABEL: Record<DocumentVerificationStatus, string> = {
-  unverified: '未核实', verified: '已核实', rejected: '已拒绝', pending_reupload: '待重传',
-};
 const VSTATUS_COLOR: Record<DocumentVerificationStatus, string> = {
   unverified: '#94a3b8', verified: '#16a34a', rejected: '#dc2626', pending_reupload: '#d97706',
 };
@@ -53,6 +52,9 @@ const EMPTY = (sid: string): Omit<SupplierDocument, 'id'> => ({
 interface Props { supplierId: string; supplier?: Supplier; }
 
 export default function DocumentCenter({ supplierId, supplier }: Props) {
+  const { lang, dict } = useI18n();
+  const t = dict.suppliers.documents;
+  const c0 = dict.suppliers.common;
   const [docs, setDocs] = useState<SupplierDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [edit, setEdit] = useState<Partial<SupplierDocument> | null>(null);
@@ -88,7 +90,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
   // ── File selection ───────────────────────────────────────────────────────────
   const applyFile = (f: File) => {
     if (!ALLOWED_TYPES.includes(f.type) && !ALLOWED_EXT.some(e => f.name.toLowerCase().endsWith(e))) {
-      setSaveErr(`不支持的文件格式：${f.name}（支持 PDF / XLS / DOC / JPG / PNG）`);
+      setSaveErr(t.errUnsupportedType(f.name));
       return;
     }
     setSelectedFile(f);
@@ -114,11 +116,11 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
     const hasStoragePath = !!edit.storage_path; // editing existing record
 
     if (!hasFile && !hasUrl && !hasStoragePath) {
-      setSaveErr('请选择本地文件，或填写外部链接');
+      setSaveErr(t.errNoFile);
       return;
     }
     if (!edit.document_name?.trim()) {
-      setSaveErr('请填写文件名称');
+      setSaveErr(t.errNoName);
       return;
     }
 
@@ -131,7 +133,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
         const result = await uploadSupplierFile(supplierId, selectedFile, edit.document_type ?? '其他');
         setUploading(false);
         if (!result) {
-          setSaveErr('文件上传失败，请检查网络后重试');
+          setSaveErr(t.errUploadFailed);
           setSaving(false);
           return;
         }
@@ -156,7 +158,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
       setSelectedFile(null);
       await load();
     } catch (e: any) {
-      setSaveErr(e?.message ?? '保存失败');
+      setSaveErr(e?.message ?? t.errSaveFailed);
     } finally {
       setSaving(false);
       setUploading(false);
@@ -164,9 +166,9 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
   };
 
   // Group by document_type
-  const groups = DOC_TYPES.reduce((acc, t) => {
-    const items = docs.filter(d => d.document_type === t);
-    if (items.length) acc[t] = items;
+  const groups = DOC_TYPES.reduce((acc, dt) => {
+    const items = docs.filter(d => d.document_type === dt);
+    if (items.length) acc[dt] = items;
     return acc;
   }, {} as Record<string, SupplierDocument[]>);
 
@@ -179,7 +181,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
   if (showLicenseUploader && supplier) {
     return (
       <div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: NAVY, marginBottom: 16 }}>上传营业执照 / Upload Trade License</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: NAVY, marginBottom: 16 }}>{t.uploadLicenseTitle}</div>
         <TradeLicenseUploader
           supplier={supplier}
           onSaved={() => { setShowLicenseUploader(false); load(); }}
@@ -190,39 +192,39 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
   }
 
   const canSave = !saving && (!!selectedFile || !!edit?.file_url?.trim() || !!edit?.storage_path);
-  const saveLabel = uploading ? '上传中…' : saving ? '保存中…' : '保存';
+  const saveLabel = uploading || saving ? c0.saving : c0.save;
 
   return (
     <div>
       {/* Primary upload actions */}
       <div style={{ background: '#fffbf0', border: `1.5px dashed ${GOLD}`, borderRadius: 10, padding: '16px 20px', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em' }}>快速上传</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t.quickUpload}</span>
         <button
           onClick={() => setShowLicenseUploader(true)}
           style={{ padding: '9px 18px', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          📄 上传营业执照 / Upload Trade License
+          {t.uploadLicenseBtn}
         </button>
         <button
           onClick={() => openEdit({ ...EMPTY(supplierId), document_type: '产品目录' as DocumentType })}
           style={{ padding: '9px 18px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, fontSize: 13, fontWeight: 600, color: NAVY, cursor: 'pointer' }}
         >
-          📁 上传其他文件
+          {t.uploadOtherBtn}
         </button>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ fontSize: 13, color: T2 }}>{docs.length} 份文件</span>
-        <button onClick={() => openEdit(EMPTY(supplierId))} style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>+ 添加文件记录</button>
+        <span style={{ fontSize: 13, color: T2 }}>{t.count(docs.length)}</span>
+        <button onClick={() => openEdit(EMPTY(supplierId))} style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{t.add}</button>
       </div>
 
-      {loading ? <div style={{ color: T3, textAlign: 'center', padding: 40 }}>加载中…</div>
-       : docs.length === 0 ? <div style={{ color: T3, textAlign: 'center', padding: 40 }}>暂无文件记录，请添加</div>
+      {loading ? <div style={{ color: T3, textAlign: 'center', padding: 40 }}>{c0.loading}</div>
+       : docs.length === 0 ? <div style={{ color: T3, textAlign: 'center', padding: 40 }}>{t.empty}</div>
        : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {Object.entries(groups).map(([type, items]) => (
             <div key={type}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{type}</div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{getDocTypeLabel(type, lang)}</div>
               {items.map(doc => {
                 const ec = expiryColor(doc.expire_date);
                 return (
@@ -232,23 +234,23 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
                       {doc.document_number && <span style={{ fontSize: 11, color: T3, marginLeft: 8 }}>#{doc.document_number}</span>}
                       {doc.file_size && <span style={{ fontSize: 10, color: T3, marginLeft: 8 }}>{formatBytes(doc.file_size)}</span>}
                       <div style={{ fontSize: 11, color: T3, marginTop: 3, display: 'flex', gap: 10 }}>
-                        {doc.issue_date && <span>签发：{doc.issue_date}</span>}
-                        {doc.expire_date && <span style={{ color: ec || T3, fontWeight: ec ? 700 : undefined }}>到期：{doc.expire_date}{ec && ' ⚠'}</span>}
-                        {doc.storage_path && <span style={{ color: '#16a34a' }}>✓ 已上传</span>}
+                        {doc.issue_date && <span>{t.issued(doc.issue_date)}</span>}
+                        {doc.expire_date && <span style={{ color: ec || T3, fontWeight: ec ? 700 : undefined }}>{t.expires(doc.expire_date)}{ec && ' ⚠'}</span>}
+                        {doc.storage_path && <span style={{ color: '#16a34a' }}>{t.uploaded}</span>}
                         <span style={{ color: VSTATUS_COLOR[doc.verification_status as DocumentVerificationStatus] ?? T3 }}>
-                          {VSTATUS_LABEL[doc.verification_status as DocumentVerificationStatus] ?? doc.verification_status}
+                          {getDocStatusLabel(doc.verification_status ?? 'unverified', lang)}
                         </span>
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 6 }}>
                       {(doc.storage_path || doc.file_url) && (
-                        <button onClick={() => handleView(doc)} style={{ fontSize: 12, color: NAVY, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>查看</button>
+                        <button onClick={() => handleView(doc)} style={{ fontSize: 12, color: NAVY, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{t.viewBtn}</button>
                       )}
-                      <button onClick={() => openEdit({ ...doc })} style={{ fontSize: 12, color: NAVY, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>编辑</button>
+                      <button onClick={() => openEdit({ ...doc })} style={{ fontSize: 12, color: NAVY, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.edit}</button>
                       {deleteId === doc.id
-                        ? <><button onClick={async () => { await deleteDocument(doc.id!); setDeleteId(null); load(); }} style={{ fontSize: 12, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>确认</button>
-                            <button onClick={() => setDeleteId(null)} style={{ fontSize: 12, color: T2, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>取消</button></>
-                        : <button onClick={() => setDeleteId(doc.id!)} style={{ fontSize: 12, color: '#dc2626', background: 'none', border: `1px solid #fca5a5`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>删除</button>
+                        ? <><button onClick={async () => { await deleteDocument(doc.id!); setDeleteId(null); load(); }} style={{ fontSize: 12, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.confirm}</button>
+                            <button onClick={() => setDeleteId(null)} style={{ fontSize: 12, color: T2, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.cancel}</button></>
+                        : <button onClick={() => setDeleteId(doc.id!)} style={{ fontSize: 12, color: '#dc2626', background: 'none', border: `1px solid #fca5a5`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.delete}</button>
                       }
                     </div>
                   </div>
@@ -266,25 +268,25 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
           onClick={e => { if (e.target === e.currentTarget) setEdit(null); }}
         >
           <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 560, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: NAVY }}>{edit.id ? '编辑文件' : '添加文件记录'}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: NAVY }}>{edit.id ? t.modalEdit : t.modalNew}</div>
 
-            {/* 1. 文件类型 */}
-            <F label="文件类型">
+            {/* 1. Document type */}
+            <F label={t.fType}>
               <select style={INP} value={edit.document_type ?? '营业执照'}
                 onChange={e => setEdit(v => ({ ...v!, document_type: e.target.value as DocumentType }))}>
-                {DOC_TYPES.map(t => <option key={t}>{t}</option>)}
+                {DOC_TYPES.map(dt => <option key={dt} value={dt}>{getDocTypeLabel(dt, lang)}</option>)}
               </select>
             </F>
 
-            {/* 2. 选择本地文件 */}
+            {/* 2. Select local file */}
             <div>
-              <label style={LBL}>选择本地文件 {!edit.storage_path && <span style={{ color: '#dc2626' }}>（必填，或填写外部链接）</span>}</label>
+              <label style={LBL}>{t.fSelectFile} {!edit.storage_path && <span style={{ color: '#dc2626' }}>{t.fSelectFileRequired}</span>}</label>
 
               {/* Existing file indicator */}
               {edit.storage_path && !selectedFile && (
                 <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#166534', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span>✓ 已有上传文件</span>
-                  <span style={{ color: T3 }}>重新选择文件将替换现有版本</span>
+                  <span>{t.hasExisting}</span>
+                  <span style={{ color: T3 }}>{t.hasExistingSub}</span>
                 </div>
               )}
 
@@ -313,14 +315,14 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
                       onClick={e => { e.stopPropagation(); setSelectedFile(null); setSaveErr(null); }}
                       style={{ marginTop: 6, fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
                     >
-                      移除
+                      {t.dropRemove}
                     </button>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                     <span style={{ fontSize: 28, opacity: 0.5 }}>📂</span>
-                    <span style={{ fontSize: 13, color: T2, fontWeight: 600 }}>点击选择文件 或 拖拽到此处</span>
-                    <span style={{ fontSize: 11, color: T3 }}>支持 PDF · XLS · XLSX · DOC · DOCX · JPG · PNG</span>
+                    <span style={{ fontSize: 13, color: T2, fontWeight: 600 }}>{t.dropPrompt}</span>
+                    <span style={{ fontSize: 11, color: T3 }}>{t.dropSupport}</span>
                   </div>
                 )}
               </div>
@@ -336,46 +338,48 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
               {uploading && (
                 <div style={{ marginTop: 8, background: '#f0f4ff', border: '1px solid #c7d7ff', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: NAVY, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid #c7d7ff', borderTopColor: NAVY, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                  正在上传文件，请勿关闭弹窗…
+                  {t.uploadingHint}
                   <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                 </div>
               )}
             </div>
 
-            {/* 3. 文件名称 */}
-            <F label="文件名称 *">
+            {/* 3. File name */}
+            <F label={t.fName}>
               <input style={INP} value={edit.document_name ?? ''}
                 onChange={e => setEdit(v => ({ ...v!, document_name: e.target.value }))}
-                placeholder="如：产品目录 2024（自动带入，可修改）" />
+                placeholder={t.fNamePlaceholder} />
             </F>
 
-            {/* 4. 外部链接（次要，历史兼容） */}
+            {/* 4. External link (secondary, legacy compat) */}
             <div>
-              <label style={{ ...LBL, color: T3 }}>外部链接（可选，仅用于 Google Drive / Notion 历史链接兼容）</label>
+              <label style={{ ...LBL, color: T3 }}>{t.fExternalUrl}</label>
               <input style={{ ...INP, border: '1.5px solid #e2e8f0', color: T3 }}
                 value={edit.file_url ?? ''}
                 onChange={e => setEdit(v => ({ ...v!, file_url: e.target.value }))}
-                placeholder="https://... (无本地文件时使用)" />
+                placeholder="https://..." />
             </div>
 
-            {/* 5. 证件信息 */}
+            {/* 5. Document details */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              <F label="证件号码"><input style={INP} value={edit.document_number ?? ''} onChange={e => setEdit(v => ({ ...v!, document_number: e.target.value }))} /></F>
-              <F label="颁发机构"><input style={INP} value={edit.issuing_authority ?? ''} onChange={e => setEdit(v => ({ ...v!, issuing_authority: e.target.value }))} /></F>
-              <F label="签发日期"><input style={INP} type="date" value={edit.issue_date ?? ''} onChange={e => setEdit(v => ({ ...v!, issue_date: e.target.value }))} /></F>
-              <F label="到期日期"><input style={INP} type="date" value={edit.expire_date ?? ''} onChange={e => setEdit(v => ({ ...v!, expire_date: e.target.value }))} /></F>
+              <F label={t.fNumber}><input style={INP} value={edit.document_number ?? ''} onChange={e => setEdit(v => ({ ...v!, document_number: e.target.value }))} /></F>
+              <F label={t.fIssuingAuthority}><input style={INP} value={edit.issuing_authority ?? ''} onChange={e => setEdit(v => ({ ...v!, issuing_authority: e.target.value }))} /></F>
+              <F label={t.fIssueDate}><input style={INP} type="date" value={edit.issue_date ?? ''} onChange={e => setEdit(v => ({ ...v!, issue_date: e.target.value }))} /></F>
+              <F label={t.fExpireDate}><input style={INP} type="date" value={edit.expire_date ?? ''} onChange={e => setEdit(v => ({ ...v!, expire_date: e.target.value }))} /></F>
             </div>
 
-            {/* 6. 核实状态 */}
-            <F label="核实状态">
+            {/* 6. Verification status */}
+            <F label={t.fVerification}>
               <select style={INP} value={edit.verification_status ?? 'unverified'}
                 onChange={e => setEdit(v => ({ ...v!, verification_status: e.target.value as DocumentVerificationStatus }))}>
-                {Object.entries(VSTATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                {(['unverified', 'verified', 'rejected', 'pending_reupload'] as DocumentVerificationStatus[]).map(v => (
+                  <option key={v} value={v}>{getDocStatusLabel(v, lang)}</option>
+                ))}
               </select>
             </F>
 
-            {/* 7. 备注 */}
-            <F label="备注">
+            {/* 7. Notes */}
+            <F label={t.fNotes}>
               <textarea style={{ ...INP, resize: 'vertical', minHeight: 60 }} value={edit.notes ?? ''} onChange={e => setEdit(v => ({ ...v!, notes: e.target.value }))} />
             </F>
 
@@ -391,14 +395,14 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
               <button
                 onClick={handleSave}
                 disabled={!canSave}
-                title={!canSave && !saving ? '请选择文件或填写外部链接' : undefined}
+                title={!canSave && !saving ? t.errNoFile : undefined}
                 style={{ flex: 1, padding: '10px 0', background: canSave ? NAVY : '#94a3b8', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: canSave ? 'pointer' : 'not-allowed', transition: 'background .15s' }}
               >
                 {saveLabel}
               </button>
               <button onClick={() => { setEdit(null); setSelectedFile(null); setSaveErr(null); }}
                 style={{ padding: '10px 20px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T2, fontWeight: 600, cursor: 'pointer' }}>
-                取消
+                {c0.cancel}
               </button>
             </div>
           </div>

@@ -6,6 +6,7 @@
  * Reuses the same Gemini Vision endpoint as CustomerDocumentManager (biz-solutions).
  */
 import React, { useRef, useState } from 'react';
+import { useI18n } from '@gci/i18n';
 import type { SupplierProduct } from '../types';
 import { uploadSupplierFile, createDocument } from '../lib/documentsCloud';
 import { listProducts } from '../lib/suppliersCloud';
@@ -74,6 +75,10 @@ function inferStatus(fields: ParsedFields): 'available' | 'expired' | 'pending_v
 }
 
 export default function CertificationUploader({ supplierId, onSaved, onCancel }: Props) {
+  const { lang, dict } = useI18n();
+  const t = dict.suppliers.certUploader;
+  const u = dict.suppliers.uploaderCommon;
+  const c0 = dict.suppliers.common;
   const fileRef = useRef<HTMLInputElement>(null);
   const [stage, setStage] = useState<Stage>('idle');
   const [file, setFile] = useState<File | null>(null);
@@ -105,7 +110,7 @@ export default function CertificationUploader({ supplierId, onSaved, onCancel }:
         body: JSON.stringify({ mimeType, data: base64, documentType: 'SUPPLIER_CERTIFICATION' }),
       });
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error || 'AI 解析失败');
+      if (!data.ok) throw new Error(data.error || u.genericParseError);
       const pf: ParsedFields = data.fields ?? {};
       setFields(pf);
       setCoveredModelsText((pf.covered_models ?? []).join('\n'));
@@ -113,7 +118,7 @@ export default function CertificationUploader({ supplierId, onSaved, onCancel }:
       setParseModel(data.model || '');
       setStage('confirm');
     } catch (e: any) {
-      setParseError(e?.message || '解析失败');
+      setParseError(e?.message || u.genericParseError);
       setStage('confirm');
     }
   };
@@ -125,14 +130,14 @@ export default function CertificationUploader({ supplierId, onSaved, onCancel }:
   };
 
   const handleSave = async () => {
-    if (!fields.certification_type) { setSaveError('请选择认证类型'); return; }
+    if (!fields.certification_type) { setSaveError(t.savingErr); return; }
     if (!file) return;
     setSaveError('');
     setStage('saving');
     try {
       // 1. Upload file
       const up = await uploadSupplierFile(supplierId, file, '认证证书');
-      if (!up) throw new Error('文件上传失败，请检查 Storage bucket 是否已创建');
+      if (!up) throw new Error(t.uploadFailed);
 
       // 2. Determine cert status from dates
       const status = inferStatus(fields);
@@ -152,10 +157,10 @@ export default function CertificationUploader({ supplierId, onSaved, onCancel }:
           || undefined,
         notes: coveredProductsText ? `Products: ${coveredProductsText}` : undefined,
       });
-      if (!cert?.id) throw new Error('认证记录保存失败');
+      if (!cert?.id) throw new Error(t.saveCertFailed);
 
       // 4. Create document record linked to cert
-      const docName = `${fields.certification_type}${fields.certification_number ? ` — ${fields.certification_number}` : ''} 证书`;
+      const docName = `${fields.certification_type}${fields.certification_number ? ` — ${fields.certification_number}` : ''} ${lang === 'zh' ? '证书' : 'Certificate'}`;
       await createDocument({
         supplier_id: supplierId,
         certification_id: cert.id,
@@ -175,7 +180,7 @@ export default function CertificationUploader({ supplierId, onSaved, onCancel }:
       setStage('done');
       setTimeout(onSaved, 800);
     } catch (e: any) {
-      setSaveError(e?.message || '保存失败');
+      setSaveError(e?.message || c0.notSet);
       setStage('confirm');
     }
   };
@@ -195,9 +200,9 @@ export default function CertificationUploader({ supplierId, onSaved, onCancel }:
         >
           <div style={{ fontSize: 32, marginBottom: 10 }}>🏅</div>
           <div style={{ fontSize: 15, fontWeight: 700, color: NAVY, marginBottom: 6 }}>
-            上传认证证书 / Upload Certification
+            {t.dropTitle}
           </div>
-          <div style={{ fontSize: 12, color: T3 }}>支持 PDF、PNG、JPG · 拖拽或点击选择</div>
+          <div style={{ fontSize: 12, color: T3 }}>{u.dropSupport}</div>
           <input
             ref={fileRef}
             type="file"
@@ -207,7 +212,7 @@ export default function CertificationUploader({ supplierId, onSaved, onCancel }:
           />
         </div>
         <div style={{ marginTop: 16, textAlign: 'right' }}>
-          <button onClick={onCancel} style={{ fontSize: 13, color: T3, background: 'none', border: 'none', cursor: 'pointer' }}>取消</button>
+          <button onClick={onCancel} style={{ fontSize: 13, color: T3, background: 'none', border: 'none', cursor: 'pointer' }}>{c0.cancel}</button>
         </div>
       </div>
     );
@@ -218,8 +223,8 @@ export default function CertificationUploader({ supplierId, onSaved, onCancel }:
     return (
       <div style={{ padding: '60px 0', textAlign: 'center' }}>
         <div style={{ fontSize: 28, marginBottom: 16 }}>⟳</div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: NAVY, marginBottom: 6 }}>AI 解析中…</div>
-        <div style={{ fontSize: 12, color: T3 }}>正在提取认证类型、证书号、有效期等信息</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: NAVY, marginBottom: 6 }}>{u.parsingTitle}</div>
+        <div style={{ fontSize: 12, color: T3 }}>{t.parsingSub}</div>
       </div>
     );
   }
@@ -229,7 +234,7 @@ export default function CertificationUploader({ supplierId, onSaved, onCancel }:
     return (
       <div style={{ padding: '60px 0', textAlign: 'center' }}>
         <div style={{ fontSize: 28, marginBottom: 16 }}>⬆</div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: NAVY }}>正在上传与保存…</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: NAVY }}>{u.savingTitle}</div>
       </div>
     );
   }
@@ -239,7 +244,7 @@ export default function CertificationUploader({ supplierId, onSaved, onCancel }:
     return (
       <div style={{ padding: '60px 0', textAlign: 'center' }}>
         <div style={{ fontSize: 32, marginBottom: 12, color: '#16a34a' }}>✓</div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: NAVY }}>认证证书已保存</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: NAVY }}>{t.done}</div>
       </div>
     );
   }
@@ -251,57 +256,57 @@ export default function CertificationUploader({ supplierId, onSaved, onCancel }:
     <div>
       {parseError ? (
         <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#92400e' }}>
-          ⚠ AI 解析失败：{parseError}。请手动填写以下字段，仍可保存。
+          {u.parseErrorBanner(parseError)}
         </div>
       ) : (
         <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#166534', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>✓ AI 解析完成（{parseModel}）— 请核对并确认以下字段</span>
+          <span>{u.parseOkBanner(parseModel)}</span>
           {confidence && (
             <span style={{ fontWeight: 700, fontSize: 12, padding: '2px 8px', borderRadius: 999,
               background: confidence === 'high' ? '#dcfce7' : confidence === 'medium' ? '#fef9ec' : '#fee2e2',
               color: confidence === 'high' ? '#166534' : confidence === 'medium' ? '#92400e' : '#991b1b',
-            }}>置信度 {confidence}</span>
+            }}>{u.confidenceLabel(confidence)}</span>
           )}
         </div>
       )}
 
-      <div style={{ fontSize: 12, color: T3, marginBottom: 12 }}>文件：{file?.name}</div>
+      <div style={{ fontSize: 12, color: T3, marginBottom: 12 }}>{u.fileLabel(file?.name ?? '')}</div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
-        <Fld label="认证类型 *" aiVal={!!fields.certification_type}>
+        <Fld label={t.fType} aiVal={!!fields.certification_type}>
           <select style={aiField(!!fields.certification_type)} value={fields.certification_type ?? ''} onChange={e => fld('certification_type', e.target.value)}>
-            <option value="">请选择</option>
-            {CERT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            <option value="">{c0.pleaseSelect}</option>
+            {CERT_TYPES.map(ct => <option key={ct} value={ct}>{ct === '其他' ? (lang === 'zh' ? '其他' : 'Other') : ct}</option>)}
           </select>
         </Fld>
-        <Fld label="标准号（如 ISO 9001:2015）" aiVal={!!fields.standard_number}>
+        <Fld label={t.fStandardNumber} aiVal={!!fields.standard_number}>
           <input style={aiField(!!fields.standard_number)} value={fields.standard_number ?? ''} onChange={e => fld('standard_number', e.target.value)} placeholder="ISO 9001:2015" />
         </Fld>
-        <Fld label="证书编号" aiVal={!!fields.certification_number}>
+        <Fld label={t.fNumber} aiVal={!!fields.certification_number}>
           <input style={aiField(!!fields.certification_number)} value={fields.certification_number ?? ''} onChange={e => fld('certification_number', e.target.value)} />
         </Fld>
-        <Fld label="认证机构" aiVal={!!fields.issuing_body}>
+        <Fld label={t.fIssuingBody} aiVal={!!fields.issuing_body}>
           <input style={aiField(!!fields.issuing_body)} value={fields.issuing_body ?? ''} onChange={e => fld('issuing_body', e.target.value)} placeholder="SGS / Bureau Veritas / TUV…" />
         </Fld>
-        <Fld label="签发日期" aiVal={!!fields.issue_date}>
+        <Fld label={t.fIssueDate} aiVal={!!fields.issue_date}>
           <input style={aiField(!!fields.issue_date)} type="date" value={fields.issue_date ?? ''} onChange={e => fld('issue_date', e.target.value)} />
         </Fld>
-        <Fld label="到期日期" aiVal={!!fields.expire_date}>
+        <Fld label={t.fExpireDate} aiVal={!!fields.expire_date}>
           <input style={aiField(!!fields.expire_date)} type="date" value={fields.expire_date ?? ''} onChange={e => fld('expire_date', e.target.value)} />
         </Fld>
-        <Fld label="适用市场 / 地区" aiVal={!!fields.market_scope}>
-          <input style={aiField(!!fields.market_scope)} value={fields.market_scope ?? ''} onChange={e => fld('market_scope', e.target.value)} placeholder="EU / UAE / 全球…" />
+        <Fld label={t.fScope} aiVal={!!fields.market_scope}>
+          <input style={aiField(!!fields.market_scope)} value={fields.market_scope ?? ''} onChange={e => fld('market_scope', e.target.value)} placeholder="EU / UAE / Global…" />
         </Fld>
-        <Fld label="认证范围说明" aiVal={!!fields.scope_description}>
+        <Fld label={t.fScopeDesc} aiVal={!!fields.scope_description}>
           <input style={aiField(!!fields.scope_description)} value={fields.scope_description ?? ''} onChange={e => fld('scope_description', e.target.value)} />
         </Fld>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-        <Fld label="覆盖产品（每行一条）" aiVal={coveredProductsText.length > 0}>
+        <Fld label={t.fCoveredProducts} aiVal={coveredProductsText.length > 0}>
           <textarea style={{ ...aiField(coveredProductsText.length > 0), resize: 'vertical', minHeight: 70 }} value={coveredProductsText} onChange={e => setCoveredProductsText(e.target.value)} />
         </Fld>
-        <Fld label="覆盖型号（每行一条）" aiVal={coveredModelsText.length > 0}>
+        <Fld label={t.fCoveredModels} aiVal={coveredModelsText.length > 0}>
           <textarea style={{ ...aiField(coveredModelsText.length > 0), resize: 'vertical', minHeight: 70 }} value={coveredModelsText} onChange={e => setCoveredModelsText(e.target.value)} />
         </Fld>
       </div>
@@ -309,9 +314,9 @@ export default function CertificationUploader({ supplierId, onSaved, onCancel }:
       {/* Link to existing product */}
       {products.length > 0 && (
         <div style={{ marginBottom: 14 }}>
-          <label style={LBL}>关联已有供应商产品（可选）</label>
+          <label style={LBL}>{t.linkProduct}</label>
           <select style={INP} value={linkedProductId} onChange={e => setLinkedProductId(e.target.value)}>
-            <option value="">不关联</option>
+            <option value="">{t.linkNone}</option>
             {products.map(p => (
               <option key={p.id} value={p.id}>
                 {p.product_name_cn || p.product_name_en || p.supplier_sku || p.id}
@@ -323,11 +328,11 @@ export default function CertificationUploader({ supplierId, onSaved, onCancel }:
 
       {/* Auto status preview */}
       <div style={{ background: '#f8fafc', border: `1px solid ${BORDER}`, borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 12, color: T2 }}>
-        保存后认证状态将自动判断为：
+        {t.statusPreviewPrefix}
         <strong style={{ marginLeft: 6, color: NAVY }}>
-          {inferStatus(fields) === 'available' ? '✓ available（有效）'
-            : inferStatus(fields) === 'expired' ? '✗ expired（已过期）'
-            : '⚠ pending_verification（待核实）'}
+          {inferStatus(fields) === 'available' ? t.statusAvailable
+            : inferStatus(fields) === 'expired' ? t.statusExpired
+            : t.statusPending}
         </strong>
       </div>
 
@@ -342,19 +347,19 @@ export default function CertificationUploader({ supplierId, onSaved, onCancel }:
           onClick={handleSave}
           style={{ flex: 1, padding: '11px 0', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
         >
-          确认并保存 →
+          {u.confirmSave}
         </button>
         <button
           onClick={() => fileRef.current?.click()}
           style={{ padding: '11px 16px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T2, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
         >
-          重新上传
+          {u.reupload}
         </button>
         <button
           onClick={onCancel}
           style={{ padding: '11px 16px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T3, fontSize: 13, cursor: 'pointer' }}
         >
-          取消
+          {c0.cancel}
         </button>
         <input
           ref={fileRef}
@@ -365,7 +370,7 @@ export default function CertificationUploader({ supplierId, onSaved, onCancel }:
         />
       </div>
       <div style={{ marginTop: 10, fontSize: 11, color: T3 }}>
-        ⚠ 绿色高亮 = AI 自动识别字段，请核对后再确认保存。确认前不写入数据库。
+        {u.aiHighlightNote}
       </div>
     </div>
   );

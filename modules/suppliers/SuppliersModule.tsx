@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useI18n } from '@gci/i18n';
 import type { Supplier } from './types';
 import SupplierList from './components/SupplierList';
 import SupplierForm from './components/SupplierForm';
@@ -19,14 +20,14 @@ type SubView =
   | { kind: 'notion-import' }
   | { kind: 'cleanup' };
 
-const TOP_TABS: { key: TopTab; label: string }[] = [
-  { key: 'list',   label: '供应商列表' },
-  { key: 'new',    label: '新增供应商' },
-  { key: 'docs',   label: '文件与证照' },
-  { key: 'quotes', label: '报价记录' },
-];
-
 export default function SuppliersModule() {
+  const { dict } = useI18n();
+  const TOP_TABS: { key: TopTab; label: string }[] = [
+    { key: 'list',   label: dict.suppliers.nav.list },
+    { key: 'new',    label: dict.suppliers.nav.add },
+    { key: 'docs',   label: dict.suppliers.nav.files },
+    { key: 'quotes', label: dict.suppliers.nav.quotes },
+  ];
   const [topTab, setTopTab] = useState<TopTab>('list');
   const [sub, setSub] = useState<SubView>({ kind: 'list' });
   const [listInitFilters, setListInitFilters] = useState<{ country?: string; category?: string }>({});
@@ -131,8 +132,8 @@ export default function SuppliersModule() {
       {topTab === 'docs' && (
         <div style={{ padding: '48px 32px', textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>📁</div>
-          <div style={{ fontWeight: 700, color: '#475569', marginBottom: 6 }}>全局文件与证照</div>
-          <div>请进入具体供应商详情页，在"营业执照与公司文件"或"认证与证书"Tab 上传管理文件</div>
+          <div style={{ fontWeight: 700, color: '#475569', marginBottom: 6 }}>{dict.suppliers.module.docsTitle}</div>
+          <div>{dict.suppliers.module.docsDesc}</div>
         </div>
       )}
 
@@ -140,8 +141,8 @@ export default function SuppliersModule() {
       {topTab === 'quotes' && (
         <div style={{ padding: '48px 32px', textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>📋</div>
-          <div style={{ fontWeight: 700, color: '#475569', marginBottom: 6 }}>全局报价记录</div>
-          <div>请进入具体供应商详情页，在"历史报价"Tab 查看和上传报价文件</div>
+          <div style={{ fontWeight: 700, color: '#475569', marginBottom: 6 }}>{dict.suppliers.module.quotesTitle}</div>
+          <div>{dict.suppliers.module.quotesDesc}</div>
         </div>
       )}
     </div>

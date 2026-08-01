@@ -5,7 +5,7 @@ import {
   listSuppliersPage, searchSuppliersPage, listFilterOptions,
   type PagedSuppliers,
 } from '../lib/suppliersCloud';
-import { getCountryLabel, getCategoryLabel } from '../lib/labelMaps';
+import { getCountryLabel, getCategoryLabel, getStatusLabel } from '../lib/labelMaps';
 
 const GOLD = '#C9A84C';
 const NAVY = '#0c1b3a';
@@ -19,10 +19,6 @@ const STATUS_COLOR: Record<string, { bg: string; text: string }> = {
   under_review: { bg: '#fef9ec', text: '#92400e' },
   archived:     { bg: '#f8fafc', text: '#94a3b8' },
 };
-const STATUS_LABEL: Record<string, string> = {
-  active: '正常', inactive: '停用', blacklisted: '黑名单', under_review: '审核中', archived: '封存',
-};
-
 const SUPPLIER_TYPES = ['Factory', 'Trading', 'Integrated', 'Service', 'Agent', 'Unknown'];
 const RATINGS = ['A', 'B', 'C', 'D'];
 const STATUSES = ['active', 'inactive', 'blacklisted', 'under_review', 'archived'];
@@ -37,7 +33,8 @@ interface Props {
 }
 
 export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanup, initialFilters }: Props) {
-  const { lang } = useI18n();
+  const { lang, dict } = useI18n();
+  const t = dict.suppliers.list;
   const [paged, setPaged] = useState<PagedSuppliers>({ items: [], total: 0, page: 1, pageSize: 100 });
   const [loading, setLoading] = useState(true);
   const [searchQ, setSearchQ] = useState('');
@@ -111,26 +108,26 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
         <input
           value={searchQ}
           onChange={e => handleSearch(e.target.value)}
-          placeholder="搜索供应商名称、编码…"
+          placeholder={t.searchPlaceholder}
           style={{ flex: 1, minWidth: 200, padding: '9px 14px', borderRadius: 10, border: `1.5px solid #b0bec5`, fontSize: 14, color: NAVY, outline: 'none', background: '#fff' }}
         />
-        <Sel value={filters.supplier_type} onChange={v => filt('supplier_type', v)} placeholder="全部类型">
-          {SUPPLIER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+        <Sel value={filters.supplier_type} onChange={v => filt('supplier_type', v)} placeholder={t.allTypes}>
+          {SUPPLIER_TYPES.map(ty => <option key={ty} value={ty}>{ty}</option>)}
         </Sel>
-        <Sel value={filters.country} onChange={v => filt('country', v)} placeholder="全部国家">
+        <Sel value={filters.country} onChange={v => filt('country', v)} placeholder={t.allCountries}>
           {filterOptions.countries.map(c => <option key={c} value={c}>{getCountryLabel(c, lang)}</option>)}
         </Sel>
-        <Sel value={filters.category} onChange={v => filt('category', v)} placeholder="全部品类">
+        <Sel value={filters.category} onChange={v => filt('category', v)} placeholder={t.allCategories}>
           {filterOptions.categories.map(c => <option key={c} value={c}>{getCategoryLabel(c, lang)}</option>)}
         </Sel>
-        <Sel value={filters.status} onChange={v => filt('status', v)} placeholder="全部状态">
-          {STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+        <Sel value={filters.status} onChange={v => filt('status', v)} placeholder={t.allStatuses}>
+          {STATUSES.map(s => <option key={s} value={s}>{getStatusLabel(s, lang)}</option>)}
         </Sel>
-        <Sel value={filters.rating} onChange={v => filt('rating', v)} placeholder="全部评级">
-          {RATINGS.map(r => <option key={r} value={r}>评级 {r}</option>)}
+        <Sel value={filters.rating} onChange={v => filt('rating', v)} placeholder={t.allRatings}>
+          {RATINGS.map(r => <option key={r} value={r}>{t.ratingOption(r)}</option>)}
         </Sel>
-        <Sel value={filters.is_preferred} onChange={v => filt('is_preferred', v)} placeholder="用过的">
-          <option value="true">仅常用</option>
+        <Sel value={filters.is_preferred} onChange={v => filt('is_preferred', v)} placeholder={t.usedBefore}>
+          <option value="true">{t.usedOnly}</option>
         </Sel>
         <button
           translate="no"
@@ -138,30 +135,30 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
           onClick={onNotionImport}
           style={{ padding: '9px 16px', borderRadius: 10, background: '#fff', color: NAVY, border: `1.5px solid ${GOLD}`, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
-          {lang === 'zh' ? '从 Notion 导入' : 'Import from Notion'}
+          {t.notionImport}
         </button>
         <button
           onClick={onCleanup}
           style={{ padding: '9px 16px', borderRadius: 10, background: '#fff', color: NAVY, border: `1.5px solid ${GOLD}`, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
-          {lang === 'zh' ? '供应商数据看板' : 'Supplier Dashboard'}
+          {t.dashboard}
         </button>
         <button
           onClick={onNew}
           style={{ padding: '9px 20px', borderRadius: 10, background: NAVY, color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
-          + 新增供应商
+          {t.addSupplier}
         </button>
       </div>
 
       {/* Count info */}
       <div style={{ padding: '12px 24px', fontSize: 12, color: '#94a3b8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 16 }}>
-        {loading ? '加载中…' : (
+        {loading ? dict.suppliers.common.loading : (
           <>
-            <span>共 <strong style={{ color: NAVY }}>{total}</strong> 家供应商</span>
+            <span>{t.totalLabel(total)}</span>
             {total > 0 && (
               <span style={{ color: '#b0bec5' }}>
-                第 {fromItem}–{toItem} 条 · 第 {page} / {totalPages} 页
+                {t.rangeInfo(fromItem, toItem, page, totalPages)}
               </span>
             )}
           </>
@@ -173,7 +170,7 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
         {!loading && items.length === 0 ? (
           <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${CARD_BORDER}`, textAlign: 'center', padding: '80px 0', color: '#94a3b8', fontSize: 14 }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🏭</div>
-            暂无供应商数据
+            {t.empty}
           </div>
         ) : (
           <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${CARD_BORDER}`, overflow: 'hidden', boxShadow: '0 1px 4px rgba(12,27,58,0.06)' }}>
@@ -181,7 +178,7 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f5f3ef' }}>
-                    {['供应商名称', '编码', '类型', '国家', '评级', '状态', '用过的', ''].map(h => (
+                    {[t.colName, t.colCode, t.colType, t.colCountry, t.colRating, t.colStatus, t.colUsed, ''].map(h => (
                       <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -204,14 +201,14 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
                           )}
                         </td>
                         <td style={{ padding: '13px 14px', color: '#64748b', fontSize: 12 }}>{s.short_code}</td>
-                        <td style={{ padding: '13px 14px', color: '#475569' }}>{s.supplier_type || '—'}</td>
-                        <td style={{ padding: '13px 14px', color: '#475569' }}>{s.country || '—'}</td>
+                        <td style={{ padding: '13px 14px', color: '#475569' }}>{s.supplier_type || dict.suppliers.common.notSet}</td>
+                        <td style={{ padding: '13px 14px', color: '#475569' }}>{s.country || dict.suppliers.common.notSet}</td>
                         <td style={{ padding: '13px 14px' }}>
-                          <span style={{ fontWeight: 800, color: RATING_COLOR[s.current_rating ?? 'B'] ?? '#475569' }}>{s.current_rating || '—'}</span>
+                          <span style={{ fontWeight: 800, color: RATING_COLOR[s.current_rating ?? 'B'] ?? '#475569' }}>{s.current_rating || dict.suppliers.common.notSet}</span>
                         </td>
                         <td style={{ padding: '13px 14px' }}>
                           <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: st.bg, color: st.text }}>
-                            {STATUS_LABEL[s.status ?? 'active'] ?? s.status}
+                            {getStatusLabel(s.status ?? 'active', lang)}
                           </span>
                         </td>
                         <td style={{ padding: '13px 14px', textAlign: 'center' }}>
@@ -222,7 +219,7 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
                             onClick={e => { e.stopPropagation(); onSelect(s); }}
                             style={{ fontSize: 12, fontWeight: 600, color: NAVY, background: 'none', border: `1px solid ${CARD_BORDER}`, borderRadius: 8, padding: '5px 12px', cursor: 'pointer' }}
                           >
-                            查看详情
+                            {t.viewDetails}
                           </button>
                         </td>
                       </tr>
@@ -243,7 +240,7 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
             disabled={page <= 1 || loading}
             style={{ padding: '7px 16px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: page <= 1 ? '#f5f3ef' : '#fff', color: page <= 1 ? '#b0bec5' : NAVY, fontWeight: 600, fontSize: 13, cursor: page <= 1 ? 'default' : 'pointer' }}
           >
-            上一页
+            {t.prevPage}
           </button>
 
           {/* Page number pills — show at most 7 pages */}
@@ -272,20 +269,20 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
             disabled={page >= totalPages || loading}
             style={{ padding: '7px 16px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: page >= totalPages ? '#f5f3ef' : '#fff', color: page >= totalPages ? '#b0bec5' : NAVY, fontWeight: 600, fontSize: 13, cursor: page >= totalPages ? 'default' : 'pointer' }}
           >
-            下一页
+            {t.nextPage}
           </button>
 
-          <span style={{ color: '#b0bec5', fontSize: 13, marginLeft: 8 }}>每页</span>
+          <span style={{ color: '#b0bec5', fontSize: 13, marginLeft: 8 }}>{t.perPage}</span>
           <select
             value={pageSize}
             onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
             style={{ padding: '7px 10px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, fontSize: 13, color: NAVY, background: '#fff', cursor: 'pointer' }}
           >
-            {PAGE_SIZES.map(n => <option key={n} value={n}>{n} 条</option>)}
+            {PAGE_SIZES.map(n => <option key={n} value={n}>{n}</option>)}
           </select>
 
           <span style={{ color: '#b0bec5', fontSize: 13, marginLeft: 4 }}>
-            跳至第
+            {t.jumpTo}
           </span>
           <input
             type="number"
@@ -305,7 +302,7 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
             }}
             style={{ width: 56, padding: '7px 8px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, fontSize: 13, color: NAVY, textAlign: 'center' }}
           />
-          <span style={{ color: '#b0bec5', fontSize: 13 }}>页</span>
+          {lang === 'zh' && <span style={{ color: '#b0bec5', fontSize: 13 }}>页</span>}
         </div>
       )}
     </div>

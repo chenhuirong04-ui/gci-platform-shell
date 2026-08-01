@@ -2,7 +2,18 @@
 // DB values are never changed — only the rendered text is translated.
 // Language must be passed explicitly from APP context (useI18n().lang).
 
-import type { Lang } from '@gci/i18n';
+import { dictionaries, type Lang } from '@gci/i18n';
+import type { SupplierStatus, DocumentType } from '../types';
+import type { DocumentVerificationStatus, CertificationStatus } from '../types';
+
+// document_type is stored in Chinese (existing DB values) — display-only EN labels.
+export const DOC_TYPE_LABEL_EN: Record<DocumentType, string> = {
+  '营业执照': 'Trade License', '公司注册文件': 'Company Registration', 'VAT文件': 'VAT Document',
+  '税务文件': 'Tax Document', '公司简介': 'Company Profile', '产品目录': 'Product Catalog',
+  '产品规格书': 'Product Spec Sheet', '检测报告': 'Test Report', '报价原件': 'Original Quote',
+  '合同': 'Contract', 'NDA': 'NDA', '银行资料': 'Bank Details', '工厂照片': 'Factory Photos',
+  '审厂报告': 'Factory Audit Report', '认证证书': 'Certification', '其他': 'Other',
+};
 
 export const COUNTRY_LABEL_MAP_ZH: Record<string, string> = {
   'China':          '中国',
@@ -55,4 +66,25 @@ export function getCountryLabel(value: string, lang: Lang): string {
 export function getCategoryLabel(value: string, lang: Lang): string {
   if (lang !== 'zh') return value;
   return CATEGORY_LABEL_MAP_ZH[value] ?? value;
+}
+
+/** Translate a supplier status DB value using the APP's current language. */
+export function getStatusLabel(value: string, lang: Lang): string {
+  return dictionaries[lang].suppliers.status[value as SupplierStatus] ?? value;
+}
+
+/** Translate a document verification status DB value using the APP's current language. */
+export function getDocStatusLabel(value: string, lang: Lang): string {
+  return dictionaries[lang].suppliers.docStatus[value as DocumentVerificationStatus] ?? value;
+}
+
+/** Translate a certification status DB value using the APP's current language. */
+export function getCertStatusLabel(value: string, lang: Lang): string {
+  return dictionaries[lang].suppliers.certStatus[value as CertificationStatus] ?? value;
+}
+
+/** Translate a supplier_documents.document_type DB value using the APP's current language. */
+export function getDocTypeLabel(value: string, lang: Lang): string {
+  if (lang !== 'en') return value;
+  return DOC_TYPE_LABEL_EN[value as DocumentType] ?? value;
 }
