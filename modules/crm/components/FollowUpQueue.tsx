@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { FollowUpTask, TradeStatus } from '../types';
 import { Language, translations } from '../services/i18n';
 import {
