@@ -633,6 +633,15 @@ export const zh: typeof en = {
   },
 
   trade: {
+    nav: {
+      home: '首页驾驶舱',
+      dashboard: '经营看板',
+      inventory: '库存',
+      consignment: '寄售',
+      history: '看板与历史',
+      cashflow: '资金流水',
+      finance: '财务账',
+    },
     pi: {
       navLabel: 'PI 报价',
       title: 'PI报价',

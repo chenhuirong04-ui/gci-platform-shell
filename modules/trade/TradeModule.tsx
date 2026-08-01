@@ -55,14 +55,14 @@ export default function TradeModule({ initialTab }: TradeModuleProps = {}) {
   const [currentUserId] = useState('Admin'); // 物理隔离：默认 Admin
 
   const navTabs = [
-    { id: 'home',        code: 'HM', label: '首页驾驶舱' },
+    { id: 'home',        code: 'HM', label: dict.trade.nav.home },
     { id: 'quote',       code: 'QT', label: dict.trade.pi.navLabel },
-    { id: 'dashboard',   code: 'DB', label: '经营看板' },
-    { id: 'inventory',   code: 'IV', label: '库存' },
-    { id: 'consignment', code: 'CS', label: '寄售' },
-    { id: 'history',     code: 'HS', label: '看板与历史' },
-    { id: 'cashflow',    code: 'CF', label: '资金流水' },
-    { id: 'finance',     code: 'FN', label: '财务账' },
+    { id: 'dashboard',   code: 'DB', label: dict.trade.nav.dashboard },
+    { id: 'inventory',   code: 'IV', label: dict.trade.nav.inventory },
+    { id: 'consignment', code: 'CS', label: dict.trade.nav.consignment },
+    { id: 'history',     code: 'HS', label: dict.trade.nav.history },
+    { id: 'cashflow',    code: 'CF', label: dict.trade.nav.cashflow },
+    { id: 'finance',     code: 'FN', label: dict.trade.nav.finance },
   ] as const;
 
   return (

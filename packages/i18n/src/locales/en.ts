@@ -632,6 +632,15 @@ export const en = {
   },
 
   trade: {
+    nav: {
+      home: 'Home Dashboard',
+      dashboard: 'Business Dashboard',
+      inventory: 'Inventory',
+      consignment: 'Consignment',
+      history: 'Dashboard & History',
+      cashflow: 'Cash Flow',
+      finance: 'Finance',
+    },
     pi: {
       navLabel: 'PI Quote',
       title: 'PI Quote',
