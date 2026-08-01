@@ -395,6 +395,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Supplier Quote / Trade & Sourcing / History UI (i18n audit fix)
     'Home': 'Home',
     'Save Supplier Quote': 'Save Supplier Quote',
+    'Supplier Quote Page Title': 'Supplier Quote',
     'Supplier Information': 'Supplier Information',
     'GCI Quote Info': 'GCI Quote Info',
     'Supplier Quote Import': 'Supplier Quote Import',
@@ -978,6 +979,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Supplier Quote / Trade & Sourcing / History UI (i18n audit fix)
     'Home': '首页',
     'Save Supplier Quote': '保存供应商报价',
+    'Supplier Quote Page Title': '供应商报价',
     'Supplier Information': '供应商信息',
     'GCI Quote Info': 'GCI 报价信息',
     'Supplier Quote Import': '供应商报价导入',
@@ -1582,6 +1584,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Supplier Quote / Trade & Sourcing / History UI (i18n audit fix)
     'Home': '首页 / Home',
     'Save Supplier Quote': '保存供应商报价 / Save Supplier Quote',
+    'Supplier Quote Page Title': '供应商报价 / Supplier Quote',
     'Supplier Information': '供应商信息 / Supplier Information',
     'GCI Quote Info': 'GCI 报价信息 / GCI Quote Info',
     'Supplier Quote Import': '供应商报价导入 / Supplier Quote Import',
