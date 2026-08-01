@@ -7,6 +7,7 @@ import {
   Download as DownloadIcon, X, Info, Save, History,
   ReceiptText, Box, Trash2, Ban, Edit3, Archive
 } from 'lucide-react';
+import { useI18n } from '@gci/i18n';
 
 import {
   QuoteRecord,
@@ -49,6 +50,14 @@ const safeLower = (v: any) => safeStr(v).toLowerCase();
 const safeDateStr = (v: any) => safeStr(v) ? safeStr(v) : '0000-00-00T00:00:00.000Z';
 
 const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) => {
+  const { dict } = useI18n();
+  const t = dict.trade.history;
+  const QUOTE_STATUS_LABEL: Record<string, string> = {
+    DRAFT: t.statusDraft,
+    QUOTED: t.statusQuoted,
+    CONVERTED: t.statusConverted,
+    LOST: t.statusLost,
+  };
   const [quotes, setQuotes] = useState<QuoteRecord[]>([]);
   const [quoteItems, setQuoteItems] = useState<QuoteItemRecord[]>([]);
   const [orders, setOrders] = useState<OrderRecord[]>([]);
@@ -1365,9 +1374,9 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
       {/* Top Tabs */}
       <div className="flex bg-white p-2 rounded-[30px] shadow-sm border border-gray-100 w-fit self-center no-print relative">
         {[
-          { id: 'history', label: '报价历史', icon: ClipboardList },
-          { id: 'orders', label: '订单中心', icon: PackageCheck },
-          { id: 'ar', label: '应收核销', icon: Wallet }
+          { id: 'history', label: t.tabHistory, icon: ClipboardList },
+          { id: 'orders', label: t.tabOrders, icon: PackageCheck },
+          { id: 'ar', label: t.tabAR, icon: Wallet }
         ].map(tab => (
           <button
             key={tab.id}
@@ -1382,9 +1391,9 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
         <button
           onClick={loadLocalData}
           className="ml-2 px-5 py-4 rounded-[22px] text-xs font-bold transition-all flex items-center gap-2 bg-gray-50 text-gray-400 hover:bg-gray-100"
-          title="Refresh"
+          title={t.refresh}
         >
-          <RefreshCw className="w-4 h-4" /> Refresh
+          <RefreshCw className="w-4 h-4" /> {t.refresh}
         </button>
       </div>
 
@@ -1485,22 +1494,22 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
               <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300" />
               <input
                 type="text"
-                placeholder="按客户名或报价单号搜索..."
+                placeholder={t.searchPlaceholder}
                 value={searchTerm}
-                on Change={e => setSearchTerm(e.target.value)}
+                onChange={e => setSearchTerm(e.target.value)}
                 className="w-full pl-16 p-5 bg-white border-2 border-gray-100 rounded-[30px] font-bold text-sm outline-none focus:border-[#CBA85C] shadow-sm transition-all"
               />
             </div>
 
             <div className="flex items-center bg-white p-2 rounded-2xl border border-gray-100 shadow-sm shrink-0">
-              <span className="px-4 text-xs font-black text-gray-400 uppercase border-r mr-2">Status</span>
-              {['ALL', 'QUOTED', 'CONVERTED'].map(f => (
+              <span className="px-4 text-xs font-black text-gray-400 uppercase border-r mr-2">{t.statusLabel}</span>
+              {(['ALL', 'QUOTED', 'CONVERTED'] as const).map(f => (
                 <button
                   key={f}
                   onClick={() => setStatusFilter(f)}
                   className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${statusFilter === f ? 'bg-[#080D1E] text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
                 >
-                  {f}
+                  {f === 'ALL' ? t.filterAll : f === 'QUOTED' ? t.filterQuoted : t.filterConverted}
                 </button>
               ))}
             </div>
@@ -1509,16 +1518,16 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
             <button
               onClick={() => setShowArchived(v => !v)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border text-xs font-black uppercase tracking-wide transition-all shadow-sm shrink-0 ${showArchived ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-gray-400 border-gray-100 hover:text-amber-600 hover:border-amber-300'}`}
-              title={showArchived ? '返回默认列表' : '显示归档未成交报价 / Show Archived'}
+              title={showArchived ? t.backToDefaultList : t.showArchivedTooltip}
             >
               <Archive className="w-4 h-4" />
-              {showArchived ? '归档中 / Archived' : '显示归档'}
+              {showArchived ? t.archivedActive : t.showArchived}
             </button>
 
             <button
               onClick={handleExportAllData}
               className="p-4 bg-white border border-gray-100 rounded-2xl text-[#CBA85C] hover:bg-[#080D1E] hover:text-white transition-all shadow-sm"
-              title="Export Backup"
+              title={t.exportBackup}
             >
               <DownloadIcon className="w-5 h-5" />
             </button>
@@ -1528,11 +1537,11 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
             <table className="w-full text-left">
               <thead className="bg-gray-50 text-xs font-black text-gray-400 uppercase tracking-wide sticky top-0 z-10 shadow-sm">
                 <tr>
-                  <th className="px-10 py-6">ID / Date</th>
-                  <th className="px-10 py-6">Customer</th>
-                  <th className="px-10 py-6 text-center">Due Date</th>
-                  <th className="px-10 py-6">Status</th>
-                  <th className="px-10 py-6 text-right">Total (AED)</th>
+                  <th className="px-10 py-6">{t.colIdDate}</th>
+                  <th className="px-10 py-6">{t.colCustomer}</th>
+                  <th className="px-10 py-6 text-center">{t.colDueDate}</th>
+                  <th className="px-10 py-6">{t.colStatus}</th>
+                  <th className="px-10 py-6 text-right">{t.colTotal}</th>
                   <th className="px-10 py-6"></th>
                 </tr>
               </thead>
@@ -1558,11 +1567,11 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                     <td className="px-10 py-8">
                       <div className="flex flex-col gap-1">
                         <span className={`px-4 py-1.5 rounded-full text-xs font-black tracking-wide shadow-sm border inline-block ${q.status === 'CONVERTED' ? 'bg-[#3F7D58] text-white border-[#3F7D58]' : 'bg-white text-gray-400 border-gray-100'}`}>
-                          {safeStr(q.status)}
+                          {QUOTE_STATUS_LABEL[safeStr(q.status)] ?? safeStr(q.status)}
                         </span>
                         {((q as any).archivedAt || (q as any).hiddenFromDefault || (q as any).deletedAt || (q as any).status === 'DELETED') && (
                           <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-50 text-amber-600 border border-amber-200 inline-block">
-                            已归档 · 未成交
+                            {t.archivedBadge}
                           </span>
                         )}
                       </div>
@@ -1575,7 +1584,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                         <button
                           onClick={() => setSelectedQuote(q)}
                           className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:bg-[#080D1E] hover:text-white transition-all"
-                          title="View Quote"
+                          title={t.viewQuote}
                         >
                           <Eye className="w-5 h-5" />
                         </button>
@@ -1583,7 +1592,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                           <button
                             onClick={() => handleArchiveQuote(q.id)}
                             className="p-4 bg-white border border-amber-100 rounded-2xl shadow-sm hover:bg-amber-600 hover:text-white transition-all text-amber-400"
-                            title="归档未成交报价 / Archive unsuccessful quote"
+                            title={t.archiveQuote}
                           >
                             <Archive className="w-4 h-4" />
                           </button>
@@ -1596,7 +1605,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                 {filteredQuotes.length === 0 && (
                   <tr>
                     <td colSpan={6} className="py-20 text-center text-gray-300 font-black uppercase text-xs">
-                      {showArchived ? '暂无归档记录 / No archived quotes' : '没有匹配的记录'}
+                      {showArchived ? t.emptyNoArchived : t.emptyNoMatch}
                     </td>
                   </tr>
                 )}
