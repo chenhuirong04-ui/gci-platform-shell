@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { persistence } from '../services/persistenceService';
 import { colors } from '@gci/design-system';
+import { useI18n } from '@gci/i18n';
 
 const GOLD = colors.goldBase;
 const NAVY = colors.bgBase;
@@ -60,13 +61,19 @@ const computeStatus = (rec: ConsignmentRecord): ConStatus => {
   return 'active';
 };
 
-const STATUS_LABEL: Record<ConStatus, string> = {
-  active:    '在售',
-  partial:   '部分结算',
-  settled:   '已结算',
-  overdue:   '超期',
-  exception: '异常',
+// Display-only label mapping for the in-app-computed ConStatus enum
+// (never persisted; the underlying record data is untouched).
+type ConsignmentDict = {
+  statusActiveManual: string; statusPartialManual: string; statusSettledManual: string;
+  statusOverdue: string; statusException: string;
 };
+const statusLabel = (t: ConsignmentDict): Record<ConStatus, string> => ({
+  active:    t.statusActiveManual,
+  partial:   t.statusPartialManual,
+  settled:   t.statusSettledManual,
+  overdue:   t.statusOverdue,
+  exception: t.statusException,
+});
 // Status pill colors -- mapped onto the 5 allowed status colors (info/
 // warning/success/danger/neutral) instead of ad-hoc Tailwind blue/amber/
 // emerald/red.
@@ -94,6 +101,9 @@ const EMPTY_FORM: Omit<ConsignmentRecord, 'id' | 'createdAt' | 'updatedAt'> = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 const ConsignmentManager: React.FC = () => {
+  const { dict } = useI18n();
+  const t = dict.trade.consignment;
+  const STATUS_LABEL = statusLabel(t);
   const [records, setRecords]       = useState<ConsignmentRecord[]>([]);
   const [search, setSearch]         = useState('');
   const [statusFilter, setStatus]   = useState<'ALL' | ConStatus>('ALL');
@@ -211,7 +221,7 @@ const ConsignmentManager: React.FC = () => {
       overallStatus: 'SETTLED' | 'PARTIAL' | 'ACTIVE';
     }>();
     for (const r of soConsignStock) {
-      const cn  = (r.customerName || '未知客户').trim();
+      const cn  = (r.customerName || t.unknownCustomer).trim();
       const rem = r.remainingQty ?? Math.max(0, (Number(r.consignedQty) || 0) - (Number(r.soldQty) || 0));
       // Tax-inclusive amount for client-facing display
       const inclUnitPrice = (r as any).taxInclusiveUnitPrice ?? r2((Number(r.unitPrice) || 0) * 1.05);
@@ -238,7 +248,7 @@ const ConsignmentManager: React.FC = () => {
       g.overallStatus  = allSettled ? 'SETTLED' : g.totalSold > 0 ? 'PARTIAL' : 'ACTIVE';
     }
     return Array.from(map.values());
-  }, [soConsignStock]);
+  }, [soConsignStock, t.unknownCustomer]);
 
   const openAdd = () => {
     setForm({ ...EMPTY_FORM });
@@ -254,8 +264,8 @@ const ConsignmentManager: React.FC = () => {
   const closeModal = () => { setShowModal(false); setEditingId(null); };
 
   const handleSave = () => {
-    if (!form.customerName.trim()) { alert('寄售客户不能为空'); return; }
-    if (!form.productName.trim())  { alert('产品名称不能为空'); return; }
+    if (!form.customerName.trim()) { alert(t.customerRequiredMsg); return; }
+    if (!form.productName.trim())  { alert(t.productRequiredMsg); return; }
     const now = new Date().toISOString();
     if (editingId) {
       persist(records.map(r =>
@@ -273,7 +283,7 @@ const ConsignmentManager: React.FC = () => {
   };
 
   const openQuick = (rec: ConsignmentRecord, field: 'soldQty' | 'settledAmount') => {
-    const label = field === 'soldQty' ? '录入已售数量' : '录入已结算金额';
+    const label = field === 'soldQty' ? t.quickLabelSold : t.quickLabelSettle;
     setQuickModal({ id: rec.id, field, label, current: Number(rec[field]) || 0 });
     setQuickVal(String(Number(rec[field]) || 0));
   };
@@ -281,7 +291,7 @@ const ConsignmentManager: React.FC = () => {
   const handleQuickSave = () => {
     if (!quickModal) return;
     const val = Number(quickVal);
-    if (isNaN(val) || val < 0) { alert('请输入有效数字'); return; }
+    if (isNaN(val) || val < 0) { alert(t.invalidNumberMsg); return; }
     const now = new Date().toISOString();
     persist(records.map(r =>
       r.id === quickModal.id ? { ...r, [quickModal.field]: val, updatedAt: now } : r
@@ -312,16 +322,16 @@ const ConsignmentManager: React.FC = () => {
     const newRemaining  = Number(editStockForm.remainingQty)  || 0;
     const newReceived   = Number(editStockForm.receivedAmount) || 0;
     if (newSold < 0 || newRemaining < 0 || newReceived < 0) {
-      alert('⚠️ 数量/金额不能为负数。'); return;
+      alert(t.negativeNotAllowedMsg); return;
     }
     if (newSold + newRemaining > consignedQty) {
-      alert(`⚠️ 已售(${newSold}) + 剩余(${newRemaining}) = ${newSold + newRemaining}，超过发货量 ${consignedQty}，请检查。`);
+      alert(t.exceedsShippedMsg.replace('{n}', String(newSold)).replace('{m}', String(newRemaining)).replace('{sum}', String(newSold + newRemaining)).replace('{total}', String(consignedQty)));
       return;
     }
     const inclUnitPrice = Number((editingStock as any).taxInclusiveUnitPrice) || r2((Number(editingStock.unitPrice) || 0) * 1.05);
     const grossValue    = r2(consignedQty * inclUnitPrice);
     if (newReceived > grossValue) {
-      alert(`⚠️ 已收金额(AED ${fmt2(newReceived)})不能超过总货值(AED ${fmt2(grossValue)})。`); return;
+      alert(t.exceedsGrossValueMsg.replace('{n}', fmt2(newReceived)).replace('{m}', fmt2(grossValue))); return;
     }
     await persistence.updateConsignmentStock({
       ...editingStock,
@@ -352,11 +362,11 @@ const ConsignmentManager: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-2xl font-black text-[#080D1E]">寄售管理</h2>
+          <h2 className="text-2xl font-black text-[#080D1E]">{t.pageTitle}</h2>
           <p className="text-sm text-gray-500 font-bold mt-1">
-            待结算 AED {fmt2(summary.totalOut)}
+            {t.pendingSettlementLabel} AED {fmt2(summary.totalOut)}
             {summary.count30 > 0 && (
-              <span className="ml-2" style={{ color: colors.statusWarning }}>· {summary.count30} 条超30天</span>
+              <span className="ml-2" style={{ color: colors.statusWarning }}>· {t.overdueSuffix.replace('{n}', String(summary.count30))}</span>
             )}
           </p>
         </div>
@@ -364,18 +374,18 @@ const ConsignmentManager: React.FC = () => {
           onClick={openAdd}
           className="flex items-center gap-2 px-5 py-2.5 bg-[#080D1E] text-white rounded-xl text-xs font-black uppercase tracking-wide shadow hover:bg-black transition-all"
         >
-          <Plus className="w-4 h-4" />新增寄售
+          <Plus className="w-4 h-4" />{t.addConsignment}
         </button>
       </div>
 
       {/* ── 第一层：寄售概览 KPI ── */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
-          { label: '总发货量',   value: kpi.totalConsigned,                    unit: '件', color: 'text-[#080D1E]'   },
-          { label: '累计已售',   value: kpi.totalSold,                         unit: '件', color: 'text-[#6FBF8E]' },
-          { label: '剩余在途',   value: kpi.totalRemaining,                    unit: '件', color: 'text-[#CBA85C]'  },
-          { label: '待结算金额', value: `AED ${fmt2(kpi.totalUnsettled)}`,     unit: '',   color: 'text-[#D9B45A]'   },
-          { label: '已收金额',   value: `AED ${fmt2(kpi.totalCollected)}`,     unit: '',   color: 'text-[#6FBF8E]' },
+          { label: t.statTotalShipped,      value: kpi.totalConsigned,                    unit: t.unitItems, color: 'text-[#080D1E]'   },
+          { label: t.statTotalSold,         value: kpi.totalSold,                         unit: t.unitItems, color: 'text-[#6FBF8E]' },
+          { label: t.statRemainingTransit,  value: kpi.totalRemaining,                    unit: t.unitItems, color: 'text-[#CBA85C]'  },
+          { label: t.statPendingAmount,     value: `AED ${fmt2(kpi.totalUnsettled)}`,     unit: '',   color: 'text-[#D9B45A]'   },
+          { label: t.statReceivedAmount,    value: `AED ${fmt2(kpi.totalCollected)}`,     unit: '',   color: 'text-[#6FBF8E]' },
         ].map(k => (
           <div key={k.label} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 text-center">
             <p className="text-base font-bold text-gray-500 mb-3">{k.label}</p>
@@ -388,23 +398,23 @@ const ConsignmentManager: React.FC = () => {
       {/* ── 第二层：按客户寄售状态 ── */}
       <div className="flex items-center gap-2.5 px-1 pt-2">
         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: GOLD }} />
-        <span className="text-base font-black text-gray-700">寄售客户状态</span>
-        <span className="ml-auto text-sm font-bold" style={{ color: GOLD }}>{customerGroups.length} 个客户</span>
+        <span className="text-base font-black text-gray-700">{t.customerStatusTitle}</span>
+        <span className="ml-auto text-sm font-bold" style={{ color: GOLD }}>{t.customersUnit.replace('{n}', String(customerGroups.length))}</span>
       </div>
 
       {customerGroups.length === 0 ? (
         <div className="bg-white rounded-2xl py-16 text-center border border-gray-100 shadow-sm">
           <Truck className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-          <p className="text-base font-black text-gray-400">暂无寄售记录</p>
-          <p className="text-sm text-gray-400 mt-1">生成「寄售」类订单后自动出现</p>
+          <p className="text-base font-black text-gray-400">{t.noRecords}</p>
+          <p className="text-sm text-gray-400 mt-1">{t.noRecordsHint}</p>
         </div>
       ) : (
         <div className="space-y-4">
           {customerGroups.map(g => {
             const statusConf =
-              g.overallStatus === 'SETTLED' ? { label: '已结算',   cls: STATUS_CLASS.settled } :
-              g.overallStatus === 'PARTIAL' ? { label: '部分结算', cls: STATUS_CLASS.partial } :
-                                              { label: '在售中',   cls: STATUS_CLASS.active };
+              g.overallStatus === 'SETTLED' ? { label: t.statusSettled, cls: STATUS_CLASS.settled } :
+              g.overallStatus === 'PARTIAL' ? { label: t.statusPartial, cls: STATUS_CLASS.partial } :
+                                              { label: t.statusActive,  cls: STATUS_CLASS.active };
             return (
               <div key={g.customerName} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
 
@@ -418,7 +428,7 @@ const ConsignmentManager: React.FC = () => {
                       <h3 className="text-xl font-black text-gray-900">{g.customerName}</h3>
                       <p className="text-sm text-gray-500 mt-0.5">
                         {g.soNos.slice(0, 3).join(' · ')}
-                        {g.soNos.length > 3 && <span className="text-gray-400"> · +{g.soNos.length - 3} 个订单</span>}
+                        {g.soNos.length > 3 && <span className="text-gray-400"> · {t.ordersMoreSuffix.replace('{n}', String(g.soNos.length - 3))}</span>}
                       </p>
                     </div>
                   </div>
@@ -430,10 +440,10 @@ const ConsignmentManager: React.FC = () => {
                 {/* 4个核心数字 */}
                 <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-gray-100">
                   {[
-                    { label: '已发货',   value: g.totalConsigned,                         unit: '件', color: 'text-gray-800'    },
-                    { label: '已售',     value: g.totalSold,                               unit: '件', color: 'text-[#6FBF8E]' },
-                    { label: '剩余',     value: g.totalRemaining,                          unit: '件', color: 'text-[#CBA85C]'  },
-                    { label: '应收金额', value: `AED ${fmt2(g.unsettledAmount)}`,           unit: '',   color: g.unsettledAmount > 0 ? 'text-[#D9B45A]' : 'text-gray-400' },
+                    { label: t.groupShipped,     value: g.totalConsigned,                         unit: t.unitItems, color: 'text-gray-800'    },
+                    { label: t.groupSold,        value: g.totalSold,                               unit: t.unitItems, color: 'text-[#6FBF8E]' },
+                    { label: t.groupRemaining,   value: g.totalRemaining,                          unit: t.unitItems, color: 'text-[#CBA85C]'  },
+                    { label: t.groupReceivable,  value: `AED ${fmt2(g.unsettledAmount)}`,           unit: '',   color: g.unsettledAmount > 0 ? 'text-[#D9B45A]' : 'text-gray-400' },
                   ].map(stat => (
                     <div key={stat.label} className="px-5 py-6 text-center">
                       <p className="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide">{stat.label}</p>
@@ -446,7 +456,7 @@ const ConsignmentManager: React.FC = () => {
                 {/* 产品明细（简要列表，不展开） */}
                 {g.items.length > 0 && (
                   <div className="border-t border-gray-100 px-6 py-4 bg-gray-50/40">
-                    <p className="text-sm font-bold text-gray-400 mb-2">产品明细</p>
+                    <p className="text-sm font-bold text-gray-400 mb-2">{t.productDetails}</p>
                     <div className="flex flex-wrap gap-2">
                       {g.items.map((item: any, idx: number) => {
                         const rem = item.remainingQty ?? Math.max(0, (Number(item.consignedQty) || 0) - (Number(item.soldQty) || 0));
@@ -455,18 +465,18 @@ const ConsignmentManager: React.FC = () => {
                           <span key={idx} className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-gray-200 transition-colors">
                             <span className="text-base font-bold text-gray-700">{item.productName}</span>
                             <span className="text-gray-300">·</span>
-                            <span className="text-base font-black" style={{ color: GOLD }}>剩 {rem} 件</span>
+                            <span className="text-base font-black" style={{ color: GOLD }}>{t.remainingUnitsPrefix} {rem} {t.unitItems}</span>
                             <span className={`text-sm font-black px-1.5 py-0.5 rounded ${
                               ss === 'SETTLED' ? 'text-[#3F7D58] bg-[#6FBF8E]/15' :
                               ss === 'PARTIAL' ? 'text-[#8A6D2F] bg-[#D9B45A]/15'     :
                                                 'text-[#4A6090] bg-[#8FA6D4]/15'
                             }`}>
-                              {ss === 'SETTLED' ? '已结' : ss === 'PARTIAL' ? '部分结算' : '未结'}
+                              {ss === 'SETTLED' ? t.settlementSettled : ss === 'PARTIAL' ? t.settlementPartial : t.settlementUnsettled}
                             </span>
                             <button
                               onClick={() => openEditStock(item)}
                               className="p-1 rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-                              title="登记销售 / 修改结算"
+                              title={t.registerSalesTooltip}
                             >
                               <Edit3 className="w-3 h-3" />
                             </button>
@@ -485,9 +495,9 @@ const ConsignmentManager: React.FC = () => {
       {/* ── Section 2: 手动补录记录（降级保留）── */}
       <div className="flex items-center gap-2.5 px-1 pt-2">
         <div className="w-2 h-2 rounded-full bg-[#D9B45A]" />
-        <span className="text-base font-black text-gray-600">手动补录记录</span>
+        <span className="text-base font-black text-gray-600">{t.manualRecordsTitle}</span>
         <span className="ml-auto text-sm font-bold bg-[#D9B45A]/15 text-[#8A6D2F] border border-[#D9B45A]/30 px-3 py-0.5 rounded-full">
-          旧版台账 · 保留参考
+          {t.legacyLedgerBadge}
         </span>
       </div>
 
@@ -497,7 +507,7 @@ const ConsignmentManager: React.FC = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <input
             value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="搜索客户 / 产品…"
+            placeholder={t.searchPlaceholder}
             className="w-full pl-8 pr-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#CBA85C]"
           />
         </div>
@@ -505,15 +515,15 @@ const ConsignmentManager: React.FC = () => {
           value={statusFilter} onChange={e => setStatus(e.target.value as any)}
           className="text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-[#CBA85C]"
         >
-          <option value="ALL">所有状态</option>
-          <option value="active">在售</option>
-          <option value="partial">部分结算</option>
-          <option value="settled">已结算</option>
-          <option value="overdue">超期</option>
-          <option value="exception">异常</option>
+          <option value="ALL">{t.allStatuses}</option>
+          <option value="active">{t.statusActiveManual}</option>
+          <option value="partial">{t.statusPartialManual}</option>
+          <option value="settled">{t.statusSettledManual}</option>
+          <option value="overdue">{t.statusOverdue}</option>
+          <option value="exception">{t.statusException}</option>
         </select>
         <span className="text-xs font-black text-gray-500 uppercase tracking-wide">
-          显示 {filtered.length} / {records.length}
+          {t.showingXofY.replace('{shown}', String(filtered.length)).replace('{total}', String(records.length))}
         </span>
       </div>
 
@@ -523,7 +533,7 @@ const ConsignmentManager: React.FC = () => {
           <div className="py-16 text-center">
             <Truck className="w-8 h-8 text-gray-200 mx-auto mb-3" />
             <p className="text-xs font-black uppercase tracking-wide text-gray-400">
-              {records.length === 0 ? '暂无寄售记录，点击「新增寄售」开始录入' : '无匹配结果'}
+              {records.length === 0 ? t.emptyNoRecordsCTA : t.emptyNoMatch}
             </p>
           </div>
         ) : (
@@ -531,8 +541,8 @@ const ConsignmentManager: React.FC = () => {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  {['客户','产品','寄售日期','寄售量','已售','剩余','单价','总金额','已结算','未结算','天数','状态','操作'].map(h => (
-                    <th key={h} className="px-3 py-3 text-left text-xs font-black uppercase tracking-wide text-gray-500 whitespace-nowrap">
+                  {[t.colCustomer, t.colProduct, t.colConsignDate, t.colConsignQty, t.colSold, t.colRemaining, t.colUnitPrice, t.colTotalAmount, t.colSettled, t.colUnsettled, t.colDays, t.colStatus, t.colActions].map((h, i) => (
+                    <th key={i} className="px-3 py-3 text-left text-xs font-black uppercase tracking-wide text-gray-500 whitespace-nowrap">
                       {h}
                     </th>
                   ))}
@@ -572,22 +582,22 @@ const ConsignmentManager: React.FC = () => {
                             onClick={() => openQuick(rec, 'soldQty')}
                             className="px-2 py-1 rounded text-xs font-black border whitespace-nowrap"
                             style={{ backgroundColor: 'rgba(111,191,142,0.12)', color: '#3F7D58', borderColor: 'rgba(111,191,142,0.3)' }}
-                            title="录入已售数量"
-                          >已售</button>
+                            title={t.recordSoldTooltip}
+                          >{t.soldBtn}</button>
                           <button
                             onClick={() => openQuick(rec, 'settledAmount')}
                             className="px-2 py-1 rounded text-xs font-black border whitespace-nowrap"
                             style={{ backgroundColor: `${GOLD}15`, color: '#8A6D2F', borderColor: `${GOLD}30` }}
-                            title="录入已结算金额"
-                          >结算</button>
+                            title={t.recordSettleTooltip}
+                          >{t.settleBtn}</button>
                           <button
                             onClick={() => openEdit(rec)}
                             className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600"
                           ><Edit3 className="w-3.5 h-3.5" /></button>
                           {deleteConfirm === rec.id ? (
                             <>
-                              <button onClick={() => handleDelete(rec.id)} className="px-2 py-1 text-white rounded text-xs font-black" style={{ backgroundColor: colors.statusDanger }}>确认</button>
-                              <button onClick={() => setDeleteConfirm(null)} className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-black">取消</button>
+                              <button onClick={() => handleDelete(rec.id)} className="px-2 py-1 text-white rounded text-xs font-black" style={{ backgroundColor: colors.statusDanger }}>{t.confirmBtn}</button>
+                              <button onClick={() => setDeleteConfirm(null)} className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-black">{t.cancelBtn}</button>
                             </>
                           ) : (
                             <button
@@ -618,7 +628,7 @@ const ConsignmentManager: React.FC = () => {
             </div>
             <div className="px-6 py-5">
               <p className="text-xs font-black uppercase tracking-wide text-gray-400 mb-2">
-                当前值：{quickModal.current} &nbsp;→&nbsp; 新值
+                {t.currentValueArrow.replace('{n}', String(quickModal.current))}
               </p>
               <input
                 type="number" min={0} step={quickModal.field === 'settledAmount' ? '0.01' : '1'}
@@ -628,17 +638,17 @@ const ConsignmentManager: React.FC = () => {
                 className="w-full px-4 py-3 text-lg font-black border-2 border-[#CBA85C]/40 rounded-xl focus:outline-none focus:border-[#CBA85C] text-center"
               />
               {quickModal.field === 'settledAmount' && (
-                <p className="text-xs text-gray-400 mt-1 text-center">单位：AED</p>
+                <p className="text-xs text-gray-400 mt-1 text-center">{t.unitAED}</p>
               )}
             </div>
             <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
               <button onClick={() => setQuickModal(null)}
                 className="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wide bg-gray-100 text-gray-600">
-                取消
+                {t.cancelBtn}
               </button>
               <button onClick={handleQuickSave}
                 className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wide bg-[#080D1E] text-white shadow">
-                <Save className="w-3.5 h-3.5" />确认录入
+                <Save className="w-3.5 h-3.5" />{t.confirmEntry}
               </button>
             </div>
           </div>
@@ -651,7 +661,7 @@ const ConsignmentManager: React.FC = () => {
           <div className="bg-white rounded-2xl w-full max-w-2xl my-6 shadow-2xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <h3 className="text-sm font-black uppercase tracking-widest text-[#080D1E]">
-                {editingId ? '修改寄售记录' : '新增寄售记录'}
+                {editingId ? t.editRecordTitle : t.addRecordTitle}
               </h3>
               <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
                 <X className="w-4 h-4" />
@@ -659,64 +669,64 @@ const ConsignmentManager: React.FC = () => {
             </div>
 
             <div className="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="寄售客户 *">
+              <Field label={t.fieldCustomer}>
                 <input value={form.customerName} onChange={e => setF('customerName', e.target.value)}
-                  className={INPUT} placeholder="客户名称" />
+                  className={INPUT} placeholder={t.customerNamePlaceholder} />
               </Field>
-              <Field label="产品名称 *">
+              <Field label={t.fieldProduct}>
                 <input value={form.productName} onChange={e => setF('productName', e.target.value)}
-                  className={INPUT} placeholder="产品名称" />
+                  className={INPUT} placeholder={t.productNamePlaceholder} />
               </Field>
-              <Field label="SKU / 货号">
+              <Field label={t.fieldSku}>
                 <input value={form.sku} onChange={e => setF('sku', e.target.value)}
-                  className={INPUT} placeholder="可选" />
+                  className={INPUT} placeholder={t.optionalPlaceholder} />
               </Field>
-              <Field label="寄售日期">
+              <Field label={t.fieldConsignDate}>
                 <input type="date" value={form.consignDate}
                   onChange={e => setF('consignDate', e.target.value)} className={INPUT} />
               </Field>
-              <Field label="寄售数量">
+              <Field label={t.fieldConsignQty}>
                 <input type="number" min={0} value={form.consignQty}
                   onChange={e => setF('consignQty', Number(e.target.value))} className={INPUT} />
               </Field>
-              <Field label="单价 (AED)">
+              <Field label={t.fieldUnitPrice}>
                 <input type="number" min={0} step="0.01" value={form.unitPrice}
                   onChange={e => setF('unitPrice', Number(e.target.value))} className={INPUT} />
               </Field>
-              <Field label="已售数量">
+              <Field label={t.fieldSoldQty}>
                 <input type="number" min={0} value={form.soldQty}
                   onChange={e => setF('soldQty', Number(e.target.value))} className={INPUT} />
               </Field>
-              <Field label="已结算金额 (AED)">
+              <Field label={t.fieldSettledAmount}>
                 <input type="number" min={0} step="0.01" value={form.settledAmount}
                   onChange={e => setF('settledAmount', Number(e.target.value))} className={INPUT} />
               </Field>
-              <Field label="预计结算日期">
+              <Field label={t.fieldExpectedSettleDate}>
                 <input type="date" value={form.expectedSettleDate}
                   onChange={e => setF('expectedSettleDate', e.target.value)} className={INPUT} />
               </Field>
-              <Field label="备注">
+              <Field label={t.fieldNote}>
                 <input value={form.note} onChange={e => setF('note', e.target.value)}
-                  className={INPUT} placeholder="可选" />
+                  className={INPUT} placeholder={t.optionalPlaceholder} />
               </Field>
 
               {/* Preview */}
               {form.consignQty > 0 && form.unitPrice > 0 && (
                 <div className="md:col-span-2 rounded-xl p-3 grid grid-cols-3 gap-3 text-center" style={{ backgroundColor: `${GOLD}15` }}>
                   <div>
-                    <div className="text-xs font-black uppercase tracking-wide" style={{ color: GOLD }}>寄售总额</div>
+                    <div className="text-xs font-black uppercase tracking-wide" style={{ color: GOLD }}>{t.previewTotalAmount}</div>
                     <div className="text-base font-black font-mono text-[#080D1E]">
                       AED {r2(form.consignQty * form.unitPrice).toFixed(2)}
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs font-black uppercase tracking-wide" style={{ color: GOLD }}>剩余数量</div>
+                    <div className="text-xs font-black uppercase tracking-wide" style={{ color: GOLD }}>{t.previewRemainingQty}</div>
                     <div className="text-base font-black font-mono text-gray-700">
                       {Math.max(0, form.consignQty - form.soldQty)}
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs font-black uppercase tracking-wide" style={{ color: GOLD }}>未结算</div>
+                    <div className="text-xs font-black uppercase tracking-wide" style={{ color: GOLD }}>{t.previewUnsettled}</div>
                     <div className="text-base font-black font-mono" style={{ color: colors.statusWarning }}>
                       AED {r2(Math.max(0, r2(form.consignQty * form.unitPrice) - form.settledAmount)).toFixed(2)}
                     </div>
@@ -728,11 +738,11 @@ const ConsignmentManager: React.FC = () => {
             <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
               <button onClick={closeModal}
                 className="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wide bg-gray-100 text-gray-600">
-                取消
+                {t.cancelBtn}
               </button>
               <button onClick={handleSave}
                 className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wide bg-[#080D1E] text-white shadow">
-                <Save className="w-3.5 h-3.5" />{editingId ? '保存修改' : '新增寄售'}
+                <Save className="w-3.5 h-3.5" />{editingId ? t.saveChanges : t.addConsignment}
               </button>
             </div>
           </div>
@@ -752,7 +762,7 @@ const ConsignmentManager: React.FC = () => {
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
                 <div>
                   <h3 className="text-sm font-black uppercase tracking-widest text-[#080D1E]">
-                    登记寄售销售 / Update Consignment Sales
+                    {t.registerSalesTitle}
                   </h3>
                   <p className="text-xs text-gray-400 mt-0.5 font-mono">{editingStock.soNo} · {editingStock.customerName}</p>
                 </div>
@@ -766,15 +776,15 @@ const ConsignmentManager: React.FC = () => {
                 <div className="rounded-xl p-3 space-y-1.5" style={{ backgroundColor: `${GOLD}0D` }}>
                   <div className="text-xs font-black text-gray-700">{editingStock.productName}</div>
                   <div className="flex flex-wrap gap-4 text-xs font-mono text-gray-500">
-                    <span>发货量 <span className="font-black text-gray-800">{cQty} 件</span></span>
-                    <span>含税单价 <span className="font-black text-gray-800">AED {fmt2(inclPrice)}</span></span>
-                    <span>总货值 <span className="font-black" style={{ color: GOLD }}>AED {fmt2(grossValue)}</span></span>
+                    <span>{t.shippedQtyLabel} <span className="font-black text-gray-800">{cQty} {t.unitItems}</span></span>
+                    <span>{t.inclUnitPriceLabel} <span className="font-black text-gray-800">AED {fmt2(inclPrice)}</span></span>
+                    <span>{t.grossValueLabel} <span className="font-black" style={{ color: GOLD }}>AED {fmt2(grossValue)}</span></span>
                   </div>
                 </div>
 
                 {/* 可编辑字段 */}
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="累计已售数量 soldQty">
+                  <Field label={t.fieldSoldQtyCumulative}>
                     <input
                       type="number" min={0} max={cQty}
                       value={editStockForm.soldQty}
@@ -782,7 +792,7 @@ const ConsignmentManager: React.FC = () => {
                       className={INPUT}
                     />
                   </Field>
-                  <Field label="剩余数量 remainingQty">
+                  <Field label={t.fieldRemainingQtyField}>
                     <input
                       type="number" min={0}
                       value={editStockForm.remainingQty}
@@ -794,11 +804,11 @@ const ConsignmentManager: React.FC = () => {
 
                 {overTotal && (
                   <p className="text-xs font-black text-[#A85D45] text-center">
-                    ⚠️ 已售({editStockForm.soldQty}) + 剩余({editStockForm.remainingQty}) = {editStockForm.soldQty + editStockForm.remainingQty}，超过发货量 {cQty}
+                    {t.overTotalWarning.replace('{n}', String(editStockForm.soldQty)).replace('{m}', String(editStockForm.remainingQty)).replace('{sum}', String(editStockForm.soldQty + editStockForm.remainingQty)).replace('{total}', String(cQty))}
                   </p>
                 )}
 
-                <Field label="累计已收金额 receivedAmount (AED)">
+                <Field label={t.fieldReceivedAmountCumulative}>
                   <input
                     type="number" min={0} step="0.01"
                     value={editStockForm.receivedAmount}
@@ -810,46 +820,46 @@ const ConsignmentManager: React.FC = () => {
                 {/* 待结算金额实时显示 */}
                 <div className="flex items-center justify-between rounded-lg px-4 py-2.5 text-xs font-bold"
                   style={{ backgroundColor: pending > 0 ? 'rgba(224,132,106,0.08)' : 'rgba(111,191,142,0.1)' }}>
-                  <span className="text-gray-500">待结算金额</span>
+                  <span className="text-gray-500">{t.pendingSettlementAmountLabel}</span>
                   <span className="text-base font-black font-mono" style={{ color: pending > 0 ? '#A85D45' : '#3F7D58' }}>
                     AED {fmt2(pending)}
                   </span>
                 </div>
 
-                <Field label="结算状态 settlementStatus">
+                <Field label={t.fieldSettlementStatus}>
                   <select
                     value={editStockForm.settlementStatus}
                     onChange={e => setEditStockForm(p => ({ ...p, settlementStatus: e.target.value as any }))}
                     className={INPUT}
                   >
-                    <option value="UNSETTLED">UNSETTLED — 未结算</option>
-                    <option value="PARTIAL">PARTIAL — 部分结算</option>
-                    <option value="SETTLED">SETTLED — 已结算完成</option>
+                    <option value="UNSETTLED">{t.statusUnsettledOption}</option>
+                    <option value="PARTIAL">{t.statusPartialOption}</option>
+                    <option value="SETTLED">{t.statusSettledOption}</option>
                   </select>
                 </Field>
 
-                <Field label="备注 notes（可选）">
+                <Field label={t.fieldNotesOptional}>
                   <input
                     value={editStockForm.memo}
                     onChange={e => setEditStockForm(p => ({ ...p, memo: e.target.value }))}
                     className={INPUT}
-                    placeholder="可选"
+                    placeholder={t.optionalPlaceholder}
                   />
                 </Field>
 
                 <p className="text-xs rounded-lg px-3 py-2 text-gray-500" style={{ backgroundColor: 'rgba(0,0,0,0.03)' }}>
-                  ℹ SETTLED = 结算完成，不代表取消寄售。取消寄售请作废对应订单。
+                  {t.settledInfoHint}
                 </p>
               </div>
 
               <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
                 <button onClick={() => setEditingStock(null)}
                   className="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wide bg-gray-100 text-gray-600">
-                  取消
+                  {t.cancelBtn}
                 </button>
                 <button onClick={handleSaveEditStock} disabled={overTotal}
                   className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wide shadow ${overTotal ? 'bg-gray-300 text-gray-400 cursor-not-allowed' : 'bg-[#080D1E] text-white'}`}>
-                  <Save className="w-3.5 h-3.5" />保存登记
+                  <Save className="w-3.5 h-3.5" />{t.saveRegistration}
                 </button>
               </div>
             </div>
