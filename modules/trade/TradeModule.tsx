@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useI18n } from '@gci/i18n';
 import QuoteManager from './components/QuoteManager';
 import FinanceTracker from './components/FinanceTracker';
 import OrderConverter from './components/OrderConverter';
@@ -39,6 +40,7 @@ interface TradeModuleProps {
 }
 
 export default function TradeModule({ initialTab }: TradeModuleProps = {}) {
+  const { dict } = useI18n();
   const _initTab = initialTab || new URLSearchParams(window.location.search).get('tab');
   const _startTab = (_validTabs.includes(_initTab || '') ? _initTab : 'home') as any;
   const [activeTab, setActiveTab] = useState<TradeTab>(_startTab);
@@ -54,7 +56,7 @@ export default function TradeModule({ initialTab }: TradeModuleProps = {}) {
 
   const navTabs = [
     { id: 'home',        code: 'HM', label: '首页驾驶舱' },
-    { id: 'quote',       code: 'QT', label: 'PI 报价' },
+    { id: 'quote',       code: 'QT', label: dict.trade.pi.navLabel },
     { id: 'dashboard',   code: 'DB', label: '经营看板' },
     { id: 'inventory',   code: 'IV', label: '库存' },
     { id: 'consignment', code: 'CS', label: '寄售' },

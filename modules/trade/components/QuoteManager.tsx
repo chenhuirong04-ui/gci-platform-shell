@@ -8,7 +8,9 @@ import {
   ReceiptText,
   X,
   Save as SaveIcon,
+  Trash2,
 } from 'lucide-react';
+import { useI18n } from '@gci/i18n';
 
 import { QuoteRecord, QuoteItemRecord } from '../types';
 import { roundTo2, calculateTradeTotals } from '../services/currencyUtils';
@@ -58,6 +60,8 @@ const CustomerDropdown: React.FC<{
   value: string;
   onChange: (name: string) => void;
 }> = ({ options, value, onChange }) => {
+  const { dict } = useI18n();
+  const t = dict.trade.pi;
   const [open, setOpen] = useState(false);
   const [q, setQ]       = useState(value);
   const [hi, setHi]     = useState(-1);
@@ -92,7 +96,7 @@ const CustomerDropdown: React.FC<{
       <input
         type="text"
         className="w-full p-4 border-2 border-[#CBA85C]/20 rounded-2xl outline-none focus:border-[#CBA85C] font-bold bg-[#CBA85C]/5 text-[#0F1E45] uppercase"
-        placeholder="选择客户..."
+        placeholder={t.selectCustomerPlaceholder}
         value={q}
         onFocus={() => { setOpen(true); setQ(''); }}
         onChange={e => { setQ(e.target.value); setOpen(true); setHi(-1); }}
@@ -111,7 +115,7 @@ const CustomerDropdown: React.FC<{
         </ul>
       )}
       {open && filtered.length === 0 && q && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-3 text-sm text-gray-400">无匹配客户</div>
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-3 text-sm text-gray-400">{t.noMatchingCustomer}</div>
       )}
     </div>
   );
@@ -126,6 +130,8 @@ const ProductDropdown: React.FC<{
   placeholder?: string;
   onChange: (item: InvItem | null, displayName: string) => void;
 }> = ({ items, value, placeholder, onChange }) => {
+  const { dict } = useI18n();
+  const t = dict.trade.pi;
   const [open, setOpen] = useState(false);
   const [q, setQ]       = useState(value);
   const [hi, setHi]     = useState(-1);
@@ -160,7 +166,7 @@ const ProductDropdown: React.FC<{
       <input
         type="text"
         className="w-full p-4 border-2 border-[#CBA85C]/20 rounded-2xl outline-none focus:border-[#CBA85C] font-bold bg-[#CBA85C]/5 text-[#0F1E45]"
-        placeholder={placeholder || "搜索产品..."}
+        placeholder={placeholder || t.searchProductPlaceholder}
         value={q}
         onFocus={() => { setOpen(true); setQ(''); }}
         onChange={e => { setQ(e.target.value); setOpen(true); setHi(-1); onChange(null, e.target.value); }}
@@ -182,24 +188,26 @@ const ProductDropdown: React.FC<{
                   : o.stock <= 10 ? { backgroundColor: 'rgba(217,180,90,0.16)', color: colors.statusWarning }
                   : { backgroundColor: 'rgba(111,191,142,0.16)', color: colors.statusSuccess }
                 }>
-                  {o.stock} {o.unit}
+                  {o.stock} {o.unit} · {o.stock <= 0 ? t.outOfStock : o.stock <= 10 ? t.lowStock : t.inStock}
                 </span>
               </div>
               {o.targetPrice > 0 && (
-                <div className="text-[10px] text-gray-400 mt-0.5">底价 AED {o.targetPrice.toFixed(2)}</div>
+                <div className="text-[10px] text-gray-400 mt-0.5">{t.cost} AED {o.targetPrice.toFixed(2)}</div>
               )}
             </li>
           ))}
         </ul>
       )}
       {open && filtered.length === 0 && q && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-3 text-sm text-gray-400">无匹配产品</div>
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-3 text-sm text-gray-400">{t.noProductsFound}</div>
       )}
     </div>
   );
 };
 
 const QuoteManager: React.FC = () => {
+  const { dict } = useI18n();
+  const t = dict.trade.pi;
   // Notion token is server-side in /api/notion-proxy — auto-connected, no manual activation needed
   const [customerOptions, setCustomerOptions] = useState<{ name: string; id: string }[]>([]);
   const [inventoryData, setInventoryData] = useState<any[]>([]);
@@ -224,8 +232,8 @@ const QuoteManager: React.FC = () => {
   const [liveQty, setLiveQty] = useState<string>('1');
 
   const [isSyncing, setIsSyncing] = useState(false);
-  const [custError, setCustError] = useState<string | null>(null);
-  const [invError, setInvError]   = useState<string | null>(null);
+  const [custError, setCustError] = useState(false);
+  const [invError, setInvError]   = useState(false);
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
   const [logisticsInfo, setLogisticsInfo] = useState('');
 
@@ -296,8 +304,8 @@ const QuoteManager: React.FC = () => {
   useEffect(() => {
     const bootstrap = async () => {
       setIsSyncing(true);
-      setCustError(null);
-      setInvError(null);
+      setCustError(false);
+      setInvError(false);
 
       try {
         // Promise.allSettled: one failure never kills the others.
@@ -317,7 +325,7 @@ const QuoteManager: React.FC = () => {
           })));
         } else {
           console.error('[QuoteManager] CUSTOMER fetch failed:', custSettled.reason);
-          setCustError('客户读取失败，请刷新');
+          setCustError(true);
         }
 
         // ── PRODUCT / INVENTORY dropdown ─────────────────────────────────────
@@ -356,7 +364,7 @@ const QuoteManager: React.FC = () => {
           setInventoryData(merged);
         } else {
           console.error('[QuoteManager] INVENTORY fetch failed:', invSettled.reason);
-          setInvError('库存读取失败，请刷新');
+          setInvError(true);
         }
       } finally {
         // Guaranteed to run regardless of success, failure, or timeout.
@@ -413,7 +421,7 @@ const QuoteManager: React.FC = () => {
   const printElementById = useCallback((elementId: string, title = 'iCare Document') => {
     const el = document.getElementById(elementId);
     if (!el) {
-      alert(`❌ 找不到打印区域: #${elementId}`);
+      alert(t.printAreaNotFound(elementId));
       return;
     }
 
@@ -457,7 +465,7 @@ const QuoteManager: React.FC = () => {
     const win = iframe.contentWindow;
     if (!doc || !win) {
       document.body.removeChild(iframe);
-      alert('❌ 打印初始化失败（iframe不可用）');
+      alert(t.printInitFailed);
       return;
     }
 
@@ -496,7 +504,7 @@ const QuoteManager: React.FC = () => {
     };
 
     doPrint();
-  }, []);
+  }, [t]);
 
   // ✅ 你按钮现在调用的就是这个（不要再 window.print）
   const handlePrintPDF = useCallback(() => {
@@ -744,6 +752,10 @@ const QuoteManager: React.FC = () => {
     });
   }, []);
 
+  const handleRemoveReviewItem = useCallback((index: number) => {
+    setReviewItems(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
   const handleApplyReviewChanges = useCallback(() => {
     // ── 强制校验 & 重新计算，杜绝 wheel/ArrowKey 引入的残差 ──────────
     const normalized = reviewItems.map(it => {
@@ -753,18 +765,18 @@ const QuoteManager: React.FC = () => {
     });
     const invalid = normalized.find(it => !Number.isInteger(it.qty) || it.qty < 1);
     if (invalid) {
-      alert(`⚠️ 数量必须为正整数 (${invalid.desc})`);
+      alert(t.qtyMustBePositive(invalid.desc));
       return;
     }
     setItems(normalized);
     setIsReviewOpen(false);
-  }, [reviewItems]);
+  }, [reviewItems, t]);
 
   return (
     <>
       {/* SUPPLY CHAIN 分区页面标题，跟其他分区保持一致的标题样式 — 独立于下面
           的双栏布局，不改它的高度计算，不影响打印逻辑 */}
-      <h1 className="no-print text-2xl font-semibold mb-4" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>PI 报价</h1>
+      <h1 className="no-print text-2xl font-semibold mb-4" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>{t.title}</h1>
       <div className="flex flex-row w-full h-[calc(100vh-160px)] gap-8 overflow-hidden relative">
       {/* 左侧控制区 */}
       <section className="w-[40%] h-full flex flex-col gap-6 no-print overflow-y-auto custom-scrollbar pr-2 pb-10">
@@ -801,23 +813,25 @@ const QuoteManager: React.FC = () => {
         )}
 
         <div className="bg-white p-8 rounded-[32px] shadow-sm" style={{ border: `1px solid ${GOLD}30` }}>
-          <label className="text-[10px] font-black uppercase tracking-widest block mb-4" style={{ color: GOLD }}>1. Customer Selection</label>
+          <label className="text-[10px] font-black uppercase tracking-widest block mb-4" style={{ color: GOLD }}>1. {t.customerSelection}</label>
           <CustomerDropdown
             options={customerOptions}
             value={customerName}
             onChange={setCustomerName}
           />
-          {custError && (
-            <p className="mt-2 text-[13px] font-bold" style={{ color: colors.statusDanger }}>{custError}</p>
+          {custError ? (
+            <p className="mt-2 text-[13px] font-bold" style={{ color: colors.statusDanger }}>{t.custLoadFailed}</p>
+          ) : !customerName && (
+            <p className="mt-2 text-[11px] font-bold text-gray-300 uppercase">{t.noCustomerSelected}</p>
           )}
         </div>
 
         <div className="bg-white p-8 rounded-[32px] shadow-sm" style={{ border: `1px solid ${GOLD}30` }}>
-          <label className="text-[10px] font-black uppercase tracking-widest block mb-4" style={{ color: GOLD }}>2. Inventory Lookup</label>
+          <label className="text-[10px] font-black uppercase tracking-widest block mb-4" style={{ color: GOLD }}>2. {t.inventoryLookup}</label>
           <ProductDropdown
             items={inventoryData}
             value={searchProduct}
-            placeholder={invError ?? (isSyncing ? "正在拉取库存..." : "搜索产品...")}
+            placeholder={invError ? t.invLoadFailed : (isSyncing ? t.loadingInventory : t.searchProductPlaceholder)}
             onChange={(item, displayName) => {
               setSearchProduct(displayName);
               if (item) {
@@ -833,26 +847,26 @@ const QuoteManager: React.FC = () => {
 
           <div className="mt-4 grid grid-cols-3 gap-3">
             <div className="bg-gray-50 p-4 rounded-xl text-center border border-gray-100">
-              <span className="text-[8px] font-black text-gray-400 block uppercase mb-1">库存</span>
+              <span className="text-[8px] font-black text-gray-400 block uppercase mb-1">{t.availableStock}</span>
               <span className="text-lg font-black text-gray-700">{tempStock}</span>
             </div>
             <div className="bg-gray-50 p-4 rounded-xl text-center border border-gray-100">
-              <span className="text-[8px] font-black text-gray-400 block uppercase mb-1">单位</span>
+              <span className="text-[8px] font-black text-gray-400 block uppercase mb-1">{t.unit}</span>
               <span className="text-lg font-black text-gray-700">{tempUnit}</span>
             </div>
             <div className="p-4 rounded-xl text-center" style={{ backgroundColor: `${GOLD}15`, border: `1px solid ${GOLD}30` }}>
-              <span className="text-[8px] font-black block uppercase mb-1" style={{ color: GOLD }}>底价</span>
+              <span className="text-[8px] font-black block uppercase mb-1" style={{ color: GOLD }}>{t.cost}</span>
               <span className="text-lg font-black font-mono" style={{ color: '#6B4E15' }}>{tempTargetPrice.toFixed(2)}</span>
             </div>
           </div>
         </div>
 
         <div className="bg-white p-8 rounded-[32px] shadow-sm border-2 border-[#CBA85C]/30">
-          <label className="text-[10px] font-black text-[#0F1E45] uppercase tracking-widest block mb-4">3. Commercial Control</label>
+          <label className="text-[10px] font-black text-[#0F1E45] uppercase tracking-widest block mb-4">3. {t.commercialControl}</label>
 
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div className="flex flex-col gap-1">
-              <span className="text-[9px] font-black text-gray-400 uppercase">Offer Price</span>
+              <span className="text-[9px] font-black text-gray-400 uppercase">{t.offerPrice}</span>
               <input
                 type="text"
                 value={livePrice}
@@ -862,7 +876,7 @@ const QuoteManager: React.FC = () => {
             </div>
 
             <div className="flex flex-col gap-1">
-              <span className="text-[9px] font-black text-gray-400 uppercase">Quantity</span>
+              <span className="text-[9px] font-black text-gray-400 uppercase">{t.quantity}</span>
               <div className="flex items-center border-2 border-[#CBA85C]/40 rounded-xl overflow-hidden h-[56px]">
                 <button
                   onClick={() => setLiveQty(q => Math.max(1, parseInt(q || "0") - 1).toString())}
@@ -890,39 +904,39 @@ const QuoteManager: React.FC = () => {
           <div className="mb-6 space-y-4 pt-4 border-t border-gray-100">
             <div className="flex flex-col gap-2">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                <CreditCard className="w-3 h-3 text-[#CBA85C]" /> Payment Terms (Manual Input)
+                <CreditCard className="w-3 h-3 text-[#CBA85C]" /> {t.paymentTerms}
               </label>
               <input
                 type="text"
                 value={paymentTerms}
                 onChange={e => setPaymentTerms(e.target.value)}
-                placeholder="例如: 30% Deposit, 70% Balanced"
+                placeholder={t.paymentTermsPlaceholder}
                 className="w-full p-4 border-2 border-[#CBA85C]/20 rounded-xl font-bold text-gray-700 outline-none focus:border-[#CBA85C]"
               />
             </div>
 
             <div className="flex flex-col gap-2">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center justify-between">
-                <span>Due Date Calculation</span>
+                <span>{t.dueDateCalculation}</span>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setTermMode('DAYS')}
                     className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${termMode === 'DAYS' ? 'bg-[#0F1E45] text-white shadow-sm' : 'bg-gray-100 text-gray-400'}`}
                   >
-                    By Days
+                    {t.byDays}
                   </button>
                   <button
                     onClick={() => setTermMode('DATE')}
                     className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${termMode === 'DATE' ? 'bg-[#0F1E45] text-white shadow-sm' : 'bg-gray-100 text-gray-400'}`}
                   >
-                    Manual Date
+                    {t.manualDate}
                   </button>
                 </div>
               </label>
 
               <div className="flex gap-2 items-center">
                 <div className="flex-1">
-                  <span className="text-[8px] font-black text-gray-300 uppercase block mb-1">Base Date</span>
+                  <span className="text-[8px] font-black text-gray-300 uppercase block mb-1">{t.baseDate}</span>
                   <input
                     type="date"
                     value={docDate}
@@ -933,7 +947,7 @@ const QuoteManager: React.FC = () => {
 
                 {termMode === 'DAYS' ? (
                   <div className="flex-1">
-                    <span className="text-[8px] font-black text-gray-300 uppercase block mb-1">Days Count</span>
+                    <span className="text-[8px] font-black text-gray-300 uppercase block mb-1">{t.daysCount}</span>
                     <input
                       type="number"
                       value={termDays}
@@ -943,7 +957,7 @@ const QuoteManager: React.FC = () => {
                   </div>
                 ) : (
                   <div className="flex-1">
-                    <span className="text-[8px] font-black text-gray-300 uppercase block mb-1">Pick Due Date</span>
+                    <span className="text-[8px] font-black text-gray-300 uppercase block mb-1">{t.pickDueDate}</span>
                     <input
                       type="date"
                       value={manualDueDate}
@@ -955,7 +969,7 @@ const QuoteManager: React.FC = () => {
               </div>
 
               <div className="mt-2 p-3 rounded-xl flex items-center justify-between" style={{ backgroundColor: `${GOLD}15`, border: `1px solid ${GOLD}30` }}>
-                <span className="text-[9px] font-black uppercase" style={{ color: GOLD }}>Calculated Due:</span>
+                <span className="text-[9px] font-black uppercase" style={{ color: GOLD }}>{t.calculatedDue}:</span>
                 <span className="text-xs font-black font-mono tracking-widest" style={{ color: NAVY }}>{calculatedDueDate}</span>
               </div>
             </div>
@@ -967,7 +981,7 @@ const QuoteManager: React.FC = () => {
             className="w-full text-white rounded-2xl font-black uppercase text-xs py-5 shadow-xl hover:opacity-90 mb-4 transition-all active:scale-[0.98]"
             style={{ backgroundColor: GOLD }}
           >
-            加入清单 / ADD ITEM
+            {t.addItem}
           </button>
 
           <button
@@ -976,13 +990,14 @@ const QuoteManager: React.FC = () => {
             className="w-full py-6 text-white rounded-2xl font-black text-[11px] uppercase tracking-[0.3em] hover:bg-black transition-all shadow-xl active:scale-[0.98]"
             style={{ backgroundColor: NAVY }}
           >
-            🚀 进入单据中心 (CENTER)
+            🚀 {t.generatePI}
           </button>
         </div>
       </section>
 
-      {/* 右侧实时预览 */}
+      {/* 右侧实时预览 — 正式PI单据格式，固定英文，不随APP语言切换 */}
       <aside className="w-[60%] h-full flex flex-col no-print bg-white rounded-[40px] border border-gray-100 shadow-2xl relative overflow-hidden">
+        <div className="absolute top-6 left-8 text-[10px] font-black uppercase tracking-widest text-gray-300 no-print">{t.preview}</div>
         <div className="p-8 pb-32 h-full overflow-y-auto custom-scrollbar flex flex-col items-center">
           <div id="home-live-preview" style={{ width: '595px', padding: '40px', backgroundColor: 'white' }} className="shadow-sm border border-gray-50 flex flex-col">
             <div className="flex flex-col items-center text-center w-full mb-10 border-b-2 border-[#1a237e] pb-6">
@@ -1044,7 +1059,7 @@ const QuoteManager: React.FC = () => {
             <div className="bg-white p-8 border-b border-gray-100 flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <ReceiptText className="w-6 h-6 text-[#1a237e]" />
-                <h2 className="text-xl font-black text-[#1a237e] uppercase tracking-widest leading-none">UNIVERSAL DOC CENTER</h2>
+                <h2 className="text-xl font-black text-[#1a237e] uppercase tracking-widest leading-none">{t.docCenterTitle}</h2>
               </div>
               <button onClick={() => setIsDocModalOpen(false)} className="p-2 text-gray-400 hover:text-red-500 transition-all">
                 <X className="w-6 h-6" />
@@ -1141,9 +1156,9 @@ const QuoteManager: React.FC = () => {
               {/* 右：操作区 */}
               <div className="w-[400px] bg-white p-10 flex flex-col gap-6 shadow-xl border-l border-gray-100">
                 <div className="space-y-4">
-                  <h3 className="text-xs font-black text-gray-400 uppercase border-b pb-2 tracking-widest">Output Control</h3>
+                  <h3 className="text-xs font-black text-gray-400 uppercase border-b pb-2 tracking-widest">{t.outputControl}</h3>
                   <textarea
-                    placeholder="备注信息 (例如物流、额外账号)..."
+                    placeholder={t.notesPlaceholder}
                     value={logisticsInfo}
                     onChange={e => setLogisticsInfo(e.target.value)}
                     className="w-full h-32 p-5 bg-gray-50 border-2 border-gray-100 rounded-[24px] outline-none font-bold text-gray-700 text-xs focus:border-[#1a237e] transition-all"
@@ -1155,7 +1170,7 @@ const QuoteManager: React.FC = () => {
                     onClick={handleOpenReview}
                     className="w-full py-4 bg-orange-50 border-2 border-orange-100 text-orange-700 rounded-[20px] font-black text-[10px] uppercase flex items-center justify-center gap-3 hover:bg-orange-100 transition-all shadow-sm"
                   >
-                    <Edit3 className="w-4 h-4" /> 复核并编辑 / Review & Edit
+                    <Edit3 className="w-4 h-4" /> {t.reviewAndEdit}
                   </button>
 
                   {/* ✅ 这里已修复：不再 window.print() 打整页，而是只打正式单据 */}
@@ -1163,28 +1178,27 @@ const QuoteManager: React.FC = () => {
                     onClick={handlePrintPDF}
                     className="w-full py-4 bg-white border-2 border-indigo-100 text-indigo-900 rounded-[20px] font-black text-[10px] uppercase flex items-center justify-center gap-3 hover:bg-indigo-50 shadow-sm transition-all"
                   >
-                    <Printer className="w-4 h-4" /> 打印预览 / 保存 PDF
+                    <Printer className="w-4 h-4" /> {t.printPreview}
                   </button>
 
                   <button
                     onClick={handleExportHTML}
                     className="w-full py-5 bg-indigo-50 text-indigo-900 rounded-[20px] font-black text-[10px] uppercase flex items-center justify-center gap-3 hover:bg-indigo-100 border border-indigo-200 shadow-sm transition-all shadow-indigo-100"
                   >
-                    <Download className="w-4 h-4" /> 下载 HTML (保留样式)
+                    <Download className="w-4 h-4" /> {t.downloadHtml}
                   </button>
 
                   <button
                     onClick={async () => {
                       if (await saveSnapshotToLocal()) {
- 
-  setIsDocModalOpen(false);
-  resetUI();
-  alert("✅ 报价已存档！");
-}
+                        setIsDocModalOpen(false);
+                        resetUI();
+                        alert(t.savedSuccess);
+                      }
                     }}
                     className="w-full py-7 bg-[#1a237e] text-white rounded-[28px] font-black text-[11px] uppercase tracking-[0.4em] flex items-center justify-center gap-4 shadow-2xl mt-4 border-t-4 border-indigo-400 hover:bg-black transition-all active:scale-95 shadow-indigo-100"
                   >
-                    <CheckCircle className="w-5 h-5" /> 确认并存档 (END)
+                    <CheckCircle className="w-5 h-5" /> {t.confirmAndSave}
                   </button>
                 </div>
               </div>
@@ -1203,8 +1217,8 @@ const QuoteManager: React.FC = () => {
                   <Edit3 className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-black text-gray-800 uppercase tracking-widest">Review & Edit Line Items</h2>
-                  <p className="text-[9px] font-bold text-gray-400 uppercase mt-0.5">Edit quantity or unit price before final submission</p>
+                  <h2 className="text-sm font-black text-gray-800 uppercase tracking-widest">{t.reviewModalTitle}</h2>
+                  <p className="text-[9px] font-bold text-gray-400 uppercase mt-0.5">{t.reviewModalSubtitle}</p>
                 </div>
               </div>
               <button onClick={() => setIsReviewOpen(false)} className="p-2 text-gray-400 hover:text-gray-600 transition-all">
@@ -1216,10 +1230,11 @@ const QuoteManager: React.FC = () => {
               <table className="w-full text-left">
                 <thead className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
                   <tr>
-                    <th className="pb-4">Description</th>
-                    <th className="pb-4 text-center w-32">Qty</th>
-                    <th className="pb-4 text-center w-40">Unit Price (AED)</th>
-                    <th className="pb-4 text-right w-40">Line Total</th>
+                    <th className="pb-4">{t.colDescription}</th>
+                    <th className="pb-4 text-center w-32">{t.colQty}</th>
+                    <th className="pb-4 text-center w-40">{t.colUnitPrice}</th>
+                    <th className="pb-4 text-right w-40">{t.colLineTotal}</th>
+                    <th className="pb-4 text-right w-16"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -1250,6 +1265,15 @@ const QuoteManager: React.FC = () => {
                       <td className="py-6 text-right font-mono font-black text-gray-800 text-xs">
                         AED {(roundTo2(it.unit_price * it.qty)).toFixed(2)}
                       </td>
+                      <td className="py-6 text-right">
+                        <button
+                          onClick={() => handleRemoveReviewItem(idx)}
+                          title={t.remove}
+                          className="p-2 text-gray-300 hover:text-red-500 transition-all"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1261,13 +1285,13 @@ const QuoteManager: React.FC = () => {
                 onClick={() => setIsReviewOpen(false)}
                 className="px-8 py-4 bg-gray-100 text-gray-400 rounded-[20px] font-black uppercase text-[10px] tracking-widest hover:bg-gray-200 transition-all"
               >
-                Cancel
+                {t.cancel}
               </button>
               <button
                 onClick={handleApplyReviewChanges}
                 className="px-10 py-4 bg-[#080D1E] text-white rounded-[20px] font-black uppercase text-[10px] tracking-widest shadow-xl shadow-slate-200 hover:bg-black transition-all flex items-center gap-2"
               >
-                <SaveIcon className="w-4 h-4" /> Apply Changes
+                <SaveIcon className="w-4 h-4" /> {t.applyChanges}
               </button>
             </div>
           </div>
