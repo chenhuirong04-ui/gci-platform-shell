@@ -129,6 +129,8 @@ export const translations: Record<Language, Record<string, string>> = {
     'Unit Price Column': 'Unit Price Column',
     'Total Price Column': 'Total Price Column',
     'Start Analysis': 'Start Analysis',
+    '← Back': '← Back',
+    'History': 'History',
 
     // History
     'Quotation History': 'Quotation History',
@@ -729,6 +731,8 @@ export const translations: Record<Language, Record<string, string>> = {
     'Unit Price Column': '单价列',
     'Total Price Column': '总价列',
     'Start Analysis': '开始解析',
+    '← Back': '← 返回',
+    'History': '历史记录',
     'Import Client List': '导入客户清单',
     'Project Package Draft': '项目草稿清单',
     'Original Item Name': '原始品名',
@@ -1323,6 +1327,8 @@ export const translations: Record<Language, Record<string, string>> = {
     'Unit Price Column': '单价列 / Unit Price Column',
     'Total Price Column': '总价列 / Total Price Column',
     'Start Analysis': '开始解析 / Start Analysis',
+    '← Back': '← 返回 / Back',
+    'History': '历史记录 / History',
     'Import Client List': '导入客户清单 / Import Client List',
     'Project Package Draft': '项目草稿清单 / Project Package Draft',
     'Original Item Name': '原始品名 / Original Item Name',

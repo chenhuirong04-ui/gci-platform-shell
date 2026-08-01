@@ -9189,7 +9189,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${view === 'history' ? 'bg-[#C9A84C] text-[#0C1B3A]' : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'}`}
             >
               <FileText className="w-3.5 h-3.5" />
-              {view === 'history' ? '← Back' : 'History'}
+              {view === 'history' ? t('← Back') : t('History')}
             </button>
             <button
               onClick={() => setShowSettings(true)}
