@@ -1566,7 +1566,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                     </td>
                     <td className="px-10 py-8">
                       <div className="flex flex-col gap-1">
-                        <span className={`px-4 py-1.5 rounded-full text-xs font-black tracking-wide shadow-sm border inline-block ${q.status === 'CONVERTED' ? 'bg-[#3F7D58] text-white border-[#3F7D58]' : 'bg-white text-gray-400 border-gray-100'}`}>
+                        <span className={`px-4 py-1.5 rounded-full text-xs font-black tracking-wide shadow-sm border inline-block whitespace-nowrap ${q.status === 'CONVERTED' ? 'bg-[#3F7D58] text-white border-[#3F7D58]' : 'bg-white text-gray-400 border-gray-100'}`}>
                           {QUOTE_STATUS_LABEL[safeStr(q.status)] ?? safeStr(q.status)}
                         </span>
                         {((q as any).archivedAt || (q as any).hiddenFromDefault || (q as any).deletedAt || (q as any).status === 'DELETED') && (
