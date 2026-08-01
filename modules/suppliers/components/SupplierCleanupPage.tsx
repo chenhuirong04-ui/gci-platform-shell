@@ -36,7 +36,7 @@ interface PendingSupplier {
   status: string;
   primaryContact: { name: string | null; whatsapp: string | null; email: string | null } | null;
   completeness: number;
-  completenessLabel: string;
+  completenessStatus: string;
   missingFields: string[];
   flags: SupplierFlags;
 }
@@ -176,6 +176,21 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
   const { lang, dict } = useI18n();
   const t = dict.suppliers.dashboard;
   const FLAG_CHIPS = buildFlagChips(t);
+  // Stable codes from the API, mapped to localized labels. Legacy Chinese
+  // strings are kept as a fallback in case a stale edge function response
+  // is still cached during rollout.
+  const COMPLETENESS_LABEL: Record<string, string> = {
+    complete: t.completenessComplete, incomplete: t.completenessIncomplete, very_incomplete: t.completenessVeryIncomplete,
+    '资料较完整': t.completenessComplete, '待补充': t.completenessIncomplete, '资料缺失较多': t.completenessVeryIncomplete,
+  };
+  const MISSING_FIELD_LABEL: Record<string, string> = {
+    country: t.missingFieldCountry, city: t.missingFieldCity, category: t.missingFieldCategory,
+    contact: t.missingFieldContact, contact_method: t.missingFieldContactMethod, website: t.missingFieldWebsite,
+    business_license: t.missingFieldBusinessLicense, catalog: t.missingFieldCatalog, certification_or_quote: t.missingFieldCertOrQuote,
+    '国家': t.missingFieldCountry, '城市': t.missingFieldCity, '产品类别': t.missingFieldCategory,
+    '联系人': t.missingFieldContact, '联系方式': t.missingFieldContactMethod, '网站': t.missingFieldWebsite,
+    '营业执照': t.missingFieldBusinessLicense, '产品目录': t.missingFieldCatalog, '认证/报价': t.missingFieldCertOrQuote,
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<SummaryData | null>(null);
@@ -669,11 +684,11 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                           {s.is_preferred ? <span style={{ color: GOLD, fontWeight: 700 }}>★</span> : <span style={{ color: '#e2e8f0' }}>—</span>}
                         </td>
                         <td style={{ padding: '12px 14px' }}>
-                          <CompletenessBar pct={s.completeness} label={s.completenessLabel} />
+                          <CompletenessBar pct={s.completeness} label={COMPLETENESS_LABEL[s.completenessStatus] ?? s.completenessStatus} />
                         </td>
                         <td style={{ padding: '12px 14px', color: '#94a3b8', fontSize: 11, maxWidth: 200 }}>
                           <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {s.missingFields.join(' · ')}
+                            {s.missingFields.map(f => MISSING_FIELD_LABEL[f] ?? f).join(' · ')}
                           </div>
                         </td>
                         <td style={{ padding: '12px 14px' }}>

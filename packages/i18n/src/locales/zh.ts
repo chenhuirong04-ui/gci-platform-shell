@@ -528,6 +528,10 @@ export const zh: typeof en = {
       archiveDialogTitle: '确认归档？',
       archiveDialogDesc: '此操作将把该供应商状态设为 archived（封存），不删除数据，随时可在供应商详情中恢复。',
       archiveFailed: (msg: string) => `归档失败：${msg}`,
+      completenessComplete: '资料较完整', completenessIncomplete: '待补充', completenessVeryIncomplete: '资料缺失较多',
+      missingFieldCountry: '国家', missingFieldCity: '城市', missingFieldCategory: '产品类别',
+      missingFieldContact: '联系人', missingFieldContactMethod: '联系方式', missingFieldWebsite: '网站',
+      missingFieldBusinessLicense: '营业执照', missingFieldCatalog: '产品目录', missingFieldCertOrQuote: '认证或报价',
     },
     uploaderCommon: {
       dropSupport: '支持 PDF、PNG、JPG · 拖拽或点击选择',

@@ -527,6 +527,10 @@ export const en = {
       archiveDialogTitle: 'Confirm Archive?',
       archiveDialogDesc: 'This sets the supplier status to archived. Data is not deleted and can be restored from the supplier detail page at any time.',
       archiveFailed: (msg: string) => `Archive failed: ${msg}`,
+      completenessComplete: 'Profile Complete', completenessIncomplete: 'Needs Completion', completenessVeryIncomplete: 'Significantly Incomplete',
+      missingFieldCountry: 'Country', missingFieldCity: 'City', missingFieldCategory: 'Product Category',
+      missingFieldContact: 'Contact', missingFieldContactMethod: 'Contact Method', missingFieldWebsite: 'Website',
+      missingFieldBusinessLicense: 'Business License', missingFieldCatalog: 'Product Catalog', missingFieldCertOrQuote: 'Certification or Quote',
     },
     uploaderCommon: {
       dropSupport: 'Supports PDF, PNG, JPG · drag & drop or click to select',

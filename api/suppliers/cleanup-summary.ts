@@ -41,10 +41,12 @@ function calcCompleteness(s: {
   return Math.round((score / 9) * 100);
 }
 
-function completenessLabel(pct: number): string {
-  if (pct >= 80) return '资料较完整';
-  if (pct >= 50) return '待补充';
-  return '资料缺失较多';
+type CompletenessStatus = 'complete' | 'incomplete' | 'very_incomplete';
+
+function completenessStatus(pct: number): CompletenessStatus {
+  if (pct >= 80) return 'complete';
+  if (pct >= 50) return 'incomplete';
+  return 'very_incomplete';
 }
 
 export default async function handler(req: Request) {
@@ -112,7 +114,7 @@ export default async function handler(req: Request) {
       created_at: string;
       primaryContact: { name: string | null; whatsapp: string | null; email: string | null } | null;
       completeness: number;
-      completenessLabel: string;
+      completenessStatus: CompletenessStatus;
       missingFields: string[];
       flags: {
         missingCountry: boolean;
@@ -146,15 +148,15 @@ export default async function handler(req: Request) {
       );
 
       const missingFields: string[] = [];
-      if (!s.country) missingFields.push('国家');
-      if (!s.city) missingFields.push('城市');
-      if (cats.length === 0) missingFields.push('产品类别');
-      if (!hasContact) missingFields.push('联系人');
-      if (!hasContactMethod) missingFields.push('联系方式');
-      if (!s.website) missingFields.push('网站');
-      if (!hasBizLicense) missingFields.push('营业执照');
-      if (!hasCatalog) missingFields.push('产品目录');
-      if (!hasCert && !hasQuote) missingFields.push('认证/报价');
+      if (!s.country) missingFields.push('country');
+      if (!s.city) missingFields.push('city');
+      if (cats.length === 0) missingFields.push('category');
+      if (!hasContact) missingFields.push('contact');
+      if (!hasContactMethod) missingFields.push('contact_method');
+      if (!s.website) missingFields.push('website');
+      if (!hasBizLicense) missingFields.push('business_license');
+      if (!hasCatalog) missingFields.push('catalog');
+      if (!hasCert && !hasQuote) missingFields.push('certification_or_quote');
 
       return {
         id: s.id,
@@ -174,7 +176,7 @@ export default async function handler(req: Request) {
           ? { name: primaryContact.contact_name ?? null, whatsapp: primaryContact.whatsapp ?? null, email: primaryContact.email ?? null }
           : null,
         completeness,
-        completenessLabel: completenessLabel(completeness),
+        completenessStatus: completenessStatus(completeness),
         missingFields,
         flags: {
           missingCountry: !s.country,
