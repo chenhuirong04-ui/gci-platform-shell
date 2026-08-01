@@ -2743,7 +2743,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           </div>
           <div>
             <h3 className="text-base font-black text-[#0C1B3A]">{t('Supplier Information')}</h3>
-            <p className="text-[11px] text-[#0C1B3A]/40">供应商信息 · 可选填，保存后可在 Archive 编辑</p>
+            <p className="text-[11px] text-[#0C1B3A]/40">{t('Supplier Information')} · {t('Supplier Information Subtitle')}</p>
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -2802,7 +2802,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           </div>
           <div>
             <h3 className="text-base font-black text-[#0C1B3A]">{t('GCI Quote Info')}</h3>
-            <p className="text-[11px] text-[#0C1B3A]/40">客户信息 · Convert to GCI Quote 后自动带入</p>
+            <p className="text-[11px] text-[#0C1B3A]/40">{t('GCI Quote Info Subtitle')}</p>
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
