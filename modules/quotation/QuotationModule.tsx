@@ -2729,10 +2729,10 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-[12px] font-black uppercase tracking-widest flex-wrap">
         <button onClick={() => { setAppMode('landing'); setDraftItems([]); setTradeTerms(''); }} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">
-          Home
+          {t('Home')}
         </button>
         <span className="text-[#0C1B3A]/15">›</span>
-        <span className="text-[#C9A84C]">Save Supplier Quote</span>
+        <span className="text-[#C9A84C]">{t('Save Supplier Quote')}</span>
       </div>
 
       {/* Supplier Metadata Form */}
@@ -2742,15 +2742,15 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             <Archive className="w-4 h-4 text-[#C9A84C]" />
           </div>
           <div>
-            <h3 className="text-base font-black text-[#0C1B3A]">Supplier Information</h3>
+            <h3 className="text-base font-black text-[#0C1B3A]">{t('Supplier Information')}</h3>
             <p className="text-[11px] text-[#0C1B3A]/40">供应商信息 · 可选填，保存后可在 Archive 编辑</p>
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {[
-            { key: 'supplierName', label: 'Supplier Name 供应商名称', placeholder: 'e.g. ABC Trading Co.' },
-            { key: 'supplierContact', label: 'Contact 联系人', placeholder: 'Name / WhatsApp / Email' },
-            { key: 'category', label: 'Category 品类', placeholder: 'Furniture / Tissue / Building...' },
+            { key: 'supplierName', label: t('Supplier Name'), placeholder: t('e.g. ABC Trading Co.') },
+            { key: 'supplierContact', label: t('Contact'), placeholder: t('Name / WhatsApp / Email') },
+            { key: 'category', label: t('Category (business)'), placeholder: t('Furniture / Tissue / Building...') },
           ].map(f => (
             <div key={f.key}>
               <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{f.label}</label>
@@ -2764,7 +2764,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             </div>
           ))}
           <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">Currency 币种</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{t('Currency')}</label>
             <select
               value={supplierMeta.currency}
               onChange={e => setSupplierMeta(prev => ({ ...prev, currency: e.target.value }))}
@@ -2774,7 +2774,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             </select>
           </div>
           <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">Quote Date 报价日期</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{t('Quote Date')}</label>
             <input
               type="date"
               value={supplierMeta.quoteDate}
@@ -2783,7 +2783,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             />
           </div>
           <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">Valid Until 有效期</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{t('Valid Until')}</label>
             <input
               type="date"
               value={supplierMeta.validUntil}
@@ -2801,15 +2801,15 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             <FileText className="w-4 h-4 text-[#C9A84C]" />
           </div>
           <div>
-            <h3 className="text-base font-black text-[#0C1B3A]">GCI Quote Info</h3>
+            <h3 className="text-base font-black text-[#0C1B3A]">{t('GCI Quote Info')}</h3>
             <p className="text-[11px] text-[#0C1B3A]/40">客户信息 · Convert to GCI Quote 后自动带入</p>
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {[
-            { key: 'customerProjectName', label: 'Customer / Project', placeholder: 'e.g. Al Nahyan Villa FF&E' },
-            { key: 'salesperson', label: 'Salesperson', placeholder: 'e.g. Chris' },
-            { key: 'phoneWhatsApp', label: 'Phone / WA', placeholder: '+971 50 000 0000' },
+            { key: 'customerProjectName', label: t('Customer / Project'), placeholder: 'e.g. Al Nahyan Villa FF&E' },
+            { key: 'salesperson', label: t('Salesperson'), placeholder: 'e.g. Chris' },
+            { key: 'phoneWhatsApp', label: t('Phone / WA'), placeholder: '+971 50 000 0000' },
           ].map(f => (
             <div key={f.key}>
               <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{f.label}</label>
@@ -2830,8 +2830,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
         <div className="p-6 border-b border-[#0C1B3A]/6 flex items-center gap-3">
           <Cpu className="w-5 h-5 text-[#C9A84C]" />
           <div>
-            <h3 className="text-[13px] font-black uppercase tracking-widest text-[#0C1B3A]">Supplier Quote Import</h3>
-            <p className="text-[11px] text-[#0C1B3A]/40 mt-0.5">Upload PDF/Excel/Image or paste text — AI extracts cost items</p>
+            <h3 className="text-[13px] font-black uppercase tracking-widest text-[#0C1B3A]">{t('Supplier Quote Import')}</h3>
+            <p className="text-[11px] text-[#0C1B3A]/40 mt-0.5">{t('Upload PDF/Excel/Image or paste text — AI extracts cost items')}</p>
           </div>
         </div>
         <div className="p-6 space-y-6">
@@ -2839,19 +2839,19 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             {/* Text paste */}
             <div className="space-y-3">
               <label className="text-[11px] font-black uppercase tracking-widest text-[#0C1B3A]/40 flex items-center gap-2">
-                <Clipboard className="w-3.5 h-3.5" /> Paste supplier quote text
+                <Clipboard className="w-3.5 h-3.5" /> {t('Paste supplier quote text')}
               </label>
               <textarea
                 value={importText}
                 onChange={e => setImportText(e.target.value)}
-                placeholder="Paste supplier quote content here..."
+                placeholder={t('Paste supplier quote content here...')}
                 className="w-full h-44 p-5 bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[20px] text-[13px] text-[#0C1B3A] placeholder:text-[#0C1B3A]/25 resize-none outline-none focus:border-[#C9A84C] transition-colors"
               />
             </div>
             {/* File upload */}
             <div className="space-y-3">
               <label className="text-[11px] font-black uppercase tracking-widest text-[#0C1B3A]/40 flex items-center gap-2">
-                <Upload className="w-3.5 h-3.5" /> Upload file
+                <Upload className="w-3.5 h-3.5" /> {t('Upload file')}
               </label>
               {/* Drop zone */}
               <div
@@ -2888,10 +2888,10 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
               {/* Parse error display */}
               {sqParseStatus === 'error' && sqParseError && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-[16px]">
-                  <p className="text-[11px] font-black text-red-600 uppercase tracking-widest mb-1">❌ Parse Failed</p>
+                  <p className="text-[11px] font-black text-red-600 uppercase tracking-widest mb-1">{t('❌ Parse Failed')}</p>
                   <p className="text-[12px] text-red-700">{sqParseError}</p>
                   <p className="text-[11px] text-red-500 mt-2">
-                    In China: Google AI may be blocked. Try VPN, or use text paste, or add items manually below.
+                    {t('In China: Google AI may be blocked. Try VPN, or use text paste, or add items manually below.')}
                   </p>
                 </div>
               )}
@@ -2919,8 +2919,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                   }
                 >
                   {isProcessingAI
-                    ? <><RefreshCw className="w-4 h-4 animate-spin" /> Parsing… (up to 25s)</>
-                    : <><Cpu className="w-4 h-4" /> Parse with AI</>
+                    ? <><RefreshCw className="w-4 h-4 animate-spin" /> {t('Parsing… (up to 25s)')}</>
+                    : <><Cpu className="w-4 h-4" /> {t('Parse with AI')}</>
                   }
                 </button>
               )}
@@ -2939,7 +2939,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             }
           >
             <Cpu className="w-4 h-4" />
-            {isProcessingAI ? 'Analyzing… (up to 25s, may be slow in China)' : 'Analyze Text with AI'}
+            {isProcessingAI ? t('Analyzing… (up to 25s, may be slow in China)') : t('Analyze Text with AI')}
           </button>
           )}
         </div>
@@ -2952,7 +2952,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             onClick={() => setDraftItems([{ id: `sq-manual-${Date.now()}`, originalName: 'Item 1', originalSpec: '', quantity: 1, unit: 'pcs', targetUnitPrice: 0, targetTotal: 0, confidence: 1, status: 'Confirmed' as const, suggestedCategory: FurnitureCategory.OTHER, sourceType: 'manual' }])}
             className="flex items-center gap-2 px-6 py-3 rounded-[16px] border-2 border-dashed border-[#0C1B3A]/15 text-[#0C1B3A]/50 text-[12px] font-black uppercase tracking-widest hover:border-[#C9A84C] hover:text-[#0C1B3A] transition-all"
           >
-            <Plus className="w-4 h-4" /> Add Items Manually (no AI needed)
+            <Plus className="w-4 h-4" /> {t('Add Items Manually (no AI needed)')}
           </button>
         </div>
       )}
@@ -2963,36 +2963,36 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#C9A84C] bg-[#C9A84C]/10 px-2 py-1 rounded-full">AI Parsed</span>
+                <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#C9A84C] bg-[#C9A84C]/10 px-2 py-1 rounded-full">{t('AI Parsed')}</span>
               </div>
-              <h3 className="text-xl font-black text-[#0C1B3A]">Supplier Cost Items</h3>
-              <p className="text-[11px] text-[#0C1B3A]/50 mt-0.5">Review and correct before saving · {draftItems.length} items</p>
+              <h3 className="text-xl font-black text-[#0C1B3A]">{t('Supplier Cost Items')}</h3>
+              <p className="text-[11px] text-[#0C1B3A]/50 mt-0.5">{t('Review and correct before saving · {n} items').replace('{n}', String(draftItems.length))}</p>
             </div>
           </div>
           {/* Currency / Exchange Rate / Margin controls — live preview, applies to every row below */}
           <div className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[20px] px-6 py-4 flex flex-wrap items-end gap-5">
             <div>
-              <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">Supplier Currency</label>
+              <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{t('Supplier Currency')}</label>
               <select value={supplierMeta.currency} onChange={e => setSupplierMeta(prev => ({ ...prev, currency: e.target.value }))}
                 className="bg-white border border-[#0C1B3A]/10 rounded-lg px-3 py-2 text-[13px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]">
-                {['CNY','USD','AED'].map(c => <option key={c} value={c}>{c === 'CNY' ? 'RMB (CNY)' : c}</option>)}
+                {['CNY','USD','AED'].map(c => <option key={c} value={c}>{c === 'CNY' ? t('RMB (CNY)') : c}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">Exchange Rate →</label>
+              <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{t('Exchange Rate →')}</label>
               <input type="number" step="0.0001" min="0" value={sqExchangeRate}
                 onChange={e => setSqExchangeRate(Number(e.target.value) || 0)}
                 className="w-28 bg-white border border-[#0C1B3A]/10 rounded-lg px-3 py-2 text-[13px] font-mono font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]" />
             </div>
             <div>
-              <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">Customer Currency</label>
+              <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{t('Customer Currency')}</label>
               <select value={sqCustomerCurrency} onChange={e => setSqCustomerCurrency(e.target.value as 'AED' | 'USD')}
                 className="bg-white border border-[#0C1B3A]/10 rounded-lg px-3 py-2 text-[13px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]">
                 {['AED','USD'].map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">Default Margin %</label>
+              <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{t('Default Margin %')}</label>
               <input type="number" step="1" min="0" value={sqGlobalMargin}
                 onChange={e => setSqGlobalMargin(Number(e.target.value) || 0)}
                 className="w-24 bg-white border border-[#0C1B3A]/10 rounded-lg px-3 py-2 text-[13px] font-mono font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]" />
@@ -3004,12 +3004,12 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           <div className="bg-white rounded-[24px] border border-[#0C1B3A]/8 overflow-hidden shadow-sm">
             <div className="grid grid-cols-12 gap-3 px-6 py-3 bg-[#0C1B3A] text-white text-[10px] font-black uppercase tracking-wider">
               <div className="col-span-1 text-center">GCI</div>
-              <div className="col-span-3">Item</div>
-              <div className="col-span-2">Spec</div>
-              <div className="col-span-1 text-center">Qty</div>
-              <div className="col-span-1 text-center">Unit</div>
-              <div className="col-span-2 text-right">Supplier Cost</div>
-              <div className="col-span-2 text-right">Customer Total</div>
+              <div className="col-span-3">{t('Item')}</div>
+              <div className="col-span-2">{t('Spec')}</div>
+              <div className="col-span-1 text-center">{t('Qty')}</div>
+              <div className="col-span-1 text-center">{t('Unit')}</div>
+              <div className="col-span-2 text-right">{t('Supplier Cost')}</div>
+              <div className="col-span-2 text-right">{t('Customer Total')}</div>
             </div>
             <div className="divide-y divide-[#0C1B3A]/6">
               {draftItems.map((item, idx) => {
@@ -3036,19 +3036,19 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                     <div className="col-span-3">
                       <div className="flex items-center gap-1.5 mb-0.5">
                         {item.sourceType === 'excel-image-ocr' && (
-                          <span className="text-[7px] font-black uppercase tracking-wider text-[#C9A84C] bg-[#C9A84C]/10 px-1.5 py-0.5 rounded">Image OCR</span>
+                          <span className="text-[7px] font-black uppercase tracking-wider text-[#C9A84C] bg-[#C9A84C]/10 px-1.5 py-0.5 rounded">{t('Image OCR')}</span>
                         )}
                         {item.dataConfidence === 'low' && (
-                          <span className="text-[7px] font-black uppercase tracking-wider text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">Low confidence — verify</span>
+                          <span className="text-[7px] font-black uppercase tracking-wider text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">{t('Low confidence — verify')}</span>
                         )}
                       </div>
                       <input value={item.originalName}
                         onChange={e => update({ originalName: e.target.value })}
-                        placeholder="Original Description"
+                        placeholder={t('Original Description')}
                         className="w-full text-[14px] font-bold text-[#0C1B3A] bg-transparent border-b-2 border-[#0C1B3A]/10 focus:border-[#C9A84C] outline-none pb-1 transition-colors" />
                     </div>
                     <div className="col-span-2">
-                      <input value={item.originalSpec || ''} placeholder="Spec / size"
+                      <input value={item.originalSpec || ''} placeholder={t('Spec / size')}
                         onChange={e => update({ originalSpec: e.target.value })}
                         className="w-full text-[13px] text-[#0C1B3A]/55 bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-1 transition-colors placeholder:text-[#0C1B3A]/20" />
                     </div>
@@ -3082,8 +3082,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
                   {/* Row 2: English Description (editable, used on customer quote) */}
                   <div className="pl-1">
-                    <label className="text-[9px] font-black uppercase tracking-widest text-[#C9A84C] block mb-1">English Description</label>
-                    <textarea value={item.englishDescription || ''} rows={2} placeholder="Professional English description for customer quote"
+                    <label className="text-[9px] font-black uppercase tracking-widest text-[#C9A84C] block mb-1">{t('English Description')}</label>
+                    <textarea value={item.englishDescription || ''} rows={2} placeholder={t('Professional English description for customer quote')}
                       onChange={e => update({ englishDescription: e.target.value })}
                       className="w-full text-[12.5px] text-[#0C1B3A]/85 bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-lg p-2 resize-none outline-none focus:border-[#C9A84C] transition-colors" />
                   </div>
@@ -3095,7 +3095,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                       ['moq','MOQ'],['packaging','Packaging'],['deliveryTime','Delivery'],
                     ] as [keyof DraftItem, string][]).map(([key, label]) => (
                       <div key={key}>
-                        <label className="text-[8px] font-black uppercase tracking-widest text-[#0C1B3A]/30 block mb-1">{label}</label>
+                        <label className="text-[8px] font-black uppercase tracking-widest text-[#0C1B3A]/30 block mb-1">{label === 'MOQ' ? label : t(label)}</label>
                         <input value={(item[key] as string) || ''} placeholder="—"
                           onChange={e => update({ [key]: e.target.value } as Partial<DraftItem>)}
                           className="w-full text-[11px] text-[#0C1B3A]/70 bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-0.5 placeholder:text-[#0C1B3A]/15" />
@@ -3104,19 +3104,19 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                   </div>
                   <div className="grid grid-cols-3 gap-2 pl-1">
                     <div>
-                      <label className="text-[8px] font-black uppercase tracking-widest text-[#0C1B3A]/30 block mb-1">Payment Terms</label>
+                      <label className="text-[8px] font-black uppercase tracking-widest text-[#0C1B3A]/30 block mb-1">{t('Payment Terms')}</label>
                       <input value={item.paymentTerms || ''} placeholder="—"
                         onChange={e => update({ paymentTerms: e.target.value })}
                         className="w-full text-[11px] text-[#0C1B3A]/70 bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-0.5 placeholder:text-[#0C1B3A]/15" />
                     </div>
                     <div className="col-span-2">
-                      <label className="text-[8px] font-black uppercase tracking-widest text-[#0C1B3A]/30 block mb-1">Remarks</label>
+                      <label className="text-[8px] font-black uppercase tracking-widest text-[#0C1B3A]/30 block mb-1">{t('Remarks')}</label>
                       <input value={item.remarks || ''} placeholder="—"
                         onChange={e => update({ remarks: e.target.value })}
                         className="w-full text-[11px] text-[#0C1B3A]/70 bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-0.5 placeholder:text-[#0C1B3A]/15" />
                     </div>
                     <div>
-                      <label className="text-[8px] font-black uppercase tracking-widest text-[#0C1B3A]/30 block mb-1">Margin % (override)</label>
+                      <label className="text-[8px] font-black uppercase tracking-widest text-[#0C1B3A]/30 block mb-1">{t('Margin % (override)')}</label>
                       <input type="number" step="1" value={item.marginPercent ?? ''} placeholder={`${sqGlobalMargin} (default)`}
                         onChange={e => update({ marginPercent: e.target.value === '' ? undefined : Number(e.target.value) })}
                         className="w-full text-[11px] font-mono text-[#0C1B3A]/70 bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-0.5 placeholder:text-[#0C1B3A]/20" />
@@ -3129,10 +3129,10 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             <div className="px-6 py-4 bg-[#0C1B3A]/3 border-t border-[#0C1B3A]/8 flex items-center justify-between">
               <button onClick={() => setDraftItems(prev => [...prev, { id: `sq-new-${Date.now()}`, originalName: 'New Item', originalSpec: '', quantity: 1, unit: 'pcs', targetUnitPrice: 0, targetTotal: 0, confidence: 1, status: 'Confirmed' as const, suggestedCategory: FurnitureCategory.OTHER, sourceType: 'manual' }])}
                 className="text-[12px] font-black uppercase tracking-widest text-[#C9A84C] hover:text-[#0C1B3A] transition-colors flex items-center gap-2">
-                <Plus className="w-4 h-4" /> Add Item
+                <Plus className="w-4 h-4" /> {t('Add Item')}
               </button>
               <div className="text-right">
-                <p className="text-[11px] font-bold uppercase text-[#0C1B3A]/30 tracking-wider">Supplier Total / Customer Total</p>
+                <p className="text-[11px] font-bold uppercase text-[#0C1B3A]/30 tracking-wider">{t('Supplier Total / Customer Total')}</p>
                 <p className="text-[13px] font-mono text-[#0C1B3A]/50">
                   {supplierMeta.currency} {draftItems.reduce((s, it) => s + it.targetUnitPrice * it.quantity, 0).toFixed(2)}
                 </p>
@@ -3149,7 +3149,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           {/* Terms */}
           {tradeTerms && (
             <div className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[16px] px-6 py-4">
-              <p className="text-[11px] font-black uppercase tracking-widest text-[#0C1B3A]/40 mb-2">Terms &amp; Notes (from AI)</p>
+              <p className="text-[11px] font-black uppercase tracking-widest text-[#0C1B3A]/40 mb-2">{t('Terms & Notes (from AI)')}</p>
               <p className="text-[13px] text-[#0C1B3A]/70 whitespace-pre-line">{tradeTerms}</p>
             </div>
           )}
@@ -3165,7 +3165,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                 style={{ backgroundColor: '#0C1B3A', color: '#C9A84C' }}
               >
                 <Archive className="w-5 h-5" />
-                {sqSaveStatus === 'saving' ? 'Saving...' : 'Save Supplier Quote'}
+                {sqSaveStatus === 'saving' ? t('Saving...') : t('Save Supplier Quote')}
               </button>
             </div>
           ) : (
@@ -3175,8 +3175,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
               <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-[16px]">
                 <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
                 <div>
-                  <p className="text-[13px] font-black text-green-800">Supplier Quote Saved</p>
-                  <p className="text-[11px] text-green-600">What would you like to do next?</p>
+                  <p className="text-[13px] font-black text-green-800">{t('Supplier Quote Saved')}</p>
+                  <p className="text-[11px] text-green-600">{t('What would you like to do next?')}</p>
                 </div>
               </div>
 
@@ -3190,28 +3190,28 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                 return (
                   <div className="bg-white border border-[#0C1B3A]/8 rounded-[20px] p-6 space-y-4">
                     <div>
-                      <h4 className="text-[13px] font-black text-[#0C1B3A]">Include Fields — what the customer sees</h4>
-                      <p className="text-[11px] text-[#0C1B3A]/45 mt-0.5">Supplier Cost Items is your internal view. Choose what carries over into the GCI Quote.</p>
+                      <h4 className="text-[13px] font-black text-[#0C1B3A]">{t('Include Fields — what the customer sees')}</h4>
+                      <p className="text-[11px] text-[#0C1B3A]/45 mt-0.5">{t('Supplier Cost Items is your internal view. Choose what carries over into the GCI Quote.')}</p>
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-[11px]">
                       <div className="bg-green-50 border border-green-200 rounded-xl p-3">
-                        <p className="font-black uppercase tracking-wider text-green-700 text-[9px] mb-1.5">Always shown to customer</p>
-                        <p className="text-green-800/80 leading-relaxed">English Description, Specification, Size/Dimension, Material, Color, Unit, Qty, Customer Unit Price, Customer Line Total</p>
+                        <p className="font-black uppercase tracking-wider text-green-700 text-[9px] mb-1.5">{t('Always shown to customer')}</p>
+                        <p className="text-green-800/80 leading-relaxed">{t('English Description, Specification, Size/Dimension, Material, Color, Unit, Qty, Customer Unit Price, Customer Line Total')}</p>
                       </div>
                       <div className="bg-red-50 border border-red-200 rounded-xl p-3">
-                        <p className="font-black uppercase tracking-wider text-red-700 text-[9px] mb-1.5">Never shown to customer</p>
-                        <p className="text-red-800/80 leading-relaxed">Supplier Name/Contact, Supplier Unit Cost, Supplier Currency, Exchange Rate, Margin %, Internal Notes</p>
+                        <p className="font-black uppercase tracking-wider text-red-700 text-[9px] mb-1.5">{t('Never shown to customer')}</p>
+                        <p className="text-red-800/80 leading-relaxed">{t('Supplier Name/Contact, Supplier Unit Cost, Supplier Currency, Exchange Rate, Margin %, Internal Notes')}</p>
                       </div>
                     </div>
                     <div>
-                      <p className="font-black uppercase tracking-wider text-[#0C1B3A]/40 text-[9px] mb-2">Optional — include if checked</p>
+                      <p className="font-black uppercase tracking-wider text-[#0C1B3A]/40 text-[9px] mb-2">{t('Optional — include if checked')}</p>
                       <div className="flex flex-wrap gap-4">
                         {OPTIONAL_FIELDS.map(([key, label]) => (
                           <label key={key} className="flex items-center gap-2 text-[12px] font-bold text-[#0C1B3A]/70 cursor-pointer">
                             <input type="checkbox" checked={sqIncludeFields[key]}
                               onChange={e => setSqIncludeFields(prev => ({ ...prev, [key]: e.target.checked }))}
                               className="w-3.5 h-3.5 accent-[#C9A84C] cursor-pointer" />
-                            {label}
+                            {label === 'MOQ' ? label : t(label)}
                           </label>
                         ))}
                       </div>
@@ -3225,7 +3225,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
               <button
                 onClick={() => {
                   const included = draftItems.filter(it => it.includeInGCI !== false);
-                  if (included.length === 0) { alert('Please select at least one item to create GCI Quote.'); return; }
+                  if (included.length === 0) { alert(t('Please select at least one item to create GCI Quote.')); return; }
                   // Gate: show currency & exchange rate confirmation before entering Pricing Review
                   // Pre-fill from the live preview controls set above (Supplier Currency / Exchange Rate / Customer Currency)
                   setPendingConversionItems(included);
@@ -3237,7 +3237,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                 style={{ backgroundColor: '#C9A84C', color: '#0C1B3A' }}
               >
                 <ExternalLink className="w-5 h-5" />
-                Convert to GCI Quote →
+                {t('Convert to GCI Quote →')}
               </button>
 
               {/* SECONDARY: View in Archive */}
@@ -3253,7 +3253,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                 }}
                 className="w-full py-4 rounded-[24px] font-black uppercase tracking-widest text-[12px] transition-all border border-[#0C1B3A]/12 text-[#0C1B3A]/60 hover:border-[#0C1B3A]/30 hover:text-[#0C1B3A] flex items-center justify-center gap-2"
               >
-                <History className="w-4 h-4" /> View in Supplier Quote Archive
+                <History className="w-4 h-4" /> {t('View in Supplier Quote Archive')}
               </button>
             </div>
           )}
@@ -6158,23 +6158,23 @@ Leave a field as empty string if not present. Never fabricate values.`;
         <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest flex-wrap">
           {quoteSource === 'supplier-archive' ? (
             <>
-              <button onClick={() => { setAppMode('landing'); setView('configurator'); setQuoteSource(null); setQuoteType(null); setQuoteMode(null); setTradePhase(null); }} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">Workflow Home</button>
+              <button onClick={() => { setAppMode('landing'); setView('configurator'); setQuoteSource(null); setQuoteType(null); setQuoteMode(null); setTradePhase(null); }} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">{t('Workflow Home')}</button>
               <span className="text-[#0C1B3A]/15">›</span>
-              <button onClick={() => { setView('history'); setHistoryTab('supplier'); setQuoteSource(null); setQuoteType(null); setQuoteMode(null); setTradePhase(null); setAppMode('landing'); }} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">Supplier Quote Archive</button>
+              <button onClick={() => { setView('history'); setHistoryTab('supplier'); setQuoteSource(null); setQuoteType(null); setQuoteMode(null); setTradePhase(null); setAppMode('landing'); }} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">{t('Supplier Quote Archive')}</button>
               <span className="text-[#0C1B3A]/15">›</span>
-              <span className="text-[#C9A84C]">GCI Quote Pricing Review</span>
+              <span className="text-[#C9A84C]">{t('GCI Quote Pricing Review')}</span>
             </>
           ) : (
             <>
-              <button onClick={() => { setAppMode('landing'); setView('configurator'); setProjectInfoSubmitted(false); setQuoteType(null); }} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">Workflow Home</button>
+              <button onClick={() => { setAppMode('landing'); setView('configurator'); setProjectInfoSubmitted(false); setQuoteType(null); }} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">{t('Workflow Home')}</button>
               <span className="text-[#0C1B3A]/15">›</span>
-              <button onClick={() => { setQuoteMode(null); setSelectedScenario(null); setQuoteType(null); setTradePhase(null); setActiveTab('items'); }} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">Quote Type</button>
+              <button onClick={() => { setQuoteMode(null); setSelectedScenario(null); setQuoteType(null); setTradePhase(null); setActiveTab('items'); }} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">{t('Quote Type')}</button>
               <span className="text-[#0C1B3A]/15">›</span>
               <button onClick={handleBackFromPricing} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">
-                {quoteType === 'boq' ? 'BOQ & AI Analysis' : 'Trade & Sourcing'}
+                {quoteType === 'boq' ? t('BOQ & AI Analysis') : t('Trade & Sourcing')}
               </button>
               <span className="text-[#0C1B3A]/15">›</span>
-              <span className="text-[#C9A84C]">Pricing Review</span>
+              <span className="text-[#C9A84C]">{t('Pricing Review')}</span>
             </>
           )}
         </div>
@@ -6185,13 +6185,13 @@ Leave a field as empty string if not present. Never fabricate values.`;
           className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-[#0C1B3A]/40 hover:text-[#C9A84C] transition-colors"
         >
           <ChevronLeft className="w-4 h-4" />
-          {quoteSource === 'supplier-archive' ? 'Back to Supplier Quote Archive' : quoteSource === 'gci-history' ? 'Back to GCI Quotes' : 'Back to Cost Items'}
+          {quoteSource === 'supplier-archive' ? t('Back to Supplier Quote Archive') : quoteSource === 'gci-history' ? t('Back to GCI Quotes') : t('Back to Cost Items')}
         </button>
 
         {/* Page title — source-aware */}
         <div className="flex items-center gap-3">
           <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#C9A84C] bg-[#C9A84C]/10 px-3 py-1 rounded-full">
-            {quoteSource === 'supplier-archive' ? 'Supplier Quote → GCI Quote' : 'Trade & Sourcing'}
+            {quoteSource === 'supplier-archive' ? t('Supplier Quote → GCI Quote') : t('Trade & Sourcing')}
           </span>
         </div>
 
@@ -6200,12 +6200,12 @@ Leave a field as empty string if not present. Never fabricate values.`;
         {/* Quote Context */}
         <div className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[20px] px-6 py-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {[
-            { label: 'Customer / Project', value: quoteInfo.customerProjectName || '—' },
-            { label: 'Quote No', value: quoteInfo.quoteNumber || 'Auto' },
-            { label: 'Date', value: quoteInfo.date || '—' },
-            { label: 'Salesperson', value: quoteInfo.salesperson || '—' },
-            { label: 'Phone / WA', value: quoteInfo.phoneWhatsApp || '—' },
-            { label: 'Source', value: _businessIdParam ? `DEAL · ${_businessIdParam}` : 'Manual' },
+            { label: t('Customer / Project'), value: quoteInfo.customerProjectName || '—' },
+            { label: t('Quote No'), value: quoteInfo.quoteNumber || 'Auto' },
+            { label: t('Date'), value: quoteInfo.date || '—' },
+            { label: t('Salesperson'), value: quoteInfo.salesperson || '—' },
+            { label: t('Phone / WA'), value: quoteInfo.phoneWhatsApp || '—' },
+            { label: t('Source'), value: _businessIdParam ? `DEAL · ${_businessIdParam}` : t('Manual') },
           ].map(f => (
             <div key={f.label}>
               <p className="text-[8px] font-black uppercase tracking-wider text-[#0C1B3A]/30 mb-0.5">{f.label}</p>
@@ -6219,17 +6219,17 @@ Leave a field as empty string if not present. Never fabricate values.`;
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[8px] font-black uppercase tracking-[0.3em] text-[#C9A84C] bg-[#C9A84C]/10 px-2 py-1 rounded-full">
-                {quoteType === 'boq' ? 'BOQ → Trade Pricing' : 'Trade & Sourcing'}
+                {quoteType === 'boq' ? t('BOQ → Trade Pricing') : t('Trade & Sourcing')}
               </span>
             </div>
-            <h2 className="text-2xl font-serif italic text-[#0C1B3A]">Review Cost & Set Selling Price</h2>
+            <h2 className="text-2xl font-serif italic text-[#0C1B3A]">{t('Review Cost & Set Selling Price')}</h2>
             <p className="text-[10px] text-[#0C1B3A]/50 mt-1">输入销售价格 · 系统自动计算利润和VAT</p>
           </div>
           <button
             onClick={() => setTradePhase('upload')}
             className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#0C1B3A]/40 hover:text-[#0C1B3A] transition-colors"
           >
-            ← Back to Draft Items
+            {t('← Back to Draft Items')}
           </button>
         </div>
 
@@ -6237,14 +6237,14 @@ Leave a field as empty string if not present. Never fabricate values.`;
         <div className="bg-white rounded-[32px] border border-[#0C1B3A]/8 overflow-hidden shadow-sm">
           {/* Table Header */}
           <div className="grid grid-cols-12 gap-2 px-6 py-3 bg-[#0C1B3A] text-white text-[9px] font-black uppercase tracking-wider">
-            <div className="col-span-3">Item</div>
-            <div className="col-span-1 text-right">Qty</div>
-            <div className="col-span-2 text-right">Supplier Cost</div>
-            <div className="col-span-2 text-right">Selling Total ✎</div>
-            <div className="col-span-1 text-right">Markup%</div>
-            <div className="col-span-1 text-right">Profit</div>
-            <div className="col-span-1 text-right">Margin%</div>
-            <div className="col-span-1 text-right">Total+VAT</div>
+            <div className="col-span-3">{t('Item')}</div>
+            <div className="col-span-1 text-right">{t('Qty')}</div>
+            <div className="col-span-2 text-right">{t('Supplier Cost')}</div>
+            <div className="col-span-2 text-right">{t('Selling Total ✎')}</div>
+            <div className="col-span-1 text-right">{t('Markup%')}</div>
+            <div className="col-span-1 text-right">{t('Profit')}</div>
+            <div className="col-span-1 text-right">{t('Margin%')}</div>
+            <div className="col-span-1 text-right">{t('Total+VAT')}</div>
           </div>
 
           {/* Items */}
@@ -6331,17 +6331,17 @@ Leave a field as empty string if not present. Never fabricate values.`;
           <div className="px-6 py-5 bg-[#0C1B3A]/3 border-t border-[#0C1B3A]/10">
             <div className="grid grid-cols-3 gap-8 text-center">
               <div>
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40">Total Supplier Cost</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Total Supplier Cost')}</p>
                 <p className="text-xl font-black font-mono text-[#0C1B3A] mt-1">AED {totalSupplierCost.toFixed(2)}</p>
               </div>
               <div>
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40">Total Profit · Margin</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Total Profit · Margin')}</p>
                 <p className={`text-xl font-black font-mono mt-1 ${totalProfit > 0 ? 'text-green-600' : totalSelling > 0 ? 'text-red-500' : 'text-[#0C1B3A]/30'}`}>
                   {totalSelling > 0 ? `AED ${totalProfit.toFixed(2)} · ${overallMargin.toFixed(1)}%` : '—'}
                 </p>
               </div>
               <div>
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40">Grand Total (incl 5% VAT)</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Grand Total (incl 5% VAT)')}</p>
                 <p className="text-xl font-black font-mono text-[#C9A84C] mt-1">
                   {totalSelling > 0 ? `AED ${grandTotal.toFixed(2)}` : '—'}
                 </p>
@@ -6384,46 +6384,46 @@ Leave a field as empty string if not present. Never fabricate values.`;
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[8px] font-black uppercase tracking-[0.3em] text-white bg-[#C9A84C] px-3 py-1 rounded-full">GCI Quotation Draft</span>
+                  <span className="text-[8px] font-black uppercase tracking-[0.3em] text-white bg-[#C9A84C] px-3 py-1 rounded-full">{t('GCI Quotation Draft')}</span>
                 </div>
-                <h3 className="text-xl font-black text-[#0C1B3A]">GCI Customer Quote</h3>
+                <h3 className="text-xl font-black text-[#0C1B3A]">{t('GCI Customer Quote')}</h3>
               </div>
               <div className="flex items-center gap-3">
                 {/* Cloud save status indicator */}
                 {cloudSaveStatus === 'saved' && cloudId && (
                   <div className="flex items-center gap-1.5 px-3 py-1 bg-green-50 border border-green-200 rounded-full">
                     <CheckCircle2 className="w-3 h-3 text-green-500" />
-                    <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">Saved · {quoteInfo.quoteNumber}</span>
+                    <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">{t('Saved · {n}').replace('{n}', quoteInfo.quoteNumber)}</span>
                   </div>
                 )}
                 {cloudSaveStatus === 'saving' && (
                   <div className="flex items-center gap-1.5 px-3 py-1 bg-[#0C1B3A]/5 rounded-full">
                     <RefreshCw className="w-3 h-3 text-[#C9A84C] animate-spin" />
-                    <span className="text-[9px] font-black text-[#0C1B3A]/50 uppercase tracking-widest">Saving…</span>
+                    <span className="text-[9px] font-black text-[#0C1B3A]/50 uppercase tracking-widest">{t('Saving…')}</span>
                   </div>
                 )}
                 {cloudSaveStatus === 'error' && (
-                  <span className="text-[9px] font-black text-red-400 uppercase tracking-widest">Save failed</span>
+                  <span className="text-[9px] font-black text-red-400 uppercase tracking-widest">{t('Save failed')}</span>
                 )}
                 <button
                   onClick={() => handleSaveToCloud(confirmed, { totalSupplierCost, totalSelling, totalProfit, overallMargin, totalVAT, grandTotal })}
                   disabled={cloudSaveStatus === 'saving'}
                   className="px-4 py-2 bg-[#0C1B3A] text-[#C9A84C] rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-[#0F2551] transition-all disabled:opacity-40 flex items-center gap-1.5 border border-[#C9A84C]/30"
                 >
-                  {cloudId ? '↑ Update Draft' : '💾 Save Draft'}
+                  {cloudId ? t('↑ Update Draft') : t('💾 Save Draft')}
                 </button>
-                <button onClick={() => setQuoteGenerated(false)} className="text-[9px] text-[#0C1B3A]/30 hover:text-[#0C1B3A] uppercase tracking-widest font-bold transition-colors">← Edit Prices</button>
+                <button onClick={() => setQuoteGenerated(false)} className="text-[9px] text-[#0C1B3A]/30 hover:text-[#0C1B3A] uppercase tracking-widest font-bold transition-colors">{t('← Edit Prices')}</button>
               </div>
             </div>
 
             {/* Editable Customer Info */}
             <div className="bg-white rounded-[20px] border border-[#0C1B3A]/8 p-5 shadow-sm">
-              <p className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 mb-4">Customer Info · 可修改后再 Update Draft</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 mb-4">{t('Customer Info')}</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[
-                  { key: 'customerProjectName', label: 'Customer / Project', placeholder: 'e.g. Al Nahyan Villa FF&E' },
-                  { key: 'salesperson', label: 'Salesperson', placeholder: 'e.g. Chris' },
-                  { key: 'phoneWhatsApp', label: 'Phone / WA', placeholder: '+971 50 000 0000' },
+                  { key: 'customerProjectName', label: t('Customer / Project'), placeholder: 'e.g. Al Nahyan Villa FF&E' },
+                  { key: 'salesperson', label: t('Salesperson'), placeholder: 'e.g. Chris' },
+                  { key: 'phoneWhatsApp', label: t('Phone / WA'), placeholder: '+971 50 000 0000' },
                 ].map(f => (
                   <div key={f.key}>
                     <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1">{f.label}</label>
@@ -6442,12 +6442,12 @@ Leave a field as empty string if not present. Never fabricate values.`;
             {/* Quote info card */}
             <div className="bg-[#0C1B3A] rounded-[24px] p-6 grid grid-cols-2 sm:grid-cols-3 gap-4">
               {[
-                { label: 'Customer / Project', value: quoteInfo.customerProjectName || '—' },
-                { label: 'Quote No', value: quoteInfo.quoteNumber || 'Auto' },
-                { label: 'Date', value: quoteInfo.date || '—' },
-                { label: 'Salesperson', value: quoteInfo.salesperson || '—' },
-                { label: 'Source', value: _businessIdParam ? `DEAL · ${_businessIdParam}` : 'Manual' },
-                { label: 'Items', value: `${confirmed.length} line items` },
+                { label: t('Customer / Project'), value: quoteInfo.customerProjectName || '—' },
+                { label: t('Quote No'), value: quoteInfo.quoteNumber || 'Auto' },
+                { label: t('Date'), value: quoteInfo.date || '—' },
+                { label: t('Salesperson'), value: quoteInfo.salesperson || '—' },
+                { label: t('Source'), value: _businessIdParam ? `DEAL · ${_businessIdParam}` : t('Manual') },
+                { label: t('Items'), value: t('{n} line items').replace('{n}', String(confirmed.length)) },
               ].map(f => (
                 <div key={f.label}>
                   <p className="text-[8px] font-black uppercase tracking-wider text-white/30 mb-0.5">{f.label}</p>
@@ -6459,11 +6459,11 @@ Leave a field as empty string if not present. Never fabricate values.`;
             {/* Financials summary */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               {[
-                { label: 'Supplier Cost', value: `AED ${totalSupplierCost.toFixed(2)}`, color: 'text-[#0C1B3A]/60' },
-                { label: 'Selling (excl VAT)', value: `AED ${totalSelling.toFixed(2)}`, color: 'text-[#0C1B3A]' },
-                { label: `Profit · ${overallMargin.toFixed(1)}%`, value: `AED ${totalProfit.toFixed(2)}`, color: totalProfit > 0 ? 'text-green-600' : 'text-red-500' },
-                { label: 'VAT 5%', value: `AED ${totalVAT.toFixed(2)}`, color: 'text-[#0C1B3A]/60' },
-                { label: 'Grand Total', value: `AED ${grandTotal.toFixed(2)}`, color: 'text-[#C9A84C] text-lg' },
+                { label: t('Supplier Cost'), value: `AED ${totalSupplierCost.toFixed(2)}`, color: 'text-[#0C1B3A]/60' },
+                { label: t('Selling (excl VAT)'), value: `AED ${totalSelling.toFixed(2)}`, color: 'text-[#0C1B3A]' },
+                { label: t('Profit · {n}%').replace('{n}', overallMargin.toFixed(1)), value: `AED ${totalProfit.toFixed(2)}`, color: totalProfit > 0 ? 'text-green-600' : 'text-red-500' },
+                { label: t('VAT 5%'), value: `AED ${totalVAT.toFixed(2)}`, color: 'text-[#0C1B3A]/60' },
+                { label: t('Grand Total'), value: `AED ${grandTotal.toFixed(2)}`, color: 'text-[#C9A84C] text-lg' },
               ].map(f => (
                 <div key={f.label} className="bg-white rounded-[16px] border border-[#0C1B3A]/8 p-4 text-center">
                   <p className="text-[8px] font-black uppercase tracking-wider text-[#0C1B3A]/30 mb-1">{f.label}</p>
@@ -6475,12 +6475,12 @@ Leave a field as empty string if not present. Never fabricate values.`;
             {/* Items table (read-only) */}
             <div className="bg-white rounded-[20px] border border-[#0C1B3A]/8 overflow-hidden">
               <div className="grid grid-cols-12 gap-2 px-5 py-2.5 bg-[#0C1B3A]/5 text-[8px] font-black uppercase tracking-wider text-[#0C1B3A]/50">
-                <div className="col-span-5">Item</div>
-                <div className="col-span-1 text-center">Qty</div>
-                <div className="col-span-2 text-right">Unit Price (AED)</div>
-                <div className="col-span-2 text-right">Subtotal</div>
-                <div className="col-span-1 text-right">VAT</div>
-                <div className="col-span-1 text-right">Total</div>
+                <div className="col-span-5">{t('Item')}</div>
+                <div className="col-span-1 text-center">{t('Qty')}</div>
+                <div className="col-span-2 text-right">{t('Unit Price (AED)')}</div>
+                <div className="col-span-2 text-right">{t('Subtotal')}</div>
+                <div className="col-span-1 text-right">{t('VAT')}</div>
+                <div className="col-span-1 text-right">{t('Total')}</div>
               </div>
               <div className="divide-y divide-[#0C1B3A]/5">
                 {confirmed.map(item => {
@@ -6504,7 +6504,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 })}
               </div>
               <div className="px-5 py-3 bg-[#0C1B3A] flex justify-end items-center gap-4">
-                <p className="text-[9px] font-black uppercase tracking-widest text-white/40">Grand Total (incl 5% VAT)</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-white/40">{t('Grand Total (incl 5% VAT)')}</p>
                 <p className="text-xl font-black font-mono text-[#C9A84C]">AED {grandTotal.toFixed(2)}</p>
               </div>
             </div>
@@ -6512,7 +6512,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
             {/* Terms & Notes in GCI Draft */}
             {tradeTerms && (
               <div className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[16px] px-6 py-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 mb-2">Terms &amp; Notes</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 mb-2">{t('Terms & Notes')}</p>
                 <p className="text-[13px] text-[#0C1B3A]/70 whitespace-pre-line leading-relaxed">{tradeTerms}</p>
               </div>
             )}
@@ -6528,7 +6528,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
                     <CheckCircle2 className="w-6 h-6 text-green-600" />
                   </div>
-                  <h3 className="text-base font-black text-green-800">Sent to TRADE successfully</h3>
+                  <h3 className="text-base font-black text-green-800">{t('Sent to TRADE successfully')}</h3>
                   <p className="text-[13px] text-green-600 mt-1">已发送到 TRADE · Project PI 草稿已创建</p>
                   {quoteInfo.quoteNumber && (
                     <p className="text-[12px] text-green-500/70 mt-2 font-mono">{quoteInfo.quoteNumber}</p>
@@ -6545,8 +6545,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white border border-[#0C1B3A]/15 text-[#0C1B3A] text-[13px] font-bold hover:border-[#C9A84C] transition-all"
                   >
                     {pdfDownloaded
-                      ? <><CheckCircle2 className="w-4 h-4 text-green-500" /> PDF Downloaded</>
-                      : <><Download className="w-4 h-4" /> Download PDF</>
+                      ? <><CheckCircle2 className="w-4 h-4 text-green-500" /> {t('PDF Downloaded')}</>
+                      : <><Download className="w-4 h-4" /> {t('Download PDF')}</>
                     }
                   </button>
                 </div>
@@ -6558,24 +6558,22 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     className="p-5 rounded-[20px] bg-[#0C1B3A] text-[#C9A84C] flex flex-col items-center gap-2 font-black text-[13px] uppercase tracking-wide hover:bg-[#0F2551] transition-all active:scale-95 border border-[#C9A84C]/30"
                   >
                     <ExternalLink className="w-5 h-5" />
-                    View in TRADE
-                    <span className="text-[11px] text-[#C9A84C]/60 normal-case font-bold tracking-normal">Open TRADE OS PI tab</span>
+                    {t('View in TRADE')}
+                    <span className="text-[11px] text-[#C9A84C]/60 normal-case font-bold tracking-normal">{t('Open TRADE OS PI tab')}</span>
                   </button>
                   <button
                     onClick={() => { setSentToTrade(false); setView('history'); }}
                     className="p-5 rounded-[20px] bg-white border-2 border-[#0C1B3A]/12 text-[#0C1B3A] flex flex-col items-center gap-2 font-black text-[13px] uppercase tracking-wide hover:border-[#C9A84C] transition-all active:scale-95"
                   >
                     <History className="w-5 h-5" />
-                    Back to History
-                    <span className="text-[11px] text-[#0C1B3A]/40 normal-case font-bold tracking-normal">查看所有报价记录</span>
+                    {t('Back to History')}
                   </button>
                   <button
                     onClick={() => { resetProject(); }}
                     className="p-5 rounded-[20px] bg-white border-2 border-[#0C1B3A]/12 text-[#0C1B3A] flex flex-col items-center gap-2 font-black text-[13px] uppercase tracking-wide hover:border-[#C9A84C] transition-all active:scale-95"
                   >
                     <PlusCircle className="w-5 h-5" />
-                    New Quote
-                    <span className="text-[11px] text-[#0C1B3A]/40 normal-case font-bold tracking-normal">新建报价</span>
+                    {t('New Quote')}
                   </button>
                 </div>
               </div>
@@ -6590,15 +6588,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   className="flex-1 p-5 rounded-[24px] bg-white border-2 border-[#0C1B3A]/15 text-[#0C1B3A] flex justify-center items-center gap-3 font-black uppercase tracking-widest text-xs hover:border-[#C9A84C] transition-all active:scale-95"
                 >
                   {pdfDownloaded
-                    ? <><CheckCircle2 className="w-4 h-4 text-green-500" /> PDF Downloaded</>
-                    : <><Download className="w-4 h-4" /> Download PDF</>
+                    ? <><CheckCircle2 className="w-4 h-4 text-green-500" /> {t('PDF Downloaded')}</>
+                    : <><Download className="w-4 h-4" /> {t('Download PDF')}</>
                   }
                 </button>
                 <button
                   onClick={handleSendTradeToTrade}
                   className="flex-1 p-5 rounded-[24px] bg-[#0C1B3A] text-[#C9A84C] flex justify-center items-center gap-3 font-black uppercase tracking-widest text-xs shadow-xl hover:bg-[#0F2551] transition-all active:scale-95 border border-[#C9A84C]/30"
                 >
-                  <ExternalLink className="w-4 h-4" /> Send to TRADE
+                  <ExternalLink className="w-4 h-4" /> {t('Send to TRADE')}
                 </button>
               </div>
             )}
@@ -6617,33 +6615,33 @@ Leave a field as empty string if not present. Never fabricate values.`;
           onClick={() => setProjectInfoSubmitted(false)}
           className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors"
         >
-          Project Info
+          {t('Project Info')}
         </button>
         <span className="text-[#0C1B3A]/15">›</span>
         <button
           onClick={() => { setQuoteMode(null); setSelectedScenario(null); setQuoteType(null); setTradePhase(null); setActiveTab('items'); }}
           className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors"
         >
-          Quote Type
+          {t('Quote Type')}
         </button>
         <span className="text-[#0C1B3A]/15">›</span>
         <span className="text-[#C9A84C]">
-          {quoteType === 'trade' ? 'Trade & Sourcing' : quoteType === 'boq' ? 'BOQ & AI Analysis' : 'Project Package'}
+          {quoteType === 'trade' ? t('Trade & Sourcing') : quoteType === 'boq' ? t('BOQ & AI Analysis') : t('Project Package')}
         </span>
         <span className="text-[#0C1B3A]/15">›</span>
-        <span className="text-[#0C1B3A]/50">{activeTab === 'draft' ? (quoteType === 'trade' || quoteType === 'boq' ? 'GCI Quotation Draft' : 'Draft') : (quoteType === 'trade' || quoteType === 'boq' ? 'Supplier Cost Items' : 'Items')}</span>
+        <span className="text-[#0C1B3A]/50">{activeTab === 'draft' ? (quoteType === 'trade' || quoteType === 'boq' ? t('GCI Quotation Draft') : t('Draft')) : (quoteType === 'trade' || quoteType === 'boq' ? t('Supplier Cost Items') : t('Items'))}</span>
       </div>
 
       {/* ── Quote Context (trade/boq paths only) ───────────────────────── */}
       {(quoteType === 'trade' || quoteType === 'boq') && (
         <div className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[20px] px-6 py-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {[
-            { label: 'Customer / Project', value: quoteInfo.customerProjectName || '—' },
-            { label: 'Quote No', value: quoteInfo.quoteNumber || 'Auto' },
-            { label: 'Date', value: quoteInfo.date || '—' },
-            { label: 'Salesperson', value: quoteInfo.salesperson || '—' },
-            { label: 'Phone / WA', value: quoteInfo.phoneWhatsApp || '—' },
-            { label: 'Source', value: _businessIdParam ? `DEAL · ${_businessIdParam}` : 'Manual' },
+            { label: t('Customer / Project'), value: quoteInfo.customerProjectName || '—' },
+            { label: t('Quote No'), value: quoteInfo.quoteNumber || 'Auto' },
+            { label: t('Date'), value: quoteInfo.date || '—' },
+            { label: t('Salesperson'), value: quoteInfo.salesperson || '—' },
+            { label: t('Phone / WA'), value: quoteInfo.phoneWhatsApp || '—' },
+            { label: t('Source'), value: _businessIdParam ? `DEAL · ${_businessIdParam}` : t('Manual') },
           ].map(f => (
             <div key={f.label}>
               <p className="text-[8px] font-black uppercase tracking-wider text-[#0C1B3A]/30 mb-0.5">{f.label}</p>
@@ -6658,24 +6656,24 @@ Leave a field as empty string if not present. Never fabricate values.`;
           onClick={() => { setQuoteMode(null); setSelectedScenario(null); setQuoteType(null); setTradePhase(null); setActiveTab('items'); }}
           className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#C9A84C] hover:text-[#0C1B3A] transition-all group"
         >
-          <ArrowLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" /> ← Quote Type Selection
+          <ArrowLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" /> {t('← Quote Type Selection')}
         </button>
         <div className="flex items-center gap-4">
           {/* Context badge — changes based on quote path */}
           {quoteType === 'trade' ? (
             <div className="flex items-center gap-3 px-4 py-2.5 bg-[#0C1B3A]/8 rounded-full border border-[#0C1B3A]/12">
               <ShoppingCart className="w-4 h-4 text-[#C9A84C]" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]">Trade &amp; Sourcing Quote</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]">{t('Trade & Sourcing Quote')}</span>
             </div>
           ) : quoteType === 'boq' ? (
             <div className="flex items-center gap-3 px-4 py-2.5 bg-[#0C1B3A]/8 rounded-full border border-[#0C1B3A]/12">
               <FileSearch className="w-4 h-4 text-[#C9A84C]" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]">BOQ &amp; AI Analysis</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]">{t('BOQ & AI Analysis')}</span>
             </div>
           ) : (
             <div className="flex items-center gap-3 px-4 py-3 bg-brand-gold/10 rounded-full">
               <Package className="w-4 h-4 text-brand-gold" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-brand-brown">{selectedScenario ? t(selectedScenario) : 'Project'} Package Mode</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-brand-brown">{selectedScenario ? t(selectedScenario) : t('Project')} {t('Package Mode')}</span>
             </div>
           )}
         </div>
@@ -6919,7 +6917,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
             <div className="flex items-center gap-3">
               <Cpu className="w-5 h-5 text-brand-gold" />
               <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-brand-brown">
-                {(quoteType === 'trade' || quoteType === 'boq') ? 'Supplier Quote Import' : t('Import Zone')}
+                {(quoteType === 'trade' || quoteType === 'boq') ? t('Supplier Quote Import') : t('Import Zone')}
               </h3>
             </div>
           </div>
@@ -6932,7 +6930,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   <label className="text-[9px] font-bold text-brand-brown-muted uppercase tracking-widest flex items-center gap-2">
                     <Clipboard className="w-3 h-3" /> {t('Text Analysis')}
                   </label>
-                  <span className="text-[8px] text-brand-brown-muted opacity-50 uppercase font-bold tracking-widest">Paste requirement text</span>
+                  <span className="text-[8px] text-brand-brown-muted opacity-50 uppercase font-bold tracking-widest">{t('Paste requirement text')}</span>
                 </div>
                 <textarea 
                   value={importText}
@@ -6995,7 +6993,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 ) : (
                   <>
                     <Cpu className="w-4 h-4 text-brand-gold" />
-                    {(quoteType === 'trade' || quoteType === 'boq') ? 'Analyze Supplier Quote' : t('Analyze Client List')}
+                    {(quoteType === 'trade' || quoteType === 'boq') ? t('Analyze Supplier Quote') : t('Analyze Client List')}
                   </>
                 )}
               </button>
@@ -7036,10 +7034,10 @@ Leave a field as empty string if not present. Never fabricate values.`;
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-[8px] font-black uppercase tracking-[0.3em] text-[#C9A84C] bg-[#C9A84C]/10 px-2 py-1 rounded-full">Step 1</span>
+                <span className="text-[8px] font-black uppercase tracking-[0.3em] text-[#C9A84C] bg-[#C9A84C]/10 px-2 py-1 rounded-full">{t('Step 1')}</span>
               </div>
-              <h3 className="text-xl font-black text-[#0C1B3A]">Supplier Cost Items</h3>
-              <p className="text-[10px] text-[#0C1B3A]/50 mt-0.5">Review and correct AI-parsed supplier costs · 核对供应商成本数据</p>
+              <h3 className="text-xl font-black text-[#0C1B3A]">{t('Supplier Cost Items')}</h3>
+              <p className="text-[10px] text-[#0C1B3A]/50 mt-0.5">{t('Review and correct AI-parsed supplier costs')}</p>
             </div>
             <span className="text-[9px] font-bold text-[#0C1B3A]/30 uppercase tracking-widest">{draftItems.length} items</span>
           </div>
@@ -7048,13 +7046,13 @@ Leave a field as empty string if not present. Never fabricate values.`;
           <div className="bg-white rounded-[24px] border border-[#0C1B3A]/8 overflow-hidden shadow-sm">
             {/* Header */}
             <div className="grid grid-cols-12 gap-3 px-6 py-3 bg-[#0C1B3A] text-white text-[10px] font-black uppercase tracking-wider">
-              <div className="col-span-3">Item Name</div>
-              <div className="col-span-3">Description / Spec</div>
-              <div className="col-span-1 text-center">Qty</div>
-              <div className="col-span-1 text-center">Unit</div>
-              <div className="col-span-2 text-right">Unit Cost</div>
+              <div className="col-span-3">{t('Item Name')}</div>
+              <div className="col-span-3">{t('Description / Spec')}</div>
+              <div className="col-span-1 text-center">{t('Qty')}</div>
+              <div className="col-span-1 text-center">{t('Unit')}</div>
+              <div className="col-span-2 text-right">{t('Unit Cost')}</div>
               <div className="col-span-1 text-center">CCY</div>
-              <div className="col-span-1 text-right">Line Total</div>
+              <div className="col-span-1 text-right">{t('Line Total')}</div>
             </div>
             {/* Rows */}
             <div className="divide-y divide-[#0C1B3A]/6">
@@ -7103,7 +7101,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       onChange={e => setDraftItems(prev => prev.map((it, i) => i === idx ? { ...it, targetUnitPrice: Number(e.target.value) || 0, targetTotal: (Number(e.target.value) || 0) * it.quantity } : it))}
                       className="w-full text-right text-[15px] font-mono font-black text-[#0C1B3A] bg-transparent border-b-2 border-[#0C1B3A]/10 focus:border-[#C9A84C] outline-none pb-1"
                     />
-                    <p className="text-[11px] text-[#0C1B3A]/30 text-right mt-1 font-mono">unit price</p>
+                    <p className="text-[11px] text-[#0C1B3A]/30 text-right mt-1 font-mono">{t('unit price')}</p>
                   </div>
                   {/* Currency */}
                   <div className="col-span-1 text-center">
@@ -7121,12 +7119,12 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       <p className="text-[15px] font-black font-mono text-[#0C1B3A]">
                         {(item.targetUnitPrice * item.quantity).toFixed(2)}
                       </p>
-                      <p className="text-[11px] text-[#0C1B3A]/30 font-mono">total</p>
+                      <p className="text-[11px] text-[#0C1B3A]/30 font-mono">{t('total (caption)')}</p>
                     </div>
                     <button
                       onClick={() => setDraftItems(prev => prev.filter((_, i) => i !== idx))}
                       className="text-[#0C1B3A]/15 hover:text-red-400 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
-                      title="Remove item"
+                      title={t('Remove item')}
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -7140,10 +7138,10 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 onClick={() => setDraftItems(prev => [...prev, { id: `manual-${Date.now()}`, originalName: 'New Item', originalSpec: '', quantity: 1, unit: 'pcs', targetUnitPrice: 0, targetTotal: 0, confidence: 1, status: 'Confirmed', suggestedCategory: FurnitureCategory.OTHER }])}
                 className="text-[11px] font-black uppercase tracking-widest text-[#C9A84C] hover:text-[#0C1B3A] transition-colors flex items-center gap-2"
               >
-                <Plus className="w-4 h-4" /> Add Item
+                <Plus className="w-4 h-4" /> {t('Add Item')}
               </button>
               <div className="text-right">
-                <p className="text-[10px] font-bold uppercase text-[#0C1B3A]/30 tracking-wider">Total Supplier Cost</p>
+                <p className="text-[10px] font-bold uppercase text-[#0C1B3A]/30 tracking-wider">{t('Total Supplier Cost')}</p>
                 <p className="text-xl font-black font-mono text-[#0C1B3A]">
                   AED {draftItems.reduce((s, it) => s + it.targetUnitPrice * it.quantity, 0).toFixed(2)}
                 </p>
@@ -7155,11 +7153,11 @@ Leave a field as empty string if not present. Never fabricate values.`;
           <div className="bg-white rounded-[20px] border border-[#0C1B3A]/8 overflow-hidden shadow-sm">
             <div className="px-6 py-3 bg-[#0C1B3A]/5 border-b border-[#0C1B3A]/6 flex items-center justify-between">
               <div>
-                <h4 className="text-[11px] font-black uppercase tracking-widest text-[#0C1B3A]">Terms &amp; Notes</h4>
-                <p className="text-[10px] text-[#0C1B3A]/40 mt-0.5">Payment terms · Lead time · Validity · Remarks from supplier quote</p>
+                <h4 className="text-[11px] font-black uppercase tracking-widest text-[#0C1B3A]">{t('Terms & Notes')}</h4>
+                <p className="text-[10px] text-[#0C1B3A]/40 mt-0.5">{t('Payment terms · Lead time · Validity · Remarks from supplier quote')}</p>
               </div>
               {tradeTerms && (
-                <button onClick={() => setTradeTerms('')} className="text-[9px] text-[#0C1B3A]/25 hover:text-red-400 transition-colors uppercase tracking-widest font-bold">Clear</button>
+                <button onClick={() => setTradeTerms('')} className="text-[9px] text-[#0C1B3A]/25 hover:text-red-400 transition-colors uppercase tracking-widest font-bold">{t('Clear')}</button>
               )}
             </div>
             <div className="p-5">
@@ -7167,7 +7165,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 value={tradeTerms}
                 onChange={e => setTradeTerms(e.target.value)}
                 rows={tradeTerms ? Math.max(3, tradeTerms.split('\n').length + 1) : 3}
-                placeholder="AI-extracted payment terms, lead time, validity, warranty, notes will appear here automatically.&#10;You can also type or paste manually.&#10;&#10;Example:&#10;Payment: 30% TT advance, 70% before shipment&#10;Lead time: 45 days after deposit&#10;Validity: 30 days"
+                placeholder={t('AI-extracted payment terms, lead time, validity, warranty, notes will appear here automatically.&#10;You can also type or paste manually.&#10;&#10;Example:&#10;Payment: 30% TT advance, 70% before shipment&#10;Lead time: 45 days after deposit&#10;Validity: 30 days')}
                 className="w-full text-[13px] text-[#0C1B3A]/70 bg-transparent outline-none resize-none leading-relaxed placeholder:text-[#0C1B3A]/20 placeholder:text-[12px]"
               />
             </div>
@@ -7186,7 +7184,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
               }
             >
               <Archive className="w-4 h-4" />
-              {sqSaveStatus === 'saving' ? 'Saving…' : sqSaveStatus === 'saved' ? '✓ Saved to Archive' : 'Save to Supplier Archive'}
+              {sqSaveStatus === 'saving' ? t('Saving…') : sqSaveStatus === 'saved' ? t('✓ Saved to Archive') : t('Save to Supplier Archive')}
             </button>
           </div>
 
@@ -7209,7 +7207,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
               }}
               className="px-10 py-5 bg-[#0C1B3A] text-[#C9A84C] rounded-full text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-[#0F2551] active:scale-95 transition-all border border-[#C9A84C]/30 flex items-center gap-3"
             >
-              Next: Set Selling Prices →
+              {t('Next: Set Selling Prices →')}
             </button>
           </div>
         </div>
@@ -7220,10 +7218,10 @@ Leave a field as empty string if not present. Never fabricate values.`;
         <>
           <div className="text-center space-y-4">
             <h2 className="text-4xl font-serif italic text-brand-brown">
-              {(quoteType === 'trade' || quoteType === 'boq') ? 'Supplier Cost Items' : '项目整套清单 Project Package Items'}
+              {(quoteType === 'trade' || quoteType === 'boq') ? t('Supplier Cost Items') : t('Project Package Items')}
             </h2>
             <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-gold">
-              {(quoteType === 'trade' || quoteType === 'boq') ? 'Items extracted from supplier quote · pending price review' : 'Consolidate multiple items into one engineering specification'}
+              {(quoteType === 'trade' || quoteType === 'boq') ? t('Items extracted from supplier quote · pending price review') : t('Consolidate multiple items into one engineering specification')}
             </p>
           </div>
 
@@ -7233,8 +7231,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
                     <PlusCircle className="w-8 h-8 text-brand-gold/30" />
                 </div>
-                <h3 className="text-xl font-serif italic text-brand-brown mb-2">您的清单还是空的 Your package is empty</h3>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-brand-brown/40">Add items below to start building your quote</p>
+                <h3 className="text-xl font-serif italic text-brand-brown mb-2">{t('Your package is empty')}</h3>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-brand-brown/40">{t('Add items below to start building your quote')}</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-4">
@@ -7249,7 +7247,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       </div>
                       <div>
                         <div className="flex items-center gap-3 mb-1">
-                          <span className="text-[10px] font-bold text-brand-gold uppercase tracking-widest">Item {idx + 1}</span>
+                          <span className="text-[10px] font-bold text-brand-gold uppercase tracking-widest">{t('Item {n}').replace('{n}', String(idx + 1))}</span>
                           <span className="w-1 h-1 rounded-full bg-brand-beige" />
                           <span className="text-[10px] font-bold text-brand-brown-muted uppercase tracking-widest">{t(item.category)}</span>
                         </div>
@@ -7285,7 +7283,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                           </button>
                        </div>
                        <div className="text-right">
-                         <span className="text-[10px] font-bold text-brand-brown-muted uppercase block">Total Value</span>
+                         <span className="text-[10px] font-bold text-brand-brown-muted uppercase block">{t('Total Value')}</span>
                          <span className="text-2xl font-serif italic text-brand-brown">
                             {(item.totalAmount * item.quantity).toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs not-italic">AED</span>
                          </span>
@@ -7329,7 +7327,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
             {packageItems.length > 0 && (
               <div className="mt-20 p-12 bg-brand-brown rounded-[48px] shadow-2xl flex flex-col sm:flex-row justify-between items-center gap-8">
                 <div className="text-center sm:text-left">
-                  <span className="text-[10px] font-bold text-brand-gold uppercase tracking-[0.3em]">Consolidated Package Total</span>
+                  <span className="text-[10px] font-bold text-brand-gold uppercase tracking-[0.3em]">{t('Consolidated Package Total')}</span>
                   <h2 className="text-5xl font-serif italic text-brand-ivory mt-2">
                     {packageItems.reduce((acc, item) => acc + (item.totalAmount * item.quantity), 0).toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs not-italic">AED</span>
                   </h2>
@@ -7354,15 +7352,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
               <div className="h-px w-12 bg-brand-gold/30" />
               <div className="flex items-center gap-2 text-brand-gold">
                 <Cpu className="w-5 h-5" />
-                <span className="text-[10px] font-bold uppercase tracking-[0.4em]">AI Mapping Engine Activated</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.4em]">{t('AI Mapping Engine Activated')}</span>
               </div>
               <div className="h-px w-12 bg-brand-gold/30" />
             </div>
             <h2 className="text-4xl font-serif italic text-brand-brown">
-              {(quoteType === 'trade' || quoteType === 'boq') ? 'GCI Quotation Draft' : '项目草稿清单 Project Package Draft'}
+              {(quoteType === 'trade' || quoteType === 'boq') ? t('GCI Quotation Draft') : t('Project Package Draft')}
             </h2>
             <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-gold opacity-80">
-              {(quoteType === 'trade' || quoteType === 'boq') ? '⚠ AI-generated draft — confirm supplier costs before pricing' : 'Classified items waiting for configuration push'}
+              {(quoteType === 'trade' || quoteType === 'boq') ? t('⚠ AI-generated draft — confirm supplier costs before pricing') : t('Classified items waiting for configuration push')}
             </p>
           </div>
 
@@ -7371,7 +7369,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
               <div className="w-24 h-24 bg-white/50 rounded-full flex items-center justify-center mx-auto mb-8">
                 <FileSpreadsheet className="w-10 h-10 text-brand-gold/40" />
               </div>
-              <p className="text-brand-brown font-serif italic text-xl mb-4 italic opacity-60">Upload a client Excel to populate this workspace</p>
+              <p className="text-brand-brown font-serif italic text-xl mb-4 italic opacity-60">{t('Upload a client Excel to populate this workspace')}</p>
               <button 
                 onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
                 className="px-10 py-5 bg-brand-brown text-brand-ivory rounded-full text-[10px] font-bold uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl"
@@ -7385,7 +7383,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 <table className="w-full text-left text-xs border-collapse table-fixed">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-brand-beige text-brand-brown-muted font-bold uppercase tracking-widest text-[9px] border-b border-brand-beige shadow-sm">
-                      <th className="p-8 py-6 w-[60px]">ID</th>
+                      <th className="p-8 py-6 w-[60px]">{t('ID')}</th>
                       <th className="p-8 py-6 w-[220px]">{t('Original Item Name')}</th>
                       <th className="p-8 py-6 w-[200px]">{t('Original Specification')}</th>
                       <th className="p-8 py-6 w-[240px]">{t('AI Suggested Category')}</th>
@@ -7426,7 +7424,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                               }}
                               className="bg-transparent border-none font-bold text-brand-brown text-[10px] uppercase tracking-widest outline-none focus:ring-0 cursor-pointer hover:text-brand-gold transition-colors truncate max-w-[150px]"
                             >
-                              <option value="unknown">Select...</option>
+                              <option value="unknown">{t('Select...')}</option>
                               {Object.values(FurnitureCategory).map(cat => (
                                 <option key={cat} value={cat}>{t(cat)}</option>
                               ))}
@@ -7529,9 +7527,9 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     <FileSpreadsheet className="w-6 h-6 text-brand-gold" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-brand-brown uppercase tracking-widest">Client Draft Summary</h4>
+                    <h4 className="text-sm font-bold text-brand-brown uppercase tracking-widest">{t('Client Draft Summary')}</h4>
                     <p className="text-[10px] text-brand-brown-muted uppercase font-bold opacity-60">
-                      Total Items: {draftItems.length}
+                      {t('Total Items: {n}').replace('{n}', String(draftItems.length))}
                     </p>
                   </div>
                 </div>
@@ -7549,7 +7547,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       }}
                       className="px-10 py-5 bg-[#0C1B3A] text-[#C9A84C] rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-[#0F2551] active:scale-95 transition-all border border-[#C9A84C]/30 flex items-center gap-3"
                     >
-                      Proceed to Pricing → 进入定价
+                      {t('Proceed to Pricing →')}
                     </button>
                   )}
 
@@ -7963,7 +7961,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                <Download className="w-5 h-5 text-brand-gold group-hover:translate-y-1 transition-transform" /> {t('Sync to CRM')}
              </button>
              <button onClick={sendToTrade} className="flex-1 p-6 rounded-[28px] bg-[#0C1B3A] text-[#C9A84C] flex justify-center items-center gap-4 font-bold uppercase tracking-widest text-xs shadow-xl hover:bg-[#0F2551] transition-all active:scale-95 group border border-[#C9A84C]/30">
-               <ExternalLink className="w-5 h-5 text-[#C9A84C] group-hover:translate-x-1 transition-transform" /> Send to TRADE
+               <ExternalLink className="w-5 h-5 text-[#C9A84C] group-hover:translate-x-1 transition-transform" /> {t('Send to TRADE')}
              </button>
              {/* Print Only View (English) */}
             <div id="quotation-print" className="hidden print:block p-10 bg-white text-black font-sans">
@@ -9298,8 +9296,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 {/* Header + Tab Switcher */}
                 <div className="space-y-4">
                   <div className="text-center space-y-2">
-                    <h2 className="text-3xl font-semibold" style={{ fontFamily: "'Space Grotesk',sans-serif", color: '#080D1E' }}>History Center</h2>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#CBA85C]" style={{ fontFamily: "'IBM Plex Mono',monospace" }}>Supplier Quotes Archive · GCI Customer Quotes</p>
+                    <h2 className="text-3xl font-semibold" style={{ fontFamily: "'Space Grotesk',sans-serif", color: '#080D1E' }}>{t('History Center')}</h2>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#CBA85C]" style={{ fontFamily: "'IBM Plex Mono',monospace" }}>{t('Supplier Quotes Archive · GCI Customer Quotes')}</p>
                   </div>
                   {/* Tab switcher */}
                   <div className="flex justify-center">
@@ -9311,7 +9309,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                           ? { backgroundColor: '#080D1E', color: '#CBA85C' }
                           : { color: '#080D1E60' }}
                       >
-                        Supplier Quotes
+                        {t('Supplier Quotes')}
                       </button>
                       <button
                         onClick={() => setHistoryTab('gci')}
@@ -9320,7 +9318,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                           ? { backgroundColor: '#080D1E', color: '#CBA85C' }
                           : { color: '#080D1E60' }}
                       >
-                        GCI Quotes
+                        {t('GCI Quotes')}
                       </button>
                     </div>
                   </div>
@@ -9330,15 +9328,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 {historyTab === 'supplier' && (
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-[#080D1E]">Supplier Quote Archive</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-[#080D1E]">{t('Supplier Quote Archive')}</span>
                       <div className="h-px flex-1 bg-[#080D1E]/10" />
                       {supplierQuotesLoading && <RefreshCw className="w-3.5 h-3.5 text-[#CBA85C] animate-spin" />}
-                      <span className="text-[9px] text-[#080D1E]/30 font-bold uppercase">Cloud · Supabase</span>
+                      <span className="text-[9px] text-[#080D1E]/30 font-bold uppercase">{t('Cloud · Supabase')}</span>
                     </div>
                     {!supplierQuotesLoading && supplierQuotes.length === 0 && (
                       <div className="text-center py-12 border-2 border-dashed border-[#080D1E]/8 rounded-[28px] text-[#080D1E]/30">
-                        <p className="text-sm" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>No supplier quotes saved yet</p>
-                        <p className="text-[11px] mt-1">Upload a supplier quote → review costs → click "Save to Supplier Archive"</p>
+                        <p className="text-sm" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>{t('No supplier quotes saved yet')}</p>
+                        <p className="text-[11px] mt-1">{t('Upload a supplier quote → review costs → click "Save to Supplier Archive"')}</p>
                       </div>
                     )}
                     <div className="grid grid-cols-1 gap-3">
@@ -9354,12 +9352,12 @@ Leave a field as empty string if not present. Never fabricate values.`;
                                 <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${statusColor}`}>{sq.status}</span>
                                 {sq.supplier_quote_no && <span className="text-[9px] font-mono text-[#080D1E]/40">{sq.supplier_quote_no}</span>}
                               </div>
-                              <h3 className="text-base font-black text-[#080D1E] truncate">{sq.supplier_name || '(Unnamed Supplier)'}</h3>
+                              <h3 className="text-base font-black text-[#080D1E] truncate">{sq.supplier_name || t('(Unnamed Supplier)')}</h3>
                               <p className="text-[11px] text-[#080D1E]/40 mt-0.5">{sq.quote_date} · {sq.currency}</p>
                               {sq.terms_notes && <p className="text-[10px] text-[#080D1E]/30 mt-0.5 truncate">{sq.terms_notes.slice(0, 60)}</p>}
                             </div>
                             <div className="text-right shrink-0">
-                              <p className="text-[9px] font-bold uppercase text-[#080D1E]/30">Total Cost</p>
+                              <p className="text-[9px] font-bold uppercase text-[#080D1E]/30">{t('Total Cost')}</p>
                               <p className="text-lg font-black font-mono text-[#080D1E]">{sq.currency} {(sq.total_cost || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
                             </div>
                             {sq.status !== 'Converted' && (
@@ -9367,29 +9365,29 @@ Leave a field as empty string if not present. Never fabricate values.`;
                                 onClick={() => handleCreateGCIQuoteFromSupplier(sq)}
                                 className="shrink-0 px-4 py-3 rounded-[16px] text-[10px] font-black uppercase tracking-wider border border-[#CBA85C]/30 text-[#CBA85C] bg-[#080D1E] hover:bg-[#0F2551] transition-all active:scale-95"
                               >
-                                Create GCI Quote
+                                {t('Create GCI Quote')}
                               </button>
                             )}
                             {sq.status === 'Converted' && (
                               <div className="shrink-0 px-4 py-3 rounded-[16px] text-[10px] font-black uppercase tracking-wider text-green-600 bg-green-50">
-                                ✓ Converted
+                                {t('✓ Converted')}
                               </div>
                             )}
                             <button
                               onClick={async () => {
                                 if (!sq.id) return;
-                                const ok = window.confirm(`Delete Supplier Quote?\n\nThis will delete:\n• supplier quote\n• supplier quote items\n\nThis action cannot be undone.`);
+                                const ok = window.confirm(t('Delete Supplier Quote?\n\nThis will delete:\n• supplier quote\n• supplier quote items\n\nThis action cannot be undone.'));
                                 if (!ok) return;
                                 const success = await deleteSupplierQuote(sq.id);
                                 if (success) {
                                   setSupplierQuotes(prev => prev.filter(q => q.id !== sq.id));
                                 } else {
-                                  alert('Delete failed. Please try again.');
+                                  alert(t('Delete failed. Please try again.'));
                                 }
                               }}
                               className="shrink-0 px-3 py-3 rounded-[16px] text-[10px] font-black uppercase tracking-wider text-red-400 border border-red-200 hover:bg-red-50 transition-all"
                             >
-                              Delete
+                              {t('Delete')}
                             </button>
                           </div>
                         );
@@ -9404,16 +9402,16 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 {/* ── Section 1: Cloud Trade/BOQ Quotes ───────────────── */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-[#080D1E]">Trade &amp; Sourcing · BOQ</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-[#080D1E]">{t('Trade & Sourcing · BOQ')}</span>
                     <div className="h-px flex-1 bg-[#080D1E]/10" />
                     {cloudHistoryLoading && <RefreshCw className="w-3.5 h-3.5 text-[#CBA85C] animate-spin" />}
-                    <span className="text-[9px] text-[#080D1E]/30 font-bold uppercase">Cloud · Auto-saved</span>
+                    <span className="text-[9px] text-[#080D1E]/30 font-bold uppercase">{t('Cloud · Auto-saved')}</span>
                   </div>
 
                   {!cloudHistoryLoading && cloudHistory.length === 0 && (
                     <div className="text-center py-10 border-2 border-dashed border-[#080D1E]/8 rounded-[28px] text-[#080D1E]/30">
-                      <p className="text-sm" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>No cloud quotes yet</p>
-                      <p className="text-[10px] mt-1">Quotes auto-save when you click Generate GCI Quote</p>
+                      <p className="text-sm" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>{t('No cloud quotes yet')}</p>
+                      <p className="text-[10px] mt-1">{t('Quotes auto-save when you click Generate GCI Quote')}</p>
                     </div>
                   )}
 
@@ -9436,11 +9434,11 @@ Leave a field as empty string if not present. Never fabricate values.`;
                               {rec.source === 'DEAL' && <span className="text-[8px] font-black text-[#CBA85C] bg-[#CBA85C]/10 px-1.5 py-0.5 rounded">DEAL</span>}
                             </div>
                             <h3 className="text-base font-black text-[#080D1E] truncate">{rec.customer_name || '—'}</h3>
-                            <p className="text-[10px] text-[#080D1E]/40 mt-0.5">{rec.quote_no} · {rec.quote_date} · {rec.salesperson || 'Staff'}</p>
+                            <p className="text-[10px] text-[#080D1E]/40 mt-0.5">{rec.quote_no} · {rec.quote_date} · {rec.salesperson || t('Staff')}</p>
                           </div>
                           {/* Right: amounts */}
                           <div className="text-right shrink-0">
-                            <p className="text-[9px] font-bold uppercase text-[#080D1E]/30">Grand Total</p>
+                            <p className="text-[9px] font-bold uppercase text-[#080D1E]/30">{t('Grand Total')}</p>
                             <p className="text-lg font-black font-mono text-[#080D1E]">AED {(rec.grand_total || 0).toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
                             {rec.margin_percent > 0 && <p className="text-[9px] text-green-600 font-bold">{rec.margin_percent.toFixed(1)}% margin</p>}
                           </div>
@@ -9448,18 +9446,18 @@ Leave a field as empty string if not present. Never fabricate values.`;
                             onClick={async e => {
                               e.stopPropagation();
                               if (!rec.id) return;
-                              const ok = window.confirm(`Delete GCI Quote?\n\nThis will delete:\n• GCI quote\n• quote items\n\nThis action cannot be undone.`);
+                              const ok = window.confirm(t('Delete GCI Quote?\n\nThis will delete:\n• GCI quote\n• quote items\n\nThis action cannot be undone.'));
                               if (!ok) return;
                               const success = await deleteQuotation(rec.id);
                               if (success) {
                                 setCloudHistory(prev => prev.filter(r => r.id !== rec.id));
                               } else {
-                                alert('Delete failed. Please try again.');
+                                alert(t('Delete failed. Please try again.'));
                               }
                             }}
                             className="shrink-0 px-3 py-3 rounded-[16px] text-[10px] font-black uppercase tracking-wider text-red-400 border border-red-200 hover:bg-red-50 transition-all"
                           >
-                            Delete
+                            {t('Delete')}
                           </button>
                           <ChevronRight className="w-5 h-5 text-[#080D1E]/20 group-hover:text-[#CBA85C] transition-colors shrink-0" />
                         </div>
@@ -9472,9 +9470,9 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 {quoteHistory.length > 0 && (
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-brand-brown/60">Custom Item Quotes</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-brand-brown/60">{t('Custom Item Quotes')}</span>
                       <div className="h-px flex-1 bg-brand-beige" />
-                      <span className="text-[9px] text-brand-brown/30 font-bold uppercase">Local · BOM</span>
+                      <span className="text-[9px] text-brand-brown/30 font-bold uppercase">{t('Local · BOM')}</span>
                     </div>
                     <div className="grid grid-cols-1 gap-3">
                       {quoteHistory.map(quote => (
@@ -9482,10 +9480,10 @@ Leave a field as empty string if not present. Never fabricate values.`;
                           <div className="flex-1 min-w-0">
                             <p className="text-[9px] font-bold text-brand-gold uppercase tracking-widest">{quote.date} · {quote.quoteNumber}</p>
                             <h3 className="text-base font-serif italic text-brand-brown truncate">{quote.customerProjectName || '未命名'}</h3>
-                            <p className="text-[10px] text-brand-brown-muted mt-0.5">{t(quote.category)} · {quote.salesperson || 'Staff'}</p>
+                            <p className="text-[10px] text-brand-brown-muted mt-0.5">{t(quote.category)} · {quote.salesperson || t('Staff')}</p>
                           </div>
                           <div className="text-right shrink-0">
-                            <span className="text-[9px] font-bold text-brand-brown-muted uppercase block">Total</span>
+                            <span className="text-[9px] font-bold text-brand-brown-muted uppercase block">{t('Total')}</span>
                             <span className="text-lg font-serif italic text-brand-brown">{quote.totalAmount.toLocaleString(undefined, {maximumFractionDigits:0})} AED</span>
                           </div>
                           <ChevronRight className="w-5 h-5 text-brand-gold/40 group-hover:text-brand-brown transition-colors shrink-0" />
@@ -9621,7 +9619,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
       
                 <div className="space-y-12">
                   <header className="space-y-3">
-                     <span className="text-[10px] font-bold text-brand-gold uppercase tracking-[0.4em]">Module Configuration</span>
+                     <span className="text-[10px] font-bold text-brand-gold uppercase tracking-[0.4em]">{t('Module Configuration')}</span>
                      <h2 className="text-4xl font-serif italic text-brand-brown">{t('Detailed Parameters')}</h2>
                   </header>
       
@@ -9648,7 +9646,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                           { label: t('Width Label'), key: 'width' },
                           { label: t('Depth Label'), key: 'depth' },
                           { label: t('Height Label'), key: 'height' },
-                          { label: 'Quantity 数量', key: 'quantity' }
+                          { label: t('Quantity'), key: 'quantity' }
                         ].map(field => (
                           <div key={field.key} className="space-y-2">
                              <span className="text-[9px] font-bold text-brand-gold/60 uppercase">{field.label}</span>
@@ -9875,7 +9873,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
           const { quoteCurrency, rate } = rateConfig;
           const isSameCurrency = supplierCur === quoteCurrency;
           const rateLabel = isSameCurrency
-            ? `No conversion needed — same currency`
+            ? t('No conversion needed — same currency')
             : `1 ${supplierCur} = ${rate} ${quoteCurrency}`;
           const exampleCost = pendingConversionItems[0]
             ? (((pendingConversionItems[0].originalUnitCost ?? pendingConversionItems[0].targetUnitPrice) * rate)).toFixed(2)
@@ -9889,20 +9887,20 @@ Leave a field as empty string if not present. Never fabricate values.`;
               <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-md mx-4 p-8 space-y-6">
                 {/* Header */}
                 <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.3em] text-[#C9A84C] mb-1">Step · Before Pricing</p>
-                  <h2 className="text-xl font-serif italic text-[#0C1B3A]">Currency & Exchange Rate</h2>
+                  <p className="text-[9px] font-black uppercase tracking-[0.3em] text-[#C9A84C] mb-1">{t('Step · Before Pricing')}</p>
+                  <h2 className="text-xl font-serif italic text-[#0C1B3A]">{t('Currency & Exchange Rate')}</h2>
                   <p className="text-[11px] text-[#0C1B3A]/50 mt-1">确认汇率后才能进入定价</p>
                 </div>
 
                 {/* Supplier currency (read-only) */}
                 <div className="bg-[#0C1B3A]/4 rounded-2xl p-4 space-y-1">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40">Supplier Original Currency 供应商币种</p>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Supplier Original Currency')}</p>
                   <p className="text-[18px] font-black text-[#0C1B3A]">{supplierCur}</p>
                 </div>
 
                 {/* GCI Quote Currency */}
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block">GCI Quote Currency 报价币种</label>
+                  <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block">{t('GCI Quote Currency')}</label>
                   <select
                     value={quoteCurrency}
                     onChange={e => {
@@ -9919,8 +9917,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 {/* Exchange Rate */}
                 <div className="space-y-1.5">
                   <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block">
-                    Exchange Rate 汇率
-                    {!isSameCurrency && <span className="ml-2 text-[#C9A84C] normal-case font-bold">· 可手动修改</span>}
+                    {t('Exchange Rate')}
+                    {!isSameCurrency && <span className="ml-2 text-[#C9A84C] normal-case font-bold">{t('Manually adjustable')}</span>}
                   </label>
                   {isSameCurrency ? (
                     <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-[13px] font-bold text-green-700">
@@ -9946,7 +9944,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 {/* Preview */}
                 {!isSameCurrency && pendingConversionItems.length > 0 && (
                   <div className="bg-[#C9A84C]/8 border border-[#C9A84C]/20 rounded-2xl px-4 py-3">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-[#C9A84C] mb-1">Preview · First Item</p>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-[#C9A84C] mb-1">{t('Preview · First Item')}</p>
                     <p className="text-[12px] text-[#0C1B3A] font-bold truncate">{pendingConversionItems[0].originalName}</p>
                     <p className="text-[11px] text-[#0C1B3A]/50 mt-0.5 font-mono">
                       {exampleOrig} {supplierCur} → <span className="text-[#0C1B3A] font-black">{exampleCost} {quoteCurrency}</span>
@@ -9960,13 +9958,13 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     onClick={() => setShowCurrencyModal(false)}
                     className="flex-1 py-3.5 rounded-[16px] border border-[#0C1B3A]/10 text-[12px] font-black uppercase tracking-widest text-[#0C1B3A]/50 hover:text-[#0C1B3A] transition-colors"
                   >
-                    Cancel
+                    {t('Cancel')}
                   </button>
                   <button
                     onClick={handleConfirmRate}
                     className="flex-1 px-8 py-3.5 rounded-[16px] bg-[#C9A84C] text-[#0C1B3A] text-[12px] font-black uppercase tracking-widest shadow-lg hover:bg-[#E8C96A] transition-all active:scale-95"
                   >
-                    Confirm & Enter Pricing →
+                    {t('Confirm & Enter Pricing →')}
                   </button>
                 </div>
               </div>
