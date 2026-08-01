@@ -1,56 +1,9 @@
 import React from 'react';
 import { Ruler, ShoppingCart, FileSearch } from 'lucide-react';
+import { useI18n } from '@gci/i18n';
 import { StepIndicator } from './StepIndicator';
 
 export type QuoteType = 'custom' | 'trade' | 'boq';
-
-interface TypeCard {
-  type: QuoteType;
-  icon: React.FC<{ className?: string }>;
-  title: string;
-  titleZh: string;
-  tag: string;
-  description: string;
-  descriptionZh: string;
-  examples: string[];
-  flow: string[];
-}
-
-const CARDS: TypeCard[] = [
-  {
-    type: 'custom',
-    icon: Ruler,
-    title: 'Custom Item Quote',
-    titleZh: '单品定制报价',
-    tag: 'Path 1',
-    description: 'Quote a single custom-made furniture item with full BOM & engineering calculation.',
-    descriptionZh: '为单一定制产品生成工程报价，含BOM材料计算',
-    examples: ['Sofa / 沙发', 'Bed / 床', 'Wardrobe / 衣柜', 'Table / 桌椅', 'TV Unit / 电视柜'],
-    flow: ['Configure item', 'BOM auto-calc', 'Set margin', 'PDF + Send to TRADE'],
-  },
-  {
-    type: 'trade',
-    icon: ShoppingCart,
-    title: 'Trade & Sourcing Quote',
-    titleZh: '贸易采购报价',
-    tag: 'Path 2',
-    description: 'Upload supplier costs, input your selling price, system calculates profit & VAT automatically.',
-    descriptionZh: '上传供应商报价，手工定价，系统自动计算利润',
-    examples: ['Furniture Projects / 家具项目', 'Tissue / 纸巾', 'Coffee / 咖啡', 'Sanitary / 卫生用品', 'Building Materials / 建材', 'AI Devices / AI设备'],
-    flow: ['Upload supplier quote', 'AI cost recognition', 'Input selling price', 'PDF + Send to TRADE'],
-  },
-  {
-    type: 'boq',
-    icon: FileSearch,
-    title: 'BOQ & AI Analysis',
-    titleZh: 'BOQ / 图纸 AI 分析',
-    tag: 'Path 3',
-    description: 'Upload BOQ, drawings or requirement PDFs. AI extracts item list — then route to Trade & Sourcing for pricing.',
-    descriptionZh: '上传BOQ/图纸/需求文件，AI提取清单，转入Trade报价流程',
-    examples: ['BOQ / 工程量清单', 'Drawings / 图纸', 'Project PDF', 'Requirement List / 需求清单'],
-    flow: ['Upload BOQ / drawing', 'AI item extraction', 'Review draft list', '→ Trade & Sourcing pricing'],
-  },
-];
 
 interface TypeSelectionProps {
   onSelect: (type: QuoteType) => void;
@@ -58,7 +11,17 @@ interface TypeSelectionProps {
   projectName: string;
 }
 
-export const TypeSelection: React.FC<TypeSelectionProps> = ({ onSelect, onBack, projectName }) => (
+export const TypeSelection: React.FC<TypeSelectionProps> = ({ onSelect, onBack, projectName }) => {
+  const { dict } = useI18n();
+  const s = dict.quotation.typeSelection;
+
+  const CARDS = [
+    { type: 'custom' as const, icon: Ruler, tag: 'Path 1', ...s.custom },
+    { type: 'trade' as const, icon: ShoppingCart, tag: 'Path 2', ...s.trade },
+    { type: 'boq' as const, icon: FileSearch, tag: 'Path 3', ...s.boq },
+  ];
+
+  return (
   <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
     <StepIndicator current={2} />
 
@@ -67,9 +30,9 @@ export const TypeSelection: React.FC<TypeSelectionProps> = ({ onSelect, onBack, 
       <p className="text-[10px] font-black uppercase tracking-[0.4em] text-[#CBA85C]" style={{ fontFamily: "'IBM Plex Mono',monospace" }}>
         {projectName}
       </p>
-      <h2 className="text-3xl font-semibold" style={{ fontFamily: "'Space Grotesk',sans-serif", color: '#080D1E' }}>Choose Quote Type</h2>
+      <h2 className="text-3xl font-semibold" style={{ fontFamily: "'Space Grotesk',sans-serif", color: '#080D1E' }}>{s.title}</h2>
       <p className="text-xs text-[#080D1E]/50 font-medium">
-        Select the path that matches your current task · 选择对应业务路径
+        {s.subtitle}
       </p>
     </div>
 
@@ -98,14 +61,11 @@ export const TypeSelection: React.FC<TypeSelectionProps> = ({ onSelect, onBack, 
               <h3 className="text-base font-semibold text-[#080D1E] leading-tight group-hover:text-[#CBA85C] transition-colors" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>
                 {card.title}
               </h3>
-              <p className="text-[10px] text-[#080D1E]/40 font-bold mt-0.5">{card.titleZh}</p>
             </div>
 
             {/* Description */}
             <p className="text-[11px] text-[#080D1E]/60 leading-relaxed flex-1">
               {card.description}
-              <br />
-              <span className="text-[#080D1E]/35">{card.descriptionZh}</span>
             </p>
 
             {/* Flow steps */}
@@ -132,7 +92,7 @@ export const TypeSelection: React.FC<TypeSelectionProps> = ({ onSelect, onBack, 
 
             {/* CTA */}
             <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-[#CBA85C] opacity-0 group-hover:opacity-100 transition-opacity">
-              Select → 进入
+              {s.select}
             </div>
           </button>
         );
@@ -145,8 +105,9 @@ export const TypeSelection: React.FC<TypeSelectionProps> = ({ onSelect, onBack, 
         onClick={onBack}
         className="text-[10px] font-black uppercase tracking-widest text-[#080D1E]/30 hover:text-[#080D1E] transition-colors flex items-center gap-2"
       >
-        ← Back to Project Info
+        {s.backToProjectInfo}
       </button>
     </div>
   </div>
-);
+  );
+};

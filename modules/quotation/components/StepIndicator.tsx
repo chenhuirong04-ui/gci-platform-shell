@@ -1,26 +1,28 @@
 import React from 'react';
+import { useI18n } from '@gci/i18n';
 
 export type QuoteType = 'custom' | 'package' | 'upload' | null;
 
 interface Step {
   id: number;
   label: string;
-  sublabel: string;
 }
-
-const STEPS: Step[] = [
-  { id: 1, label: 'Project Info',   sublabel: '项目信息' },
-  { id: 2, label: 'Quote Type',     sublabel: '选择路径' },
-  { id: 3, label: 'Cost Input',     sublabel: '录入成本' },
-  { id: 4, label: 'Review & Margin',sublabel: '调整利润' },
-  { id: 5, label: 'Send to TRADE',  sublabel: '发送报价' },
-];
 
 interface StepIndicatorProps {
   current: number; // 1–5
 }
 
-export const StepIndicator: React.FC<StepIndicatorProps> = ({ current }) => (
+export const StepIndicator: React.FC<StepIndicatorProps> = ({ current }) => {
+  const { dict } = useI18n();
+  const s = dict.quotation.steps;
+  const STEPS: Step[] = [
+    { id: 1, label: s.projectInfo },
+    { id: 2, label: s.quoteType },
+    { id: 3, label: s.costInput },
+    { id: 4, label: s.reviewMargin },
+    { id: 5, label: s.sendToTrade },
+  ];
+  return (
   <div className="w-full mb-8">
     <div className="flex items-center justify-center gap-0">
       {STEPS.map((step, idx) => {
@@ -43,9 +45,6 @@ export const StepIndicator: React.FC<StepIndicatorProps> = ({ current }) => (
                 <p className={`text-[9px] font-black uppercase tracking-wider leading-none ${active ? 'text-[#080D1E]' : done ? 'text-[#CBA85C]' : 'text-[#080D1E]/30'}`}>
                   {step.label}
                 </p>
-                <p className={`text-[8px] mt-0.5 ${active ? 'text-[#080D1E]/60' : 'text-[#080D1E]/20'}`}>
-                  {step.sublabel}
-                </p>
               </div>
             </div>
             {/* Connector */}
@@ -57,4 +56,5 @@ export const StepIndicator: React.FC<StepIndicatorProps> = ({ current }) => (
       })}
     </div>
   </div>
-);
+  );
+};

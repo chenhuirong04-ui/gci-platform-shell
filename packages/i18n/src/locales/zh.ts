@@ -690,4 +690,38 @@ export const zh: typeof en = {
       savedSuccess: '✅ 报价已存档！',
     },
   },
+
+  quotation: {
+    steps: {
+      projectInfo: '项目信息',
+      quoteType: '报价类型',
+      costInput: '成本录入',
+      reviewMargin: '审核与利润',
+      sendToTrade: '发送至贸易报价',
+    },
+    typeSelection: {
+      title: '选择报价类型',
+      subtitle: '选择最适合的报价流程',
+      select: '选择 →',
+      backToProjectInfo: '← 返回项目信息',
+      custom: {
+        title: '定制产品报价',
+        description: '为单一定制产品生成工程报价，含BOM材料计算',
+        examples: ['沙发', '床', '衣柜', '桌椅', '电视柜'],
+        flow: ['配置产品', 'BOM 自动计算', '设置利润', 'PDF + 发送至贸易报价'],
+      },
+      trade: {
+        title: '贸易采购报价',
+        description: '上传供应商报价，手工定价，系统自动计算利润',
+        examples: ['家具项目', '纸巾', '咖啡', '卫生用品', '建材', 'AI设备'],
+        flow: ['上传供应商报价', 'AI 成本识别', '输入销售价格', 'PDF + 发送至贸易报价'],
+      },
+      boq: {
+        title: 'BOQ 与 AI 分析',
+        description: '上传BOQ/图纸/需求文件，AI提取清单，转入Trade报价流程',
+        examples: ['工程量清单', '图纸', '项目 PDF', '需求清单'],
+        flow: ['上传 BOQ / 图纸', 'AI 提取清单', '审核草稿清单', '→ 转入贸易采购定价'],
+      },
+    },
+  },
 };

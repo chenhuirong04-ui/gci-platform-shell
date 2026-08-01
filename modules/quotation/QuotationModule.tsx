@@ -76,6 +76,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label = 'Request'): Pro
 }
 import * as XLSX from 'xlsx';
 import { translations, Language } from './translations';
+import { useI18n } from '@gci/i18n';
 import { StepIndicator } from './components/StepIndicator';
 import { TypeSelection, QuoteType } from './components/TypeSelection';
 import { saveQuotation, updateQuotation, loadByQuoteNo, listQuotations, markSentToTrade, deleteQuotation, QuotationItem, QuotationRecord } from './lib/quotationCloud';
@@ -287,6 +288,7 @@ interface QuotationModuleProps {
 }
 
 export default function QuotationModule({ initialMode, initialView }: QuotationModuleProps = {}) {
+  const { lang } = useI18n();
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<FurnitureCategory | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
@@ -458,7 +460,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     vatPercent: DEFAULT_PRICES.vatPercent,
   });
 
-  const language: Language = 'bilingual'; // Fixed UI language
+  const language: Language = lang; // Operational UI language — follows the app's EN/中文 toggle
 
   const generateQuoteNumber = (history: QuoteRecord[]) => {
     const today = new Date();
@@ -764,11 +766,11 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   const saveToHistory = () => {
     if (!selectedCategory) return;
     if (!quoteInfo.customerProjectName) {
-      alert('请输入客户/项目名称 Please enter Customer / Project Name');
+      alert(t('Please enter Customer / Project Name'));
       return;
     }
-    
-    const currentConfig = 
+
+    const currentConfig =
       selectedCategory === FurnitureCategory.BED ? config :
       selectedCategory === FurnitureCategory.SOFA ? sofaConfig :
       selectedCategory === FurnitureCategory.CHAIR ? chairConfig :
@@ -791,7 +793,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     const updated = [newRecord, ...quoteHistory];
     setQuoteHistory(updated);
     localStorage.setItem('gci_quote_history', JSON.stringify(updated));
-    alert('报价已保存至历史记录 Saved to history');
+    alert(t('Saved to history'));
   };
 
   // ── Cloud Save / Load ────────────────────────────────────────────────────
@@ -3408,7 +3410,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
   const sendToTrade = () => {
     if (!quoteInfo.customerProjectName) {
-      alert('请先填写客户/项目名称 Please enter Customer / Project Name');
+      alert(t('Please enter Customer / Project Name'));
       return;
     }
     const isPackage = quoteMode === 'package';
@@ -4095,7 +4097,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   };
 
   const t = (key: string) => {
-    return translations.bilingual[key] || translations.en[key] || key;
+    return translations[language]?.[key] || translations.en[key] || translations.bilingual[key] || key;
   };
 
   const tPDF = (key: string) => {
@@ -6091,8 +6093,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
     const grandTotal = totalSelling + totalVAT;
 
     const handleSendTradeToTrade = () => {
-      if (!quoteInfo.customerProjectName) { alert('请填写客户/项目名称'); return; }
-      if (totalSelling <= 0) { alert('请先输入销售价格'); return; }
+      if (!quoteInfo.customerProjectName) { alert(t('Please enter Customer / Project Name')); return; }
+      if (totalSelling <= 0) { alert(t('Please enter selling price')); return; }
       const payload = {
         customerName: quoteInfo.customerProjectName,
         projectName: quoteInfo.customerProjectName,
@@ -6357,13 +6359,13 @@ Leave a field as empty string if not present. Never fabricate values.`;
         {/* Step 5: Generate GCI Quote */}
         <div className="flex items-center gap-2 justify-center">
           <div className="h-px flex-1 bg-[#0C1B3A]/8" />
-          <span className="text-[8px] font-black uppercase tracking-[0.3em] text-[#C9A84C] px-3">Step 5 · Generate GCI Quote</span>
+          <span className="text-[8px] font-black uppercase tracking-[0.3em] text-[#C9A84C] px-3">{t('Step 5 · Generate GCI Quote')}</span>
           <div className="h-px flex-1 bg-[#0C1B3A]/8" />
         </div>
         <div className="flex justify-center">
           <button
             onClick={() => {
-              if (totalSelling <= 0) { alert('请先为所有品项输入销售价格 Please enter selling prices first'); return; }
+              if (totalSelling <= 0) { alert(t('Please enter selling prices first')); return; }
               setQuoteGenerated(true);
               // Auto-save to cloud on generate
               handleSaveToCloud(confirmed, { totalSupplierCost, totalSelling, totalProfit, overallMargin, totalVAT, grandTotal });
@@ -7540,7 +7542,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       onClick={() => {
                         const confirmed = draftItems.filter(it => it.status === 'Confirmed');
                         if (confirmed.length === 0) {
-                          alert('请先确认至少一个品项 Please confirm at least one item first');
+                          alert(t('Please confirm at least one item first'));
                           return;
                         }
                         setTradePhase('pricing');
@@ -7934,7 +7936,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
             {/* Step 5 marker — final action row */}
             <div className="flex items-center gap-2 justify-center mb-3">
               <div className="h-px flex-1 bg-[#0C1B3A]/8" />
-              <span className="text-[8px] font-black uppercase tracking-[0.3em] text-[#C9A84C] px-3">Step 5 · Final Actions</span>
+              <span className="text-[8px] font-black uppercase tracking-[0.3em] text-[#C9A84C] px-3">{t('Step 5 · Final Actions')}</span>
               <div className="h-px flex-1 bg-[#0C1B3A]/8" />
             </div>
 
