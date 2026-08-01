@@ -276,6 +276,10 @@ export const zh: typeof en = {
       active: '正常', inactive: '停用', blacklisted: '黑名单',
       under_review: '审核中', archived: '封存',
     },
+    supplierType: {
+      Factory: '工厂', Trading: '贸易商', Integrated: '工贸一体',
+      Service: '服务商', Agent: '代理商', Unknown: '未知',
+    },
     docStatus: {
       unverified: '未核实', verified: '已核实', rejected: '已拒绝', pending_reupload: '待重传',
     },

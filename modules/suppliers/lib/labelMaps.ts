@@ -3,7 +3,7 @@
 // Language must be passed explicitly from APP context (useI18n().lang).
 
 import { dictionaries, type Lang } from '@gci/i18n';
-import type { SupplierStatus, DocumentType } from '../types';
+import type { SupplierStatus, SupplierType, DocumentType } from '../types';
 import type { DocumentVerificationStatus, CertificationStatus } from '../types';
 
 // document_type is stored in Chinese (existing DB values) — display-only EN labels.
@@ -71,6 +71,11 @@ export function getCategoryLabel(value: string, lang: Lang): string {
 /** Translate a supplier status DB value using the APP's current language. */
 export function getStatusLabel(value: string, lang: Lang): string {
   return dictionaries[lang].suppliers.status[value as SupplierStatus] ?? value;
+}
+
+/** Translate a supplier_type DB value using the APP's current language. */
+export function getSupplierTypeLabel(value: string, lang: Lang): string {
+  return dictionaries[lang].suppliers.supplierType[value as SupplierType] ?? value;
 }
 
 /** Translate a document verification status DB value using the APP's current language. */

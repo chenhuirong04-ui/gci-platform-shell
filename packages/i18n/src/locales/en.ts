@@ -275,6 +275,10 @@ export const en = {
       active: 'Active', inactive: 'Inactive', blacklisted: 'Blacklisted',
       under_review: 'Under Review', archived: 'Archived',
     },
+    supplierType: {
+      Factory: 'Factory', Trading: 'Trading', Integrated: 'Integrated',
+      Service: 'Service', Agent: 'Agent', Unknown: 'Unknown',
+    },
     docStatus: {
       unverified: 'Unverified', verified: 'Verified', rejected: 'Rejected', pending_reupload: 'Pending Re-upload',
     },

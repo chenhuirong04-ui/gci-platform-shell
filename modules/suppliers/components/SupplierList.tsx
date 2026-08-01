@@ -5,7 +5,7 @@ import {
   listSuppliersPage, searchSuppliersPage, listFilterOptions,
   type PagedSuppliers,
 } from '../lib/suppliersCloud';
-import { getCountryLabel, getCategoryLabel, getStatusLabel } from '../lib/labelMaps';
+import { getCountryLabel, getCategoryLabel, getStatusLabel, getSupplierTypeLabel } from '../lib/labelMaps';
 
 const GOLD = '#C9A84C';
 const NAVY = '#0c1b3a';
@@ -112,7 +112,7 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
           style={{ flex: 1, minWidth: 200, padding: '9px 14px', borderRadius: 10, border: `1.5px solid #b0bec5`, fontSize: 14, color: NAVY, outline: 'none', background: '#fff' }}
         />
         <Sel value={filters.supplier_type} onChange={v => filt('supplier_type', v)} placeholder={t.allTypes}>
-          {SUPPLIER_TYPES.map(ty => <option key={ty} value={ty}>{ty}</option>)}
+          {SUPPLIER_TYPES.map(ty => <option key={ty} value={ty}>{getSupplierTypeLabel(ty, lang)}</option>)}
         </Sel>
         <Sel value={filters.country} onChange={v => filt('country', v)} placeholder={t.allCountries}>
           {filterOptions.countries.map(c => <option key={c} value={c}>{getCountryLabel(c, lang)}</option>)}
@@ -201,7 +201,7 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
                           )}
                         </td>
                         <td style={{ padding: '13px 14px', color: '#64748b', fontSize: 12 }}>{s.short_code}</td>
-                        <td style={{ padding: '13px 14px', color: '#475569' }}>{s.supplier_type || dict.suppliers.common.notSet}</td>
+                        <td style={{ padding: '13px 14px', color: '#475569' }}>{s.supplier_type ? getSupplierTypeLabel(s.supplier_type, lang) : dict.suppliers.common.notSet}</td>
                         <td style={{ padding: '13px 14px', color: '#475569' }}>{s.country || dict.suppliers.common.notSet}</td>
                         <td style={{ padding: '13px 14px' }}>
                           <span style={{ fontWeight: 800, color: RATING_COLOR[s.current_rating ?? 'B'] ?? '#475569' }}>{s.current_rating || dict.suppliers.common.notSet}</span>

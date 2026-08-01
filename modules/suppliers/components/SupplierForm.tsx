@@ -3,7 +3,7 @@ import { useI18n } from '@gci/i18n';
 import type { Supplier, SupplierType, SupplierStatus, SupplierRating, DocumentType } from '../types';
 import { createSupplier, generateShortCode, updateSupplier } from '../lib/suppliersCloud';
 import { createDocument, moveStorageFile, resolveStorageBucket } from '../lib/documentsCloud';
-import { getStatusLabel, getDocTypeLabel } from '../lib/labelMaps';
+import { getStatusLabel, getDocTypeLabel, getSupplierTypeLabel } from '../lib/labelMaps';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const GOLD    = '#C9A84C';
@@ -558,7 +558,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
               <div style={R3}>
                 <FLD label={t.fSupplierType}>
                   <select style={SEL} value={form.supplier_type} onChange={e => setF('supplier_type', e.target.value as SupplierType)}>
-                    {TYPES.map(ty => <option key={ty} value={ty}>{ty}</option>)}
+                    {TYPES.map(ty => <option key={ty} value={ty}>{getSupplierTypeLabel(ty, lang)}</option>)}
                   </select>
                 </FLD>
                 <FLD label={t.fCategories} ai={aiFilledKeys.has('categoriesRaw')}>

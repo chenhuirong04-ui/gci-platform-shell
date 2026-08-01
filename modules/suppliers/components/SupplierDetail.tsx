@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useI18n } from '@gci/i18n';
 import type { Supplier } from '../types';
 import { getSupplier } from '../lib/suppliersCloud';
-import { getStatusLabel } from '../lib/labelMaps';
+import { getStatusLabel, getSupplierTypeLabel } from '../lib/labelMaps';
 import ContactManager from './ContactManager';
 import ProductManager from './ProductManager';
 import ServiceManager from './ServiceManager';
@@ -90,7 +90,7 @@ export default function SupplierDetail({ supplierId, onBack, onEdit }: Props) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
                   <h1 translate="no" className="notranslate" style={{ fontSize: 22, fontWeight: 800, color: NAVY, margin: 0 }}>{supplier.supplier_name_display}</h1>
                   {supplier.is_preferred && <span style={{ fontSize: 16 }} title={t.preferredTitle}>⭐</span>}
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: NAVY + '14', color: NAVY }}>{supplier.supplier_type ?? dict.suppliers.common.notSet}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: NAVY + '14', color: NAVY }}>{supplier.supplier_type ? getSupplierTypeLabel(supplier.supplier_type, lang) : dict.suppliers.common.notSet}</span>
                   <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: statusStyle.bg, color: statusStyle.text }}>
                     {getStatusLabel(supplier.status ?? 'active', lang)}
                   </span>
