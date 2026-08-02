@@ -760,6 +760,11 @@ export const en = {
       unitCountPct: '{n} · {pct}%',
       todayActionCenterTitle: "Today's Action Center",
     },
+    actionCenter: {
+      generateSuggestions: 'Generate AI Suggestions',
+      aiDraftBadge: 'AI Draft · Review Required',
+      notGeneratedHint: 'AI suggestions not generated yet.',
+    },
     sync: {
       lastSynced: 'Last synced',
       justNow: 'Just now',

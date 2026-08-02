@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Brain, AlertTriangle, Clock, MessageSquare,
   Copy, Check, RefreshCw, X, Zap, Sparkles,
@@ -6,6 +6,7 @@ import {
   Bot, Shield, Cpu, PauseCircle,
 } from 'lucide-react';
 import { colors, statusMap, type StatusKey, Card, Badge, SectionHeader } from '@gci/design-system';
+import { useI18n } from '@gci/i18n';
 import { FollowUpTask, Project } from '../types';
 import { getTaskBusinessId } from '../utils/businessId';
 import { GoogleGenAI } from '@google/genai';
@@ -752,6 +753,9 @@ function AISummaryCard({
   onExpand: () => void;
   onRefresh: () => void;
 }) {
+  const { dict } = useI18n();
+  const at = dict.crm.actionCenter;
+  const hasRun = aiLoading || !!aiError || !!aiResult;
   const suggestions = aiResult
     ? (aiResult.actions || []).slice(0, 3).map(a => a.title || a.reason).filter(Boolean)
     : aiError
@@ -777,7 +781,7 @@ function AISummaryCard({
           <span className="text-[13px] font-black" style={{ color: LIGHT_TEXT }}>OpenAI 智能建议</span>
           {!aiLoading && !aiError && aiResult && (
             <span className="text-[10px] font-black px-1.5 py-0.5 rounded"
-              style={{ background: 'rgba(111,191,142,0.15)', color: '#6FBF8E' }}>GPT-4o</span>
+              style={{ background: 'rgba(212,168,67,0.15)', color: GOLD_ACCENT }}>{at.aiDraftBadge}</span>
           )}
           {aiError && (
             <span className="text-[10px] font-black px-1.5 py-0.5 rounded"
@@ -786,9 +790,9 @@ function AISummaryCard({
         </div>
         <button onClick={e => { e.stopPropagation(); onRefresh(); }} disabled={aiLoading}
           className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-bold disabled:opacity-40 transition-colors"
-          style={{ border: `1px solid ${DARK_BORDER}`, color: MUTED_LIGHT }}>
+          style={{ border: `1px solid ${hasRun ? DARK_BORDER : GOLD_ACCENT + '60'}`, color: hasRun ? MUTED_LIGHT : GOLD_ACCENT }}>
           <RefreshCw className={`w-3 h-3 ${aiLoading ? 'animate-spin' : ''}`} />
-          {aiLoading ? '分析中' : '刷新'}
+          {aiLoading ? '分析中' : hasRun ? '刷新' : at.generateSuggestions}
         </button>
       </div>
 
@@ -812,7 +816,7 @@ function AISummaryCard({
       )}
 
       {!aiLoading && suggestions.length === 0 && (
-        <p className="text-[13px] py-1" style={{ color: MUTED_LIGHT }}>等待数据加载后自动分析…</p>
+        <p className="text-[13px] py-1" style={{ color: MUTED_LIGHT }}>{hasRun ? '暂无更多建议' : at.notGeneratedHint}</p>
       )}
 
       {/* Footer */}
@@ -855,7 +859,6 @@ export default function ActionCenter({ tasks, projects, followupTasks, pausedTas
   const [aiResult, setAiResult]   = useState<GPTResult | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError]     = useState('');
-  const [aiCalled, setAiCalled]   = useState(false);
 
   // Use pre-filtered followupTasks when available (= dashboardStats.todayFollowups).
   // Fall back to full task list filtered for active status only (standalone use).
@@ -896,10 +899,8 @@ export default function ActionCenter({ tasks, projects, followupTasks, pausedTas
     } finally { setAiLoading(false); }
   };
 
-  useEffect(() => {
-    if (!aiCalled && activeTasks.length > 0) { setAiCalled(true); callGPT(); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTasks.length]);
+  // AI suggestions are opt-in only — no auto-call on mount. User must click
+  // "Generate AI Suggestions" (AISummaryCard) to trigger callGPT().
 
   const handleOpen = (item: ActionItem) => {
     if (item.task) { onSelectTask(item.task); return; }

@@ -761,6 +761,11 @@ export const zh: typeof en = {
       unitCountPct: '{n} 个 · {pct}%',
       todayActionCenterTitle: '今日行动中心',
     },
+    actionCenter: {
+      generateSuggestions: '生成AI建议',
+      aiDraftBadge: 'AI草稿 · 需人工确认',
+      notGeneratedHint: 'AI建议尚未生成。',
+    },
     sync: {
       lastSynced: '最后同步',
       justNow: '刚刚',
