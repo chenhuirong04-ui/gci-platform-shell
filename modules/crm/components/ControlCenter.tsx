@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Calendar, AlertTriangle, Briefcase,
-  ChevronRight, TrendingUp, Activity
+  ChevronRight, TrendingUp, Activity, Users, MessageSquare, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { PageHeader, StatCard } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
@@ -126,6 +126,57 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
     (t as any).notionSource !== 'contact_only'
   );
 
+  // ── Business Overview stats (V1) — reuses the same non-deleted task set;
+  // "客户总数" groups by contactKey (falling back to clientName), matching
+  // the exact identity logic CustomerDirectory.tsx uses, so the two numbers
+  // stay consistent with each other.
+  const [actionCenterOpen, setActionCenterOpen] = useState(false);
+  const overview = useMemo(() => {
+    const nonDeleted = tasks.filter(t => t.status !== 'deleted');
+    const daysAgo = (iso: string) => {
+      if (!iso) return Infinity;
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return Infinity;
+      return Math.round((Date.now() - d.getTime()) / 86400000);
+    };
+    const customerGroups = new Map<string, string>();
+    for (const t of nonDeleted) {
+      const key = (t.contactKey || '').trim().toLowerCase() || (t.clientName || '').trim().toLowerCase() || t.id;
+      if (!customerGroups.has(key)) customerGroups.set(key, key);
+    }
+    return {
+      customers: customerGroups.size,
+      new7: nonDeleted.filter(t => daysAgo(t.createdAt) <= 7).length,
+      active30: nonDeleted.filter(t => daysAgo(t.updatedAt || t.createdAt) <= 30 && t.status !== 'archived').length,
+      quoting: nonDeleted.filter(t => t.tradeStatus === '待报价' && t.status !== 'archived').length,
+      archived: nonDeleted.filter(t => t.status === 'archived').length,
+      // Most recently updated businesses / customers / communications, for
+      // the three "recent activity" lists below.
+      recentBusinesses: [...nonDeleted]
+        .filter(t => t.status !== 'archived')
+        .sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''))
+        .slice(0, 4),
+      recentCustomers: (() => {
+        const firstSeen = new Map<string, FollowUpTask>();
+        for (const t of nonDeleted) {
+          const key = (t.contactKey || '').trim().toLowerCase() || (t.clientName || '').trim().toLowerCase() || t.id;
+          const existing = firstSeen.get(key);
+          if (!existing || (t.createdAt || '') < (existing.createdAt || '')) firstSeen.set(key, t);
+        }
+        return [...firstSeen.values()].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')).slice(0, 4);
+      })(),
+      recentComms: (() => {
+        const flat: { task: FollowUpTask; timestamp: string; message: string }[] = [];
+        for (const t of nonDeleted) {
+          for (const h of (t.history || [])) {
+            if (h?.timestamp && h?.message) flat.push({ task: t, timestamp: h.timestamp, message: h.message });
+          }
+        }
+        return flat.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 4);
+      })(),
+    };
+  }, [tasks]);
+
   const nowLabel = new Date().toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US', {
     year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
   });
@@ -136,7 +187,77 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
       {/* Header — shared PageHeader (GCI Design System V1 pilot) */}
       <PageHeader title={ct.pageTitle} eyebrow={nowLabel} />
 
-      {/* Stats row — shared StatCard (GCI Design System V1 pilot) */}
+      {/* Business Overview stats (V1) — asset-first framing: how many
+          customers/businesses exist and what changed recently, ahead of the
+          task-oriented KPIs below. */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
+          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewCustomers}</div>
+          <div className="text-2xl font-black mt-1" style={{ color: T1 }}>{overview.customers}</div>
+        </div>
+        <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
+          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewBusinesses}</div>
+          <div className="text-2xl font-black mt-1" style={{ color: T1 }}>{dashboardStats.totalBusinesses}</div>
+        </div>
+        <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
+          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewNew7}</div>
+          <div className="text-2xl font-black mt-1" style={{ color: GOLD }}>{overview.new7}</div>
+        </div>
+        <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
+          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewActive30}</div>
+          <div className="text-2xl font-black mt-1" style={{ color: GOLD }}>{overview.active30}</div>
+        </div>
+        <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
+          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.projectBased}</div>
+          <div className="text-2xl font-black mt-1" style={{ color: '#8FA6D4' }}>{dashboardStats.totalProjects}</div>
+        </div>
+        <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
+          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.trading}</div>
+          <div className="text-2xl font-black mt-1" style={{ color: GOLD }}>{dashboardStats.totalTrades}</div>
+        </div>
+        <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
+          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewQuoting}</div>
+          <div className="text-2xl font-black mt-1" style={{ color: '#D9B45A' }}>{overview.quoting}</div>
+        </div>
+        <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
+          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewExecuting}</div>
+          <div className="text-2xl font-black mt-1" style={{ color: '#6FBF8E' }}>{dashboardStats.executingBusinessesCount}</div>
+        </div>
+        <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
+          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewArchived}</div>
+          <div className="text-2xl font-black mt-1" style={{ color: T2 }}>{overview.archived}</div>
+        </div>
+      </div>
+
+      {/* Recent activity — three compact lists so "最近有多少项目/客户/沟通"
+          is answerable at a glance without opening another tab. */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="rounded-[18px] border p-5 shadow-sm" style={{ backgroundColor: CARD, borderColor: BORDER }}>
+          <SectionHeader icon={<Briefcase className="w-4 h-4" />} title={ct.recentBusinessesTitle} />
+          {overview.recentBusinesses.length === 0
+            ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{ct.noRecentItems}</div>
+            : overview.recentBusinesses.map(t => <TaskRow key={t.id} task={t} onClick={() => onSelectTask(t)} />)}
+        </div>
+        <div className="rounded-[18px] border p-5 shadow-sm" style={{ backgroundColor: CARD, borderColor: BORDER }}>
+          <SectionHeader icon={<Users className="w-4 h-4" />} title={ct.recentCustomersTitle} />
+          {overview.recentCustomers.length === 0
+            ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{ct.noRecentItems}</div>
+            : overview.recentCustomers.map(t => <TaskRow key={t.id} task={t} onClick={() => onSelectTask(t)} />)}
+        </div>
+        <div className="rounded-[18px] border p-5 shadow-sm" style={{ backgroundColor: CARD, borderColor: BORDER }}>
+          <SectionHeader icon={<MessageSquare className="w-4 h-4" />} title={ct.recentCommsTitle} />
+          {overview.recentComms.length === 0
+            ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{ct.noRecentItems}</div>
+            : overview.recentComms.map((c, i) => (
+                <div key={i} className="px-3 py-2.5 rounded-xl mb-2" style={{ background: CARD2, border: `1px solid ${BORDER}` }}>
+                  <div className="text-xs font-black truncate" style={{ color: T1 }}>{c.task.clientName}</div>
+                  <div className="text-[11px] truncate mt-0.5" style={{ color: T2 }}>{c.message}</div>
+                </div>
+              ))}
+        </div>
+      </div>
+
+      {/* Task-oriented KPIs — kept, but now secondary to the overview above */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard icon={<Calendar className="w-5 h-5" />}      label={ct.kpiFollowupsToday} value={todayFollowupCount === null ? null : dashboardStats.todayFollowupCount} color="#8FA6D4" />
         <StatCard icon={<TrendingUp className="w-5 h-5" />}    label={ct.kpiHighPriority}   value={dashboardStats.highPriorityCount}       color={GOLD} />
@@ -275,22 +396,32 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
         </div>
       </div>
 
-      {/* 今日行动中心 — 替换原"快捷操作" */}
+      {/* 今日行动中心 — secondary/optional, collapsed by default. Not the
+          page's core focus anymore; AI suggestions inside stay manually
+          triggered (unchanged from the earlier opt-in batch). */}
       <div>
-        <div className="flex items-center gap-2 mb-4">
-          <Activity className="w-4 h-4" style={{ color: GOLD }} />
-          <h2 className="font-mono-label text-sm font-black uppercase tracking-widest" style={{ color: T1 }}>
-            {ct.todayActionCenterTitle} · AI Action Center
-          </h2>
-        </div>
-        <ActionCenter
-          tasks={tasks}
-          projects={projects}
-          followupTasks={dashboardStats.todayFollowups}
-          pausedTasks={dashboardStats.actionCenterGroups.paused}
-          onSelectTask={onSelectTask}
-          onTabSwitch={onTabSwitch}
-        />
+        <button
+          onClick={() => setActionCenterOpen(v => !v)}
+          className="w-full flex items-center justify-between gap-2 mb-4 px-1 py-1"
+        >
+          <span className="flex items-center gap-2">
+            <Activity className="w-4 h-4" style={{ color: GOLD }} />
+            <h2 className="font-mono-label text-sm font-black uppercase tracking-widest" style={{ color: T1 }}>
+              {ct.todayActionCenterTitle} · AI Action Center
+            </h2>
+          </span>
+          {actionCenterOpen ? <ChevronUp className="w-4 h-4" style={{ color: T2 }} /> : <ChevronDown className="w-4 h-4" style={{ color: T2 }} />}
+        </button>
+        {actionCenterOpen && (
+          <ActionCenter
+            tasks={tasks}
+            projects={projects}
+            followupTasks={dashboardStats.todayFollowups}
+            pausedTasks={dashboardStats.actionCenterGroups.paused}
+            onSelectTask={onSelectTask}
+            onTabSwitch={onTabSwitch}
+          />
+        )}
       </div>
 
     </div>
