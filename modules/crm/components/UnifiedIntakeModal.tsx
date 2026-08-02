@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Sparkles, PenLine, Users, Search, ChevronRight } from 'lucide-react';
 import type { FollowUpTask, Project } from '../types';
 import AIIntakePanel from './AIIntakePanel';
@@ -130,7 +131,13 @@ export default function UnifiedIntakeModal({
     setMode('manual');
   };
 
-  return (
+  // Rendered via a portal straight to <body> — CrmModule's tree has an
+  // ancestor with a CSS transform somewhere above this component, which
+  // turns that ancestor into the containing block for `position: fixed`
+  // descendants (a standard CSS behavior), so without the portal this
+  // overlay renders at that ancestor's scroll position instead of centered
+  // in the viewport.
+  return createPortal(
     <div className="fixed inset-0 z-[500] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
       <div className="w-full max-w-2xl max-h-[88vh] rounded-3xl overflow-hidden flex flex-col" style={{ background: '#0A1628', border: `1px solid ${BORDER}` }}>
         <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
@@ -294,6 +301,7 @@ export default function UnifiedIntakeModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
