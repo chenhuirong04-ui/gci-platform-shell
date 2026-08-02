@@ -92,12 +92,37 @@ export const en = {
     heroPlaceholder: "Ask GCI...  e.g. create an invoice / create a quotation / generate today's brief",
     cmdPrefix: 'Help me ',
 
+    greeting: {
+      morning: 'Good Morning',
+      afternoon: 'Good Afternoon',
+      evening: 'Good Evening',
+      prompt: 'What would you like GCI to do today?',
+    },
+
+    tabLabels: {
+      chat: 'AI Chat',
+      assistant: 'AI Assistant',
+      agent: 'AI Agent',
+      daily: "Today's Workspace",
+      workflow: 'AI Workflow',
+      inbox: 'AI Inbox',
+    },
+
+    statusLabels: {
+      mock: 'MOCK',
+      soon: 'COMING SOON',
+      live: 'LIVE',
+    },
+
     chat: {
       sectionLabel: 'AI Chat — Query only, no data modification',
       description: 'Ask GCI any question. AI will query existing data and answer.',
       descriptionBold: 'Read-only, no data changes.',
       placeholder: "Ask GCI anything...  e.g. Which customers need follow-up today?",
       quickLabel: 'Quick Questions',
+      usageHint: 'Use the Ask GCI input above to send any instruction. AI will identify your intent and route it to the correct function.',
+      continueAsking: 'Continue asking…',
+      continueAskingPlaceholder: 'Continue asking GCI…',
       suggestions: [
         "What are today's priorities?",
         'Which quotations have not replied?',
@@ -221,6 +246,7 @@ export const en = {
       edit: 'Edit',
       cancel: 'Cancel',
       close: 'Close',
+      orContinueAskingHint: '— or continue asking in the input above',
     },
 
     invoice: {

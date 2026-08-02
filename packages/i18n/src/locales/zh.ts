@@ -93,12 +93,37 @@ export const zh: typeof en = {
     heroPlaceholder: 'Ask GCI...  帮我做一张发票 / 帮我创建报价 / 生成今日简报',
     cmdPrefix: '帮我',
 
+    greeting: {
+      morning: '早上好',
+      afternoon: '下午好',
+      evening: '晚上好',
+      prompt: '今天想让 GCI 帮你做什么？',
+    },
+
+    tabLabels: {
+      chat: 'AI 对话',
+      assistant: 'AI 助手',
+      agent: 'AI 智能体',
+      daily: '今日工作台',
+      workflow: 'AI 工作流',
+      inbox: 'AI 收件箱',
+    },
+
+    statusLabels: {
+      mock: '演示',
+      soon: '即将上线',
+      live: 'LIVE',
+    },
+
     chat: {
       sectionLabel: 'AI 对话 — 仅查询，不修改数据',
       description: '直接问 GCI 任何问题，AI 从现有数据中查询并回答。',
       descriptionBold: '只读，不修改任何数据。',
       placeholder: '问 GCI 任何问题...  e.g. 今天有哪些逾期跟进？',
       quickLabel: '快捷提问',
+      usageHint: '使用上方 Ask GCI 输入框发送任意指令，AI 会识别你的意图并路由到正确功能。',
+      continueAsking: '继续追问…',
+      continueAskingPlaceholder: '继续追问 GCI…',
       suggestions: [
         '今天有什么重要事情？',
         '哪些报价还没有回复？',
@@ -222,6 +247,7 @@ export const zh: typeof en = {
       edit: '编辑',
       cancel: '取消',
       close: '关闭',
+      orContinueAskingHint: '— 或在顶部输入框继续追问',
     },
 
     invoice: {

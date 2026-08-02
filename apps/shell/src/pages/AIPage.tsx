@@ -200,21 +200,28 @@ const MUTED = '#8A97B0';   // lifted for readability — was #505A70
 const SUBTLE = '#5A6A84';  // was #3A4255, invisible on dark bg
 
 type TabKey = 'chat' | 'assistant' | 'agent' | 'daily' | 'workflow' | 'inbox';
+const TAB_KEYS: TabKey[] = ['chat', 'assistant', 'agent', 'daily', 'workflow', 'inbox'];
 
-const TABS: { key: TabKey; label: string; icon: string; status: 'mock' | 'soon' | 'live' }[] = [
-  { key: 'chat',      label: 'AI Chat',      icon: '💬', status: 'mock' },
-  { key: 'assistant', label: 'AI Assistant', icon: '⚡', status: 'mock' },
-  { key: 'agent',     label: 'AI Agent',     icon: '🤖', status: 'soon' },
-  { key: 'daily',     label: '今日工作台',    icon: '📋', status: 'live' },
-  { key: 'workflow',  label: 'AI Workflow',  icon: '🔄', status: 'soon' },
-  { key: 'inbox',     label: 'AI Inbox',     icon: '📥', status: 'mock' },
-];
+// Display-only — tab labels and status badge text follow the app language;
+// the TabKey values and 'mock'/'soon'/'live' status values never change.
+function getTabs(dict: ReturnType<typeof useI18n>['dict']): { key: TabKey; label: string; icon: string; status: 'mock' | 'soon' | 'live' }[] {
+  return [
+    { key: 'chat',      label: dict.ai.tabLabels.chat,      icon: '💬', status: 'mock' },
+    { key: 'assistant', label: dict.ai.tabLabels.assistant, icon: '⚡', status: 'mock' },
+    { key: 'agent',     label: dict.ai.tabLabels.agent,     icon: '🤖', status: 'soon' },
+    { key: 'daily',     label: dict.ai.tabLabels.daily,     icon: '📋', status: 'live' },
+    { key: 'workflow',  label: dict.ai.tabLabels.workflow,  icon: '🔄', status: 'soon' },
+    { key: 'inbox',     label: dict.ai.tabLabels.inbox,     icon: '📥', status: 'mock' },
+  ];
+}
 
-const STATUS_STYLES: Record<string, { label: string; color: string; bg: string }> = {
-  mock: { label: 'MOCK',        color: '#D4A843', bg: 'rgba(212,168,67,0.12)' },
-  soon: { label: 'COMING SOON', color: MUTED,     bg: 'rgba(255,255,255,0.05)' },
-  live: { label: 'LIVE',        color: '#6FBF8E', bg: 'rgba(111,191,142,0.12)' },
-};
+function getStatusStyles(dict: ReturnType<typeof useI18n>['dict']): Record<string, { label: string; color: string; bg: string }> {
+  return {
+    mock: { label: dict.ai.statusLabels.mock, color: '#D4A843', bg: 'rgba(212,168,67,0.12)' },
+    soon: { label: dict.ai.statusLabels.soon, color: MUTED,     bg: 'rgba(255,255,255,0.05)' },
+    live: { label: dict.ai.statusLabels.live, color: '#6FBF8E', bg: 'rgba(111,191,142,0.12)' },
+  };
+}
 
 // ── Command processing panel ──────────────────────────────────────────────────
 interface CmdState {
@@ -427,10 +434,7 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
     missing: dict.ai.panel.implMissing,
   };
 
-  const TAB_LABELS: Record<TabKey, string> = {
-    chat: 'AI Chat', assistant: 'AI Assistant', agent: 'AI Agent',
-    daily: 'AI Daily', workflow: 'AI Workflow', inbox: 'AI Inbox',
-  };
+  const TAB_LABELS: Record<TabKey, string> = dict.ai.tabLabels;
   const MODULE_COLORS: Record<string, string> = {
     CRM: '#5BA3C9', Quotation: GOLD, Trade: '#8FA6D4',
     Warehouse: '#D4A843', Finance: '#6FBF8E', 'AI Inbox': '#94A3B8',
@@ -2194,7 +2198,7 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
               <button onClick={onCancel} style={{ padding: '10px 18px', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>
                 {dict.ai.panel.close}
               </button>
-              <span style={{ fontSize: 12, color: SUBTLE }}>— 或在顶部输入框继续追问</span>
+              <span style={{ fontSize: 12, color: SUBTLE }}>{dict.ai.panel.orContinueAskingHint}</span>
             </div>
           )}
         </div>
@@ -2214,6 +2218,8 @@ function SectionLabel({ text }: { text: string }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const { dict } = useI18n();
+  const STATUS_STYLES = getStatusStyles(dict);
   const s = STATUS_STYLES[status] || STATUS_STYLES.soon;
   return (
     <span className="font-mono-label" style={{ fontSize: 9, letterSpacing: '0.14em', color: s.color, background: s.bg, borderRadius: 4, padding: '2px 7px' }}>
@@ -2285,7 +2291,9 @@ function AIChatTab({ onSubmit }: { onSubmit: (v: string) => void }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, padding: '10px 14px', background: 'rgba(203,168,92,0.06)', border: '1px solid rgba(203,168,92,0.15)', borderRadius: 10 }}>
         <span style={{ fontSize: 18 }}>⬆</span>
         <span style={{ fontSize: 13, color: MUTED }}>
-          使用上方 <strong style={{ color: GOLD_L }}>Ask GCI</strong> 输入框发送任意指令。AI 自动识别意图并路由到正确功能。
+          {dict.ai.chat.usageHint.split('Ask GCI').map((part, i, arr) => (
+            <span key={i}>{part}{i < arr.length - 1 && <strong style={{ color: GOLD_L }}>Ask GCI</strong>}</span>
+          ))}
         </span>
       </div>
 
@@ -2303,7 +2311,7 @@ function AIChatTab({ onSubmit }: { onSubmit: (v: string) => void }) {
           onClick={() => setShowFollowUp(true)}
           style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 9, color: SUBTLE, fontSize: 13, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
         >
-          <span style={{ fontSize: 14 }}>✎</span> 继续追问…
+          <span style={{ fontSize: 14 }}>✎</span> {dict.ai.chat.continueAsking}
         </button>
       ) : (
         <div style={{ position: 'relative', maxWidth: 560 }}>
@@ -2312,7 +2320,7 @@ function AIChatTab({ onSubmit }: { onSubmit: (v: string) => void }) {
             value={followUp}
             onChange={e => setFollowUp(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') submit(followUp); if (e.key === 'Escape') setShowFollowUp(false); }}
-            placeholder="继续追问 GCI…"
+            placeholder={dict.ai.chat.continueAskingPlaceholder}
             style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(203,168,92,0.3)', borderRadius: 10, padding: '11px 48px 11px 14px', fontSize: 14, color: TEXT, outline: 'none', boxSizing: 'border-box', fontFamily: "'Space Grotesk',sans-serif" }}
             onFocus={e => (e.target.style.borderColor = 'rgba(203,168,92,0.55)')}
             onBlur={e => (e.target.style.borderColor = 'rgba(203,168,92,0.3)')}
@@ -2517,7 +2525,7 @@ export function AIPage() {
   const didAutoRun = useRef(false);
 
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
+  const greeting = hour < 12 ? dict.ai.greeting.morning : hour < 18 ? dict.ai.greeting.afternoon : dict.ai.greeting.evening;
 
   function handleCommand(raw: string) {
     if (!raw.trim()) return;
@@ -3406,7 +3414,7 @@ export function AIPage() {
     }
     if (autoCmd) {
       handleCommand(autoCmd);
-    } else if (autoTab && TABS.some(t => t.key === autoTab)) {
+    } else if (autoTab && TAB_KEYS.includes(autoTab as TabKey)) {
       setTab(autoTab as TabKey);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3428,7 +3436,7 @@ export function AIPage() {
         <h1 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 32, fontWeight: 600, color: TEXT, margin: '0 0 8px', letterSpacing: '-0.01em' }}>
           {greeting}, Chris
         </h1>
-        <p style={{ fontSize: 16, color: MUTED, margin: '0 0 24px' }}>What would you like GCI to do today?</p>
+        <p style={{ fontSize: 16, color: MUTED, margin: '0 0 24px' }}>{dict.ai.greeting.prompt}</p>
 
         <div style={{ position: 'relative', maxWidth: 720 }}>
           <input
@@ -3474,13 +3482,13 @@ export function AIPage() {
 
       {/* Tab bar — scrollbar hidden via .ai-tab-bar CSS class */}
       <div className="ai-tab-bar" style={{ display: 'flex', gap: 4, marginBottom: 28, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 0, overflowX: 'auto' }}>
-        {TABS.map(t => (
+        {getTabs(dict).map(t => (
           <button key={t.key} onClick={() => { setTab(t.key); if (cmdState) clearCmd(); }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: tab === t.key ? `2px solid ${GOLD}` : '2px solid transparent', color: tab === t.key ? GOLD_L : MUTED, fontSize: 13, fontWeight: tab === t.key ? 600 : 400, fontFamily: "'Space Grotesk',sans-serif", transition: 'all 0.15s', marginBottom: -1, whiteSpace: 'nowrap', flexShrink: 0 }}>
             <span>{t.icon}</span>
             <span>{t.label}</span>
             {t.status !== 'live' && (
-              <span className="font-mono-label" style={{ fontSize: 8, color: STATUS_STYLES[t.status].color, background: STATUS_STYLES[t.status].bg, borderRadius: 3, padding: '1px 5px', letterSpacing: '0.1em' }}>
-                {STATUS_STYLES[t.status].label}
+              <span className="font-mono-label" style={{ fontSize: 8, color: getStatusStyles(dict)[t.status].color, background: getStatusStyles(dict)[t.status].bg, borderRadius: 3, padding: '1px 5px', letterSpacing: '0.1em' }}>
+                {getStatusStyles(dict)[t.status].label}
               </span>
             )}
           </button>
