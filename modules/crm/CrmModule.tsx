@@ -1144,35 +1144,52 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
       ? 'bg-rose-700 border-rose-600'
       : 'bg-[#0D1E35] border-[#1E3A5F]';
 
-  // SALES 分区的 4 个 Tab 在前；内部事项排最后并在渲染时用分隔线隔开——
-  // 全局 Sidebar 已经把"内部事项"归到 OPERATIONS，这里只是让本模块内部
-  // 的横条顺序和分组跟全局导航保持一致，不影响 activeTab 的任何逻辑。
-  const navTabs = [
-    { id: 'control' as const,    label: dict.crm.nav.controlCenter },
-    { id: 'dashboard' as const,  label: dict.crm.nav.customerFollowUp },
-    { id: 'project' as const,    label: dict.crm.nav.businessCenter },
-    { id: 'history' as const,    label: dict.crm.nav.historyArchive },
-    { id: 'internal' as const,   label: dict.crm.nav.internalTasks },
-  ].filter(tab => !demoMode || tab.id === 'control' || tab.id === 'dashboard');
+  // V1 nav consolidation: control/dashboard/project/history used to be four
+  // flat, equally-weighted tabs, but they all read the same underlying
+  // Follow-up Log data — collapsed into two top-level groups (业务总览 /
+  // 客户与项目), with dashboard/project/history now living as sub-tabs
+  // inside "客户与项目". activeTab's underlying values are unchanged so old
+  // ?tab= deep links keep working; this only changes how the tab bar groups
+  // and labels them.
+  const CUSTOMERS_AND_PROJECTS_TABS = ['dashboard', 'project', 'history'] as const;
+  const isInCustomersAndProjects = (CUSTOMERS_AND_PROJECTS_TABS as readonly string[]).includes(activeTab);
+
+  const topGroups = [
+    { id: 'control' as const, label: dict.crm.nav.businessOverview, active: activeTab === 'control' },
+    { id: 'customersAndProjects' as const, label: dict.crm.nav.customersAndProjects, active: isInCustomersAndProjects },
+    { id: 'internal' as const, label: dict.crm.nav.internalTasks, active: activeTab === 'internal' },
+  ].filter(g => !demoMode || g.id === 'control' || g.id === 'customersAndProjects');
+
+  const subTabs = [
+    { id: 'dashboard' as const, label: dict.crm.nav.subNavCustomers },
+    { id: 'project' as const,   label: dict.crm.nav.subNavBusiness },
+    { id: 'history' as const,   label: dict.crm.nav.subNavArchived },
+  ];
 
   return (
     <div className="min-h-screen font-sans pb-36" style={{ background: '#0A1628', color: '#E8F0FF' }}>
       <nav className="no-print sticky top-0 z-[90] px-3" style={{ background: '#0D1E35', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 py-2.5">
           <div className="flex items-center overflow-x-auto gap-1.5">
-            {navTabs.map(tab => (
-              <React.Fragment key={tab.id}>
-                {tab.id === 'internal' && (
+            {topGroups.map(group => (
+              <React.Fragment key={group.id}>
+                {group.id === 'internal' && (
                   <div className="w-px h-5 mx-1.5 shrink-0" style={{ background: 'rgba(255,255,255,0.10)' }} />
                 )}
                 <button
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => {
+                    if (group.id === 'customersAndProjects') {
+                      if (!isInCustomersAndProjects) setActiveTab('dashboard');
+                    } else {
+                      setActiveTab(group.id);
+                    }
+                  }}
                   className="shrink-0 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all"
-                  style={activeTab === tab.id
+                  style={group.active
                     ? { backgroundColor: '#B8960C', color: '#fff' }
                     : { background: 'rgba(255,255,255,0.06)', color: '#7A9CC5' }}
                 >
-                  {tab.label}
+                  {group.label}
                 </button>
               </React.Fragment>
             ))}
@@ -1233,6 +1250,22 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
             )}
           </div>
         </div>
+        {isInCustomersAndProjects && (
+          <div className="max-w-7xl mx-auto flex items-center gap-1.5 pb-2.5 overflow-x-auto">
+            {subTabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className="shrink-0 px-3.5 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all"
+                style={activeTab === tab.id
+                  ? { background: 'rgba(203,168,92,0.16)', color: '#E2C988', border: '1px solid rgba(203,168,92,0.3)' }
+                  : { background: 'transparent', color: '#5B7092', border: '1px solid transparent' }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
       </nav>
 
       <main className="max-w-7xl mx-auto px-6 py-8">

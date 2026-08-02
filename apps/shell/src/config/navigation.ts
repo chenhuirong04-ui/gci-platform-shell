@@ -6,6 +6,8 @@ export interface ModuleDef {
     | 'customerFollowUp'
     | 'businessCenter'
     | 'historyArchive'
+    | 'businessOverview'
+    | 'customersAndProjects'
     | 'piQuote'
     | 'engineeringQuote'
     | 'supplierQuote'
@@ -50,10 +52,12 @@ export const sections: SectionDef[] = [
   {
     labelKey: 'salesSection',
     items: [
-      { code: 'CC', nameKey: 'controlCenter', path: '/crm?tab=control' },
-      { code: 'CF', nameKey: 'customerFollowUp', count: '5', badgeColor: '#E2C988', badgeBg: 'rgba(203,168,92,0.16)', path: '/crm?tab=dashboard' },
-      { code: 'BC', nameKey: 'businessCenter', path: '/crm?tab=project' },
-      { code: 'HA', nameKey: 'historyArchive', path: '/crm?tab=history' },
+      // V1 nav consolidation: Control Center / Customer Follow-up / Business
+      // Center / History Archive were four separate entries all reading the
+      // same underlying Follow-up Log data — collapsed into two. Old ?tab=
+      // values still resolve inside CrmModule.tsx for bookmark compatibility.
+      { code: 'BO', nameKey: 'businessOverview', path: '/crm?tab=control' },
+      { code: 'CP', nameKey: 'customersAndProjects', count: '5', badgeColor: '#E2C988', badgeBg: 'rgba(203,168,92,0.16)', path: '/crm?tab=dashboard' },
     ],
   },
   {
