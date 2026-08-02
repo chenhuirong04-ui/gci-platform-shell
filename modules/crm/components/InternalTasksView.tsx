@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { InternalTask, InternalTaskStatus, InternalTaskCategory } from '../types';
 import { PersistenceService } from '../services/persistenceService';
-import { translations } from '../services/i18n';
+import { useI18n } from '@gci/i18n';
 import {
   Plus, Calendar, User, CheckCircle2, Clock, Hourglass, X, LayoutGrid, Zap, AlignLeft
 } from 'lucide-react';
@@ -20,7 +20,24 @@ interface InternalTasksViewProps {
 }
 
 const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) => {
-  const t = translations['zh'];
+  const { dict } = useI18n();
+  const t = dict.crm.internalTasks;
+  // Display-only mapping for the fixed status/category enums — the actual
+  // InternalTask.status / .category field values (Chinese literals) are
+  // never changed, only what's rendered.
+  const STATUS_LABEL: Record<InternalTaskStatus, string> = {
+    '待处理':   t.statusPending,
+    '进行中':   t.statusInProgress,
+    '等待他人': t.statusWaiting,
+    '已完成':   t.statusCompleted,
+  };
+  const CATEGORY_LABEL: Record<InternalTaskCategory, string> = {
+    '销售': t.categorySales,
+    '财务': t.categoryFinance,
+    '采购': t.categoryProcurement,
+    '行政': t.categoryAdmin,
+    '系统': t.categorySystem,
+  };
   const [tasks, setTasks] = useState<InternalTask[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTask, setEditingTask] = useState<InternalTask | null>(null);
@@ -56,15 +73,15 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
     setTasks(prev => [task, ...prev]);
     setNewTask(initialTaskState);
     setShowAddModal(false);
-    if (onShowToast) onShowToast('事项已录入', 'success');
+    if (onShowToast) onShowToast(t.taskCreatedToast, 'success');
   };
 
   const handleUpdateTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTask || !editingTask.title.trim()) return;
-    setTasks(prev => prev.map(t => t.id === editingTask.id ? editingTask : t));
+    setTasks(prev => prev.map(x => x.id === editingTask.id ? editingTask : x));
     setEditingTask(null);
-    if (onShowToast) onShowToast('事项已更新', 'success');
+    if (onShowToast) onShowToast(t.taskUpdatedToast, 'success');
   };
 
   const statusCols: InternalTaskStatus[] = ["待处理", "进行中", "等待他人", "已完成"];
@@ -83,26 +100,26 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-xl text-white shadow-lg" style={{ backgroundColor: GOLD }}><LayoutGrid className="w-5 h-5" /></div>
-          <h2 className="text-xl font-black uppercase tracking-tight" style={{ color: T1 }}>内部事项看板</h2>
+          <h2 className="text-xl font-black uppercase tracking-tight" style={{ color: T1 }}>{t.pageTitle}</h2>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
           className="text-white px-6 py-3 rounded-2xl font-black text-xs uppercase shadow-xl flex items-center gap-2 transition-all active:scale-95 hover:opacity-90"
           style={{ backgroundColor: GOLD }}
         >
-          <Plus className="w-4 h-4" /> 新增待办
+          <Plus className="w-4 h-4" /> {t.addTask}
         </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 h-[calc(100vh-280px)] overflow-hidden">
         {statusCols.map(status => {
-          const colTasks = (tasks || []).filter(t => t.status === status);
+          const colTasks = (tasks || []).filter(x => x.status === status);
           return (
             <div key={status} className="flex flex-col gap-4 h-full overflow-hidden">
               <div className="px-5 py-4 rounded-[24px] flex items-center justify-between shrink-0" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
                 <div className="flex items-center gap-2">
                   {getStatusIcon(status)}
-                  <span className="text-xs font-black uppercase tracking-widest" style={{ color: T1 }}>{status}</span>
+                  <span className="text-xs font-black uppercase tracking-widest" style={{ color: T1 }}>{STATUS_LABEL[status] ?? status}</span>
                 </div>
                 <span className="px-2 py-0.5 rounded-lg text-[10px] font-black" style={{ background: 'rgba(255,255,255,0.07)', color: T2 }}>{colTasks.length}</span>
               </div>
@@ -118,7 +135,7 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
                     onMouseLeave={e => (e.currentTarget.style.borderColor = BORDER)}
                   >
                     <div className="flex justify-between items-start mb-3">
-                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase" style={{ background: 'rgba(255,255,255,0.07)', color: T2 }}>{task.category}</span>
+                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase" style={{ background: 'rgba(255,255,255,0.07)', color: T2 }}>{CATEGORY_LABEL[task.category] ?? task.category}</span>
                       {task.description && <AlignLeft className="w-3 h-3" style={{ color: T2 }} />}
                     </div>
 
@@ -144,14 +161,14 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
         <div className="fixed inset-0 z-[3000] flex items-center justify-center p-6">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
           <form onSubmit={handleCreateTask} className="relative rounded-[40px] p-8 w-full max-w-md shadow-2xl space-y-6" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
-            <h2 className="text-xl font-black uppercase" style={{ color: T1 }}>创建事项</h2>
+            <h2 className="text-xl font-black uppercase" style={{ color: T1 }}>{t.createTaskTitle}</h2>
 
             <input
               required
               type="text"
               value={newTask.title}
               onChange={e => setNewTask({ ...newTask, title: e.target.value })}
-              placeholder="事项标题"
+              placeholder={t.taskTitlePlaceholder}
               className="w-full rounded-2xl px-5 py-4 text-sm font-bold outline-none"
               style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
             />
@@ -163,11 +180,11 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
                 className="rounded-2xl px-4 py-4 text-xs font-bold outline-none"
                 style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
               >
-                <option value="销售">销售</option>
-                <option value="财务">财务</option>
-                <option value="采购">采购</option>
-                <option value="行政">行政</option>
-                <option value="系统">系统</option>
+                <option value="销售">{t.categorySales}</option>
+                <option value="财务">{t.categoryFinance}</option>
+                <option value="采购">{t.categoryProcurement}</option>
+                <option value="行政">{t.categoryAdmin}</option>
+                <option value="系统">{t.categorySystem}</option>
               </select>
 
               <select
@@ -176,10 +193,10 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
                 className="rounded-2xl px-4 py-4 text-xs font-bold outline-none"
                 style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
               >
-                <option value="待处理">待处理</option>
-                <option value="进行中">进行中</option>
-                <option value="等待他人">等待他人</option>
-                <option value="已完成">已完成</option>
+                <option value="待处理">{t.statusPending}</option>
+                <option value="进行中">{t.statusInProgress}</option>
+                <option value="等待他人">{t.statusWaiting}</option>
+                <option value="已完成">{t.statusCompleted}</option>
               </select>
             </div>
 
@@ -190,7 +207,7 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
                   type="text"
                   value={newTask.owner}
                   onChange={e => setNewTask({ ...newTask, owner: e.target.value })}
-                  placeholder="负责人"
+                  placeholder={t.ownerPlaceholder}
                   className="w-full rounded-2xl pl-10 pr-4 py-4 text-xs font-bold outline-none"
                   style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
                 />
@@ -210,7 +227,7 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
               className="w-full text-white py-5 rounded-[24px] font-black text-sm uppercase shadow-xl hover:opacity-90 transition-all"
               style={{ backgroundColor: GOLD }}
             >
-              确认添加
+              {t.confirmAdd}
             </button>
           </form>
         </div>
@@ -221,7 +238,7 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setEditingTask(null)} />
           <form onSubmit={handleUpdateTask} className="relative rounded-[40px] p-8 w-full max-w-md shadow-2xl space-y-6" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-black uppercase" style={{ color: T1 }}>编辑事项</h2>
+              <h2 className="text-xl font-black uppercase" style={{ color: T1 }}>{t.editTaskTitle}</h2>
               <button
                 type="button"
                 onClick={() => setEditingTask(null)}
@@ -237,7 +254,7 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
               type="text"
               value={editingTask.title}
               onChange={e => setEditingTask({ ...editingTask, title: e.target.value })}
-              placeholder="事项标题"
+              placeholder={t.taskTitlePlaceholder}
               className="w-full rounded-2xl px-5 py-4 text-sm font-bold outline-none"
               style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
             />
@@ -245,54 +262,54 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
             <textarea
               value={editingTask.description || ''}
               onChange={e => setEditingTask({ ...editingTask, description: e.target.value })}
-              placeholder="添加备注或详情描述..."
+              placeholder={t.notePlaceholder}
               className="w-full rounded-2xl px-5 py-4 text-sm font-bold outline-none h-24 resize-none"
               style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
             />
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest ml-2" style={{ color: T2 }}>所属分类</label>
+                <label className="text-[10px] font-black uppercase tracking-widest ml-2" style={{ color: T2 }}>{t.categoryFieldLabel}</label>
                 <select
                   value={editingTask.category}
                   onChange={e => setEditingTask({ ...editingTask, category: e.target.value as any })}
                   className="w-full rounded-2xl px-4 py-3.5 text-xs font-bold outline-none"
                   style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
                 >
-                  <option value="销售">销售</option>
-                  <option value="财务">财务</option>
-                  <option value="采购">采购</option>
-                  <option value="行政">行政</option>
-                  <option value="系统">系统</option>
+                  <option value="销售">{t.categorySales}</option>
+                  <option value="财务">{t.categoryFinance}</option>
+                  <option value="采购">{t.categoryProcurement}</option>
+                  <option value="行政">{t.categoryAdmin}</option>
+                  <option value="系统">{t.categorySystem}</option>
                 </select>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest ml-2" style={{ color: GOLD }}>事项状态</label>
+                <label className="text-[10px] font-black uppercase tracking-widest ml-2" style={{ color: GOLD }}>{t.statusFieldLabel}</label>
                 <select
                   value={editingTask.status}
                   onChange={e => setEditingTask({ ...editingTask, status: e.target.value as any })}
                   className="w-full rounded-2xl px-4 py-3.5 text-xs font-black outline-none"
                   style={{ background: CARD2, border: `1px solid ${GOLD}40`, color: GOLD }}
                 >
-                  <option value="待处理">待处理</option>
-                  <option value="进行中">进行中</option>
-                  <option value="等待他人">等待他人</option>
-                  <option value="已完成">已完成</option>
+                  <option value="待处理">{t.statusPending}</option>
+                  <option value="进行中">{t.statusInProgress}</option>
+                  <option value="等待他人">{t.statusWaiting}</option>
+                  <option value="已完成">{t.statusCompleted}</option>
                 </select>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest ml-2" style={{ color: T2 }}>执行人</label>
+                <label className="text-[10px] font-black uppercase tracking-widest ml-2" style={{ color: T2 }}>{t.ownerFieldLabel}</label>
                 <div className="relative">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: T2 }} />
                   <input
                     type="text"
                     value={editingTask.owner}
                     onChange={e => setEditingTask({ ...editingTask, owner: e.target.value })}
-                    placeholder="负责人"
+                    placeholder={t.ownerPlaceholder}
                     className="w-full rounded-2xl pl-10 pr-4 py-3.5 text-xs font-bold outline-none"
                     style={{ background: CARD2, border: `1px solid ${BORDER}`, color: T1 }}
                   />
@@ -300,7 +317,7 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest ml-2" style={{ color: T2 }}>截止日期</label>
+                <label className="text-[10px] font-black uppercase tracking-widest ml-2" style={{ color: T2 }}>{t.dueDateFieldLabel}</label>
                 <input
                   type="date"
                   value={editingTask.dueDate}
@@ -316,7 +333,7 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ onShowToast }) =>
               className="w-full text-white py-5 rounded-[24px] font-black text-sm uppercase shadow-xl hover:opacity-90 transition-all"
               style={{ backgroundColor: GOLD }}
             >
-              保存更改
+              {t.saveChanges}
             </button>
           </form>
         </div>

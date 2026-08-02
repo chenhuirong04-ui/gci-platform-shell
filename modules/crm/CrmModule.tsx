@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useI18n } from '@gci/i18n';
 import { generateTaskContent } from './services/geminiService';
 import { FollowUpTask, CMOResponse, Project, ProjectType, ProjectStatus, ProjectLogEntry } from './types';
 import { PersistenceService } from './services/persistenceService';
@@ -181,6 +182,7 @@ type CrmTab = 'control' | 'dashboard' | 'history' | 'project' | 'internal';
 const _crmValidTabs = ['control', 'dashboard', 'history', 'project', 'internal'] as const;
 
 function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoMode?: boolean }) {
+  const { dict, lang } = useI18n();
   const isAdminMode = new URLSearchParams(window.location.search).get('admin') === '1';
   const [tasks, setTasks] = useState<FollowUpTask[]>(() => demoMode ? createDemoLeads() : []);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -1146,11 +1148,11 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
   // 全局 Sidebar 已经把"内部事项"归到 OPERATIONS，这里只是让本模块内部
   // 的横条顺序和分组跟全局导航保持一致，不影响 activeTab 的任何逻辑。
   const navTabs = [
-    { id: 'control' as const,    label: '控制中心' },
-    { id: 'dashboard' as const,  label: '客户跟进' },
-    { id: 'project' as const,    label: '业务中心' },
-    { id: 'history' as const,    label: '历史归档' },
-    { id: 'internal' as const,   label: '内部事项' },
+    { id: 'control' as const,    label: dict.crm.nav.controlCenter },
+    { id: 'dashboard' as const,  label: dict.crm.nav.customerFollowUp },
+    { id: 'project' as const,    label: dict.crm.nav.businessCenter },
+    { id: 'history' as const,    label: dict.crm.nav.historyArchive },
+    { id: 'internal' as const,   label: dict.crm.nav.internalTasks },
   ].filter(tab => !demoMode || tab.id === 'control' || tab.id === 'dashboard');
 
   return (
@@ -1178,9 +1180,9 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
           <div className="flex items-center gap-3 shrink-0">
             {!demoMode && lastSyncAt && (
               <span className="text-[10px] font-bold whitespace-nowrap hidden md:inline" style={{ color: '#4A6080' }}>
-                最后同步: {(() => {
+                {dict.crm.sync.lastSynced}: {(() => {
                   const diff = Math.floor((Date.now() - new Date(lastSyncAt).getTime()) / 60000);
-                  return diff < 1 ? '刚刚' : `${diff}分钟前`;
+                  return diff < 1 ? dict.crm.sync.justNow : dict.crm.sync.minutesAgo.replace('{n}', String(diff));
                 })()}
               </span>
             )}
@@ -1191,10 +1193,10 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
                 disabled={retryFollowupSyncing}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black transition-all disabled:opacity-50"
                 style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.35)' }}
-                title="补写 Follow-up Log（SB Pool 已创建，但 Follow-up Log 未写入）"
+                title={dict.crm.sync.retryFollowupLogTooltip}
               >
                 <RefreshCw className={`w-3 h-3 ${retryFollowupSyncing ? 'animate-spin' : ''}`} />
-                {retryFollowupSyncing ? '补写中…' : '⚠ 补写记录'}
+                {retryFollowupSyncing ? dict.crm.sync.retryingFollowupLog : dict.crm.sync.retryFollowupLog}
               </button>
             )}
             {/* 批量同步归档→Notion */}
@@ -1204,10 +1206,10 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
                 disabled={batchSyncing}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black transition-all disabled:opacity-50"
                 style={{ backgroundColor: 'rgba(184,150,12,0.15)', color: '#B8960C', border: '1px solid rgba(184,150,12,0.35)' }}
-                title="将本地归档记录同步到 Notion"
+                title={dict.crm.sync.archiveToNotionTooltip}
               >
                 <RefreshCw className={`w-3 h-3 ${batchSyncing ? 'animate-spin' : ''}`} />
-                {batchSyncing ? '同步中…' : '↑ 归档→Notion'}
+                {batchSyncing ? dict.crm.sync.syncing : dict.crm.sync.archiveToNotion}
               </button>
             )}
             {!demoMode && <button
@@ -1215,10 +1217,10 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
               disabled={syncStatus === 'syncing'}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black text-white transition-all disabled:opacity-50"
               style={{ backgroundColor: '#B8960C' }}
-              title="从 Notion 同步数据"
+              title={dict.crm.sync.syncTooltip}
             >
               <RefreshCw className={`w-3 h-3 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
-              {syncStatus === 'syncing' ? '同步中…' : '↻ 同步'}
+              {syncStatus === 'syncing' ? dict.crm.sync.syncing : dict.crm.sync.sync}
             </button>}
             {!demoMode && isAdminMode && (
               <button
@@ -1226,7 +1228,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
                 className="px-3 py-1.5 rounded-xl text-[10px] font-black text-white"
                 style={{ backgroundColor: '#1E3A5F' }}
               >
-                ⬆ 导入
+                {dict.crm.sync.adminImport}
               </button>
             )}
           </div>
@@ -1340,7 +1342,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
         )}
 
         {activeTab === 'internal' && (
-          <InternalTasksView lang={'zh'} onShowToast={showToast as any} />
+          <InternalTasksView lang={lang} onShowToast={showToast as any} />
         )}
 
         {activeTab === 'project' && (
