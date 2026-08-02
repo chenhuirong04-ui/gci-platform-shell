@@ -90,7 +90,7 @@ const QUOTE_ESCALATE_DAYS = 3;
 //   • 已报价 — escalate after QUOTE_ESCALATE_DAYS days overdue
 //   • Priority A — any overdue status
 
-function buildUrgent(tasks: FollowUpTask[]): ActionItem[] {
+function buildUrgent(tasks: FollowUpTask[], lang: 'zh' | 'en'): ActionItem[] {
   return tasks
     .filter(t => t.status === 'todo' && !DONE_STATUSES.includes(t.tradeStatus))
     .map(t => ({ t, od: calcDaysOverdue(t.nextFollowUpAt) }))
@@ -111,27 +111,33 @@ function buildUrgent(tasks: FollowUpTask[]): ActionItem[] {
       const isQuoteOverdue = t.tradeStatus === QUOTED_WAITING && od >= QUOTE_ESCALATE_DAYS;
       const isInternal = t.tradeStatus === '需求整理中';
 
-      const problem = isInternal
-        ? '需求整理中，内部方案/BOQ 尚未完成，阻碍报价进度'
-        : isQuoteOverdue ? `报价已发 ${od} 天，客户尚未回复`
-        : od > 0 ? `A 级客户，跟进计划逾期 ${od} 天`
-        : 'A 级客户，今日到期';
+      const problem = lang === 'zh'
+        ? (isInternal ? '需求整理中，内部方案/BOQ 尚未完成，阻碍报价进度'
+          : isQuoteOverdue ? `报价已发 ${od} 天，客户尚未回复`
+          : od > 0 ? `A 级客户，跟进计划逾期 ${od} 天`
+          : 'A 级客户，今日到期')
+        : (isInternal ? 'Requirements in progress — internal proposal/BOQ not yet finished, blocking the quotation'
+          : isQuoteOverdue ? `Quote sent ${od} day${od !== 1 ? 's' : ''} ago, no client reply yet`
+          : od > 0 ? `Grade A client, follow-up overdue by ${od} day${od !== 1 ? 's' : ''}`
+          : 'Grade A client, due today');
 
-      const suggestion = isInternal
-        ? '今日内完成需求整理，推进 BOQ/RFQ 生成'
-        : isQuoteOverdue && od >= 5 ? '立即发 WhatsApp，询问客户决策进度'
-        : isQuoteOverdue ? '主动跟进，确认客户是否收到并已阅报价'
-        : t.suggestedAction || 'A 级客户，今日必须完成联系';
+      const suggestion = lang === 'zh'
+        ? (isInternal ? '今日内完成需求整理，推进 BOQ/RFQ 生成'
+          : isQuoteOverdue && od >= 5 ? '立即发 WhatsApp，询问客户决策进度'
+          : isQuoteOverdue ? '主动跟进，确认客户是否收到并已阅报价'
+          : t.suggestedAction || 'A 级客户，今日必须完成联系')
+        : (isInternal ? 'Finish requirements today, move BOQ/RFQ generation forward'
+          : isQuoteOverdue && od >= 5 ? 'Send a WhatsApp message immediately to ask about the client\'s decision progress'
+          : isQuoteOverdue ? 'Follow up proactively — confirm the client received and reviewed the quote'
+          : t.suggestedAction || 'Grade A client — must make contact today');
 
-      const reasons = [
-        t.tradeStatus,
-        t.priority === 'A' ? 'A级' : '',
-        od > 0 ? `逾期${od}天` : '今日到期',
-      ].filter(Boolean);
+      const reasons = lang === 'zh'
+        ? [t.tradeStatus, t.priority === 'A' ? 'A级' : '', od > 0 ? `逾期${od}天` : '今日到期'].filter(Boolean)
+        : [t.tradeStatus, t.priority === 'A' ? 'Grade A' : '', od > 0 ? `${od} day${od !== 1 ? 's' : ''} overdue` : 'Due today'].filter(Boolean);
 
       return {
         id: t.id, clientName: t.clientName, problem, suggestion,
-        matchReason: '状态: ' + reasons.join(' · '),
+        matchReason: (lang === 'zh' ? '状态: ' : 'Status: ') + reasons.join(' · '),
         daysOverdue: od, tradeStatus: t.tradeStatus, task: t, source: 'task' as const,
       };
     });
@@ -141,7 +147,7 @@ function buildUrgent(tasks: FollowUpTask[]): ActionItem[] {
 // Rules: tradeStatus === '已报价待确认' (not yet escalated to urgent)
 //        OR tradeStatus === '合同待签' — client confirmed, waiting for signed contract
 
-function buildWaitingClient(tasks: FollowUpTask[], urgentIds: Set<string>): ActionItem[] {
+function buildWaitingClient(tasks: FollowUpTask[], urgentIds: Set<string>, lang: 'zh' | 'en'): ActionItem[] {
   const CONTRACT_PENDING = '合同待签';
   return tasks
     .filter(t =>
@@ -152,19 +158,33 @@ function buildWaitingClient(tasks: FollowUpTask[], urgentIds: Set<string>): Acti
     .map(t => {
       const od = calcDaysOverdue(t.nextFollowUpAt);
       const isContract = t.tradeStatus === CONTRACT_PENDING;
-      return {
-        id: t.id, clientName: t.clientName,
-        problem: isContract
+      const problem = lang === 'zh'
+        ? (isContract
           ? (od > 0 ? `合同待签，已等 ${od} 天，需催促客户签约` : '客户确认合作，等待签署合同')
-          : (od > 0 ? `等待客户/业主确认，已等 ${od} 天` : '等待客户/业主确认'),
-        suggestion: isContract
+          : (od > 0 ? `等待客户/业主确认，已等 ${od} 天` : '等待客户/业主确认'))
+        : (isContract
+          ? (od > 0 ? `Contract pending signature, waiting ${od} day${od !== 1 ? 's' : ''} — needs a nudge` : 'Client confirmed the deal, waiting for signed contract')
+          : (od > 0 ? `Waiting for client/owner confirmation, ${od} day${od !== 1 ? 's' : ''} so far` : 'Waiting for client/owner confirmation'));
+      const suggestion = lang === 'zh'
+        ? (isContract
           ? (od >= 5 ? '立即跟进，确认合同状态，必要时发提醒或推动签约会议'
             : od >= 2 ? '主动催促，询问合同审批进度，提供任何所需文件'
             : '保持跟进，确认客户是否已收到合同并开始审核')
           : (od >= 5 ? '立即跟进，询问审批进展，提供补充资料支持'
             : od >= 2 ? '主动催促，提供进一步支持或备选方案'
-            : '保持跟进，等待客户内部决策'),
-        matchReason: `状态: ${t.tradeStatus}${od > 0 ? ` · 已等${od}天` : ''}`,
+            : '保持跟进，等待客户内部决策'))
+        : (isContract
+          ? (od >= 5 ? 'Follow up immediately — confirm contract status, send a reminder or push for a signing call if needed'
+            : od >= 2 ? 'Proactively nudge — ask about contract approval progress, provide any documents needed'
+            : 'Keep following up — confirm the client received the contract and started reviewing it')
+          : (od >= 5 ? 'Follow up immediately — ask about approval progress, provide supporting materials'
+            : od >= 2 ? 'Proactively nudge — offer further support or alternatives'
+            : 'Keep following up — waiting on the client\'s internal decision'));
+      const matchReason = lang === 'zh'
+        ? `状态: ${t.tradeStatus}${od > 0 ? ` · 已等${od}天` : ''}`
+        : `Status: ${t.tradeStatus}${od > 0 ? ` · waiting ${od} day${od !== 1 ? 's' : ''}` : ''}`;
+      return {
+        id: t.id, clientName: t.clientName, problem, suggestion, matchReason,
         daysOverdue: Math.max(0, od), tradeStatus: t.tradeStatus, task: t, source: 'task' as const,
       };
     })
@@ -175,17 +195,22 @@ function buildWaitingClient(tasks: FollowUpTask[], urgentIds: Set<string>): Acti
 // ── Block 3: 等供应商报价/确认 ────────────────────────────────────────────────
 // Rule: tradeStatus === '待报价'
 
-function buildWaitingSupplier(tasks: FollowUpTask[]): ActionItem[] {
+function buildWaitingSupplier(tasks: FollowUpTask[], lang: 'zh' | 'en'): ActionItem[] {
   return tasks
     .filter(t => t.status === 'todo' && t.tradeStatus === '待报价')
     .map(t => {
       const od = calcDaysOverdue(t.nextFollowUpAt);
+      const problem = lang === 'zh'
+        ? (od > 0 ? `正在寻价/等供应商报价，已等 ${od} 天` : '正在寻价/等供应商报价')
+        : (od > 0 ? `Sourcing / waiting on supplier quote, ${od} day${od !== 1 ? 's' : ''} so far` : 'Sourcing / waiting on supplier quote');
+      const suggestion = lang === 'zh'
+        ? (od >= 3 ? '今日催促供应商，确认报价时间，同步反馈给客户' : '跟进供应商进度，预估报价到位时间')
+        : (od >= 3 ? 'Nudge the supplier today, confirm the quote timing, and update the client' : 'Follow up on supplier progress, estimate when the quote will be ready');
+      const matchReason = lang === 'zh'
+        ? `状态: 待报价${od > 0 ? ` · 已等${od}天` : ''}`
+        : `Status: Pending Quotation${od > 0 ? ` · waiting ${od} day${od !== 1 ? 's' : ''}` : ''}`;
       return {
-        id: t.id, clientName: t.clientName,
-        problem: od > 0 ? `正在寻价/等供应商报价，已等 ${od} 天` : '正在寻价/等供应商报价',
-        suggestion: od >= 3 ? '今日催促供应商，确认报价时间，同步反馈给客户'
-          : '跟进供应商进度，预估报价到位时间',
-        matchReason: `状态: 待报价${od > 0 ? ` · 已等${od}天` : ''}`,
+        id: t.id, clientName: t.clientName, problem, suggestion, matchReason,
         daysOverdue: Math.max(0, od), tradeStatus: t.tradeStatus, task: t, source: 'task' as const,
       };
     })
@@ -196,18 +221,22 @@ function buildWaitingSupplier(tasks: FollowUpTask[]): ActionItem[] {
 // ── Block 4: 暂缓中 ───────────────────────────────────────────────────────────
 // Rule: tradeStatus === '暂缓'
 
-function buildPaused(tasks: FollowUpTask[]): ActionItem[] {
+function buildPaused(tasks: FollowUpTask[], lang: 'zh' | 'en'): ActionItem[] {
   return tasks
     .filter(t => t.status === 'todo' && t.tradeStatus === '暂缓')
     .map(t => {
       const od = calcDaysOverdue(t.nextFollowUpAt);
+      const problem = lang === 'zh'
+        ? (od > 0 ? `已暂缓，跟进计划已过期 ${od} 天` : '当前处于暂缓状态')
+        : (od > 0 ? `Paused — follow-up plan expired ${od} day${od !== 1 ? 's' : ''} ago` : 'Currently paused');
+      const suggestion = lang === 'zh'
+        ? (od > 7 ? '建议评估是否重新激活此客户' : '按既定计划维持暂缓，等待合适时机')
+        : (od > 7 ? 'Consider re-evaluating whether to reactivate this client' : 'Keep paused as planned, wait for the right timing');
+      const matchReason = lang === 'zh'
+        ? `状态: 暂缓${od > 0 ? ` · 已过期${od}天` : ''}`
+        : `Status: Paused${od > 0 ? ` · expired ${od} day${od !== 1 ? 's' : ''} ago` : ''}`;
       return {
-        id: t.id, clientName: t.clientName,
-        problem: od > 0 ? `已暂缓，跟进计划已过期 ${od} 天` : '当前处于暂缓状态',
-        suggestion: od > 7
-          ? '建议评估是否重新激活此客户'
-          : '按既定计划维持暂缓，等待合适时机',
-        matchReason: `状态: 暂缓${od > 0 ? ` · 已过期${od}天` : ''}`,
+        id: t.id, clientName: t.clientName, problem, suggestion, matchReason,
         daysOverdue: Math.max(0, od), tradeStatus: t.tradeStatus, task: t, source: 'task' as const,
       };
     })
@@ -223,6 +252,7 @@ function buildRuleSuggestions(
   urgent: ActionItem[],
   waitingClient: ActionItem[],
   waitingSupplier: ActionItem[],
+  lang: 'zh' | 'en',
 ): string[] {
   const active     = tasks.filter(t => t.status === 'todo' && !DONE_STATUSES.includes(t.tradeStatus));
   const aCount     = active.filter(t => t.priority === 'A').length;
@@ -234,19 +264,31 @@ function buildRuleSuggestions(
   const suggestions: string[] = [];
   const urgentA = urgent.filter(a => a.task?.priority === 'A').length;
   if (internalCount > 0)
-    suggestions.push(`${internalCount} 条处于"需求整理中"—— 内部方案未完成，会直接阻碍报价进度`);
+    suggestions.push(lang === 'zh'
+      ? `${internalCount} 条处于"需求整理中"—— 内部方案未完成，会直接阻碍报价进度`
+      : `${internalCount} record${internalCount !== 1 ? 's' : ''} in "Requirements in Progress" — unfinished internal proposals will directly block quotations`);
   if (aCount > 0 && urgentA > 0)
-    suggestions.push(`${aCount} 条 A 级客户中有 ${urgentA} 条已逾期 —— 建议今日优先处理`);
+    suggestions.push(lang === 'zh'
+      ? `${aCount} 条 A 级客户中有 ${urgentA} 条已逾期 —— 建议今日优先处理`
+      : `${urgentA} of ${aCount} Grade A clients are overdue — recommend prioritizing them today`);
   if (quotedOld > 0)
-    suggestions.push(`${quotedOld} 条报价已发出 5 天以上无回复 —— 主动催促可显著提升成交率`);
+    suggestions.push(lang === 'zh'
+      ? `${quotedOld} 条报价已发出 5 天以上无回复 —— 主动催促可显著提升成交率`
+      : `${quotedOld} quotation${quotedOld !== 1 ? 's' : ''} sent 5+ days ago with no reply — a proactive nudge can meaningfully lift close rates`);
   if (waitingSupplier.length >= 2)
-    suggestions.push(`${waitingSupplier.length} 条在等供应商报价 —— 建议集中催报价，再统一回复客户`);
+    suggestions.push(lang === 'zh'
+      ? `${waitingSupplier.length} 条在等供应商报价 —— 建议集中催报价，再统一回复客户`
+      : `${waitingSupplier.length} records waiting on supplier quotes — recommend batching supplier follow-ups, then responding to clients together`);
   if (waitingClient.length >= 3)
-    suggestions.push(`${waitingClient.length} 条在等客户/业主确认 —— 可用 WhatsApp 模板批量催促`);
+    suggestions.push(lang === 'zh'
+      ? `${waitingClient.length} 条在等客户/业主确认 —— 可用 WhatsApp 模板批量催促`
+      : `${waitingClient.length} records waiting on client/owner confirmation — a WhatsApp template can help batch-nudge them`);
   if (projCount > 3 && projCount > tradeCount)
-    suggestions.push(`项目型（${projCount}）> 贸易型（${tradeCount}）—— 建议集中推进工程 BOQ 和 FF&E 报价`);
+    suggestions.push(lang === 'zh'
+      ? `项目型（${projCount}）> 贸易型（${tradeCount}）—— 建议集中推进工程 BOQ 和 FF&E 报价`
+      : `Project-Based (${projCount}) > Trading (${tradeCount}) — recommend focusing on engineering BOQ and FF&E quotations`);
   if (suggestions.length === 0)
-    return ['当前暂无明显异常，建议按高优先级客户顺序跟进。'];
+    return [lang === 'zh' ? '当前暂无明显异常，建议按高优先级客户顺序跟进。' : 'No notable issues right now — recommend following up by client priority order.'];
   return suggestions.slice(0, 3);
 }
 
@@ -408,12 +450,13 @@ function WAModal({ item, onClose }: { item: ActionItem; onClose: () => void }) {
 //    instead of a hardcoded #6366F1. ───────────────────────────────────────────
 
 function RuleEngineBadge() {
+  const { dict } = useI18n();
   return (
     <Badge
       color={colors.statusNeutral}
       bg="rgba(148,163,184,0.16)"
       icon={<Cpu className="w-2.5 h-2.5" />}
-      label="规则引擎"
+      label={dict.crm.actionCenter.ruleEngineBadge}
       className="rounded-lg"
     />
   );
@@ -426,8 +469,11 @@ function ActionCard({ item, status, onWA, onOpen }: {
   onWA?: (item: ActionItem) => void;
   onOpen?: (item: ActionItem) => void;
 }) {
+  const { dict, lang } = useI18n();
+  const at = dict.crm.actionCenter;
   const accentColor = statusMap[status].color;
   const bizId = item.task ? getTaskBusinessId(item.task.id) : '';
+  const waitingLabel = lang === 'zh' ? `已等 ${item.daysOverdue} 天` : `Waiting ${item.daysOverdue} day${item.daysOverdue !== 1 ? 's' : ''}`;
   return (
     <Card tone="light" className="flex gap-3 p-3.5 hover:border-slate-200 transition-colors">
       <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ backgroundColor: accentColor }} />
@@ -438,7 +484,7 @@ function ActionCard({ item, status, onWA, onOpen }: {
             <span className="text-sm font-black truncate" style={{ color: NAVY }}>{item.clientName}</span>
           </div>
           {item.daysOverdue > 0 && (
-            <Badge color={accentColor} bg={statusMap[status].bg} label={`已等 ${item.daysOverdue} 天`} className="rounded-full flex-shrink-0" />
+            <Badge color={accentColor} bg={statusMap[status].bg} label={waitingLabel} className="rounded-full flex-shrink-0" />
           )}
         </div>
         <p className="text-[13px] text-slate-500 leading-relaxed">{item.problem}</p>
@@ -456,14 +502,14 @@ function ActionCard({ item, status, onWA, onOpen }: {
               <button onClick={() => onWA(item)}
                 className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[13px] font-black text-white"
                 style={{ backgroundColor: NAVY }}>
-                <MessageSquare className="w-2.5 h-2.5" /> 生成 WA 消息
+                <MessageSquare className="w-2.5 h-2.5" /> {at.generateWaMessage}
               </button>
             )}
             {onOpen && (
               <button onClick={() => onOpen(item)}
                 className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[13px] font-black border"
                 style={{ borderColor: NAVY + '30', color: NAVY }}>
-                打开详情 <ChevronRight className="w-2.5 h-2.5" />
+                {at.openDetails} <ChevronRight className="w-2.5 h-2.5" />
               </button>
             )}
           </div>
@@ -509,6 +555,8 @@ function OpportunityCard({ opp, onOpen }: { opp: NewOpportunity; onOpen: (t: Fol
 // ── GPT Action Card ───────────────────────────────────────────────────────────
 
 function GPTActionCard({ action, index }: { action: GPTAction; index: number }) {
+  const { dict } = useI18n();
+  const at = dict.crm.actionCenter;
   const [copied, setCopied] = useState(false);
   const [showWA, setShowWA] = useState(false);
 
@@ -530,17 +578,17 @@ function GPTActionCard({ action, index }: { action: GPTAction; index: number }) 
         </div>
         <span className="text-sm font-black flex-1" style={{ color: NAVY }}>{action.title}</span>
         {!action.worthInvesting && (
-          <Badge color="#64748B" bg="#F1F5F9" label="低优先" />
+          <Badge color="#64748B" bg="#F1F5F9" label={at.lowPriorityBadge} />
         )}
       </div>
       {/* Body */}
       <div className="px-4 py-3 space-y-2.5">
         <div>
-          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">客户 · </span>
+          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{at.customerLabel} · </span>
           <span className="text-[13px] font-black" style={{ color: NAVY }}>{action.clientName}</span>
         </div>
         <div>
-          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">原因分析</div>
+          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">{at.reasonAnalysisLabel}</div>
           <p className="text-[13px] text-slate-600 leading-relaxed">{action.reason}</p>
         </div>
         <div className="flex items-start gap-1.5 rounded-lg p-2.5" style={{ backgroundColor: statusMap.urgent.bg }}>
@@ -557,11 +605,11 @@ function GPTActionCard({ action, index }: { action: GPTAction; index: number }) 
             <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 border-b border-slate-100">
               <div className="flex items-center gap-1">
                 <MessageSquare className="w-2.5 h-2.5 text-slate-400" />
-                <span className="text-[9px] font-black text-slate-400 uppercase">WhatsApp 文案</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase">{at.whatsappTemplateLabel}</span>
               </div>
               <button onClick={() => setShowWA(v => !v)}
                 className="text-[13px] font-black" style={{ color: GOLD }}>
-                {showWA ? '收起' : '展开'}
+                {showWA ? at.collapse : at.expand}
               </button>
             </div>
             {showWA && (
@@ -573,7 +621,7 @@ function GPTActionCard({ action, index }: { action: GPTAction; index: number }) 
                   className="mt-2 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[13px] font-black border"
                   style={{ borderColor: GOLD + '60', color: GOLD }}>
                   {copied ? <Check className="w-2.5 h-2.5" /> : <Copy className="w-2.5 h-2.5" />}
-                  {copied ? '已复制' : '复制文案'}
+                  {copied ? at.copied : at.copyText}
                 </button>
               </div>
             )}
@@ -592,22 +640,26 @@ function buildOthers(
   urgentIds: Set<string>,
   supplierIds: Set<string>,
   clientIds: Set<string>,
+  lang: 'zh' | 'en',
 ): ActionItem[] {
   const claimedIds = new Set([...urgentIds, ...supplierIds, ...clientIds]);
   return tasks
     .filter(t => t.status === 'todo' && !DONE_STATUSES.includes(t.tradeStatus) && !claimedIds.has(t.id))
     .map(t => {
       const od = calcDaysOverdue(t.nextFollowUpAt);
+      const problem = lang === 'zh'
+        ? (od > 0 ? `状态: ${t.tradeStatus}，跟进计划逾期 ${od} 天` : od === 0 ? `状态: ${t.tradeStatus}，今日跟进` : `状态: ${t.tradeStatus}`)
+        : (od > 0 ? `Status: ${t.tradeStatus}, follow-up overdue by ${od} day${od !== 1 ? 's' : ''}` : od === 0 ? `Status: ${t.tradeStatus}, due today` : `Status: ${t.tradeStatus}`);
+      const suggestion = lang === 'zh'
+        ? (t.suggestedAction || '按计划推进，记录最新跟进情况')
+        : (t.suggestedAction || 'Proceed as planned, log the latest follow-up status');
+      const matchReason = lang === 'zh'
+        ? `状态: ${t.tradeStatus}${t.priority ? ` · ${t.priority}级` : ''}`
+        : `Status: ${t.tradeStatus}${t.priority ? ` · Grade ${t.priority}` : ''}`;
       return {
         id: t.id,
         clientName: t.clientName,
-        problem: od > 0
-          ? `状态: ${t.tradeStatus}，跟进计划逾期 ${od} 天`
-          : od === 0
-          ? `状态: ${t.tradeStatus}，今日跟进`
-          : `状态: ${t.tradeStatus}`,
-        suggestion: t.suggestedAction || '按计划推进，记录最新跟进情况',
-        matchReason: `状态: ${t.tradeStatus}${t.priority ? ` · ${t.priority}级` : ''}`,
+        problem, suggestion, matchReason,
         daysOverdue: Math.max(0, od),
         tradeStatus: t.tradeStatus,
         task: t,
@@ -682,6 +734,8 @@ function SummaryCard({
   emptyText: string;
   onExpand: () => void;
 }) {
+  const { lang } = useI18n();
+
   // Hide empty cards entirely — no large blank space
   if (count === 0) return null;
 
@@ -734,7 +788,7 @@ function SummaryCard({
         onClick={e => { e.stopPropagation(); onExpand(); }}
         className="flex items-center gap-1 text-[12px] font-bold transition-opacity hover:opacity-70 mt-0.5"
         style={{ color: accentColor }}>
-        查看全部 {count} 条
+        {lang === 'zh' ? `查看全部 ${count} 条` : `View all ${count}`}
         <ChevronRight className="w-3 h-3" />
       </button>
     </div>
@@ -753,7 +807,7 @@ function AISummaryCard({
   onExpand: () => void;
   onRefresh: () => void;
 }) {
-  const { dict } = useI18n();
+  const { dict, lang } = useI18n();
   const at = dict.crm.actionCenter;
   const hasRun = aiLoading || !!aiError || !!aiResult;
   const suggestions = aiResult
@@ -778,21 +832,21 @@ function AISummaryCard({
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Bot className="w-3.5 h-3.5" style={{ color: GOLD_ACCENT }} />
-          <span className="text-[13px] font-black" style={{ color: LIGHT_TEXT }}>OpenAI 智能建议</span>
+          <span className="text-[13px] font-black" style={{ color: LIGHT_TEXT }}>{at.openaiSuggestionsTitle}</span>
           {!aiLoading && !aiError && aiResult && (
             <span className="text-[10px] font-black px-1.5 py-0.5 rounded"
               style={{ background: 'rgba(212,168,67,0.15)', color: GOLD_ACCENT }}>{at.aiDraftBadge}</span>
           )}
           {aiError && (
             <span className="text-[10px] font-black px-1.5 py-0.5 rounded"
-              style={{ background: 'rgba(148,163,184,0.15)', color: MUTED_LIGHT }}>规则引擎</span>
+              style={{ background: 'rgba(148,163,184,0.15)', color: MUTED_LIGHT }}>{at.ruleEngineBadge}</span>
           )}
         </div>
         <button onClick={e => { e.stopPropagation(); onRefresh(); }} disabled={aiLoading}
           className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-bold disabled:opacity-40 transition-colors"
           style={{ border: `1px solid ${hasRun ? DARK_BORDER : GOLD_ACCENT + '60'}`, color: hasRun ? MUTED_LIGHT : GOLD_ACCENT }}>
           <RefreshCw className={`w-3 h-3 ${aiLoading ? 'animate-spin' : ''}`} />
-          {aiLoading ? '分析中' : hasRun ? '刷新' : at.generateSuggestions}
+          {aiLoading ? at.analyzing : hasRun ? at.refreshSuggestions : at.generateSuggestions}
         </button>
       </div>
 
@@ -800,7 +854,7 @@ function AISummaryCard({
       {aiLoading && (
         <div className="flex items-center gap-2 py-1">
           <RefreshCw className="w-3.5 h-3.5 animate-spin flex-shrink-0" style={{ color: GOLD_ACCENT }} />
-          <span className="text-[13px] font-bold" style={{ color: MUTED_LIGHT }}>GPT-4o 正在分析业务数据…</span>
+          <span className="text-[13px] font-bold" style={{ color: MUTED_LIGHT }}>{at.gptAnalyzing}</span>
         </div>
       )}
 
@@ -816,7 +870,7 @@ function AISummaryCard({
       )}
 
       {!aiLoading && suggestions.length === 0 && (
-        <p className="text-[13px] py-1" style={{ color: MUTED_LIGHT }}>{hasRun ? '暂无更多建议' : at.notGeneratedHint}</p>
+        <p className="text-[13px] py-1" style={{ color: MUTED_LIGHT }}>{hasRun ? at.noMoreSuggestions : at.notGeneratedHint}</p>
       )}
 
       {/* Footer */}
@@ -825,13 +879,15 @@ function AISummaryCard({
           <button onClick={onExpand}
             className="flex items-center gap-1 text-[12px] font-bold hover:opacity-70 transition-opacity"
             style={{ color: GOLD_ACCENT }}>
-            {aiResult ? `查看全部 ${(aiResult.actions || []).length} 条建议` : '查看规则分析'}
+            {aiResult
+              ? (lang === 'zh' ? `查看全部 ${(aiResult.actions || []).length} 条建议` : `View all ${(aiResult.actions || []).length} suggestions`)
+              : (lang === 'zh' ? '查看规则分析' : 'View rule-based analysis')}
             <ChevronRight className="w-3 h-3" />
           </button>
         ) : <div />}
         <div className="text-[11px] font-bold flex items-center gap-1" style={{ color: MUTED_LIGHT }}>
           <Shield className="w-2.5 h-2.5" />
-          AI辅助建议，请以实际业务判断为准
+          {at.aiDisclaimer}
         </div>
       </div>
     </div>
@@ -854,6 +910,8 @@ interface Props {
 }
 
 export default function ActionCenter({ tasks, projects, followupTasks, pausedTasks, onSelectTask, onTabSwitch }: Props) {
+  const { dict, lang } = useI18n();
+  const at = dict.crm.actionCenter;
   const [waItem, setWaItem]       = useState<ActionItem | null>(null);
   const [expanded, setExpanded]   = useState<BlockKey | null>(null);
   const [aiResult, setAiResult]   = useState<GPTResult | null>(null);
@@ -867,19 +925,19 @@ export default function ActionCenter({ tasks, projects, followupTasks, pausedTas
     ? followupTasks.filter(t => t.status !== 'deleted' && t.status !== 'archived')
     : baseActiveTasks.filter(t => (t as any).notionSource !== 'contact_only');
 
-  const urgent          = buildUrgent(activeTasks);
+  const urgent          = buildUrgent(activeTasks, lang);
   const urgentIds       = new Set(urgent.map(a => a.id));
-  const waitingClient   = buildWaitingClient(activeTasks, urgentIds);
-  const waitingSupplier = buildWaitingSupplier(activeTasks);
+  const waitingClient   = buildWaitingClient(activeTasks, urgentIds, lang);
+  const waitingSupplier = buildWaitingSupplier(activeTasks, lang);
   const supplierIds     = new Set(waitingSupplier.map(a => a.id));
   const clientIds       = new Set(waitingClient.map(a => a.id));
-  const others          = buildOthers(activeTasks, urgentIds, supplierIds, clientIds);
+  const others          = buildOthers(activeTasks, urgentIds, supplierIds, clientIds, lang);
 
   // Paused: use pre-computed prop (when followupTasks excludes 暂缓), else build from baseActiveTasks
-  const pausedItems     = pausedTasks ? buildPaused(pausedTasks) : buildPaused(baseActiveTasks);
+  const pausedItems     = pausedTasks ? buildPaused(pausedTasks, lang) : buildPaused(baseActiveTasks, lang);
 
   // Rule suggestions use all base tasks for context (projects etc.)
-  const ruleSuggestions = buildRuleSuggestions(baseActiveTasks, projects, urgent, waitingClient, waitingSupplier);
+  const ruleSuggestions = buildRuleSuggestions(baseActiveTasks, projects, urgent, waitingClient, waitingSupplier, lang);
 
   const callGPT = async () => {
     setAiLoading(true); setAiError('');
@@ -895,7 +953,7 @@ export default function ActionCenter({ tasks, projects, followupTasks, pausedTas
       }
       setAiResult(await res.json());
     } catch (e: any) {
-      setAiError(e.message || 'AI 分析失败');
+      setAiError(e.message || (lang === 'zh' ? 'AI 分析失败' : 'AI analysis failed'));
     } finally { setAiLoading(false); }
   };
 
@@ -912,47 +970,57 @@ export default function ActionCenter({ tasks, projects, followupTasks, pausedTas
   const urgentLines = urgent.map(a => ({
     id: a.id,
     label: `${(a.task as any)?.businessId || getTaskBusinessId(a.task?.id || '')} ${a.clientName}`.trim(),
-    meta: a.daysOverdue > 0 ? `逾期 ${a.daysOverdue} 天` : '今日到期',
+    meta: a.daysOverdue > 0
+      ? (lang === 'zh' ? `逾期 ${a.daysOverdue} 天` : `${a.daysOverdue} day${a.daysOverdue !== 1 ? 's' : ''} overdue`)
+      : (lang === 'zh' ? '今日到期' : 'Due today'),
     urgent: true,
   }));
 
   const clientLines = waitingClient.map(a => ({
     id: a.id,
     label: `${(a.task as any)?.businessId || getTaskBusinessId(a.task?.id || '')} ${a.clientName}`.trim(),
-    meta: a.daysOverdue > 0 ? `等 ${a.daysOverdue} 天` : a.tradeStatus,
+    meta: a.daysOverdue > 0
+      ? (lang === 'zh' ? `等 ${a.daysOverdue} 天` : `Waiting ${a.daysOverdue} day${a.daysOverdue !== 1 ? 's' : ''}`)
+      : a.tradeStatus,
     urgent: a.daysOverdue >= 5,
   }));
 
   const supplierLines = waitingSupplier.map(a => ({
     id: a.id,
     label: `${(a.task as any)?.businessId || getTaskBusinessId(a.task?.id || '')} ${a.clientName}`.trim(),
-    meta: a.daysOverdue > 0 ? `等 ${a.daysOverdue} 天` : '待报价',
+    meta: a.daysOverdue > 0
+      ? (lang === 'zh' ? `等 ${a.daysOverdue} 天` : `Waiting ${a.daysOverdue} day${a.daysOverdue !== 1 ? 's' : ''}`)
+      : dict.crm.controlCenter.stagePendingQuotation,
     urgent: false,
   }));
 
   const pausedLines = pausedItems.map(a => ({
     id: a.id,
     label: `${(a.task as any)?.businessId || getTaskBusinessId(a.task?.id || '')} ${a.clientName}`.trim(),
-    meta: a.daysOverdue > 0 ? `暂缓 ${a.daysOverdue} 天` : '暂缓中',
+    meta: a.daysOverdue > 0
+      ? (lang === 'zh' ? `暂缓 ${a.daysOverdue} 天` : `Paused ${a.daysOverdue} day${a.daysOverdue !== 1 ? 's' : ''}`)
+      : at.blockPausedTitle,
     urgent: false,
   }));
 
   const othersLines = others.map(a => ({
     id: a.id,
     label: `${(a.task as any)?.businessId || getTaskBusinessId(a.task?.id || '')} ${a.clientName}`.trim(),
-    meta: a.daysOverdue > 0 ? `逾期 ${a.daysOverdue} 天` : a.tradeStatus,
+    meta: a.daysOverdue > 0
+      ? (lang === 'zh' ? `逾期 ${a.daysOverdue} 天` : `${a.daysOverdue} day${a.daysOverdue !== 1 ? 's' : ''} overdue`)
+      : a.tradeStatus,
     urgent: a.daysOverdue > 0,
   }));
 
   // ── Modal configs ────────────────────────────────────────────────────────
 
   const MODAL_CONFIGS: Record<BlockKey, ModalConfig> = {
-    urgent:   { key: 'urgent',   status: 'urgent',          icon: <AlertTriangle className="w-3.5 h-3.5" />, title: '今日必须推进',         badge: <RuleEngineBadge /> },
-    supplier: { key: 'supplier', status: 'waitingSupplier', icon: <PackageSearch className="w-3.5 h-3.5" />, title: '待报价 · 等供应商回价', badge: <RuleEngineBadge /> },
-    client:   { key: 'client',   status: 'waitingClient',   icon: <Clock className="w-3.5 h-3.5" />,         title: '待确认 · 合同待签',    badge: <RuleEngineBadge /> },
-    paused:   { key: 'paused',   status: 'paused',          icon: <PauseCircle className="w-3.5 h-3.5" />,   title: '暂缓中',               badge: <RuleEngineBadge /> },
-    others:   { key: 'others',   status: 'otherInquiry',    icon: <Sparkles className="w-3.5 h-3.5" />,      title: '新询盘 · 其他',        badge: <RuleEngineBadge /> },
-    ai:       { key: 'ai',       status: 'ai',              icon: <Bot className="w-3.5 h-3.5" />,           title: 'OpenAI 智能建议' },
+    urgent:   { key: 'urgent',   status: 'urgent',          icon: <AlertTriangle className="w-3.5 h-3.5" />, title: at.blockUrgentTitle,   badge: <RuleEngineBadge /> },
+    supplier: { key: 'supplier', status: 'waitingSupplier', icon: <PackageSearch className="w-3.5 h-3.5" />, title: at.blockSupplierTitle, badge: <RuleEngineBadge /> },
+    client:   { key: 'client',   status: 'waitingClient',   icon: <Clock className="w-3.5 h-3.5" />,         title: at.blockClientTitle,   badge: <RuleEngineBadge /> },
+    paused:   { key: 'paused',   status: 'paused',          icon: <PauseCircle className="w-3.5 h-3.5" />,   title: at.blockPausedTitle,   badge: <RuleEngineBadge /> },
+    others:   { key: 'others',   status: 'otherInquiry',    icon: <Sparkles className="w-3.5 h-3.5" />,      title: at.blockOthersTitle,   badge: <RuleEngineBadge /> },
+    ai:       { key: 'ai',       status: 'ai',              icon: <Bot className="w-3.5 h-3.5" />,           title: at.openaiSuggestionsTitle },
   };
 
   return (
@@ -964,35 +1032,35 @@ export default function ActionCenter({ tasks, projects, followupTasks, pausedTas
         <ExpandedModal config={MODAL_CONFIGS[expanded]} onClose={() => setExpanded(null)}>
           {expanded === 'urgent' && (
             urgent.length === 0
-              ? <p className="text-sm text-slate-400 font-bold text-center py-8">今日暂无必须推进事项</p>
+              ? <p className="text-sm text-slate-400 font-bold text-center py-8">{at.emptyUrgent}</p>
               : urgent.map(item => (
                   <ActionCard key={item.id} item={item} status="urgent" onWA={setWaItem} onOpen={handleOpen} />
                 ))
           )}
           {expanded === 'client' && (
             waitingClient.length === 0
-              ? <p className="text-sm text-slate-400 font-bold text-center py-8">暂无待确认报价或合同待签记录</p>
+              ? <p className="text-sm text-slate-400 font-bold text-center py-8">{at.emptyClient}</p>
               : waitingClient.map(item => (
                   <ActionCard key={item.id} item={item} status="waitingClient" onWA={setWaItem} onOpen={handleOpen} />
                 ))
           )}
           {expanded === 'supplier' && (
             waitingSupplier.length === 0
-              ? <p className="text-sm text-slate-400 font-bold text-center py-8">暂无等待供应商报价</p>
+              ? <p className="text-sm text-slate-400 font-bold text-center py-8">{at.emptySupplier}</p>
               : waitingSupplier.map(item => (
                   <ActionCard key={item.id} item={item} status="waitingSupplier" onOpen={handleOpen} />
                 ))
           )}
           {expanded === 'paused' && (
             pausedItems.length === 0
-              ? <p className="text-sm text-slate-400 font-bold text-center py-8">暂无暂缓中记录</p>
+              ? <p className="text-sm text-slate-400 font-bold text-center py-8">{at.emptyPaused}</p>
               : pausedItems.map(item => (
                   <ActionCard key={item.id} item={item} status="paused" onOpen={handleOpen} />
                 ))
           )}
           {expanded === 'others' && (
             others.length === 0
-              ? <p className="text-sm text-slate-400 font-bold text-center py-8">暂无其他待跟进记录</p>
+              ? <p className="text-sm text-slate-400 font-bold text-center py-8">{at.emptyOthers}</p>
               : others.map(item => (
                   <ActionCard key={item.id} item={item} status="otherInquiry" onWA={setWaItem} onOpen={handleOpen} />
                 ))
@@ -1001,14 +1069,14 @@ export default function ActionCenter({ tasks, projects, followupTasks, pausedTas
             aiLoading ? (
               <div className="flex items-center justify-center gap-3 py-12">
                 <RefreshCw className="w-5 h-5 animate-spin" style={{ color: GOLD }} />
-                <span className="text-sm font-bold text-slate-400">GPT-4o 正在分析您的业务数据…</span>
+                <span className="text-sm font-bold text-slate-400">{at.gptAnalyzing}</span>
               </div>
             ) : aiError ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-2 p-3 rounded-xl" style={{ backgroundColor: statusMap.urgent.bg, border: `1px solid ${statusMap.urgent.color}30` }}>
                   <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: statusMap.urgent.color }} />
                   <div>
-                    <p className="text-[13px] font-black" style={{ color: statusMap.urgent.color }}>GPT-4o 连接失败，显示规则引擎分析</p>
+                    <p className="text-[13px] font-black" style={{ color: statusMap.urgent.color }}>{at.gptConnectionFailed}</p>
                     <p className="text-[13px] mt-0.5" style={{ color: statusMap.urgent.color }}>{aiError}</p>
                   </div>
                 </div>
@@ -1025,11 +1093,11 @@ export default function ActionCenter({ tasks, projects, followupTasks, pausedTas
                   <div className="rounded-xl p-4 border" style={{ borderColor: GOLD + '30', backgroundColor: GOLD + '08' }}>
                     <div className="flex items-center gap-1.5 mb-2">
                       <Sparkles className="w-3.5 h-3.5" style={{ color: GOLD }} />
-                      <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: GOLD }}>整体洞察</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: GOLD }}>{at.overallInsightLabel}</span>
                       {aiResult.priorityFocus && (
                         <span className="ml-auto text-[9px] font-black px-1.5 py-0.5 rounded"
                           style={{ backgroundColor: NAVY + '10', color: NAVY }}>
-                          重点: {aiResult.priorityFocus}
+                          {at.focusLabel}: {aiResult.priorityFocus}
                         </span>
                       )}
                     </div>
@@ -1043,13 +1111,13 @@ export default function ActionCenter({ tasks, projects, followupTasks, pausedTas
                 ))}
                 <div className="pt-2 text-[9px] font-bold text-slate-300 flex items-center gap-1">
                   <Shield className="w-2.5 h-2.5" />
-                  AI辅助建议，请以实际业务判断为准
+                  {at.aiDisclaimer}
                 </div>
               </div>
             ) : (
               <div className="text-center py-12">
                 <Bot className="w-10 h-10 mx-auto mb-3 text-slate-200" />
-                <p className="text-sm font-bold text-slate-400">等待数据加载后自动分析…</p>
+                <p className="text-sm font-bold text-slate-400">{at.notGeneratedHint}</p>
               </div>
             )
           )}
@@ -1062,36 +1130,36 @@ export default function ActionCenter({ tasks, projects, followupTasks, pausedTas
         {/* Card 1 — 今日必须推进 */}
         <SummaryCard
           status="urgent" icon={<AlertTriangle className="w-3.5 h-3.5" />}
-          title="今日必须推进" count={urgent.length}
+          title={at.blockUrgentTitle} count={urgent.length}
           badge={<RuleEngineBadge />}
-          previewLines={urgentLines} emptyText="今日暂无必须推进事项"
+          previewLines={urgentLines} emptyText={at.emptyUrgent}
           onExpand={() => setExpanded('urgent')}
         />
 
         {/* Card 2 — 待报价 */}
         <SummaryCard
           status="waitingSupplier" icon={<PackageSearch className="w-3.5 h-3.5" />}
-          title="待报价 · 等供应商回价" count={waitingSupplier.length}
+          title={at.blockSupplierTitle} count={waitingSupplier.length}
           badge={<RuleEngineBadge />}
-          previewLines={supplierLines} emptyText="暂无等待供应商报价"
+          previewLines={supplierLines} emptyText={at.emptySupplier}
           onExpand={() => setExpanded('supplier')}
         />
 
         {/* Card 3 — 已报价待确认 / 合同待签 */}
         <SummaryCard
           status="waitingClient" icon={<Clock className="w-3.5 h-3.5" />}
-          title="待确认 · 合同待签" count={waitingClient.length}
+          title={at.blockClientTitle} count={waitingClient.length}
           badge={<RuleEngineBadge />}
-          previewLines={clientLines} emptyText="暂无等待客户确认的报价"
+          previewLines={clientLines} emptyText={at.emptyClient}
           onExpand={() => setExpanded('client')}
         />
 
         {/* Card 4 — 新询盘 · 其他 */}
         <SummaryCard
           status="otherInquiry" icon={<Sparkles className="w-3.5 h-3.5" />}
-          title="新询盘 · 其他" count={others.length}
+          title={at.blockOthersTitle} count={others.length}
           badge={<RuleEngineBadge />}
-          previewLines={othersLines} emptyText="今日暂无其他待跟进"
+          previewLines={othersLines} emptyText={at.emptyOthers}
           onExpand={() => setExpanded('others')}
         />
 
