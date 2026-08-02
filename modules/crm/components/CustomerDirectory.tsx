@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Search, Globe, User, ChevronRight } from 'lucide-react';
-import { FollowUpTask } from '../types';
+import type { FollowUpTask } from '../types';
 import { getTaskBusinessId } from '../utils/businessId';
 
 // ── Dark theme tokens (matches FollowUpQueue/ProjectProgress) ──────────

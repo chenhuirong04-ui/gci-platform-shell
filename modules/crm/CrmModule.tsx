@@ -13,6 +13,7 @@ import FollowUpQueue from './components/FollowUpQueue';
 import HistoryView from './components/HistoryView';
 import ProjectProgress from './components/ProjectProgress';
 import CustomerDirectory from './components/CustomerDirectory';
+import BusinessRegister from './components/BusinessRegister';
 import InternalTasksView from './components/InternalTasksView';
 import ControlCenter from './components/ControlCenter';
 import AILeadAssistant from './components/AILeadAssistant';
@@ -211,6 +212,10 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
   const [detailOpen, setDetailOpen] = useState(false);
   const [navTasks, setNavTasks] = useState<FollowUpTask[]>([]);
   const [demoAiOpen, setDemoAiOpen] = useState(false);
+  // "项目与业务" defaults to the vertical BusinessRegister list; the existing
+  // Kanban/list/trade-followup views (ProjectProgress) are kept reachable as
+  // an explicit secondary view, not the default landing.
+  const [showProjectKanban, setShowProjectKanban] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
 
@@ -1387,32 +1392,49 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
           <InternalTasksView lang={lang} onShowToast={showToast as any} />
         )}
 
-        {activeTab === 'project' && (
-          <ProjectProgress
-            projects={combinedProjectsForView.filter(p => !p.deleted && !p.archivedAt)}
-            onAddProject={(p: any) => setProjects(v => [p, ...v])}
-            onUpdateProject={(p: any) => {
-              if (typeof p.id === 'string' && p.id.startsWith('SYNTH_')) {
-                const taskId = p.id.replace('SYNTH_', '');
-                setTasks(v => v.map(t =>
-                  t.id === taskId
-                    ? { ...t, tradeStatus: p.tradeStatus, updatedAt: new Date().toISOString() }
-                    : t
-                ));
-              } else {
-                setProjects(v => v.map(o => (o.id === p.id ? p : o)));
-              }
-            }}
-            onArchiveProject={(id: string) => {
-              if (id.startsWith('SYNTH_')) archiveTask(id.replace('SYNTH_', ''));
-              else archiveProject(id);
-            }}
-            onDeleteProject={(id: string) => deleteProject(id)}
-            lang={'zh'}
-            tradeItems={[] as any}
-            onAddTrade={() => {}}
-            onUpdateTrade={() => {}}
+        {activeTab === 'project' && !showProjectKanban && (
+          <BusinessRegister
+            tasks={normalizedTasks}
+            onSelectTask={(task) => { setSelectedTask(task); setDetailOpen(true); }}
+            onOpenKanban={() => setShowProjectKanban(true)}
           />
+        )}
+
+        {activeTab === 'project' && showProjectKanban && (
+          <div className="space-y-3">
+            <button
+              onClick={() => setShowProjectKanban(false)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all"
+              style={{ background: 'rgba(255,255,255,0.06)', color: '#7A9CC5' }}
+            >
+              ← 返回业务列表
+            </button>
+            <ProjectProgress
+              projects={combinedProjectsForView.filter(p => !p.deleted && !p.archivedAt)}
+              onAddProject={(p: any) => setProjects(v => [p, ...v])}
+              onUpdateProject={(p: any) => {
+                if (typeof p.id === 'string' && p.id.startsWith('SYNTH_')) {
+                  const taskId = p.id.replace('SYNTH_', '');
+                  setTasks(v => v.map(t =>
+                    t.id === taskId
+                      ? { ...t, tradeStatus: p.tradeStatus, updatedAt: new Date().toISOString() }
+                      : t
+                  ));
+                } else {
+                  setProjects(v => v.map(o => (o.id === p.id ? p : o)));
+                }
+              }}
+              onArchiveProject={(id: string) => {
+                if (id.startsWith('SYNTH_')) archiveTask(id.replace('SYNTH_', ''));
+                else archiveProject(id);
+              }}
+              onDeleteProject={(id: string) => deleteProject(id)}
+              lang={'zh'}
+              tradeItems={[] as any}
+              onAddTrade={() => {}}
+              onUpdateTrade={() => {}}
+            />
+          </div>
         )}
 
         {activeTab === 'history' && (
