@@ -73,6 +73,26 @@ function getGeminiKey(): string {
   return (import.meta as any).env?.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
 }
 
+// Display-layer mapping for the raw tradeStatus enum value (Notion 行动状态).
+// Never changes the stored/filtered value — only what's shown to the user.
+// Unmapped/unknown statuses fall back to the raw stored value.
+const TRADE_STATUS_LABEL_EN: Record<string, string> = {
+  '新询盘': 'New Inquiry',
+  '需求整理中': 'Requirements in Progress',
+  '待报价': 'Pending Quotation',
+  '已报价待确认': 'Quoted, Awaiting Confirmation',
+  '合同待签': 'Contract Pending Signature',
+  '执行中': 'In Progress',
+  '已交付': 'Delivered',
+  '暂缓': 'Paused',
+  '已成交': 'Closed Won',
+  '已归档': 'Archived',
+};
+function tradeStatusLabel(status: string, lang: 'zh' | 'en'): string {
+  if (lang === 'zh') return status;
+  return TRADE_STATUS_LABEL_EN[status] ?? status;
+}
+
 // ── Classification constants ──────────────────────────────────────────────────
 // ALL classification is status-field only. No keyword/text guessing allowed.
 // Source of truth: Notion 行动状态 → tradeStatus field in FollowUpTask.
@@ -132,8 +152,8 @@ function buildUrgent(tasks: FollowUpTask[], lang: 'zh' | 'en'): ActionItem[] {
           : t.suggestedAction || 'Grade A client — must make contact today');
 
       const reasons = lang === 'zh'
-        ? [t.tradeStatus, t.priority === 'A' ? 'A级' : '', od > 0 ? `逾期${od}天` : '今日到期'].filter(Boolean)
-        : [t.tradeStatus, t.priority === 'A' ? 'Grade A' : '', od > 0 ? `${od} day${od !== 1 ? 's' : ''} overdue` : 'Due today'].filter(Boolean);
+        ? [tradeStatusLabel(t.tradeStatus, lang), t.priority === 'A' ? 'A级' : '', od > 0 ? `逾期${od}天` : '今日到期'].filter(Boolean)
+        : [tradeStatusLabel(t.tradeStatus, lang), t.priority === 'A' ? 'Grade A' : '', od > 0 ? `${od} day${od !== 1 ? 's' : ''} overdue` : 'Due today'].filter(Boolean);
 
       return {
         id: t.id, clientName: t.clientName, problem, suggestion,
@@ -181,8 +201,8 @@ function buildWaitingClient(tasks: FollowUpTask[], urgentIds: Set<string>, lang:
             : od >= 2 ? 'Proactively nudge — offer further support or alternatives'
             : 'Keep following up — waiting on the client\'s internal decision'));
       const matchReason = lang === 'zh'
-        ? `状态: ${t.tradeStatus}${od > 0 ? ` · 已等${od}天` : ''}`
-        : `Status: ${t.tradeStatus}${od > 0 ? ` · waiting ${od} day${od !== 1 ? 's' : ''}` : ''}`;
+        ? `状态: ${tradeStatusLabel(t.tradeStatus, lang)}${od > 0 ? ` · 已等${od}天` : ''}`
+        : `Status: ${tradeStatusLabel(t.tradeStatus, lang)}${od > 0 ? ` · waiting ${od} day${od !== 1 ? 's' : ''}` : ''}`;
       return {
         id: t.id, clientName: t.clientName, problem, suggestion, matchReason,
         daysOverdue: Math.max(0, od), tradeStatus: t.tradeStatus, task: t, source: 'task' as const,
@@ -647,15 +667,16 @@ function buildOthers(
     .filter(t => t.status === 'todo' && !DONE_STATUSES.includes(t.tradeStatus) && !claimedIds.has(t.id))
     .map(t => {
       const od = calcDaysOverdue(t.nextFollowUpAt);
+      const statusLabel = tradeStatusLabel(t.tradeStatus, lang);
       const problem = lang === 'zh'
-        ? (od > 0 ? `状态: ${t.tradeStatus}，跟进计划逾期 ${od} 天` : od === 0 ? `状态: ${t.tradeStatus}，今日跟进` : `状态: ${t.tradeStatus}`)
-        : (od > 0 ? `Status: ${t.tradeStatus}, follow-up overdue by ${od} day${od !== 1 ? 's' : ''}` : od === 0 ? `Status: ${t.tradeStatus}, due today` : `Status: ${t.tradeStatus}`);
+        ? (od > 0 ? `状态: ${statusLabel}，跟进计划逾期 ${od} 天` : od === 0 ? `状态: ${statusLabel}，今日跟进` : `状态: ${statusLabel}`)
+        : (od > 0 ? `Status: ${statusLabel}, follow-up overdue by ${od} day${od !== 1 ? 's' : ''}` : od === 0 ? `Status: ${statusLabel}, due today` : `Status: ${statusLabel}`);
       const suggestion = lang === 'zh'
         ? (t.suggestedAction || '按计划推进，记录最新跟进情况')
         : (t.suggestedAction || 'Proceed as planned, log the latest follow-up status');
       const matchReason = lang === 'zh'
-        ? `状态: ${t.tradeStatus}${t.priority ? ` · ${t.priority}级` : ''}`
-        : `Status: ${t.tradeStatus}${t.priority ? ` · Grade ${t.priority}` : ''}`;
+        ? `状态: ${statusLabel}${t.priority ? ` · ${t.priority}级` : ''}`
+        : `Status: ${statusLabel}${t.priority ? ` · Grade ${t.priority}` : ''}`;
       return {
         id: t.id,
         clientName: t.clientName,
@@ -981,7 +1002,7 @@ export default function ActionCenter({ tasks, projects, followupTasks, pausedTas
     label: `${(a.task as any)?.businessId || getTaskBusinessId(a.task?.id || '')} ${a.clientName}`.trim(),
     meta: a.daysOverdue > 0
       ? (lang === 'zh' ? `等 ${a.daysOverdue} 天` : `Waiting ${a.daysOverdue} day${a.daysOverdue !== 1 ? 's' : ''}`)
-      : a.tradeStatus,
+      : tradeStatusLabel(a.tradeStatus, lang),
     urgent: a.daysOverdue >= 5,
   }));
 
@@ -990,7 +1011,7 @@ export default function ActionCenter({ tasks, projects, followupTasks, pausedTas
     label: `${(a.task as any)?.businessId || getTaskBusinessId(a.task?.id || '')} ${a.clientName}`.trim(),
     meta: a.daysOverdue > 0
       ? (lang === 'zh' ? `等 ${a.daysOverdue} 天` : `Waiting ${a.daysOverdue} day${a.daysOverdue !== 1 ? 's' : ''}`)
-      : dict.crm.controlCenter.stagePendingQuotation,
+      : tradeStatusLabel(a.tradeStatus, lang),
     urgent: false,
   }));
 
@@ -1008,7 +1029,7 @@ export default function ActionCenter({ tasks, projects, followupTasks, pausedTas
     label: `${(a.task as any)?.businessId || getTaskBusinessId(a.task?.id || '')} ${a.clientName}`.trim(),
     meta: a.daysOverdue > 0
       ? (lang === 'zh' ? `逾期 ${a.daysOverdue} 天` : `${a.daysOverdue} day${a.daysOverdue !== 1 ? 's' : ''} overdue`)
-      : a.tradeStatus,
+      : tradeStatusLabel(a.tradeStatus, lang),
     urgent: a.daysOverdue > 0,
   }));
 
