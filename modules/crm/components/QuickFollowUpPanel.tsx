@@ -621,6 +621,10 @@ export default function QuickFollowUpPanel({
                 value={task.owner || null} empty="负责人待分配 — 点击编辑" onClick={openEdit} />
               <InfoRow icon={<Building2 className="w-3.5 h-3.5" />} label="业务类型"
                 value={typeLabel} />
+              <InfoRow icon={<Calendar className="w-3.5 h-3.5" />} label="创建时间"
+                value={task.createdAt ? new Date(task.createdAt).toLocaleDateString('zh-CN') : null} empty="待补充" />
+              <InfoRow icon={<Clock className="w-3.5 h-3.5" />} label="最近更新时间"
+                value={task.updatedAt ? new Date(task.updatedAt).toLocaleDateString('zh-CN') : null} empty="待补充" />
 
               {/* Attachments */}
               <div className="flex items-start gap-3 py-2.5" style={{ borderBottom: `1px solid ${BORD}` }}>
