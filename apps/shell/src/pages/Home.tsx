@@ -50,6 +50,9 @@ function loadHomeStats() {
 }
 
 // ─── Priority alerts from real data ────────────────────────────────────────
+// Raw data is language-independent (loaded once on mount). Translated display
+// strings are derived at render time via formatAlert() so language toggles
+// never require re-fetching or re-deriving the underlying alert data.
 interface LiveAlert {
   dot: string;
   text: string;
@@ -61,9 +64,14 @@ interface LiveAlert {
   path: string;
 }
 
-function loadLiveAlerts(lang: 'zh' | 'en'): LiveAlert[] {
+type RawAlert =
+  | { kind: 'overdueFollowup'; clientName: string; overdueDays: number; ref: string }
+  | { kind: 'staleQuote'; clientName: string; age: number; ref: string }
+  | { kind: 'urgentOrder'; clientName: string; daysLeft: number; ref: string };
+
+function loadLiveAlerts(): RawAlert[] {
   const today = new Date().toISOString().split('T')[0];
-  const alerts: LiveAlert[] = [];
+  const alerts: RawAlert[] = [];
 
   // 1. Overdue CRM follow-ups (top 2) — same active filter as loadHomeStats
   const crmTasks: any[] = safeLocalGet('ICARE_HISTORY_V1');
@@ -80,18 +88,7 @@ function loadLiveAlerts(lang: 'zh' | 'en'): LiveAlert[] {
     const overdueDays = Math.round(
       (new Date(today).getTime() - new Date(t.nextFollowUpAt.slice(0, 10)).getTime()) / 86400000
     );
-    alerts.push({
-      dot: '#E0846A',
-      text: lang === 'zh'
-        ? `${t.clientName} — 跟进已逾期 ${overdueDays} 天`
-        : `${t.clientName} — follow-up overdue by ${overdueDays} day${overdueDays !== 1 ? 's' : ''}`,
-      ref: t.id ? t.id.slice(0, 16) : '',
-      src: 'CRM',
-      sc: '#8FA6D4',
-      sb: 'rgba(143,166,212,0.14)',
-      action: lang === 'zh' ? '跟进' : 'Follow up',
-      path: '/crm?tab=dashboard',
-    });
+    alerts.push({ kind: 'overdueFollowup', clientName: t.clientName, overdueDays, ref: t.id ? t.id.slice(0, 16) : '' });
   }
 
   // 2. Quoted orders waiting > 3 days (top 1)
@@ -108,16 +105,10 @@ function loadLiveAlerts(lang: 'zh' | 'en'): LiveAlert[] {
   if (stalequote) {
     const total = stalequote.grandTotal ? `AED ${Number(stalequote.grandTotal).toLocaleString()}` : '';
     alerts.push({
-      dot: '#D4A843',
-      text: lang === 'zh'
-        ? `${stalequote.clientName || stalequote.client || '客户'} — 报价已发出 ${stalequote.age} 天未回复`
-        : `${stalequote.clientName || stalequote.client || 'Client'} — quote sent ${stalequote.age} days ago, no reply`,
+      kind: 'staleQuote',
+      clientName: stalequote.clientName || stalequote.client || '',
+      age: stalequote.age,
       ref: [stalequote.docNo || stalequote.id?.slice(0, 12), total].filter(Boolean).join(' · '),
-      src: 'QUOTATION',
-      sc: '#D4A843',
-      sb: 'rgba(212,168,67,0.12)',
-      action: lang === 'zh' ? '查看' : 'View',
-      path: '/trade?tab=history',
     });
   }
 
@@ -134,20 +125,65 @@ function loadLiveAlerts(lang: 'zh' | 'en'): LiveAlert[] {
 
   if (urgentOrder) {
     alerts.push({
-      dot: '#D4A843',
-      text: lang === 'zh'
-        ? `${urgentOrder.clientName || urgentOrder.client || '订单'} — 交期还有 ${urgentOrder.daysLeft} 天`
-        : `${urgentOrder.clientName || urgentOrder.client || 'Order'} — due in ${urgentOrder.daysLeft} day${urgentOrder.daysLeft !== 1 ? 's' : ''}`,
+      kind: 'urgentOrder',
+      clientName: urgentOrder.clientName || urgentOrder.client || '',
+      daysLeft: urgentOrder.daysLeft,
       ref: [urgentOrder.docNo || urgentOrder.id?.slice(0, 12), urgentOrder.dueDate].filter(Boolean).join(' · '),
-      src: 'TRADE',
-      sc: '#8FA6D4',
-      sb: 'rgba(143,166,212,0.14)',
-      action: lang === 'zh' ? '确认' : 'Check',
-      path: '/trade?tab=history',
     });
   }
 
   return alerts.slice(0, 3);
+}
+
+// Render-time translation — takes raw, language-independent alert data and
+// the current language, and produces the display strings. Pure function,
+// called on every render; never stored in state.
+function formatAlert(a: RawAlert, lang: 'zh' | 'en'): LiveAlert {
+  switch (a.kind) {
+    case 'overdueFollowup':
+      return {
+        dot: '#E0846A',
+        text: lang === 'zh'
+          ? `${a.clientName} — 跟进已逾期 ${a.overdueDays} 天`
+          : `${a.clientName} — follow-up overdue by ${a.overdueDays} day${a.overdueDays !== 1 ? 's' : ''}`,
+        ref: a.ref,
+        src: 'CRM',
+        sc: '#8FA6D4',
+        sb: 'rgba(143,166,212,0.14)',
+        action: lang === 'zh' ? '跟进' : 'Follow up',
+        path: '/crm?tab=dashboard',
+      };
+    case 'staleQuote': {
+      const name = a.clientName || (lang === 'zh' ? '客户' : 'Client');
+      return {
+        dot: '#D4A843',
+        text: lang === 'zh'
+          ? `${name} — 报价已发出 ${a.age} 天未回复`
+          : `${name} — quote sent ${a.age} days ago, no reply`,
+        ref: a.ref,
+        src: 'QUOTATION',
+        sc: '#D4A843',
+        sb: 'rgba(212,168,67,0.12)',
+        action: lang === 'zh' ? '查看' : 'View',
+        path: '/trade?tab=history',
+      };
+    }
+    case 'urgentOrder': {
+      const name = a.clientName || (lang === 'zh' ? '订单' : 'Order');
+      return {
+        dot: '#D4A843',
+        text: lang === 'zh'
+          ? `${name} — 交期还有 ${a.daysLeft} 天`
+          : `${name} — due in ${a.daysLeft} day${a.daysLeft !== 1 ? 's' : ''}`,
+        ref: a.ref,
+        src: 'TRADE',
+        sc: '#8FA6D4',
+        sb: 'rgba(143,166,212,0.14)',
+        action: lang === 'zh' ? '确认' : 'Check',
+        path: '/trade?tab=history',
+      };
+    }
+  }
 }
 
 // ─── Quick Actions config (with real navigation paths) ─────────────────────
@@ -225,13 +261,16 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
     inventoryAlerts: number | null;
   }>({ followUpsToday: null, pendingQuotes: null, activeOrders: null, inventoryAlerts: null });
 
-  const [liveAlerts, setLiveAlerts] = useState<LiveAlert[] | null>(null);
+  const [liveAlerts, setLiveAlerts] = useState<RawAlert[] | null>(null);
   const [inventoryDrawerOpen, setInventoryDrawerOpen] = useState(false);
 
+  // Data load is language-independent — runs once on mount only. Language
+  // toggles must never re-trigger these requests (see formatAlert() above
+  // for how display text is derived at render time instead).
   useEffect(() => {
     const s = loadHomeStats();
     setStats(s);
-    setLiveAlerts(loadLiveAlerts(lang));
+    setLiveAlerts(loadLiveAlerts());
 
     // Fetch combined inventory alert count: warehouse (Notion) + consignment (Supabase)
     const base = typeof window !== 'undefined' ? window.location.origin : '';
@@ -245,7 +284,7 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
     }).catch(() => {
       // Silent fail — card shows '--' if APIs unavailable
     });
-  }, [lang]);
+  }, []);
 
   // Dynamic summary line based on real counts
   function buildSummary() {
@@ -269,7 +308,7 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
     { ...statCardSpecs[3], val: stats.inventoryAlerts !== null ? String(stats.inventoryAlerts) : '--', mod: dict.workspace.modInventory },
   ];
 
-  const alertsToShow = liveAlerts ?? [];
+  const alertsToShow = (liveAlerts ?? []).map(a => formatAlert(a, lang));
 
   return (
     <div style={{ maxWidth: 'var(--content-max-w)', margin: '0 auto', padding: '48px 48px 60px' }}>
