@@ -8,12 +8,12 @@ import { notionSyncService } from './services/notionSync';
 import { ADMIN_IMPORT_TASKS, ADMIN_IMPORT_PROJECTS } from './adminImportData';
 import LeadMasterDetail from './components/LeadMasterDetail';
 import QuickFollowUpPanel from './components/QuickFollowUpPanel';
-import AIIntakePanel from './components/AIIntakePanel';
 import FollowUpQueue from './components/FollowUpQueue';
 import HistoryView from './components/HistoryView';
 import ProjectProgress from './components/ProjectProgress';
 import CustomerDirectory from './components/CustomerDirectory';
 import BusinessRegister from './components/BusinessRegister';
+import UnifiedIntakeModal from './components/UnifiedIntakeModal';
 import InternalTasksView from './components/InternalTasksView';
 import ControlCenter from './components/ControlCenter';
 import AILeadAssistant from './components/AILeadAssistant';
@@ -205,7 +205,6 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(() => demoMode ? null : notionSyncService.getLastSyncAt());
   // Authoritative today-follow-up count from API (Follow-up Log only, before orphan merge)
   const [todayFollowupCount, setTodayFollowupCount] = useState<number | null>(null);
-  const [intakeOpen, setIntakeOpen] = useState(!demoMode); // Demo never opens the production intake workflow.
   const [selectedTask, setSelectedTask] = useState<FollowUpTask | null>(null);
   // detailOpen: whether the slide-over panel is visible. Kept separate from
   // selectedTask so closing the panel does not lose the current customer context.
@@ -216,6 +215,12 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
   // Kanban/list/trade-followup views (ProjectProgress) are kept reachable as
   // an explicit secondary view, not the default landing.
   const [showProjectKanban, setShowProjectKanban] = useState(false);
+  // Single unified "新增客户 / 业务" entry point for Customers & Projects —
+  // replaces the old separate AIIntakePanel-in-comms toggle and the
+  // ProjectProgress "手动建档" button (now hidden). All three paths inside
+  // (AI intake / manual create / add follow-up to existing) share the same
+  // handleAddTask save path below.
+  const [intakeModalOpen, setIntakeModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
 
@@ -1258,19 +1263,30 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
           </div>
         </div>
         {isInCustomersAndProjects && (
-          <div className="max-w-7xl mx-auto flex items-center gap-1.5 pb-2.5 overflow-x-auto">
-            {subTabs.map(tab => (
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-1.5 pb-2.5 overflow-x-auto">
+            <div className="flex items-center gap-1.5">
+              {subTabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className="shrink-0 px-3.5 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all"
+                  style={activeTab === tab.id
+                    ? { background: 'rgba(203,168,92,0.16)', color: '#E2C988', border: '1px solid rgba(203,168,92,0.3)' }
+                    : { background: 'transparent', color: '#5B7092', border: '1px solid transparent' }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            {!demoMode && (
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className="shrink-0 px-3.5 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all"
-                style={activeTab === tab.id
-                  ? { background: 'rgba(203,168,92,0.16)', color: '#E2C988', border: '1px solid rgba(203,168,92,0.3)' }
-                  : { background: 'transparent', color: '#5B7092', border: '1px solid transparent' }}
+                onClick={() => setIntakeModalOpen(true)}
+                className="shrink-0 px-3.5 py-1.5 rounded-lg text-[11px] font-black whitespace-nowrap transition-all"
+                style={{ background: '#B8960C', color: '#fff' }}
               >
-                {tab.label}
+                ＋ 新增客户 / 业务
               </button>
-            ))}
+            )}
           </div>
         )}
       </nav>
@@ -1336,30 +1352,10 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
 
         {activeTab === 'comms' && (
           <div className="space-y-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-black" style={{ color: '#E8F0FF' }}>沟通记录</h2>
-                <p className="text-sm font-medium mt-0.5" style={{ color: '#7A9CC5' }}>AI 辅助跟进 · 所有待处理记录</p>
-              </div>
-              {!demoMode && <button
-                onClick={() => setIntakeOpen(v => !v)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all"
-                style={{ background: 'rgba(255,255,255,0.07)', color: '#7A9CC5', border: '1px solid rgba(255,255,255,0.12)' }}
-              >
-                {intakeOpen ? '收起录入 ↑' : '展开录入 ↓'}
-              </button>}
+            <div>
+              <h2 className="text-2xl font-black" style={{ color: '#E8F0FF' }}>沟通记录</h2>
+              <p className="text-sm font-medium mt-0.5" style={{ color: '#7A9CC5' }}>直接读取 Follow-up Log · 新增记录请使用右上角"新增客户 / 业务"</p>
             </div>
-
-            {intakeOpen && (
-              <AIIntakePanel
-                onAdd={async (data) => {
-                  await handleAddTask(data);
-                  showToast('记录已创建', 'success');
-                }}
-                isLoading={isGenerating}
-                projects={projects}
-              />
-            )}
 
             <FollowUpQueue
               tasks={normalizedTasks}
@@ -1491,6 +1487,43 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
           }}
         />
       )}
+
+      <UnifiedIntakeModal
+        open={intakeModalOpen}
+        onClose={() => setIntakeModalOpen(false)}
+        tasks={normalizedTasks}
+        projects={projects}
+        isLoading={isGenerating}
+        onAdd={async (data) => {
+          await handleAddTask(data);
+          showToast('记录已创建', 'success');
+        }}
+        onAppendFollowUp={(taskId, log) => {
+          const now = new Date().toISOString();
+          setTasks(prev => prev.map(t => {
+            if (t.id !== taskId) return t;
+            return {
+              ...t,
+              nextFollowUpAt: log.nextDate,
+              // Matches the same (pre-existing, already-tolerated) informal
+              // 'follow_up' log-entry shape used by QuickFollowUpPanel's
+              // onSave above — FollowUpLog's declared type union doesn't
+              // include it, hence the cast, consistent with that call site.
+              history: [
+                {
+                  id: `quick-${Date.now()}`,
+                  timestamp: now,
+                  message: `[${log.method}] ${log.content}`,
+                  type: 'follow_up',
+                  by: 'Admin',
+                },
+                ...(t.history || []),
+              ] as FollowUpTask['history'],
+            };
+          }));
+          showToast('跟进记录已保存', 'success');
+        }}
+      />
 
       {demoMode && demoAiOpen && selectedTask && (
         <div data-testid="demo-ai-panel" className="fixed inset-0 z-[4000] overflow-y-auto bg-slate-950/80 p-6 backdrop-blur-sm">
