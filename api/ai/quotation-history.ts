@@ -113,7 +113,12 @@ export default async function handler(request: Request): Promise<Response> {
   const normalizedCustomer = rawCustomer ? cleanCustomer(rawCustomer) : '';
   const searchTerms        = normalizedCustomer ? generateSearchTerms(normalizedCustomer) : [];
 
-  const selectCols = 'id,quote_no,customer_name,project_name,grand_total,status,created_at,quote_date,salesperson,quote_type,phone_wa,margin_percent,vat_amount,selling_total,archivedAt,hiddenFromDefault,archiveReason';
+  // Note: archivedAt/hiddenFromDefault/archiveReason were previously requested
+  // here but do not exist as columns on quotation_records (no writer anywhere
+  // in the codebase ever sets them) — PostgREST rejected every query with a
+  // 400 because of this. Removed; isArchived/archiveReason below are hardcoded
+  // to their always-was-effectively-null values instead.
+  const selectCols = 'id,quote_no,customer_name,project_name,grand_total,status,created_at,quote_date,salesperson,quote_type,phone_wa,margin_percent,vat_amount,selling_total';
 
   // When a product keyword is provided, we first find quotation_items matching
   // the product, then filter records to only those containing that item.
@@ -244,7 +249,10 @@ export default async function handler(request: Request): Promise<Response> {
   }
 
   const quotes = rows.map(q => {
-    const isArchived = !!(q.archivedAt || q.hiddenFromDefault);
+    // archivedAt/hiddenFromDefault columns don't exist on this table (see
+    // selectCols comment above) — no writer has ever set an archive flag, so
+    // this was always effectively false for every real record.
+    const isArchived = false;
     const isCrmRecord = q.quote_type === 'CRM_RECORD';
     // Extract sourceTaskId from phone_wa (format: 'CRM_TASK:{id}')
     const sourceTaskId = isCrmRecord && q.phone_wa?.startsWith('CRM_TASK:')
@@ -275,7 +283,7 @@ export default async function handler(request: Request): Promise<Response> {
       items:        isCrmRecord ? [] : (itemsMap[q.id]?.valid || []),
       hiddenInvalidItemsCount: itemsMap[q.id]?.hiddenCount || 0,
       isArchived,
-      archiveReason: q.archiveReason || null,
+      archiveReason: null,
       // CRM留底专用
       ...(isCrmRecord ? {
         amountStatus:  Number(q.grand_total) > 0 ? 'structured' : 'not_structured',

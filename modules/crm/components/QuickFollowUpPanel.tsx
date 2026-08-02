@@ -758,7 +758,7 @@ export default function QuickFollowUpPanel({
               {!quoteLoading && quoteData && !quoteData.ok && (
                 <div className="px-3 py-2 rounded-lg text-xs font-bold"
                   style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#FCA5A5' }}>
-                  {quoteData.error || '查询失败'}
+                  暂时无法读取历史报价，请稍后重试。
                 </div>
               )}
 
