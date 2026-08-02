@@ -12,6 +12,7 @@ import AIIntakePanel from './components/AIIntakePanel';
 import FollowUpQueue from './components/FollowUpQueue';
 import HistoryView from './components/HistoryView';
 import ProjectProgress from './components/ProjectProgress';
+import CustomerDirectory from './components/CustomerDirectory';
 import InternalTasksView from './components/InternalTasksView';
 import ControlCenter from './components/ControlCenter';
 import AILeadAssistant from './components/AILeadAssistant';
@@ -178,8 +179,8 @@ function PasswordGate({ onPass }: { onPass: () => void }) {
    CRM Module — 迁移自 AppInner（不再渲染 AppShell/Sidebar/Header，
    GCI Platform 壳全局提供）。Day 4-5 monorepo 合并计划。
    ========================= */
-type CrmTab = 'control' | 'dashboard' | 'history' | 'project' | 'internal';
-const _crmValidTabs = ['control', 'dashboard', 'history', 'project', 'internal'] as const;
+type CrmTab = 'control' | 'dashboard' | 'history' | 'project' | 'internal' | 'comms';
+const _crmValidTabs = ['control', 'dashboard', 'history', 'project', 'internal', 'comms'] as const;
 
 function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoMode?: boolean }) {
   const { dict, lang } = useI18n();
@@ -1151,7 +1152,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
   // inside "客户与项目". activeTab's underlying values are unchanged so old
   // ?tab= deep links keep working; this only changes how the tab bar groups
   // and labels them.
-  const CUSTOMERS_AND_PROJECTS_TABS = ['dashboard', 'project', 'history'] as const;
+  const CUSTOMERS_AND_PROJECTS_TABS = ['dashboard', 'project', 'comms', 'history'] as const;
   const isInCustomersAndProjects = (CUSTOMERS_AND_PROJECTS_TABS as readonly string[]).includes(activeTab);
 
   const topGroups = [
@@ -1163,6 +1164,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
   const subTabs = [
     { id: 'dashboard' as const, label: dict.crm.nav.subNavCustomers },
     { id: 'project' as const,   label: dict.crm.nav.subNavBusiness },
+    { id: 'comms' as const,     label: dict.crm.nav.subNavComms },
     { id: 'history' as const,   label: dict.crm.nav.subNavArchived },
   ];
 
@@ -1321,10 +1323,17 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
         )}
 
         {activeTab === 'dashboard' && (
+          <CustomerDirectory
+            tasks={normalizedTasks}
+            onSelectTask={(task) => { setSelectedTask(task); setDetailOpen(true); }}
+          />
+        )}
+
+        {activeTab === 'comms' && (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-black" style={{ color: '#E8F0FF' }}>客户跟进</h2>
+                <h2 className="text-2xl font-black" style={{ color: '#E8F0FF' }}>沟通记录</h2>
                 <p className="text-sm font-medium mt-0.5" style={{ color: '#7A9CC5' }}>AI 辅助跟进 · 所有待处理记录</p>
               </div>
               {!demoMode && <button
@@ -1419,7 +1428,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
         )}
       </main>
 
-      {selectedTask && detailOpen && activeTab === 'dashboard' && (
+      {selectedTask && detailOpen && (activeTab === 'dashboard' || activeTab === 'comms') && (
         <QuickFollowUpPanel
           task={selectedTask}
           onClose={() => setDetailOpen(false)}
@@ -1506,7 +1515,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
         </div>
       )}
 
-      {selectedTask && detailOpen && activeTab !== 'dashboard' && (
+      {selectedTask && detailOpen && activeTab !== 'dashboard' && activeTab !== 'comms' && (
         <LeadMasterDetail
           task={selectedTask}
           onClose={() => setDetailOpen(false)}
