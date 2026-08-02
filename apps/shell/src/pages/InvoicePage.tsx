@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
+import { useI18n } from '@gci/i18n';
 import type { InvoiceDraft, BillingProfile } from '../types/invoice';
 import { INVOICE_STATUS_LABELS, INVOICE_STATUS_COLORS } from '../types/invoice';
 import {
@@ -26,16 +27,18 @@ function fmt(n: number) {
 
 // ── Cloud Sync badge ──────────────────────────────────────────────────────────
 function CloudBadge({ status }: { status: ReturnType<typeof getCloudStatus> }) {
+  const { dict } = useI18n();
+  const t = dict.invoicePage;
   const connected = status === 'connected';
   const unknown   = status === 'unknown';
   const color  = connected ? '#6FBF8E' : unknown ? MUTED : '#D4A843';
   const bg     = connected ? 'rgba(111,191,142,0.10)' : unknown ? 'rgba(255,255,255,0.04)' : 'rgba(212,168,67,0.10)';
   const border = connected ? 'rgba(111,191,142,0.30)' : unknown ? 'rgba(255,255,255,0.1)' : 'rgba(212,168,67,0.35)';
   const label  = connected
-    ? 'Cloud Sync: Connected — 迪拜 & 中国团队共享'
+    ? t.cloudConnected
     : unknown
-    ? 'Cloud Sync: Checking…'
-    : 'Cloud Sync: Fallback — 仅本地，团队不可见';
+    ? t.cloudChecking
+    : t.cloudFallback;
 
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 14px', borderRadius: 20, background: bg, border: `1px solid ${border}` }}>
@@ -52,18 +55,28 @@ function DraftsList({ drafts, loading, onStatusChange }: {
   onStatusChange: (id: string, status: InvoiceDraft['status']) => void;
 }) {
   const { user } = useAuth();
+  const { dict } = useI18n();
+  const t = dict.invoicePage;
+  const STATUS_LABEL: Record<InvoiceDraft['status'], string> = {
+    draft:            t.statusDraft,
+    waiting_approval: t.statusWaitingApproval,
+    approved:         t.statusApproved,
+    issued:           t.statusIssued,
+    cancelled:        t.statusCancelled,
+    paid:             t.statusPaid,
+  };
   const [preview, setPreview] = useState<InvoiceDraft | null>(null);
 
   if (loading) {
-    return <div style={{ padding: '60px 24px', textAlign: 'center', color: MUTED, fontSize: 13, fontFamily: 'IBM Plex Mono, monospace' }}>Loading invoices from Supabase…</div>;
+    return <div style={{ padding: '60px 24px', textAlign: 'center', color: MUTED, fontSize: 13, fontFamily: 'IBM Plex Mono, monospace' }}>{t.loadingInvoices}</div>;
   }
 
   if (drafts.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '80px 24px', color: MUTED }}>
         <div style={{ fontSize: 36, marginBottom: 16, opacity: 0.3 }}>🧾</div>
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>暂无发票草稿</div>
-        <div style={{ fontSize: 13 }}>在 AI Workspace 输入「帮我做一张发票」开始创建</div>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>{t.noDraftsTitle}</div>
+        <div style={{ fontSize: 13 }}>{t.noDraftsHint}</div>
       </div>
     );
   }
@@ -85,8 +98,8 @@ function DraftsList({ drafts, loading, onStatusChange }: {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span style={{ fontSize: 12, fontFamily: 'IBM Plex Mono, monospace', color: GOLD }}>{d.invoiceNo}</span>
-                    <span style={{ fontSize: 10.5, color: sc.color, background: sc.bg, borderRadius: 4, padding: '2px 8px', fontFamily: 'IBM Plex Mono, monospace' }}>{INVOICE_STATUS_LABELS[d.status]}</span>
-                    {ismine && <span style={{ fontSize: 9.5, color: '#505A70', fontFamily: 'IBM Plex Mono, monospace' }}>YOU</span>}
+                    <span style={{ fontSize: 10.5, color: sc.color, background: sc.bg, borderRadius: 4, padding: '2px 8px', fontFamily: 'IBM Plex Mono, monospace' }}>{STATUS_LABEL[d.status] ?? INVOICE_STATUS_LABELS[d.status]}</span>
+                    {ismine && <span style={{ fontSize: 9.5, color: '#505A70', fontFamily: 'IBM Plex Mono, monospace' }}>{t.youBadge}</span>}
                   </div>
                   <span style={{ fontSize: 14, fontWeight: 700, color: TEXT }}>{d.currency} {fmt(d.total)}</span>
                 </div>
@@ -106,19 +119,19 @@ function DraftsList({ drafts, loading, onStatusChange }: {
         <div style={{ width: 460, flexShrink: 0 }}>
           <div style={{ position: 'sticky', top: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <span style={{ fontSize: 11, color: GOLD, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.15em' }}>INVOICE PREVIEW</span>
+              <span style={{ fontSize: 11, color: GOLD, fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.15em' }}>{t.invoicePreviewLabel}</span>
               <div style={{ display: 'flex', gap: 6 }}>
                 {preview.status === 'draft' && (
                   <button
                     onClick={() => onStatusChange(preview.id, 'waiting_approval')}
                     style={{ padding: '5px 12px', borderRadius: 6, background: 'rgba(212,168,67,0.15)', border: '1px solid rgba(212,168,67,0.35)', color: '#D4A843', fontSize: 11, cursor: 'pointer' }}
-                  >Submit for Approval</button>
+                  >{t.submitForApproval}</button>
                 )}
                 {preview.status === 'waiting_approval' && (
                   <button
                     onClick={() => onStatusChange(preview.id, 'approved')}
                     style={{ padding: '5px 12px', borderRadius: 6, background: 'rgba(111,191,142,0.15)', border: '1px solid rgba(111,191,142,0.35)', color: '#6FBF8E', fontSize: 11, cursor: 'pointer' }}
-                  >Approve</button>
+                  >{t.approve}</button>
                 )}
                 <button onClick={() => setPreview(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, fontSize: 18, lineHeight: 1 }}>×</button>
               </div>
@@ -135,9 +148,11 @@ function DraftsList({ drafts, loading, onStatusChange }: {
 
 // ── Billing profiles list ─────────────────────────────────────────────────────
 function ProfilesList({ profiles, loading, onAdded }: { profiles: BillingProfile[]; loading: boolean; onAdded: (p: BillingProfile) => void }) {
+  const { dict } = useI18n();
+  const t = dict.invoicePage;
   const [showPanel, setShowPanel] = useState(false);
   if (loading) {
-    return <div style={{ padding: '60px 24px', textAlign: 'center', color: MUTED, fontSize: 13, fontFamily: 'IBM Plex Mono, monospace' }}>Loading billing profiles from Supabase…</div>;
+    return <div style={{ padding: '60px 24px', textAlign: 'center', color: MUTED, fontSize: 13, fontFamily: 'IBM Plex Mono, monospace' }}>{t.loadingProfiles}</div>;
   }
 
   return (
@@ -148,7 +163,7 @@ function ProfilesList({ profiles, loading, onAdded }: { profiles: BillingProfile
           <button
             onClick={() => setShowPanel(true)}
             style={{ padding: '10px 22px', borderRadius: 9, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: '#000', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}
-          >+ 新增开票资料</button>
+          >{t.addBillingProfile}</button>
         )}
         {showPanel && (
           <BillingProfileDraftPanel
@@ -162,8 +177,8 @@ function ProfilesList({ profiles, loading, onAdded }: { profiles: BillingProfile
       {profiles.length === 0 && !showPanel && (
         <div style={{ textAlign: 'center', padding: '60px 24px', color: MUTED }}>
           <div style={{ fontSize: 36, marginBottom: 16, opacity: 0.3 }}>🏢</div>
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>暂无账单资料</div>
-          <div style={{ fontSize: 13 }}>点击上方「新增开票资料」，或在 AI Workspace 输入「帮我保存开票资料」</div>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>{t.noProfilesTitle}</div>
+          <div style={{ fontSize: 13 }}>{t.noProfilesHint}</div>
         </div>
       )}
 
@@ -172,14 +187,14 @@ function ProfilesList({ profiles, loading, onAdded }: { profiles: BillingProfile
           <div key={p.id} style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '18px 20px' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: TEXT, marginBottom: 4 }}>{p.customerName}</div>
             {p.billingName && p.billingName !== p.customerName && (
-              <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 4 }}>Billing: {p.billingName}</div>
+              <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 4 }}>{t.billingLabel}: {p.billingName}</div>
             )}
             <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 2 }}>{p.billingAddress}</div>
             {p.trn && <div style={{ fontSize: 11, color: MUTED, fontFamily: 'monospace', marginBottom: 2 }}>TRN: {p.trn}</div>}
             {p.phone && <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 2 }}>{p.phone}</div>}
             <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 10.5, color: GOLD, fontFamily: 'IBM Plex Mono, monospace' }}>{p.defaultCurrency} · VAT {p.defaultVatRate}%</span>
-              {p.lastInvoiceDate && <span style={{ fontSize: 10.5, color: MUTED }}>Last invoice: {p.lastInvoiceDate}</span>}
+              {p.lastInvoiceDate && <span style={{ fontSize: 10.5, color: MUTED }}>{t.lastInvoiceLabel}: {p.lastInvoiceDate}</span>}
             </div>
           </div>
         ))}
@@ -192,6 +207,8 @@ function ProfilesList({ profiles, loading, onAdded }: { profiles: BillingProfile
 export function InvoicePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { dict, lang } = useI18n();
+  const t = dict.invoicePage;
 
   const [tab, setTab] = useState<PageTab>('drafts');
   const [drafts, setDrafts]     = useState<InvoiceDraft[]>([]);
@@ -225,13 +242,13 @@ export function InvoicePage() {
               Invoice Manager
             </h1>
             <p style={{ fontSize: 14, color: MUTED, margin: 0 }}>
-              发票草稿 & 账单资料管理 — 所有发票在正式审批前均为 Draft 状态
+              {t.subtitle}
             </p>
           </div>
           <button
-            onClick={() => navigate('/ai?q=' + encodeURIComponent('帮我做一张发票'))}
+            onClick={() => navigate('/ai?q=' + encodeURIComponent(lang === 'en' ? 'Create an invoice for me' : '帮我做一张发票'))}
             style={{ padding: '11px 22px', borderRadius: 10, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: '#000', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif", flexShrink: 0 }}
-          >+ 新建发票</button>
+          >{t.createInvoice}</button>
         </div>
         <CloudBadge status={cloudStatus} />
       </div>
@@ -239,16 +256,16 @@ export function InvoicePage() {
       {/* Tab bar */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 28, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 0 }}>
         {([
-          { key: 'drafts',   label: '发票草稿',    count: drafts.length },
-          { key: 'profiles', label: '账单资料库',   count: profiles.length },
-        ] as { key: PageTab; label: string; count: number }[]).map(t => (
+          { key: 'drafts',   label: t.tabDrafts,    count: drafts.length },
+          { key: 'profiles', label: t.tabProfiles,   count: profiles.length },
+        ] as { key: PageTab; label: string; count: number }[]).map(tb => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: tab === t.key ? `2px solid ${GOLD}` : '2px solid transparent', color: tab === t.key ? GOLD_L : MUTED, fontSize: 13.5, fontWeight: tab === t.key ? 600 : 400, fontFamily: "'Space Grotesk',sans-serif", transition: 'all 0.15s', marginBottom: -1 }}
+            key={tb.key}
+            onClick={() => setTab(tb.key)}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: tab === tb.key ? `2px solid ${GOLD}` : '2px solid transparent', color: tab === tb.key ? GOLD_L : MUTED, fontSize: 13.5, fontWeight: tab === tb.key ? 600 : 400, fontFamily: "'Space Grotesk',sans-serif", transition: 'all 0.15s', marginBottom: -1 }}
           >
-            {t.label}
-            <span style={{ fontSize: 10.5, background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: '1px 7px', color: MUTED, fontFamily: 'IBM Plex Mono, monospace' }}>{t.count}</span>
+            {tb.label}
+            <span style={{ fontSize: 10.5, background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: '1px 7px', color: MUTED, fontFamily: 'IBM Plex Mono, monospace' }}>{tb.count}</span>
           </button>
         ))}
       </div>

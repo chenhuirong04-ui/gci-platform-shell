@@ -1,6 +1,7 @@
 // Paper-style invoice preview matching the actual GCI TAX INVOICE template.
 import type { InvoiceDraft } from '../../types/invoice';
 import { GCI_COMPANY } from '../../types/invoice';
+import { useI18n } from '@gci/i18n';
 
 const GREEN = '#2D6A4F';
 const GREEN_BG = '#2D6A4F';
@@ -79,10 +80,11 @@ interface Props {
 }
 
 export function InvoicePreview({ draft, printAreaId }: Props & { printAreaId?: string }) {
+  const { dict } = useI18n();
   if (!draft) {
     return (
       <div style={{ padding: 32, background: '#fff', color: '#c00', fontFamily: 'Arial,sans-serif' }}>
-        发票预览数据不完整，请返回修改。
+        {dict.invoicePage.previewIncompleteError}
       </div>
     );
   }

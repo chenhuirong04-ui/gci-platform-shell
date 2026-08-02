@@ -124,23 +124,24 @@ function DupeWarning({ existing, onUpdate, onCreateNew, onCancel }: {
   onCancel: () => void;
 }) {
   const { dict } = useI18n();
+  const t = dict.ai.billing;
   return (
     <div style={{ background: 'rgba(212,168,67,0.08)', border: '1px solid rgba(212,168,67,0.3)', borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
-      <div style={{ fontSize: 12, color: '#D4A843', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, marginBottom: 8 }}>⚠ {dict.ai.billing.duplicateTitle}</div>
+      <div style={{ fontSize: 12, color: '#D4A843', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, marginBottom: 8 }}>⚠ {t.duplicateTitle}</div>
       <div style={{ fontSize: 14, color: TEXT, marginBottom: 6 }}>
-        已找到相同客户开票资料：<strong>{existing.customerName}</strong>
+        {t.dupeFoundLabel} <strong>{existing.customerName}</strong>
       </div>
       {existing.trn && <div style={{ fontSize: 13, color: MUTED, fontFamily: 'monospace', marginBottom: 12 }}>TRN: {existing.trn}</div>}
-      <div style={{ fontSize: 13, color: MUTED, marginBottom: 14 }}>是否更新现有资料，还是新建一条？</div>
+      <div style={{ fontSize: 13, color: MUTED, marginBottom: 14 }}>{t.dupeQuestion}</div>
       <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={onUpdate} style={{ flex: 1, padding: '10px', borderRadius: 7, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: '#000', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
-          更新现有资料
+          {t.updateExisting}
         </button>
         <button onClick={onCreateNew} style={{ flex: 1, padding: '10px', borderRadius: 7, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)', color: TEXT, fontSize: 14, cursor: 'pointer' }}>
-          新建一条
+          {t.createNewOne}
         </button>
         <button onClick={onCancel} style={{ padding: '10px 14px', borderRadius: 7, background: 'none', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>
-          取消
+          {t.cancelBtn}
         </button>
       </div>
     </div>
@@ -160,6 +161,7 @@ interface Props {
 export function BillingProfileDraftPanel({ initialText = '', directMode = false, onClose, onSaved }: Props) {
   const { user } = useAuth();
   const { dict } = useI18n();
+  const t = dict.ai.billing;
 
   // 0 = text paste (AI mode), 1 = review form, 2 = saved
   const [step, setStep] = useState(directMode ? 1 : 0);
@@ -240,9 +242,7 @@ export function BillingProfileDraftPanel({ initialText = '', directMode = false,
     onSaved?.(updated ?? dupe);
   }
 
-  const STEPS = directMode
-    ? ['填写开票资料', '已保存']
-    : ['粘贴原始信息', '确认 / 编辑', '已保存'];
+  const STEPS = directMode ? t.stepsDirectMode : t.stepsWizardMode;
 
   const stepIndex = directMode ? (step === 1 ? 0 : 1) : step;
 
@@ -256,7 +256,7 @@ export function BillingProfileDraftPanel({ initialText = '', directMode = false,
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: GOLD }} />
           <span style={{ fontSize: 13, color: GOLD, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }}>
-            {directMode ? dict.ai.billing.panelTitle : 'AI 助手 · 保存开票资料'}
+            {directMode ? t.panelTitle : t.aiPanelTitle}
           </span>
         </div>
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, fontSize: 22, lineHeight: 1, padding: 0 }}>×</button>
@@ -282,25 +282,25 @@ export function BillingProfileDraftPanel({ initialText = '', directMode = false,
         {step === 0 && (
           <div>
             <div style={{ fontSize: 14, color: MUTED, marginBottom: 16 }}>
-              将客户开票信息粘贴到下方。系统会自动识别公司名、地址、TRN、电话等字段。
+              {t.pasteHint}
             </div>
             <textarea
               value={rawText}
               onChange={e => setRawText(e.target.value)}
-              placeholder={'帮我把这个客户的开票资料存起来：\n\n公司名 IFZA FZCO\n地址 DSO-IFZA, Dubai Digital Park...\n电话 +971 4 228 5285\nTRN 100442089700003'}
+              placeholder={t.pastePlaceholder}
               rows={8}
               style={{ ...inputStyle, resize: 'vertical', fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.6 }}
             />
             <div style={{ fontSize: 12, color: DIM, marginTop: 8, marginBottom: 20, fontFamily: 'IBM Plex Mono, monospace' }}>
-              Source reference only. File / OCR extraction not connected in V1.
+              {t.sourceRefOnlyNote}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button
                 onClick={applyExtraction}
                 disabled={!rawText.trim()}
                 style={{ flex: 1, padding: '11px', borderRadius: 8, background: rawText.trim() ? `linear-gradient(135deg,${GOLD},${GOLD_L})` : 'rgba(255,255,255,0.06)', border: 'none', color: '#000', fontWeight: 700, fontSize: 14, cursor: rawText.trim() ? 'pointer' : 'not-allowed', fontFamily: "'Space Grotesk',sans-serif" }}
-              >识别并填写字段 →</button>
-              <button onClick={() => setStep(1)} style={{ padding: '11px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.16)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>跳过 / 手动填写</button>
+              >{t.extractBtn}</button>
+              <button onClick={() => setStep(1)} style={{ padding: '11px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.16)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>{t.skipBtn}</button>
             </div>
           </div>
         )}
@@ -321,68 +321,68 @@ export function BillingProfileDraftPanel({ initialText = '', directMode = false,
             {/* Extracted hint */}
             {!directMode && rawText && (
               <div style={{ background: 'rgba(111,191,142,0.06)', border: '1px solid rgba(111,191,142,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 18, fontSize: 13.5, color: '#6FBF8E' }}>
-                ✓ 已从文字中自动识别部分字段，请检查并补充缺失内容
+                {t.extractedHint}
               </div>
             )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
               <div style={{ gridColumn: '1 / -1' }}>
-                <Field label="Customer Name" value={form.customerName} onChange={set('customerName')} placeholder="e.g. IFZA FZCO" required />
+                <Field label={t.fieldCustomerName} value={form.customerName} onChange={set('customerName')} placeholder="e.g. IFZA FZCO" required />
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
-                <Field label="Billing Name (if different)" value={form.billingName} onChange={set('billingName')} placeholder="Leave blank if same as customer name" />
+                <Field label={t.fieldBillingName} value={form.billingName} onChange={set('billingName')} placeholder={t.fieldBillingNamePlaceholder} />
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
-                <Field label="Billing Address" value={form.billingAddress} onChange={set('billingAddress')} placeholder="Full billing address" required />
+                <Field label={t.fieldBillingAddress} value={form.billingAddress} onChange={set('billingAddress')} placeholder={t.fieldBillingAddressPlaceholder} required />
               </div>
-              <Field label="TRN" value={form.trn} onChange={set('trn')} placeholder="100xxxxxxx00003" />
-              <Field label="Phone" value={form.phone} onChange={set('phone')} placeholder="+971 4 xxx xxxx" />
+              <Field label={t.fieldTRN} value={form.trn} onChange={set('trn')} placeholder="100xxxxxxx00003" />
+              <Field label={t.fieldPhone} value={form.phone} onChange={set('phone')} placeholder="+971 4 xxx xxxx" />
               <div style={{ gridColumn: '1 / -1' }}>
-                <Field label="Email" value={form.email} onChange={set('email')} placeholder="billing@company.com" type="email" />
+                <Field label={t.fieldEmail} value={form.email} onChange={set('email')} placeholder="billing@company.com" type="email" />
               </div>
-              <Field label="City" value={form.city} onChange={set('city')} placeholder="Dubai" />
-              <Field label="Country" value={form.country} onChange={set('country')} placeholder="UAE" />
+              <Field label={t.fieldCity} value={form.city} onChange={set('city')} placeholder="Dubai" />
+              <Field label={t.fieldCountry} value={form.country} onChange={set('country')} placeholder="UAE" />
               <div style={{ marginBottom: 12 }}>
-                <label style={labelStyle}>Default Currency</label>
+                <label style={labelStyle}>{t.fieldDefaultCurrency}</label>
                 <select value={form.defaultCurrency} onChange={e => setForm(p => ({ ...p, defaultCurrency: e.target.value as any }))} style={{ ...inputStyle }}>
                   {['AED', 'USD', 'EUR', 'GBP'].map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div style={{ marginBottom: 12 }}>
-                <label style={labelStyle}>Default VAT Rate (%)</label>
+                <label style={labelStyle}>{t.fieldDefaultVatRate}</label>
                 <input type="number" value={form.defaultVatRate} min={0} max={100} onChange={e => setForm(p => ({ ...p, defaultVatRate: Number(e.target.value) }))} style={inputStyle} />
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
-                <Field label="Default Payment Terms" value={form.defaultPaymentTerms} onChange={set('defaultPaymentTerms')} placeholder="e.g. 100% before delivery" />
+                <Field label={t.fieldDefaultPaymentTerms} value={form.defaultPaymentTerms} onChange={set('defaultPaymentTerms')} placeholder="e.g. 100% before delivery" />
               </div>
 
               {/* Source reference section */}
               <div style={{ gridColumn: '1 / -1', marginTop: 8, padding: '14px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10 }}>
-                <div style={{ fontSize: 12, color: MUTED, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 500, marginBottom: 10 }}>{dict.ai.billing.sourceLabel}</div>
+                <div style={{ fontSize: 12, color: MUTED, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 500, marginBottom: 10 }}>{t.sourceLabel}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
                   <div style={{ marginBottom: 12 }}>
-                    <label style={labelStyle}>Source Type</label>
+                    <label style={labelStyle}>{t.fieldSourceType}</label>
                     <select value={form.sourceType} onChange={e => setForm(p => ({ ...p, sourceType: e.target.value }))} style={inputStyle}>
-                      {['Manual', 'PDF', 'WhatsApp', 'Email', 'Screenshot', 'Other'].map(t => <option key={t} value={t}>{t}</option>)}
+                      {['Manual', 'PDF', 'WhatsApp', 'Email', 'Screenshot', 'Other'].map(st => <option key={st} value={st}>{st}</option>)}
                     </select>
                   </div>
-                  <Field label="Source File Name" value={form.sourceFileName} onChange={set('sourceFileName')} placeholder="e.g. IFZA invoice.pdf" />
+                  <Field label={t.fieldSourceFileName} value={form.sourceFileName} onChange={set('sourceFileName')} placeholder="e.g. IFZA invoice.pdf" />
                 </div>
-                <Field label="Notes" value={form.notes} onChange={set('notes')} placeholder="e.g. Seeded from INV-000143" />
+                <Field label={t.fieldNotes} value={form.notes} onChange={set('notes')} placeholder="e.g. Seeded from INV-000143" />
                 <div style={{ fontSize: 12, color: DIM, fontFamily: 'IBM Plex Mono, monospace' }}>
-                  Source reference only. File storage / OCR not connected in V1.
+                  {t.sourceRefOnlyNote}
                 </div>
               </div>
             </div>
 
             <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-              {!directMode && <button onClick={() => setStep(0)} style={{ padding: '11px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.16)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>← 返回</button>}
-              <button onClick={onClose} style={{ padding: '11px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.16)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>取消</button>
+              {!directMode && <button onClick={() => setStep(0)} style={{ padding: '11px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.16)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>{t.backBtn}</button>}
+              <button onClick={onClose} style={{ padding: '11px 20px', borderRadius: 8, background: 'none', border: '1px solid rgba(255,255,255,0.16)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>{t.cancelBtn}</button>
               <button
                 onClick={() => handleSave(false)}
                 disabled={!canSave || saving}
                 style={{ flex: 1, padding: '11px', borderRadius: 8, background: canSave && !saving ? `linear-gradient(135deg,${GOLD},${GOLD_L})` : 'rgba(255,255,255,0.06)', border: 'none', color: '#000', fontWeight: 700, fontSize: 14, cursor: canSave && !saving ? 'pointer' : 'not-allowed', fontFamily: "'Space Grotesk',sans-serif" }}
-              >{saving ? '保存中…' : '保存开票资料'}</button>
+              >{saving ? t.savingBtn : t.saveBtn}</button>
             </div>
           </div>
         )}
@@ -391,19 +391,19 @@ export function BillingProfileDraftPanel({ initialText = '', directMode = false,
         {step === 2 && savedProfile && (
           <div style={{ textAlign: 'center', padding: '24px 0' }}>
             <div style={{ fontSize: 32, marginBottom: 16 }}>✓</div>
-            <div style={{ fontSize: 18, fontWeight: 600, color: TEXT, marginBottom: 8 }}>开票资料已保存</div>
+            <div style={{ fontSize: 18, fontWeight: 600, color: TEXT, marginBottom: 8 }}>{t.savedTitle}</div>
             <div style={{ fontSize: 13.5, color: GOLD, marginBottom: 6 }}>{savedProfile.customerName}</div>
             {savedProfile.trn && <div style={{ fontSize: 13, color: MUTED, fontFamily: 'monospace', marginBottom: 6 }}>TRN: {savedProfile.trn}</div>}
             <div style={{ fontSize: 13.5, color: MUTED, marginBottom: 8 }}>
-              已存入 Supabase，迪拜和中国团队均可在发票向导中直接选用。
+              {t.savedHint}
             </div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 20, background: 'rgba(111,191,142,0.10)', border: '1px solid rgba(111,191,142,0.3)', marginBottom: 24 }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#6FBF8E' }} />
-              <span style={{ fontSize: 12, color: '#6FBF8E', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.06em' }}>Cloud Sync: Connected — 团队共享</span>
+              <span style={{ fontSize: 12, color: '#6FBF8E', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '0.06em' }}>{t.cloudSyncTeamShared}</span>
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <a href="/invoice?tab=profiles" style={{ padding: '11px 24px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)', color: TEXT, fontSize: 14, textDecoration: 'none' }}>查看账单资料库</a>
-              <button onClick={onClose} style={{ padding: '11px 24px', borderRadius: 8, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: '#000', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>完成</button>
+              <a href="/invoice?tab=profiles" style={{ padding: '11px 24px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.16)', color: TEXT, fontSize: 14, textDecoration: 'none' }}>{t.viewLibraryBtn}</a>
+              <button onClick={onClose} style={{ padding: '11px 24px', borderRadius: 8, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: '#000', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>{t.doneBtn}</button>
             </div>
           </div>
         )}
