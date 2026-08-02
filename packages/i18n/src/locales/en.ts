@@ -742,7 +742,7 @@ export const en = {
       subNavArchived: 'Archived',
     },
     controlCenter: {
-      pageTitle: 'Control Center',
+      pageTitle: 'Business Overview',
       kpiFollowupsToday: 'Follow-ups Today',
       kpiHighPriority: 'High-Priority Clients (A)',
       kpiActiveProjects: 'Active Projects',

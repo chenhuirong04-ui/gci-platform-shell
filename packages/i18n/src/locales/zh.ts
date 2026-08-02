@@ -743,7 +743,7 @@ export const zh: typeof en = {
       subNavArchived: '已归档',
     },
     controlCenter: {
-      pageTitle: '控制中心',
+      pageTitle: '业务总览',
       kpiFollowupsToday: '今日待跟进',
       kpiHighPriority: '高优先客户（A）',
       kpiActiveProjects: '执行中项目',
