@@ -4,6 +4,7 @@ import {
   ChevronRight, TrendingUp, Activity
 } from 'lucide-react';
 import { PageHeader, StatCard } from '@gci/design-system';
+import { useI18n } from '@gci/i18n';
 import { FollowUpTask, Project } from '../types';
 import ActionCenter from './ActionCenter';
 
@@ -107,6 +108,9 @@ function ProjectRow({ project }: { project: Project }) {
 }
 
 export default function ControlCenter({ tasks, projects, todayFollowupCount, onTabSwitch, onSelectTask }: Props) {
+  const { dict, lang } = useI18n();
+  const ct = dict.crm.controlCenter;
+
   // ── Single source of truth for all dashboard numbers ────────────────────────
   const dashboardStats = useMemo(
     () => buildDashboardStats(tasks, todayFollowupCount),
@@ -122,7 +126,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
     (t as any).notionSource !== 'contact_only'
   );
 
-  const nowLabel = new Date().toLocaleDateString('zh-CN', {
+  const nowLabel = new Date().toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US', {
     year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
   });
 
@@ -130,14 +134,14 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
     <div className="space-y-8" style={{ color: T1 }}>
 
       {/* Header — shared PageHeader (GCI Design System V1 pilot) */}
-      <PageHeader title="控制中心" eyebrow={nowLabel} />
+      <PageHeader title={ct.pageTitle} eyebrow={nowLabel} />
 
       {/* Stats row — shared StatCard (GCI Design System V1 pilot) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={<Calendar className="w-5 h-5" />}      label="今日待跟进"     value={todayFollowupCount === null ? null : dashboardStats.todayFollowupCount} color="#8FA6D4" />
-        <StatCard icon={<TrendingUp className="w-5 h-5" />}    label="高优先客户 (A)" value={dashboardStats.highPriorityCount}       color={GOLD} />
-        <StatCard icon={<Briefcase className="w-5 h-5" />}     label="执行中项目"     value={dashboardStats.executingProjectsCount}  color="#6FBF8E" />
-        <StatCard icon={<AlertTriangle className="w-5 h-5" />} label="逾期风险 (>3天)" value={dashboardStats.overdueCount}            color="#E0846A" />
+        <StatCard icon={<Calendar className="w-5 h-5" />}      label={ct.kpiFollowupsToday} value={todayFollowupCount === null ? null : dashboardStats.todayFollowupCount} color="#8FA6D4" />
+        <StatCard icon={<TrendingUp className="w-5 h-5" />}    label={ct.kpiHighPriority}   value={dashboardStats.highPriorityCount}       color={GOLD} />
+        <StatCard icon={<Briefcase className="w-5 h-5" />}     label={ct.kpiActiveProjects} value={dashboardStats.executingProjectsCount}  color="#6FBF8E" />
+        <StatCard icon={<AlertTriangle className="w-5 h-5" />} label={ct.kpiOverdueRisk}    value={dashboardStats.overdueCount}            color="#E0846A" />
       </div>
 
       {/* 数据概览 */}
@@ -145,16 +149,16 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
 
         {/* 客户跟进状态 */}
         <div className="rounded-[18px] border p-6 shadow-sm lg:col-span-1" style={{ backgroundColor: CARD, borderColor: BORDER }}>
-          <SectionHeader icon={<TrendingUp className="w-4 h-4" />} title="客户跟进状态" />
+          <SectionHeader icon={<TrendingUp className="w-4 h-4" />} title={ct.followupStatusTitle} />
           {(() => {
             const stages: { label: string; status: string; color: string }[] = [
-              { label: '新询盘',       status: '新询盘',       color: '#8FA6D4' },
-              { label: '需求整理中',   status: '需求整理中',   color: '#A78BFA' },
-              { label: '待报价',       status: '待报价',       color: GOLD },
-              { label: '已报价待确认', status: '已报价待确认', color: '#D9B45A' },
-              { label: '合同待签',     status: '合同待签',     color: '#B084C9' },
-              { label: '执行中',       status: '执行中',       color: '#6FBF8E' },
-              { label: '已交付',       status: '已交付',       color: '#34D399' },
+              { label: ct.stageNewInquiry,                 status: '新询盘',       color: '#8FA6D4' },
+              { label: ct.stageRequirementsInProgress,     status: '需求整理中',   color: '#A78BFA' },
+              { label: ct.stagePendingQuotation,           status: '待报价',       color: GOLD },
+              { label: ct.stageQuotedAwaitingConfirmation, status: '已报价待确认', color: '#D9B45A' },
+              { label: ct.stageContractPending,            status: '合同待签',     color: '#B084C9' },
+              { label: ct.stageInProgress,                 status: '执行中',       color: '#6FBF8E' },
+              { label: ct.stageDelivered,                  status: '已交付',       color: '#34D399' },
             ];
             const allActive = tasks.filter(t =>
               t.status !== 'deleted' && t.status !== 'archived' &&
@@ -183,15 +187,15 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
 
         {/* 优先级分布 */}
         <div className="rounded-[18px] border p-6 shadow-sm" style={{ backgroundColor: CARD, borderColor: BORDER }}>
-          <SectionHeader icon={<AlertTriangle className="w-4 h-4" />} title="优先级分布" />
+          <SectionHeader icon={<AlertTriangle className="w-4 h-4" />} title={ct.priorityDistributionTitle} />
           {(() => {
             // Source: 全部业务主档案 — A+B+C == totalBusinesses (invariant)
             const { A, B, C, total } = dashboardStats.priorityStats;
             const pTotal = total || 1;
             const grades = [
-              { label: 'A 级 · 高优先', count: A, color: '#E0846A' },
-              { label: 'B 级 · 正常',   count: B, color: GOLD },
-              { label: 'C 级 · 低优先', count: C, color: '#94A3B8' },
+              { label: ct.gradeAHigh,   count: A, color: '#E0846A' },
+              { label: ct.gradeBNormal, count: B, color: GOLD },
+              { label: ct.gradeCLow,    count: C, color: '#94A3B8' },
             ];
             return (
               <div className="space-y-4 mt-2">
@@ -201,7 +205,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
                     <div key={g.label}>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-bold" style={{ color: T2 }}>{g.label}</span>
-                        <span className="text-xs font-black" style={{ color: g.color }}>{g.count} 条 · {pct}%</span>
+                        <span className="text-xs font-black" style={{ color: g.color }}>{ct.unitRecordsPct.replace('{n}', String(g.count)).replace('{pct}', String(pct))}</span>
                       </div>
                       <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
                         <div className="h-full rounded-full transition-all duration-500"
@@ -212,7 +216,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
                 })}
                 <div className="mt-4 rounded-xl px-4 py-2 text-xs font-black text-center"
                   style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: T1 }}>
-                  共 {total} 条业务主档案
+                  {ct.totalBusinessRecords.replace('{n}', String(total))}
                 </div>
               </div>
             );
@@ -221,7 +225,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
 
         {/* 项目类型占比 */}
         <div className="rounded-[18px] border p-6 shadow-sm" style={{ backgroundColor: CARD, borderColor: BORDER }}>
-          <SectionHeader icon={<Briefcase className="w-4 h-4" />} title="项目类型占比" />
+          <SectionHeader icon={<Briefcase className="w-4 h-4" />} title={ct.projectTypeDistributionTitle} />
           {(() => {
             // Source: 全部业务主档案 (same source as totalBusinesses)
             const proj  = dashboardStats.totalProjects;
@@ -233,8 +237,8 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
               <div className="space-y-5 mt-2">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold" style={{ color: T2 }}>项目型</span>
-                    <span className="text-xs font-black" style={{ color: '#8FA6D4' }}>{proj} 个 · {projPct}%</span>
+                    <span className="text-xs font-bold" style={{ color: T2 }}>{ct.projectBased}</span>
+                    <span className="text-xs font-black" style={{ color: '#8FA6D4' }}>{ct.unitCountPct.replace('{n}', String(proj)).replace('{pct}', String(projPct))}</span>
                   </div>
                   <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
                     <div className="h-full rounded-full transition-all duration-500"
@@ -243,8 +247,8 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold" style={{ color: T2 }}>贸易型</span>
-                    <span className="text-xs font-black" style={{ color: GOLD }}>{trade} 个 · {tradePct}%</span>
+                    <span className="text-xs font-bold" style={{ color: T2 }}>{ct.trading}</span>
+                    <span className="text-xs font-black" style={{ color: GOLD }}>{ct.unitCountPct.replace('{n}', String(trade)).replace('{pct}', String(tradePct))}</span>
                   </div>
                   <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
                     <div className="h-full rounded-full transition-all duration-500"
@@ -254,15 +258,15 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
                 <div className="mt-2 flex gap-2">
                   <div className="flex-1 rounded-xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.06)' }}>
                     <div className="text-lg font-black" style={{ color: '#8FA6D4' }}>{proj}</div>
-                    <div className="text-[10px] font-bold" style={{ color: T2 }}>项目型</div>
+                    <div className="text-[10px] font-bold" style={{ color: T2 }}>{ct.projectBased}</div>
                   </div>
                   <div className="flex-1 rounded-xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.06)' }}>
                     <div className="text-lg font-black" style={{ color: GOLD }}>{trade}</div>
-                    <div className="text-[10px] font-bold" style={{ color: T2 }}>贸易型</div>
+                    <div className="text-[10px] font-bold" style={{ color: T2 }}>{ct.trading}</div>
                   </div>
                   <div className="flex-1 rounded-xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.06)' }}>
                     <div className="text-lg font-black" style={{ color: T1 }}>{dashboardStats.totalBusinesses}</div>
-                    <div className="text-[10px] font-bold" style={{ color: T2 }}>总计</div>
+                    <div className="text-[10px] font-bold" style={{ color: T2 }}>{ct.total}</div>
                   </div>
                 </div>
               </div>
@@ -276,7 +280,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
         <div className="flex items-center gap-2 mb-4">
           <Activity className="w-4 h-4" style={{ color: GOLD }} />
           <h2 className="font-mono-label text-sm font-black uppercase tracking-widest" style={{ color: T1 }}>
-            今日行动中心 · AI Action Center
+            {ct.todayActionCenterTitle} · AI Action Center
           </h2>
         </div>
         <ActionCenter

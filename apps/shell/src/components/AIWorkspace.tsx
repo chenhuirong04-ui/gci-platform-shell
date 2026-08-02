@@ -6,12 +6,19 @@ import { useI18n } from '@gci/i18n';
 const GOLD = '#CBA85C';
 const GOLD_L = '#E2C988';
 
-const SUGGESTIONS = [
+const SUGGESTIONS_ZH = [
   '帮我创建一个新客户',
   '生成一份报价单',
   '查一下库存情况',
   '今天有哪些跟进？',
   '整理 WhatsApp 消息',
+];
+const SUGGESTIONS_EN = [
+  'Create a new customer',
+  'Generate a quotation',
+  'Check inventory status',
+  'What follow-ups are due today?',
+  'Organize WhatsApp messages',
 ];
 
 // cmd: triggers intent routing on /ai; tab: just switches to that tab
@@ -30,6 +37,7 @@ export function AIWorkspace() {
   const { dict, lang } = useI18n();
   const [input, setInput] = useState('');
   const w = dict.workspace;
+  const SUGGESTIONS = lang === 'zh' ? SUGGESTIONS_ZH : SUGGESTIONS_EN;
 
   function goAI(cmd?: string, tab?: string) {
     if (cmd) navigate(`/ai?q=${encodeURIComponent(cmd)}`);
