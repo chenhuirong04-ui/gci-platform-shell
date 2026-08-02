@@ -244,7 +244,12 @@ const ProjectProgress: React.FC<ProjectProgressProps> = ({
                  style={filterType === '贸易型' ? { backgroundColor: GOLD, color: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' } : { color: T2 }}>贸易型询盘</button>
             </div>
 
-            <button onClick={() => setShowAddModal(true)} className="px-6 py-3 text-white rounded-2xl text-[13px] font-black uppercase shadow-xl hover:opacity-90 transition-all active:scale-95" style={{ backgroundColor: GOLD }}><Plus className="w-4 h-4 inline mr-2" /> 手动建档</button>
+            {/* "手动建档" hidden: it only wrote to the local `projects` array
+                (ICARE_PROJECTS_V1), which this view never reads back — saved
+                records were invisible to the user. Not deleting the modal or
+                onAddProject wiring (no data migration/deletion this batch);
+                re-enable once the unified intake (batch 8) replaces it with a
+                path that writes to the real, visible tasks/Notion flow. */}
          </div>
 
          <div className="h-px w-full" style={{ background: BORDER }} />
