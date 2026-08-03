@@ -1,15 +1,15 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   Calendar, AlertTriangle, Briefcase,
-  ChevronRight, TrendingUp, Activity, Users, MessageSquare, ChevronDown, ChevronUp
+  ChevronRight, TrendingUp, Users, MessageSquare
 } from 'lucide-react';
 import { PageHeader, StatCard } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
 import { FollowUpTask, Project } from '../types';
-import ActionCenter from './ActionCenter';
 
 import { getTaskBusinessId, getProjectBusinessId } from '../utils/businessId';
 import { buildDashboardStats } from '../utils/dashboardStats';
+import { isRealCommLog } from '../utils/commLog';
 
 interface Props {
   tasks: FollowUpTask[];
@@ -130,7 +130,6 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
   // "客户总数" groups by contactKey (falling back to clientName), matching
   // the exact identity logic CustomerDirectory.tsx uses, so the two numbers
   // stay consistent with each other.
-  const [actionCenterOpen, setActionCenterOpen] = useState(false);
   const overview = useMemo(() => {
     const nonDeleted = tasks.filter(t => t.status !== 'deleted');
     const daysAgo = (iso: string) => {
@@ -165,11 +164,13 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
         }
         return [...firstSeen.values()].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')).slice(0, 4);
       })(),
+      // Real human/customer communications only — excludes system audit
+      // entries like "已记录（AI分析中）" / "AI 分析完成" / status-change logs.
       recentComms: (() => {
         const flat: { task: FollowUpTask; timestamp: string; message: string }[] = [];
         for (const t of nonDeleted) {
           for (const h of (t.history || [])) {
-            if (h?.timestamp && h?.message) flat.push({ task: t, timestamp: h.timestamp, message: h.message });
+            if (h?.timestamp && h?.message && isRealCommLog(h)) flat.push({ task: t, timestamp: h.timestamp, message: h.message });
           }
         }
         return flat.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 4);
@@ -190,7 +191,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
       {/* Business Overview stats (V1) — asset-first framing: how many
           customers/businesses exist and what changed recently, ahead of the
           task-oriented KPIs below. */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
         <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
           <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewCustomers}</div>
           <div className="text-2xl font-black mt-1" style={{ color: T1 }}>{overview.customers}</div>
@@ -216,16 +217,8 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
           <div className="text-2xl font-black mt-1" style={{ color: GOLD }}>{dashboardStats.totalTrades}</div>
         </div>
         <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
-          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewQuoting}</div>
-          <div className="text-2xl font-black mt-1" style={{ color: '#D9B45A' }}>{overview.quoting}</div>
-        </div>
-        <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
           <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewExecuting}</div>
           <div className="text-2xl font-black mt-1" style={{ color: '#6FBF8E' }}>{dashboardStats.executingBusinessesCount}</div>
-        </div>
-        <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
-          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewArchived}</div>
-          <div className="text-2xl font-black mt-1" style={{ color: T2 }}>{overview.archived}</div>
         </div>
       </div>
 
@@ -265,164 +258,11 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
         <StatCard icon={<AlertTriangle className="w-5 h-5" />} label={ct.kpiOverdueRisk}    value={dashboardStats.overdueCount}            color="#E0846A" />
       </div>
 
-      {/* 数据概览 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* 客户跟进状态 */}
-        <div className="rounded-[18px] border p-6 shadow-sm lg:col-span-1" style={{ backgroundColor: CARD, borderColor: BORDER }}>
-          <SectionHeader icon={<TrendingUp className="w-4 h-4" />} title={ct.followupStatusTitle} />
-          {(() => {
-            const stages: { label: string; status: string; color: string }[] = [
-              { label: ct.stageNewInquiry,                 status: '新询盘',       color: '#8FA6D4' },
-              { label: ct.stageRequirementsInProgress,     status: '需求整理中',   color: '#A78BFA' },
-              { label: ct.stagePendingQuotation,           status: '待报价',       color: GOLD },
-              { label: ct.stageQuotedAwaitingConfirmation, status: '已报价待确认', color: '#D9B45A' },
-              { label: ct.stageContractPending,            status: '合同待签',     color: '#B084C9' },
-              { label: ct.stageInProgress,                 status: '执行中',       color: '#6FBF8E' },
-              { label: ct.stageDelivered,                  status: '已交付',       color: '#34D399' },
-            ];
-            const allActive = tasks.filter(t =>
-              t.status !== 'deleted' && t.status !== 'archived' &&
-              (t as any).notionSource !== 'contact_only'
-            );
-            const counts = stages.map(s => allActive.filter(t => t.tradeStatus === s.status).length);
-            const max = Math.max(...counts, 1);
-            return (
-              <div className="space-y-3 mt-2">
-                {stages.map((s, i) => (
-                  <div key={s.label}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-bold" style={{ color: T2 }}>{s.label}</span>
-                      <span className="text-xs font-black" style={{ color: counts[i] > 0 ? s.color : T2 }}>{counts[i]}</span>
-                    </div>
-                    <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
-                      <div className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${(counts[i] / max) * 100}%`, backgroundColor: s.color }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-        </div>
-
-        {/* 优先级分布 */}
-        <div className="rounded-[18px] border p-6 shadow-sm" style={{ backgroundColor: CARD, borderColor: BORDER }}>
-          <SectionHeader icon={<AlertTriangle className="w-4 h-4" />} title={ct.priorityDistributionTitle} />
-          {(() => {
-            // Source: 全部业务主档案 — A+B+C == totalBusinesses (invariant)
-            const { A, B, C, total } = dashboardStats.priorityStats;
-            const pTotal = total || 1;
-            const grades = [
-              { label: ct.gradeAHigh,   count: A, color: '#E0846A' },
-              { label: ct.gradeBNormal, count: B, color: GOLD },
-              { label: ct.gradeCLow,    count: C, color: '#94A3B8' },
-            ];
-            return (
-              <div className="space-y-4 mt-2">
-                {grades.map(g => {
-                  const pct = Math.round((g.count / pTotal) * 100);
-                  return (
-                    <div key={g.label}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold" style={{ color: T2 }}>{g.label}</span>
-                        <span className="text-xs font-black" style={{ color: g.color }}>{ct.unitRecordsPct.replace('{n}', String(g.count)).replace('{pct}', String(pct))}</span>
-                      </div>
-                      <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
-                        <div className="h-full rounded-full transition-all duration-500"
-                          style={{ width: `${pct}%`, backgroundColor: g.color }} />
-                      </div>
-                    </div>
-                  );
-                })}
-                <div className="mt-4 rounded-xl px-4 py-2 text-xs font-black text-center"
-                  style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: T1 }}>
-                  {ct.totalBusinessRecords.replace('{n}', String(total))}
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-
-        {/* 项目类型占比 */}
-        <div className="rounded-[18px] border p-6 shadow-sm" style={{ backgroundColor: CARD, borderColor: BORDER }}>
-          <SectionHeader icon={<Briefcase className="w-4 h-4" />} title={ct.projectTypeDistributionTitle} />
-          {(() => {
-            // Source: 全部业务主档案 (same source as totalBusinesses)
-            const proj  = dashboardStats.totalProjects;
-            const trade = dashboardStats.totalTrades;
-            const total = proj + trade || 1;
-            const projPct  = Math.round((proj  / total) * 100);
-            const tradePct = 100 - projPct;
-            return (
-              <div className="space-y-5 mt-2">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold" style={{ color: T2 }}>{ct.projectBased}</span>
-                    <span className="text-xs font-black" style={{ color: '#8FA6D4' }}>{ct.unitCountPct.replace('{n}', String(proj)).replace('{pct}', String(projPct))}</span>
-                  </div>
-                  <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
-                    <div className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${projPct}%`, backgroundColor: '#8FA6D4' }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold" style={{ color: T2 }}>{ct.trading}</span>
-                    <span className="text-xs font-black" style={{ color: GOLD }}>{ct.unitCountPct.replace('{n}', String(trade)).replace('{pct}', String(tradePct))}</span>
-                  </div>
-                  <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
-                    <div className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${tradePct}%`, backgroundColor: GOLD }} />
-                  </div>
-                </div>
-                <div className="mt-2 flex gap-2">
-                  <div className="flex-1 rounded-xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                    <div className="text-lg font-black" style={{ color: '#8FA6D4' }}>{proj}</div>
-                    <div className="text-[10px] font-bold" style={{ color: T2 }}>{ct.projectBased}</div>
-                  </div>
-                  <div className="flex-1 rounded-xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                    <div className="text-lg font-black" style={{ color: GOLD }}>{trade}</div>
-                    <div className="text-[10px] font-bold" style={{ color: T2 }}>{ct.trading}</div>
-                  </div>
-                  <div className="flex-1 rounded-xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                    <div className="text-lg font-black" style={{ color: T1 }}>{dashboardStats.totalBusinesses}</div>
-                    <div className="text-[10px] font-bold" style={{ color: T2 }}>{ct.total}</div>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-      </div>
-
-      {/* 今日行动中心 — secondary/optional, collapsed by default. Not the
-          page's core focus anymore; AI suggestions inside stay manually
-          triggered (unchanged from the earlier opt-in batch). */}
-      <div>
-        <button
-          onClick={() => setActionCenterOpen(v => !v)}
-          className="w-full flex items-center justify-between gap-2 mb-4 px-1 py-1"
-        >
-          <span className="flex items-center gap-2">
-            <Activity className="w-4 h-4" style={{ color: GOLD }} />
-            <h2 className="font-mono-label text-sm font-black uppercase tracking-widest" style={{ color: T1 }}>
-              {ct.todayActionCenterTitle} · AI Action Center
-            </h2>
-          </span>
-          {actionCenterOpen ? <ChevronUp className="w-4 h-4" style={{ color: T2 }} /> : <ChevronDown className="w-4 h-4" style={{ color: T2 }} />}
-        </button>
-        {actionCenterOpen && (
-          <ActionCenter
-            tasks={tasks}
-            projects={projects}
-            followupTasks={dashboardStats.todayFollowups}
-            pausedTasks={dashboardStats.actionCenterGroups.paused}
-            onSelectTask={onSelectTask}
-            onTabSwitch={onTabSwitch}
-          />
-        )}
-      </div>
+      {/* 优先级分布 / 项目类型占比 / 客户阶段大图表 / AI Action Center — removed
+          from Business Overview rendering per 2026-08 simplification. Their
+          underlying components/data (ActionCenter.tsx, dashboardStats stage
+          counts) are untouched and still used elsewhere; this page just no
+          longer renders them. */}
 
     </div>
   );
