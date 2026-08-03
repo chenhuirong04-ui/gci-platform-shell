@@ -43,7 +43,7 @@ const TYPE_LABEL: Record<string, string> = {
   TRADE: '贸易询盘', PROJECT: '项目推进', LOG_ONLY: '内部记录',
 };
 
-export type WorkspaceTab = 'info' | 'business' | 'action' | 'files' | 'quotes';
+export type WorkspaceTab = 'info' | 'business' | 'action' | 'files' | 'quotes' | 'finance';
 
 // Full workspace i18n surface — shared with CustomerWorkspacePage.tsx (the
 // page passes the same dict.crm.workspace object down to both itself and
@@ -224,6 +224,22 @@ export default function CustomerWorkspaceBody({
     finally { setQuoteLoading(false); }
   };
 
+  // ── Financial activity state — read-only aggregation, same fuzzy-name
+  // matching pattern as quote history. No new backend, no writes. ─────────
+  const [financeData, setFinanceData] = useState<any>(null);
+  const [financeLoading, setFinanceLoading] = useState(false);
+
+  const loadFinanceActivity = async () => {
+    if (!task.clientName || financeData !== null) return;
+    setFinanceLoading(true);
+    try {
+      const res = await fetch(`/api/ai/customer-360?customer=${encodeURIComponent(task.clientName)}`);
+      const data = await res.json();
+      setFinanceData(data);
+    } catch { setFinanceData({ ok: false, error: 'failed' }); }
+    finally { setFinanceLoading(false); }
+  };
+
   const [draft, setDraft] = useState<Partial<FollowUpTask>>({});
   type NotionSync = 'idle' | 'syncing' | 'ok' | 'warn' | 'no_id';
   const [notionSync, setNotionSync] = useState<NotionSync>('idle');
@@ -337,9 +353,10 @@ export default function CustomerWorkspaceBody({
             ['action', dict.tabComms],
             ['files', dict.tabFiles],
             ['quotes', dict.tabQuotes],
+            ['finance', dict.tabFinance],
           ] as const).map(([key, label]) => (
             <button key={key}
-              onClick={() => { onTabChange(key); if (key === 'quotes') loadQuoteHistory(); if (key === 'files') setProposalUploadStatus('idle'); }}
+              onClick={() => { onTabChange(key); if (key === 'quotes') loadQuoteHistory(); if (key === 'finance') loadFinanceActivity(); if (key === 'files') setProposalUploadStatus('idle'); }}
               className="flex-1 py-2 rounded-lg text-[12px] font-black transition-all whitespace-nowrap px-2"
               style={tab === key ? { background: GOLD, color: '#fff' } : { color: T3 }}>
               {label}
@@ -794,6 +811,96 @@ export default function CustomerWorkspaceBody({
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {/* ── FINANCE TAB (财务往来) — read-only, reuses /api/ai/customer-360 ─── */}
+      {!editing && tab === 'finance' && (
+        <div className="max-w-2xl space-y-4">
+          <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>{tpl(dict.financeTitle, { name: task.clientName || '' })}</p>
+
+          {financeLoading && (
+            <div className="flex items-center gap-2 text-xs font-bold py-4" style={{ color: T3 }}>
+              <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" /> {dict.financeLoading}
+            </div>
+          )}
+          {!financeLoading && financeData && !financeData.ok && (
+            <div className="px-3 py-2 rounded-lg text-xs font-bold" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#FCA5A5' }}>
+              {dict.financeError}
+            </div>
+          )}
+          {!financeLoading && financeData?.ok && (
+            <>
+              <div className="text-[10px]" style={{ color: T3 }}>{dict.financeNote}</div>
+
+              {/* Invoices */}
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-widest mb-2" style={{ color: T3 }}>{dict.sectionInvoices}</div>
+                {financeData.invoices?.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {financeData.invoices.map((inv: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg text-xs" style={{ background: CARD2, border: `1px solid ${BORD}` }}>
+                        <div className="min-w-0">
+                          <div className="font-black truncate" style={{ color: T1 }}>{inv.invoiceNo}</div>
+                          <div className="text-[10px]" style={{ color: T3 }}>{inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString('zh-CN') : dict.na} · {inv.statusZh || inv.status}</div>
+                        </div>
+                        <div className="font-black shrink-0" style={{ color: GOLD }}>AED {Number(inv.total).toLocaleString()}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : <div className="text-xs font-medium py-2" style={{ color: T3 }}>{dict.financeEmpty}</div>}
+              </div>
+
+              {/* Orders & receivables */}
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-widest mb-2" style={{ color: T3 }}>{dict.sectionOrders}</div>
+                {financeData.orders?.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {financeData.orders.map((o: any, i: number) => (
+                      <div key={i} className="px-3 py-2 rounded-lg text-xs" style={{ background: CARD2, border: `1px solid ${BORD}` }}>
+                        <div className="flex items-center justify-between">
+                          <span className="font-black" style={{ color: T1 }}>{o.orderId}</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: `${GOLD}22`, color: GOLD }}>{o.statusZh || o.status}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 mt-1.5 text-[10px]" style={{ color: T2 }}>
+                          <div>{dict.orderGrandTotal}：AED {Number(o.grandTotal).toLocaleString()}</div>
+                          <div>{dict.orderPaid}：AED {Number(o.paidAmount).toLocaleString()}</div>
+                          <div style={{ color: o.outstandingAmount > 0 ? '#E0846A' : T2 }}>{dict.orderOutstanding}：AED {Number(o.outstandingAmount).toLocaleString()}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : <div className="text-xs font-medium py-2" style={{ color: T3 }}>{dict.financeEmpty}</div>}
+              </div>
+
+              {/* Consignment */}
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-widest mb-2" style={{ color: T3 }}>{dict.sectionConsignment}</div>
+                {financeData.consignment?.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {financeData.consignment.map((c: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg text-xs" style={{ background: CARD2, border: `1px solid ${BORD}` }}>
+                        <div className="min-w-0">
+                          <div className="font-black truncate" style={{ color: T1 }}>{c.productName}</div>
+                          <div className="text-[10px]" style={{ color: T3 }}>{c.soNo} · {c.settlementStatus}</div>
+                        </div>
+                        <div className="font-black shrink-0" style={{ color: GOLD }}>AED {Number(c.amount).toLocaleString()}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : <div className="text-xs font-medium py-2" style={{ color: T3 }}>{dict.financeEmpty}</div>}
+              </div>
+
+              {/* Customer deposits — no reliable data source found; honest empty state */}
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-widest mb-2" style={{ color: T3 }}>{dict.sectionDeposit}</div>
+                <div className="text-xs font-medium py-2" style={{ color: T3 }}>{dict.depositEmpty}</div>
+              </div>
+            </>
+          )}
+          {!financeLoading && !financeData && (
+            <div className="text-xs font-medium py-4" style={{ color: T3 }}>{dict.financeEmpty}</div>
+          )}
         </div>
       )}
 
