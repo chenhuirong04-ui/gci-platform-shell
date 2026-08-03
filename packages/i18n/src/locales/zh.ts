@@ -859,6 +859,7 @@ export const zh: typeof en = {
       currentBadge: '当前',
       unnamedBusiness: '未命名业务',
       noOtherBusiness: '暂无该客户的其他业务记录。',
+      noProjectCode: '暂无项目编码',
       addBusinessBtn: '+ 新增业务',
       newBusinessTitle: '新增业务',
       createBusinessBtn: '创建业务',

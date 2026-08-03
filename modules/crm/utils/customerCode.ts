@@ -36,3 +36,25 @@ export function findCustomerByCode(tasks: FollowUpTask[], code: string): Custome
   const relatedTasks = tasks.filter(t => t.id !== matched.id && identityKey(t) === key);
   return { task: matched, relatedTasks };
 }
+
+// Formal project/business code: {customerCode}-P{01,02,...} for PROJECT
+// businesses, {customerCode}-B{01,02,...} for TRADE. Scans the customer's
+// OTHER businesses for existing codes matching this prefix and takes
+// max-sequence + 1 — never array.length, so a deleted/archived business
+// never causes a duplicate to be re-issued.
+export function generateProjectCode(
+  customerCode: string,
+  businessType: 'PROJECT' | 'TRADE' | string,
+  groupTasks: FollowUpTask[],
+): string {
+  const letter = businessType === 'PROJECT' ? 'P' : 'B';
+  const prefix = `${customerCode}-${letter}`;
+  let maxSeq = 0;
+  for (const t of groupTasks) {
+    const code = (t as any).projectCode as string | undefined;
+    if (!code || !code.startsWith(prefix)) continue;
+    const n = parseInt(code.slice(prefix.length), 10);
+    if (!isNaN(n) && n > maxSeq) maxSeq = n;
+  }
+  return `${prefix}${String(maxSeq + 1).padStart(2, '0')}`;
+}

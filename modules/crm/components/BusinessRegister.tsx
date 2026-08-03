@@ -231,7 +231,14 @@ export default function BusinessRegister({
                       </div>
                       {!bizId && <div className="text-[9px] mt-0.5" style={{ color: T3 }}>{PLACEHOLDER}</div>}
                     </td>
-                    <td className="px-3 py-3 max-w-[220px] truncate" style={{ color: T2 }} title={businessName(t)}>{businessName(t)}</td>
+                    <td className="px-3 py-3 max-w-[220px]" title={businessName(t)}>
+                      <div className="flex items-center gap-1.5">
+                        {(t as any).projectCode && (
+                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded shrink-0" style={{ background: 'rgba(255,255,255,0.08)', color: T3 }}>{(t as any).projectCode}</span>
+                        )}
+                        <span className="truncate" style={{ color: T2 }}>{businessName(t)}</span>
+                      </div>
+                    </td>
                     <td className="px-3 py-3" style={{ color: T2 }}>{TYPE_LABEL[t.businessType] || t.businessType || PLACEHOLDER}</td>
                     <td className="px-3 py-3">
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: `${GOLD}22`, color: GOLD_L }}>{t.tradeStatus || PLACEHOLDER}</span>

@@ -158,6 +158,13 @@ export interface FollowUpTask {
   // Notion sync status — 'followup_failed' means SB Pool OK but Follow-up Log write failed
   notionSyncStatus?: 'ok' | 'followup_failed';
   proposals?: Proposal[];
+  // Formal per-project/business identifier, distinct from the customer-level
+  // code (customerCode/businessId). Generated client-side at creation time
+  // (see utils/customerCode.ts generateProjectCode) — never sent to Notion,
+  // never overwritten by sync (same safe local-only pattern as `proposals`).
+  // Older records created before this field existed simply don't have one;
+  // display "暂无项目编码" rather than backfilling or fabricating a value.
+  projectCode?: string;
 }
 
 export interface AIInsights {

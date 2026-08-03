@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ArrowLeft, Plus, MessageSquarePlus, UploadCloud, Edit2 } from 'lucide-react';
 import type { FollowUpTask } from '../types';
-import { findCustomerByCode, getCustomerCode } from '../utils/customerCode';
+import { findCustomerByCode } from '../utils/customerCode';
 import { isRealCommLog } from '../utils/commLog';
 import CustomerWorkspaceBody from '../components/CustomerWorkspaceBody';
 import type { WorkspaceTab, WorkspaceDict } from '../components/CustomerWorkspaceBody';
@@ -25,6 +25,7 @@ interface Props {
   onUpdateTask: (task: FollowUpTask) => void;
   onUpdateAnyTask: (task: FollowUpTask) => void;
   onCreateBusiness: (formData: Partial<FollowUpTask>) => void;
+  onGoToBusiness: (task: FollowUpTask) => void;
 }
 
 function fmtDate(iso: string | undefined, na: string): string {
@@ -43,17 +44,19 @@ function SummaryField({ label, value, na }: { label: string; value?: string | nu
 }
 
 export default function CustomerWorkspacePage({
-  customerCode, tasks, hydrated, dict, onBack, onSave, onUpdateTask, onUpdateAnyTask, onCreateBusiness,
+  customerCode, tasks, hydrated, dict, onBack, onSave, onUpdateTask, onUpdateAnyTask, onCreateBusiness, onGoToBusiness,
 }: Props) {
   const [tab, setTab] = useState<WorkspaceTab>('info');
   const [editing, setEditing] = useState(false);
   const [showAddBusinessForm, setShowAddBusinessForm] = useState(false);
-  const [focusedId, setFocusedId] = useState<string | null>(null);
 
   const lookup = useMemo(() => findCustomerByCode(tasks, customerCode), [tasks, customerCode]);
+  // The workspace always shows the task resolved directly from the URL —
+  // it never switches focus in-place; 关联业务 rows navigate to the
+  // dedicated business detail page instead (see onGoToBusiness).
+  const focusedTask = lookup?.task || null;
   const group = lookup ? [lookup.task, ...lookup.relatedTasks] : [];
-  const focusedTask = (focusedId && group.find(t => t.id === focusedId)) || lookup?.task || null;
-  const relatedTasks = focusedTask ? group.filter(t => t.id !== focusedTask.id) : [];
+  const relatedTasks = lookup?.relatedTasks || [];
 
   if (!hydrated) {
     return (
@@ -75,7 +78,9 @@ export default function CustomerWorkspacePage({
     );
   }
 
-  const displayCode = getCustomerCode(focusedTask);
+  // Always the URL-level code — a customer has exactly one customerCode,
+  // regardless of which of their businesses this task represents.
+  const displayCode = customerCode;
   const lastCommMessage = (() => {
     const flat: { timestamp: string; message: string }[] = [];
     for (const t of group) {
@@ -147,6 +152,7 @@ export default function CustomerWorkspacePage({
         <CustomerWorkspaceBody
           task={focusedTask}
           relatedTasks={relatedTasks}
+          customerCode={customerCode}
           tab={tab}
           onTabChange={setTab}
           editing={editing}
@@ -155,9 +161,9 @@ export default function CustomerWorkspacePage({
           onShowAddBusinessFormChange={setShowAddBusinessForm}
           dict={dict}
           onSave={onSave}
-          onUpdateTask={(updated) => { onUpdateTask(updated); if (updated.id === focusedTask.id) setFocusedId(updated.id); }}
+          onUpdateTask={onUpdateTask}
           onUpdateAnyTask={onUpdateAnyTask}
-          onSwitchTask={(t) => setFocusedId(t.id)}
+          onGoToBusiness={onGoToBusiness}
           onCreateBusiness={onCreateBusiness}
         />
       </div>

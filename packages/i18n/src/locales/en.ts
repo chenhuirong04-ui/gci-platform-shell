@@ -858,6 +858,7 @@ export const en = {
       currentBadge: 'Current',
       unnamedBusiness: 'Unnamed Business',
       noOtherBusiness: 'No other businesses for this customer yet.',
+      noProjectCode: 'No project code yet',
       addBusinessBtn: '+ Add Business',
       newBusinessTitle: 'Add Business',
       createBusinessBtn: 'Create Business',

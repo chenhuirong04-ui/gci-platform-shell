@@ -17,6 +17,7 @@ import React, { useState, useRef } from 'react';
 import type { FollowUpTask, Proposal } from '../types';
 import { uploadFileToDrive } from '../services/driveService';
 import { isRealCommLog } from '../utils/commLog';
+import { generateProjectCode } from '../utils/customerCode';
 import {
   MessageSquare, Calendar, Phone, Mail, MapPin,
   User, Clock, Building2, Save, XCircle, Plus,
@@ -70,7 +71,7 @@ export interface WorkspaceDict {
   contactMissing: string; emailMissing: string; cityMissing: string; ownerMissing: string;
   createdAt: string; updatedAt: string; filesRowLabel: string; filesCount: string; filesEmpty: string;
   historyTitle: string; notionConnectedNote: string;
-  relatedBusinessesLabel: string; currentBadge: string; unnamedBusiness: string; noOtherBusiness: string;
+  relatedBusinessesLabel: string; currentBadge: string; unnamedBusiness: string; noOtherBusiness: string; noProjectCode: string;
   addBusinessBtn: string; newBusinessTitle: string; createBusinessBtn: string;
   newCommTitle: string; contentPlaceholder: string; saveComm: string; savedBadge: string; recentRecords: string;
   quotesOf: string; refresh: string; loadingQuotes: string; quotesLoadFailed: string; noQuotesFound: string;
@@ -94,6 +95,11 @@ export interface WorkspaceDict {
 interface Props {
   task: FollowUpTask;
   relatedTasks?: FollowUpTask[];
+  // Customer-level code (from the URL) — the SAME value regardless of which
+  // sibling business is being shown, and the prefix new project codes are
+  // generated against. Never recompute a per-task code for display; a
+  // customer has exactly one customerCode.
+  customerCode: string;
   tab: WorkspaceTab;
   onTabChange: (t: WorkspaceTab) => void;
   editing: boolean;
@@ -104,7 +110,10 @@ interface Props {
   onSave: (taskId: string, log: { method: string; content: string; nextDate: string }) => void;
   onUpdateTask?: (task: FollowUpTask) => void;
   onUpdateAnyTask?: (task: FollowUpTask) => void;
-  onSwitchTask?: (task: FollowUpTask) => void;
+  // Navigates to the dedicated business detail page for a sibling business
+  // (/crm/customer/:customerCode/business/:businessKey) — 关联业务 rows are
+  // links to that page, not an in-place focus switch.
+  onGoToBusiness?: (task: FollowUpTask) => void;
   onCreateBusiness?: (formData: Partial<FollowUpTask>) => void;
 }
 
@@ -138,9 +147,9 @@ function InfoRow({ icon, label, value, empty, onClick }: {
 }
 
 export default function CustomerWorkspaceBody({
-  task, relatedTasks = [], tab, onTabChange, editing, onEditingChange,
+  task, relatedTasks = [], customerCode, tab, onTabChange, editing, onEditingChange,
   showAddBusinessForm, onShowAddBusinessFormChange, dict,
-  onSave, onUpdateTask, onUpdateAnyTask, onSwitchTask, onCreateBusiness,
+  onSave, onUpdateTask, onUpdateAnyTask, onGoToBusiness, onCreateBusiness,
 }: Props) {
   const typeLabel = TYPE_LABEL[task.businessType || 'TRADE'] ?? '贸易询盘';
 
@@ -324,6 +333,7 @@ export default function CustomerWorkspaceBody({
     if (!newBizGoal.trim() || !onCreateBusiness) return;
     setNewBizSaving(true);
     try {
+      const projectCode = generateProjectCode(customerCode, newBizType, allCustomerTasks);
       await onCreateBusiness({
         clientName: task.clientName,
         phoneE164: task.phoneE164,
@@ -334,6 +344,7 @@ export default function CustomerWorkspaceBody({
         goal: newBizGoal.trim(),
         lastContext: newBizContext.trim(),
         nextFollowUpAt: newBizNextDate,
+        projectCode,
       } as any);
       setNewBizGoal(''); setNewBizContext('');
       onShowAddBusinessFormChange(false);
@@ -531,8 +542,11 @@ export default function CustomerWorkspaceBody({
           )}
 
           <div className="px-3 py-2.5 rounded-xl" style={{ background: `${GOLD}15`, border: `1px solid ${GOLD}40` }}>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[9px] font-black px-1.5 py-0.5 rounded" style={{ background: `${GOLD}30`, color: GOLD }}>{dict.currentBadge}</span>
+              {(task as any).projectCode && (
+                <span className="text-[9px] font-black px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.08)', color: T2 }}>{(task as any).projectCode}</span>
+              )}
               <span className="text-xs font-black" style={{ color: T1 }}>{task.inquirySummary || task.goal || dict.unnamedBusiness}</span>
             </div>
             <div className="text-[10px] mt-1" style={{ color: T2 }}>{task.tradeStatus || '—'} · {TYPE_LABEL[task.businessType || 'TRADE']}</div>
@@ -541,10 +555,13 @@ export default function CustomerWorkspaceBody({
             <div className="text-xs font-medium py-4" style={{ color: T3 }}>{dict.noOtherBusiness}</div>
           ) : (
             relatedTasks.map(t => (
-              <button key={t.id} onClick={() => onSwitchTask?.(t)} className="w-full text-left px-3 py-2.5 rounded-xl transition-colors hover:bg-white/5" style={{ background: CARD2, border: `1px solid ${BORD}` }}>
-                <div className="text-xs font-black truncate" style={{ color: T1 }}>{t.inquirySummary || t.goal || dict.unnamedBusiness}</div>
+              <button key={t.id} onClick={() => onGoToBusiness?.(t)} className="w-full text-left px-3 py-2.5 rounded-xl transition-colors hover:bg-white/5" style={{ background: CARD2, border: `1px solid ${BORD}` }}>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.08)', color: T2 }}>{(t as any).projectCode || dict.noProjectCode}</span>
+                  <span className="text-xs font-black truncate" style={{ color: T1 }}>{t.inquirySummary || t.goal || dict.unnamedBusiness}</span>
+                </div>
                 <div className="text-[10px] mt-1 flex items-center justify-between" style={{ color: T2 }}>
-                  <span>{t.tradeStatus || '—'} · {TYPE_LABEL[t.businessType || 'TRADE']}</span>
+                  <span>{t.tradeStatus || '—'} · {TYPE_LABEL[t.businessType || 'TRADE']} · {t.owner || dict.na}</span>
                   <span>{t.updatedAt ? new Date(t.updatedAt).toLocaleDateString('zh-CN') : dict.na}</span>
                 </div>
               </button>
