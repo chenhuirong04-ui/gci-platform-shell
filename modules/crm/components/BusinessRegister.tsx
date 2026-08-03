@@ -18,6 +18,28 @@ const TYPE_LABEL: Record<string, string> = { TRADE: '贸易型', PROJECT: '项�
 const DONE_STATUSES = new Set(['已成交', '已归档', '执行中']);
 const QUOTED_STATUSES = new Set(['已报价待确认', '合同待签', '执行中', '已成交']);
 
+// inquirySummary/goal sometimes just echoes the trade status at creation
+// time (e.g. "已签合同,") rather than a real project/business name — this
+// list keeps those out of the "项目/业务" column so a status word never
+// gets displayed as if it were the business's name.
+const STATUS_PHRASES = new Set([
+  '新询盘', '需求整理中', '待报价', '已报价待确认', '合同待签', '执行中', '已成交',
+  '暂缓', '已归档', '待人工确认', '已报价', '等待确认', '新建', '跟进中', '谈判中',
+  '已暂停', '已关闭', '寻价中', '已发客户', '已确认', '已转订单', '已签合同',
+]);
+function looksLikeStatusPhrase(s: string): boolean {
+  return STATUS_PHRASES.has(s.trim().replace(/[，,。.!！\s]+$/g, ''));
+}
+// Real project/business name if there is one; otherwise a short requirement
+// summary — never a bare status phrase (see STATUS_PHRASES above).
+function businessName(t: FollowUpTask): string {
+  const summary = (t.inquirySummary || '').trim();
+  if (summary && !looksLikeStatusPhrase(summary)) return summary;
+  const goal = (t.goal || '').trim();
+  if (goal && !looksLikeStatusPhrase(goal)) return goal;
+  return PLACEHOLDER;
+}
+
 function quoteStatusOf(tradeStatus: string): string {
   if (QUOTED_STATUSES.has(tradeStatus)) return '已报价';
   if (tradeStatus === '待报价') return '报价中';
@@ -102,10 +124,11 @@ export default function BusinessRegister({
       .sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
   }, [active, search, typeFilter, stageFilter, countryFilter, ownerFilter]);
 
+  // Compact stat row — 最近7天新增/报价中/已归档 stay reachable via the
+  // filters and "仅看已归档" toggle below instead of their own big cards.
   const STAT_ITEMS: [string, number][] = [
-    ['全部业务', stats.total], ['最近7天新增', stats.new7], ['最近30天活跃', stats.active30],
-    ['项目型', stats.project], ['贸易型', stats.trade], ['报价中', stats.quoting],
-    ['执行中', stats.executing], ['已归档', stats.archived],
+    ['全部业务', stats.total], ['最近30天活跃', stats.active30],
+    ['项目型', stats.project], ['贸易型', stats.trade], ['执行中', stats.executing],
   ];
 
   return (
@@ -125,7 +148,7 @@ export default function BusinessRegister({
       </div>
 
       {/* Top stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
         {STAT_ITEMS.map(([label, value]) => (
           <div key={label} className="rounded-xl px-4 py-3" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
             <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T3 }}>{label}</div>
@@ -179,7 +202,7 @@ export default function BusinessRegister({
           <table className="w-full text-xs" style={{ minWidth: 1180 }}>
             <thead>
               <tr style={{ background: CARD2 }}>
-                {['客户/项目名称', '业务编号', '客户名称', '国家', '业务类型', '需求摘要', '当前阶段', '最近沟通', '下一步', '报价状态', '文件数量', '负责人', '最近更新'].map(h => (
+                {['客户/公司', '项目/业务', '业务类型', '当前阶段', '最近沟通', '下一步', '报价状态', '文件数量', '负责人', '最近更新'].map(h => (
                   <th key={h} className="text-left px-3 py-2.5 font-black uppercase tracking-wide whitespace-nowrap" style={{ color: T2, fontSize: 10 }}>{h}</th>
                 ))}
               </tr>
@@ -195,12 +218,15 @@ export default function BusinessRegister({
                     className="cursor-pointer transition-colors hover:bg-white/5"
                     style={{ borderTop: `1px solid ${BORDER}`, background: CARD }}
                   >
-                    <td className="px-3 py-3 font-black" style={{ color: T1 }}>{t.inquirySummary || t.goal || PLACEHOLDER}</td>
-                    <td className="px-3 py-3" style={{ color: bizId ? T2 : T3 }}>{bizId || PLACEHOLDER}</td>
-                    <td className="px-3 py-3" style={{ color: T2 }}>{t.clientName || PLACEHOLDER}</td>
-                    <td className="px-3 py-3" style={{ color: t.countryCity ? T2 : T3 }}>{t.countryCity || PLACEHOLDER}</td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-1.5">
+                        {bizId && <span className="text-[9px] font-black px-1.5 py-0.5 rounded shrink-0" style={{ background: `${GOLD}22`, color: GOLD_L }}>{bizId}</span>}
+                        <span className="font-black truncate" style={{ color: T1 }}>{t.clientName || PLACEHOLDER}</span>
+                      </div>
+                      {!bizId && <div className="text-[9px] mt-0.5" style={{ color: T3 }}>{PLACEHOLDER}</div>}
+                    </td>
+                    <td className="px-3 py-3 max-w-[220px] truncate" style={{ color: T2 }} title={businessName(t)}>{businessName(t)}</td>
                     <td className="px-3 py-3" style={{ color: T2 }}>{TYPE_LABEL[t.businessType] || t.businessType || PLACEHOLDER}</td>
-                    <td className="px-3 py-3 max-w-[200px] truncate" style={{ color: T2 }} title={t.goal}>{t.goal || PLACEHOLDER}</td>
                     <td className="px-3 py-3">
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: `${GOLD}22`, color: GOLD_L }}>{t.tradeStatus || PLACEHOLDER}</span>
                     </td>
@@ -218,7 +244,7 @@ export default function BusinessRegister({
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={13} className="px-3 py-10 text-center" style={{ color: T3 }}>未找到匹配的业务记录</td>
+                  <td colSpan={10} className="px-3 py-10 text-center" style={{ color: T3 }}>未找到匹配的业务记录</td>
                 </tr>
               )}
             </tbody>

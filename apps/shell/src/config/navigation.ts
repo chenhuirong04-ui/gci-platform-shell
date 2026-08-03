@@ -57,7 +57,7 @@ export const sections: SectionDef[] = [
       // same underlying Follow-up Log data — collapsed into two. Old ?tab=
       // values still resolve inside CrmModule.tsx for bookmark compatibility.
       { code: 'BO', nameKey: 'businessOverview', path: '/crm?tab=control' },
-      { code: 'CP', nameKey: 'customersAndProjects', count: '5', badgeColor: '#E2C988', badgeBg: 'rgba(203,168,92,0.16)', path: '/crm?tab=dashboard' },
+      { code: 'CP', nameKey: 'customersAndProjects', count: '5', badgeColor: '#E2C988', badgeBg: 'rgba(203,168,92,0.16)', path: '/crm?tab=project' },
     ],
   },
   {

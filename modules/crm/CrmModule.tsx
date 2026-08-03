@@ -1183,8 +1183,8 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
   ].filter(g => !demoMode || g.id === 'control' || g.id === 'customersAndProjects');
 
   const subTabs = [
-    { id: 'dashboard' as const, label: dict.crm.nav.subNavCustomers },
     { id: 'project' as const,   label: dict.crm.nav.subNavBusiness },
+    { id: 'dashboard' as const, label: dict.crm.nav.subNavCustomers },
     { id: 'comms' as const,     label: dict.crm.nav.subNavComms },
     { id: 'history' as const,   label: dict.crm.nav.subNavArchived },
   ];
@@ -1207,7 +1207,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
                 <button
                   onClick={() => {
                     if (group.id === 'customersAndProjects') {
-                      if (!isInCustomersAndProjects) setActiveTab('dashboard');
+                      if (!isInCustomersAndProjects) setActiveTab('project');
                     } else {
                       setActiveTab(group.id);
                     }
