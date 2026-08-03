@@ -56,11 +56,24 @@ interface NavInfo {
 
 interface Props {
   task: FollowUpTask;
+  // Other businesses belonging to the same customer (same identity grouping
+  // as CustomerDirectory.tsx) — powers the 项目与业务 tab and lets 客户资料
+  // aggregate files across all of this customer's businesses instead of just
+  // the currently-open one.
+  relatedTasks?: FollowUpTask[];
   onClose: () => void;
   onSave: (taskId: string, log: { method: string; content: string; nextDate: string }) => void;
   onViewFull: () => void;
   onArchiveTask?: (id: string) => void;
   onUpdateTask?: (task: FollowUpTask) => void;
+  // Same underlying update as onUpdateTask but for a task OTHER than the
+  // currently-focused one (e.g. uploading a file against a sibling
+  // business) — doesn't change which task the drawer is currently showing.
+  onUpdateAnyTask?: (task: FollowUpTask) => void;
+  // Switches the drawer to show a different business for the same customer
+  // (used by the 项目与业务 tab) — reuses the same mechanism as the
+  // prev/next navigation arrows.
+  onSwitchTask?: (task: FollowUpTask) => void;
   navInfo?: NavInfo;
 }
 
@@ -115,30 +128,48 @@ function InfoRow({
 }
 
 export default function QuickFollowUpPanel({
-  task, onClose, onSave, onViewFull, onArchiveTask, onUpdateTask, navInfo,
+  task, relatedTasks = [], onClose, onSave, onViewFull, onArchiveTask, onUpdateTask, onUpdateAnyTask, onSwitchTask, navInfo,
 }: Props) {
   const bizId    = (task as any).businessId || getTaskBusinessId(task.id);
   const priority = task.priority || 'B';
   const typeLabel = TYPE_LABEL[task.businessType || 'TRADE'] ?? '贸易询盘';
 
-  const [tab, setTab]   = useState<'info' | 'action' | 'quotes' | 'proposals'>('info');
+  const [tab, setTab] = useState<'info' | 'business' | 'action' | 'files' | 'quotes'>('info');
   const [proposalUploadStatus, setProposalUploadStatus] = useState<'idle' | 'uploading' | 'ok' | 'fail'>('idle');
   const [isDraggingProposal, setIsDraggingProposal] = useState(false);
   const proposalInputRef = useRef<HTMLInputElement>(null);
-  const [fileCategory, setFileCategory] = useState<'proposal' | 'contract' | 'project_doc' | 'other'>('proposal');
+  const [fileCategory, setFileCategory] = useState<NonNullable<Proposal['category']>>('company_docs');
+  // Association: which business this upload belongs to. 'customer' = tag it
+  // as customer-wide (still physically stored on `targetTaskId` below, since
+  // Proposal[] only exists as a per-task array — see Proposal.scope comment
+  // in types.ts). 'business' / 'both' require picking a specific business.
+  const [fileScope, setFileScope] = useState<'customer' | 'business' | 'both'>('customer');
+  const [targetTaskId, setTargetTaskId] = useState<string>(task.id);
+  const [fileNotes, setFileNotes] = useState('');
+  const allCustomerTasks = [task, ...relatedTasks];
 
   const FILE_CATEGORY_LABELS: Record<string, string> = {
-    proposal:    '提案 / 方案',
-    contract:    '合同 / 回签文件',
-    project_doc: '项目资料',
-    other:       '其他附件',
+    company_docs:          '公司证件',
+    contact_identity:      '联系与身份资料',
+    product_requirements:  '产品与需求资料',
+    business_docs:         '商务文件',
+    comms_evidence:        '沟通证据',
+    other_docs:            '其他资料',
+    // Legacy categories — kept so files uploaded before this change still
+    // display a real label instead of falling back to raw key text.
+    proposal:    '提案 / 方案（旧分类）',
+    contract:    '合同 / 回签文件（旧分类）',
+    project_doc: '项目资料（旧分类）',
+    other:       '其他附件（旧分类）',
   };
 
   // Single entry point for all proposal file uploads (click + drag-drop)
   const handleProposalFiles = async (files: File[]) => {
     const file = files[0];
-    if (!file || !onUpdateTask) return;
-    console.log('[PROPOSAL UPLOAD] files', files);
+    const targetTask = allCustomerTasks.find(t => t.id === targetTaskId) || task;
+    const updateTarget = targetTask.id === task.id ? onUpdateTask : (onUpdateAnyTask || onUpdateTask);
+    if (!file || !updateTarget) return;
+    console.log('[PROPOSAL UPLOAD] files', files, 'target', targetTask.id, 'scope', fileScope);
     setProposalUploadStatus('uploading');
 
     const reader = new FileReader();
@@ -154,31 +185,35 @@ export default function QuickFollowUpPanel({
         id: propId, name: file.name, mimeType: file.type,
         size: file.size, uploadedAt, uploadStatus: 'uploading',
         category: fileCategory,
+        scope: fileScope,
+        source: '手动上传',
+        notes: fileNotes.trim() || undefined,
       };
       // Snapshot current proposals so both async updates use same base
-      const currentProposals = task.proposals || [];
+      const currentProposals = targetTask.proposals || [];
       const withNew = [...currentProposals, newProposal];
-      onUpdateTask({ ...task, proposals: withNew });
+      updateTarget({ ...targetTask, proposals: withNew });
       console.log('[PROPOSAL UPLOAD] updated proposals (uploading)', withNew);
 
       try {
         const result = await uploadFileToDrive(
           { id: propId, name: file.name, type: file.type, data: dataURL, size: file.size, uploadedAt, isAnalyzed: false },
-          { businessType: task.businessType, clientName: task.clientName }
+          { businessType: targetTask.businessType, clientName: targetTask.clientName }
         );
         console.log('[PROPOSAL UPLOAD] drive result', result);
         if (result.ok && result.driveUrl) {
           const finalProposals = withNew.map(p =>
             p.id === propId ? { ...p, driveUrl: result.driveUrl, uploadStatus: 'uploaded' as const } : p
           );
-          onUpdateTask({ ...task, proposals: finalProposals });
+          updateTarget({ ...targetTask, proposals: finalProposals });
           setProposalUploadStatus('ok');
+          setFileNotes('');
           console.log('[PROPOSAL UPLOAD] updated proposals (ok)', finalProposals);
         } else {
           const finalProposals = withNew.map(p =>
             p.id === propId ? { ...p, uploadStatus: 'failed' as const } : p
           );
-          onUpdateTask({ ...task, proposals: finalProposals });
+          updateTarget({ ...targetTask, proposals: finalProposals });
           setProposalUploadStatus('fail');
         }
       } catch (err) {
@@ -186,7 +221,7 @@ export default function QuickFollowUpPanel({
         const finalProposals = withNew.map(p =>
           p.id === propId ? { ...p, uploadStatus: 'failed' as const } : p
         );
-        onUpdateTask({ ...task, proposals: finalProposals });
+        updateTarget({ ...targetTask, proposals: finalProposals });
         setProposalUploadStatus('fail');
       }
     };
@@ -416,13 +451,14 @@ export default function QuickFollowUpPanel({
           {!editing && (
             <div className="flex gap-1 mt-4 p-1 rounded-xl" style={{ background: CARD2 }}>
               {([
-                ['info',      '客户详情'],
-                ['action',    '跟进记录'],
-                ['quotes',    '历史报价'],
-                ['proposals', '文件'],
+                ['info',     '基本资料'],
+                ['business', '项目与业务'],
+                ['action',   '沟通记录'],
+                ['files',    '客户资料'],
+                ['quotes',   '报价记录'],
               ] as const).map(([key, label]) => (
-                <button key={key} onClick={() => { setTab(key); if (key === 'quotes') loadQuoteHistory(); if (key === 'proposals') setProposalUploadStatus('idle'); }}
-                  className="flex-1 py-1.5 rounded-lg text-xs font-black transition-all"
+                <button key={key} onClick={() => { setTab(key); if (key === 'quotes') loadQuoteHistory(); if (key === 'files') setProposalUploadStatus('idle'); }}
+                  className="flex-1 py-1.5 rounded-lg text-[11px] font-black transition-all"
                   style={tab === key ? { background: GOLD, color: '#fff' } : { color: T3 }}>
                   {label}
                 </button>
@@ -626,20 +662,21 @@ export default function QuickFollowUpPanel({
               <InfoRow icon={<Clock className="w-3.5 h-3.5" />} label="最近更新时间"
                 value={task.updatedAt ? new Date(task.updatedAt).toLocaleDateString('zh-CN') : null} empty="待补充" />
 
-              {/* Attachments */}
-              <div className="flex items-start gap-3 py-2.5" style={{ borderBottom: `1px solid ${BORD}` }}>
+              {/* Customer files summary — real aggregate across this customer's
+                  businesses; upload/browse happens on the 客户资料 tab. */}
+              <div className="flex items-start gap-3 py-2.5 cursor-pointer" style={{ borderBottom: `1px solid ${BORD}` }}
+                onClick={() => setTab('files')}>
                 <div className="shrink-0 mt-0.5" style={{ color: T3 }}><Paperclip className="w-3.5 h-3.5" /></div>
                 <div className="flex-1">
-                  <div style={labelStyle}>附件</div>
-                  {task.attachments && task.attachments.length > 0 ? (
-                    <div className="text-sm font-medium" style={{ color: T1 }}>
-                      {task.attachments.length} 个附件
-                    </div>
-                  ) : (
-                    <div className="text-sm font-medium" style={{ color: T3 }}>
-                      暂无附件 · 附件上传将在下一阶段接入
-                    </div>
-                  )}
+                  <div style={labelStyle}>客户资料</div>
+                  {(() => {
+                    const count = allCustomerTasks.reduce((n, t) => n + (t.proposals?.length || 0), 0);
+                    return count > 0 ? (
+                      <div className="text-sm font-medium" style={{ color: T1 }}>{count} 份资料 — 点击查看</div>
+                    ) : (
+                      <div className="text-sm font-medium" style={{ color: T3 }}>暂无客户资料 — 点击前往上传</div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -662,6 +699,48 @@ export default function QuickFollowUpPanel({
                 <div className="mt-3 text-[9px] font-bold" style={{ color: T3 }}>
                   Notion 已连接 · 编辑和关闭跟进均可同步
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* ── VIEW MODE — BUSINESS TAB (项目与业务) ─── */}
+          {!editing && tab === 'business' && (
+            <div className="p-5 space-y-3">
+              <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>
+                {task.clientName || '该客户'} 关联的业务（共 {allCustomerTasks.length} 条）
+              </p>
+
+              {/* Current business, marked as such */}
+              <div className="px-3 py-2.5 rounded-xl" style={{ background: `${GOLD}15`, border: `1px solid ${GOLD}40` }}>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded" style={{ background: `${GOLD}30`, color: GOLD }}>当前</span>
+                  <span className="text-xs font-black" style={{ color: T1 }}>{task.inquirySummary || task.goal || '未命名业务'}</span>
+                </div>
+                <div className="text-[10px] mt-1" style={{ color: T2 }}>{task.tradeStatus || '—'} · {TYPE_LABEL[task.businessType || 'TRADE']}</div>
+              </div>
+
+              {relatedTasks.length === 0 ? (
+                <div className="text-xs font-medium py-4" style={{ color: T3 }}>
+                  暂无该客户的其他业务记录。
+                </div>
+              ) : (
+                relatedTasks.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => onSwitchTask?.(t)}
+                    className="w-full text-left px-3 py-2.5 rounded-xl transition-colors hover:bg-white/5"
+                    style={{ background: CARD2, border: `1px solid ${BORD}` }}
+                  >
+                    <div className="text-xs font-black truncate" style={{ color: T1 }}>{t.inquirySummary || t.goal || '未命名业务'}</div>
+                    <div className="text-[10px] mt-1 flex items-center justify-between" style={{ color: T2 }}>
+                      <span>{t.tradeStatus || '—'} · {TYPE_LABEL[t.businessType || 'TRADE']}</span>
+                      <span>{t.updatedAt ? new Date(t.updatedAt).toLocaleDateString('zh-CN') : '待补充'}</span>
+                    </div>
+                  </button>
+                ))
+              )}
+              {!onSwitchTask && relatedTasks.length > 0 && (
+                <p className="text-[10px]" style={{ color: T3 }}>点击业务名称可切换查看（当前视图不支持切换）。</p>
               )}
             </div>
           )}
@@ -738,12 +817,12 @@ export default function QuickFollowUpPanel({
               )}
             </div>
           )}
-          {/* ── QUOTES TAB ─── */}
+          {/* ── QUOTES TAB (报价记录) ─── */}
           {!editing && tab === 'quotes' && (
             <div className="p-5 space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>
-                  {task.clientName} 的历史报价
+                  {task.clientName} 的报价记录
                 </p>
                 <button onClick={() => { setQuoteData(null); loadQuoteHistory(); }}
                   className="text-[10px] font-bold px-2 py-1 rounded-lg transition-colors"
@@ -755,14 +834,14 @@ export default function QuickFollowUpPanel({
               {quoteLoading && (
                 <div className="flex items-center gap-2 text-xs font-bold py-4" style={{ color: T3 }}>
                   <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-                  正在查询历史报价…
+                  正在查询报价记录…
                 </div>
               )}
 
               {!quoteLoading && quoteData && !quoteData.ok && (
                 <div className="px-3 py-2 rounded-lg text-xs font-bold"
                   style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#FCA5A5' }}>
-                  暂时无法读取历史报价，请稍后重试。
+                  暂时无法读取报价记录，请稍后重试。
                 </div>
               )}
 
@@ -839,6 +918,29 @@ export default function QuickFollowUpPanel({
                             })() : (
                               <div className="text-[10px] font-medium" style={{ color: T3 }}>该报价暂无产品明细</div>
                             )}
+
+                            {/* Extended fields — shows what the existing quotation-history
+                                API actually returns; fields it doesn't track (版本/客户反馈/
+                                下一步) are marked 待补充 rather than fabricated. */}
+                            <div className="mt-2 pt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]" style={{ borderTop: `1px solid ${BORD}` }}>
+                              <div><span style={{ color: T3 }}>报价类型：</span><span style={{ color: T2 }}>{q.quoteType || '待补充'}</span></div>
+                              <div><span style={{ color: T3 }}>币种：</span><span style={{ color: T2 }}>{q.currency || '待补充'}</span></div>
+                              <div><span style={{ color: T3 }}>版本：</span><span style={{ color: T3 }}>待补充</span></div>
+                              <div><span style={{ color: T3 }}>客户反馈：</span><span style={{ color: T3 }}>待补充</span></div>
+                              <div><span style={{ color: T3 }}>下一步：</span><span style={{ color: T3 }}>待补充</span></div>
+                              <div><span style={{ color: T3 }}>关联项目/业务：</span><span style={{ color: T2 }}>{q.projectName || '待补充'}</span></div>
+                            </div>
+                            {q.attachments && q.attachments.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {q.attachments.map((a: any, ai: number) => a.url ? (
+                                  <a key={ai} href={a.url} target="_blank" rel="noreferrer"
+                                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black transition-colors"
+                                    style={{ background: `${GOLD}18`, color: GOLD }}>
+                                    <ExternalLink className="w-3 h-3" /> {a.name || '查看报价文件'}
+                                  </a>
+                                ) : null)}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -849,21 +951,58 @@ export default function QuickFollowUpPanel({
 
               {!quoteLoading && !quoteData && (
                 <div className="text-xs font-medium py-4" style={{ color: T3 }}>
-                  点击"历史报价"标签自动加载。
+                  点击"报价记录"标签自动加载。
                 </div>
               )}
             </div>
           )}
 
-          {/* ── PROPOSALS TAB ─── */}
-          {!editing && tab === 'proposals' && (
+          {/* ── FILES TAB (客户资料) ─── */}
+          {!editing && tab === 'files' && (
             <div className="p-5 space-y-3">
+
+              {/* Association scope */}
+              <div className="flex flex-col gap-1">
+                <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: T3 }}>关联范围</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {([
+                    ['customer', '仅关联客户'],
+                    ['business', '关联具体项目/业务'],
+                    ['both',     '同时关联'],
+                  ] as const).map(([sc, label]) => (
+                    <button key={sc} onClick={() => setFileScope(sc)}
+                      className="py-1.5 px-2 rounded-lg text-[10.5px] font-bold transition-all"
+                      style={fileScope === sc
+                        ? { background: `${GOLD}22`, color: GOLD, border: `1px solid ${GOLD}60` }
+                        : { background: CARD2, color: T3, border: `1px solid ${BORD}` }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Target business — shown when the file needs to be tied to a
+                  specific business (physically it's still stored on that
+                  business's own proposals[] array, since there's no separate
+                  customer-level storage; scope above records the intent). */}
+              {(fileScope === 'business' || fileScope === 'both') && (
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: T3 }}>选择项目 / 业务</p>
+                  <select value={targetTaskId} onChange={e => setTargetTaskId(e.target.value)} style={inputStyle}>
+                    {allCustomerTasks.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.id === task.id ? '（当前）' : ''}{t.inquirySummary || t.goal || '未命名业务'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* File category selector */}
               <div className="flex flex-col gap-1">
-                <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: T3 }}>文件类型</p>
+                <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: T3 }}>资料类别</p>
                 <div className="grid grid-cols-2 gap-1.5">
-                  {(['proposal', 'contract', 'project_doc', 'other'] as const).map(cat => (
+                  {(['company_docs', 'contact_identity', 'product_requirements', 'business_docs', 'comms_evidence', 'other_docs'] as const).map(cat => (
                     <button key={cat} onClick={() => setFileCategory(cat)}
                       className="py-1.5 px-2 rounded-lg text-[11px] font-bold transition-all text-left"
                       style={fileCategory === cat
@@ -873,6 +1012,13 @@ export default function QuickFollowUpPanel({
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: T3 }}>说明（可选）</p>
+                <input value={fileNotes} onChange={e => setFileNotes(e.target.value)}
+                  placeholder="例如：客户签署的合同扫描件" style={inputStyle} />
               </div>
 
               {/* Drop zone — click or drag to upload */}
@@ -914,38 +1060,53 @@ export default function QuickFollowUpPanel({
                 </div>
               )}
 
-              {/* Proposals list */}
-              {task.proposals && task.proposals.length > 0 && (
-                <div className="space-y-2">
-                  <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>
-                    客户文件 ({task.proposals.length})
-                  </div>
-                  {task.proposals.map(p => (
-                    <div key={p.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
-                      style={{ background: CARD2, border: `1px solid ${BORD}` }}>
-                      <FileText className="w-4 h-4 shrink-0" style={{ color: T3 }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold truncate" style={{ color: T1 }}>{p.name}</p>
-                        <p className="text-[10px]" style={{ color: T3 }}>
-                          {p.category ? FILE_CATEGORY_LABELS[p.category] + ' · ' : ''}
-                          {new Date(p.uploadedAt).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}
-                        </p>
-                      </div>
-                      <div className="shrink-0 flex items-center gap-2">
-                        {p.uploadStatus === 'uploading' && <div className="w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />}
-                        {p.uploadStatus === 'uploaded' && p.driveUrl && (
-                          <a href={p.driveUrl} target="_blank" rel="noreferrer"
-                            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black transition-colors"
-                            style={{ background: `${GOLD}18`, color: GOLD }}>
-                            <ExternalLink className="w-3 h-3" /> 打开文件
-                          </a>
-                        )}
-                        {p.uploadStatus === 'failed' && <span className="text-[10px] font-bold text-red-400">上传失败</span>}
-                      </div>
+              {/* Files list — aggregated across this customer's businesses,
+                  each row tagged with which business it actually lives on so
+                  multiple businesses' files never get conflated. */}
+              {(() => {
+                const allFiles = allCustomerTasks.flatMap(t =>
+                  (t.proposals || []).map(p => ({ p, sourceTask: t }))
+                );
+                if (allFiles.length === 0) return null;
+                return (
+                  <div className="space-y-2">
+                    <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>
+                      客户资料 ({allFiles.length})
                     </div>
-                  ))}
-                </div>
-              )}
+                    {allFiles.map(({ p, sourceTask }) => (
+                      <div key={p.id} className="flex items-start gap-3 px-3 py-2.5 rounded-xl"
+                        style={{ background: CARD2, border: `1px solid ${BORD}` }}>
+                        <FileText className="w-4 h-4 shrink-0 mt-0.5" style={{ color: T3 }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold truncate" style={{ color: T1 }}>{p.name}</p>
+                          <p className="text-[10px] mt-0.5" style={{ color: T3 }}>
+                            {p.category ? FILE_CATEGORY_LABELS[p.category] + ' · ' : ''}
+                            {new Date(p.uploadedAt).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                            {p.uploadedBy ? ` · 上传人：${p.uploadedBy}` : ''}
+                          </p>
+                          <p className="text-[10px] mt-0.5" style={{ color: T2 }}>
+                            关联客户：{task.clientName || '待补充'} · 关联项目/业务：{sourceTask.inquirySummary || sourceTask.goal || '未命名业务'}
+                            {p.scope === 'customer' && ' （标记为客户级）'}
+                          </p>
+                          {p.source && <p className="text-[10px] mt-0.5" style={{ color: T3 }}>来源：{p.source}</p>}
+                          {p.notes && <p className="text-[10px] mt-0.5" style={{ color: T3 }}>说明：{p.notes}</p>}
+                        </div>
+                        <div className="shrink-0 flex items-center gap-2">
+                          {p.uploadStatus === 'uploading' && <div className="w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />}
+                          {p.uploadStatus === 'uploaded' && p.driveUrl && (
+                            <a href={p.driveUrl} target="_blank" rel="noreferrer"
+                              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black transition-colors"
+                              style={{ background: `${GOLD}18`, color: GOLD }}>
+                              <ExternalLink className="w-3 h-3" /> 查看/下载
+                            </a>
+                          )}
+                          {p.uploadStatus === 'failed' && <span className="text-[10px] font-bold text-red-400">上传失败</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -954,8 +1115,8 @@ export default function QuickFollowUpPanel({
         <div className="shrink-0 p-4 space-y-2" style={{ borderTop: `1px solid ${BORD}`, background: CARD }}>
 
           {/* Edit mode: Save / Cancel */}
-          {/* Proposals tab — hidden file input (shared by drop zone click + this button) */}
-          {!editing && tab === 'proposals' && (
+          {/* Files tab (客户资料) — hidden file input (shared by drop zone click + this button) */}
+          {!editing && tab === 'files' && (
             <>
               <input
                 ref={proposalInputRef}

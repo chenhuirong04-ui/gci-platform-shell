@@ -47,7 +47,25 @@ export interface Proposal {
   size?: number;
   uploadedAt: string;
   uploadStatus?: 'uploading' | 'uploaded' | 'failed';
-  category?: 'proposal' | 'contract' | 'project_doc' | 'other';
+  // 'proposal'/'contract'/'project_doc'/'other' are the original categories —
+  // kept for files already uploaded under them. The six 客户资料 categories
+  // are the current upload options going forward.
+  category?:
+    | 'proposal' | 'contract' | 'project_doc' | 'other'
+    | 'company_docs' | 'contact_identity' | 'product_requirements'
+    | 'business_docs' | 'comms_evidence' | 'other_docs';
+  // Additive metadata for the 客户资料 tab — never round-tripped through
+  // Notion (this array is only ever persisted as part of the FollowUpTask
+  // JSON blob in localStorage/Supabase), so these are safe, non-breaking
+  // optional fields, not a schema change.
+  uploadedBy?: string;
+  source?: string;
+  notes?: string;
+  // Association scope chosen at upload time: 'customer' = applies to the
+  // whole customer regardless of which specific business it was uploaded
+  // against; 'business' = specific to the business/project it's attached to
+  // (i.e. the FollowUpTask it lives on); 'both' = relevant to both.
+  scope?: 'customer' | 'business' | 'both';
 }
 
 export interface ProjectLogEntry {

@@ -1450,6 +1450,23 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
       {selectedTask && detailOpen && (activeTab === 'dashboard' || activeTab === 'comms') && (
         <QuickFollowUpPanel
           task={selectedTask}
+          // Other businesses belonging to the same customer — same
+          // contactKey/clientName identity grouping CustomerDirectory.tsx
+          // uses, so "项目与业务" and 客户档案's "关联业务" count stay
+          // consistent with each other.
+          relatedTasks={(() => {
+            const key = (selectedTask.contactKey || '').trim().toLowerCase()
+              || (selectedTask.clientName || '').trim().toLowerCase() || selectedTask.id;
+            return normalizedTasks.filter(t => {
+              if (t.id === selectedTask.id) return false;
+              const tKey = (t.contactKey || '').trim().toLowerCase() || (t.clientName || '').trim().toLowerCase() || t.id;
+              return tKey === key;
+            });
+          })()}
+          onSwitchTask={(t) => setSelectedTask(t)}
+          onUpdateAnyTask={(updated: FollowUpTask) => {
+            setTasks(v => v.map(t => (t.id === updated.id ? updated : t)));
+          }}
           onClose={() => setDetailOpen(false)}
           navInfo={navIdx >= 0 ? { current: navIdx + 1, total: navTotal, hasPrev, hasNext, onPrev: goPrev, onNext: goNext } : undefined}
           onSave={(taskId, log) => {
