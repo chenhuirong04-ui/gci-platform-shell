@@ -61,10 +61,13 @@ function daysAgo(iso: string): number {
 }
 
 export default function BusinessRegister({
-  tasks, onSelectTask, onOpenKanban,
+  tasks, onSelectTask, onSelectBusiness, onOpenKanban,
 }: {
   tasks: FollowUpTask[];
+  // 客户编码/客户名称 → 客户工作台
   onSelectTask: (task: FollowUpTask) => void;
+  // 项目编码/项目名称 → 独立业务详情页
+  onSelectBusiness: (task: FollowUpTask) => void;
   onOpenKanban: () => void;
 }) {
   const [search, setSearch] = useState('');
@@ -220,23 +223,22 @@ export default function BusinessRegister({
                 return (
                   <tr
                     key={t.id}
-                    onClick={() => onSelectTask(t)}
-                    className="cursor-pointer transition-colors hover:bg-white/5"
+                    className="transition-colors hover:bg-white/5"
                     style={{ borderTop: `1px solid ${BORDER}`, background: CARD }}
                   >
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-3 cursor-pointer" onClick={() => onSelectTask(t)}>
                       <div className="flex items-center gap-1.5">
                         {bizId && <span className="text-[9px] font-black px-1.5 py-0.5 rounded shrink-0" style={{ background: `${GOLD}22`, color: GOLD_L }}>{bizId}</span>}
                         <span className="font-black truncate" style={{ color: T1 }}>{t.clientName || PLACEHOLDER}</span>
                       </div>
                       {!bizId && <div className="text-[9px] mt-0.5" style={{ color: T3 }}>{PLACEHOLDER}</div>}
                     </td>
-                    <td className="px-3 py-3 max-w-[220px]" title={businessName(t)}>
+                    <td className="px-3 py-3 max-w-[220px] cursor-pointer" title={businessName(t)} onClick={() => onSelectBusiness(t)}>
                       <div className="flex items-center gap-1.5">
                         {(t as any).projectCode && (
                           <span className="text-[9px] font-black px-1.5 py-0.5 rounded shrink-0" style={{ background: 'rgba(255,255,255,0.08)', color: T3 }}>{(t as any).projectCode}</span>
                         )}
-                        <span className="truncate" style={{ color: T2 }}>{businessName(t)}</span>
+                        <span className="truncate underline decoration-dotted" style={{ color: T2 }}>{businessName(t)}</span>
                       </div>
                     </td>
                     <td className="px-3 py-3" style={{ color: T2 }}>{TYPE_LABEL[t.businessType] || t.businessType || PLACEHOLDER}</td>
@@ -248,7 +250,7 @@ export default function BusinessRegister({
                     <td className="px-3 py-3" style={{ color: T2 }}>{qs}</td>
                     <td className="px-3 py-3" style={{ color: T2 }}>{(t.attachments || []).length}</td>
                     <td className="px-3 py-3" style={{ color: t.owner ? T2 : T3 }}>{t.owner || PLACEHOLDER}</td>
-                    <td className="px-3 py-3 flex items-center justify-between gap-2" style={{ color: T2 }}>
+                    <td className="px-3 py-3 flex items-center justify-between gap-2 cursor-pointer" style={{ color: T2 }} onClick={() => onSelectBusiness(t)} title="查看业务">
                       {fmtDate(t.updatedAt || t.createdAt)}
                       <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: T3 }} />
                     </td>

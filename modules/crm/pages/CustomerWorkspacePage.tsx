@@ -26,6 +26,10 @@ interface Props {
   onUpdateAnyTask: (task: FollowUpTask) => void;
   onCreateBusiness: (formData: Partial<FollowUpTask>) => void;
   onGoToBusiness: (task: FollowUpTask) => void;
+  // Which tab to land on — set when arriving back from a business detail
+  // page's "返回" button so 关联业务 stays in view instead of resetting to
+  // 客户概况.
+  initialTab?: WorkspaceTab;
 }
 
 function fmtDate(iso: string | undefined, na: string): string {
@@ -44,9 +48,9 @@ function SummaryField({ label, value, na }: { label: string; value?: string | nu
 }
 
 export default function CustomerWorkspacePage({
-  customerCode, tasks, hydrated, dict, onBack, onSave, onUpdateTask, onUpdateAnyTask, onCreateBusiness, onGoToBusiness,
+  customerCode, tasks, hydrated, dict, onBack, onSave, onUpdateTask, onUpdateAnyTask, onCreateBusiness, onGoToBusiness, initialTab,
 }: Props) {
-  const [tab, setTab] = useState<WorkspaceTab>('info');
+  const [tab, setTab] = useState<WorkspaceTab>(initialTab || 'info');
   const [editing, setEditing] = useState(false);
   const [showAddBusinessForm, setShowAddBusinessForm] = useState(false);
 

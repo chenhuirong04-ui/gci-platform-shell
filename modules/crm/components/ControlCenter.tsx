@@ -18,7 +18,10 @@ interface Props {
   // When non-null, stat card 1 uses this directly. null = sync not yet run.
   todayFollowupCount?: number | null;
   onTabSwitch: (tab: 'dashboard' | 'project' | 'internal' | 'history') => void;
+  // 最近新增客户 → 客户工作台
   onSelectTask: (task: FollowUpTask) => void;
+  // 最近更新的业务 → 独立业务详情页
+  onSelectBusiness: (task: FollowUpTask) => void;
 }
 
 const GOLD = '#B8960C';
@@ -107,7 +110,7 @@ function ProjectRow({ project }: { project: Project }) {
   );
 }
 
-export default function ControlCenter({ tasks, projects, todayFollowupCount, onTabSwitch, onSelectTask }: Props) {
+export default function ControlCenter({ tasks, projects, todayFollowupCount, onTabSwitch, onSelectTask, onSelectBusiness }: Props) {
   const { dict, lang } = useI18n();
   const ct = dict.crm.controlCenter;
 
@@ -229,7 +232,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
           <SectionHeader icon={<Briefcase className="w-4 h-4" />} title={ct.recentBusinessesTitle} />
           {overview.recentBusinesses.length === 0
             ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{ct.noRecentItems}</div>
-            : overview.recentBusinesses.map(t => <TaskRow key={t.id} task={t} onClick={() => onSelectTask(t)} />)}
+            : overview.recentBusinesses.map(t => <TaskRow key={t.id} task={t} onClick={() => onSelectBusiness(t)} />)}
         </div>
         <div className="rounded-[18px] border p-5 shadow-sm" style={{ backgroundColor: CARD, borderColor: BORDER }}>
           <SectionHeader icon={<Users className="w-4 h-4" />} title={ct.recentCustomersTitle} />

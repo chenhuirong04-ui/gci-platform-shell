@@ -10,6 +10,7 @@ import { getCustomerCode } from './utils/customerCode';
 import { ADMIN_IMPORT_TASKS, ADMIN_IMPORT_PROJECTS } from './adminImportData';
 import LeadMasterDetail from './components/LeadMasterDetail';
 import CustomerWorkspacePage from './pages/CustomerWorkspacePage';
+import BusinessDetailPage from './pages/BusinessDetailPage';
 import FollowUpQueue from './components/FollowUpQueue';
 import HistoryView from './components/HistoryView';
 import ProjectProgress from './components/ProjectProgress';
@@ -195,7 +196,50 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
   // state intact when the user navigates back.
   const customerRouteMatch = routerLocation.pathname.match(/^\/crm\/customer\/([^/]+)\/?$/);
   const customerCodeParam = customerRouteMatch ? decodeURIComponent(customerRouteMatch[1]) : null;
+  // Business detail route — /crm/customer/:customerCode/business/:businessKey.
+  // businessKey is the stable task.id (never the formal projectCode, which
+  // can be absent on older records). Mutually exclusive with
+  // customerRouteMatch above since that pattern excludes '/' in the segment.
+  const businessRouteMatch = routerLocation.pathname.match(/^\/crm\/customer\/([^/]+)\/business\/([^/]+)\/?$/);
+  const businessRouteCustomerCode = businessRouteMatch ? decodeURIComponent(businessRouteMatch[1]) : null;
+  const businessRouteKey = businessRouteMatch ? decodeURIComponent(businessRouteMatch[2]) : null;
+  const isOnStandaloneRoute = !!customerCodeParam || !!businessRouteMatch;
   const goToCustomer = (task: FollowUpTask) => navigate(`/crm/customer/${encodeURIComponent(getCustomerCode(task))}`);
+  const goToBusiness = (customerCode: string, task: FollowUpTask, from?: 'workspace' | 'project') =>
+    navigate(`/crm/customer/${encodeURIComponent(customerCode)}/business/${encodeURIComponent(task.id)}`, { state: { from } });
+
+  // Shared handlers for the customer workspace AND business detail page —
+  // defined once so both pages call into the exact same save/update/create
+  // logic (no second copy of the follow-up-save or business-create paths).
+  const handleWorkspaceQuickSave = (taskId: string, log: { method: string; content: string; nextDate: string }) => {
+    const now = new Date().toISOString();
+    setTasks(prev => prev.map(t => {
+      if (t.id !== taskId) return t;
+      const updated: FollowUpTask = {
+        ...t,
+        nextFollowUpAt: log.nextDate,
+        history: [
+          {
+            id: `quick-${Date.now()}`,
+            timestamp: now,
+            message: `[${log.method}] ${log.content}`,
+            type: 'follow_up' as const,
+            by: 'Admin',
+          },
+          ...(t.history || []),
+        ],
+      };
+      return updated;
+    }));
+    showToast('跟进记录已保存', 'success');
+  };
+
+  const handleWorkspaceUpdateTask = (updated: FollowUpTask) => {
+    setTasks(v => v.map(t => (t.id === updated.id ? updated : t)));
+    showToast('记录已更新', 'success');
+  };
+
+  const handleWorkspaceCreateBusiness = (formData: Partial<FollowUpTask>) => { handleAddTask(formData); };
   const isAdminMode = new URLSearchParams(window.location.search).get('admin') === '1';
   const [tasks, setTasks] = useState<FollowUpTask[]>(() => demoMode ? createDemoLeads() : []);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -1203,7 +1247,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
           standalone customer workspace route, so its internal search /
           filter / scroll state survives the round trip without a new
           global store. */}
-      <div style={{ display: customerCodeParam ? 'none' : undefined }}>
+      <div style={{ display: isOnStandaloneRoute ? 'none' : undefined }}>
       <nav className="no-print sticky top-0 z-[90] px-3" style={{ background: '#0D1E35', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 py-2.5">
           <div className="flex items-center overflow-x-auto gap-1.5">
@@ -1360,6 +1404,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
             todayFollowupCount={todayFollowupCount}
             onTabSwitch={(tab) => setActiveTab(tab)}
             onSelectTask={(task) => goToCustomer(task)}
+            onSelectBusiness={(task) => goToBusiness(getCustomerCode(task), task, 'project')}
           />
         )}
 
@@ -1413,6 +1458,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
           <BusinessRegister
             tasks={normalizedTasks}
             onSelectTask={(task) => goToCustomer(task)}
+            onSelectBusiness={(task) => goToBusiness(getCustomerCode(task), task, 'project')}
             onOpenKanban={() => setShowProjectKanban(true)}
           />
         )}
@@ -1475,36 +1521,35 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
           hydrated={hydrated}
           dict={dict.crm.workspace}
           onBack={() => navigate('/crm?tab=dashboard')}
-          onCreateBusiness={(formData) => { handleAddTask(formData); }}
-          onGoToBusiness={(task) => navigate(`/crm/customer/${encodeURIComponent(customerCodeParam || '')}/business/${encodeURIComponent(task.id)}`)}
-          onSave={(taskId, log) => {
-            const now = new Date().toISOString();
-            setTasks(prev => prev.map(t => {
-              if (t.id !== taskId) return t;
-              return {
-                ...t,
-                nextFollowUpAt: log.nextDate,
-                history: [
-                  {
-                    id: `quick-${Date.now()}`,
-                    timestamp: now,
-                    message: `[${log.method}] ${log.content}`,
-                    type: 'follow_up' as const,
-                    by: 'Admin',
-                  },
-                  ...(t.history || []),
-                ],
-              };
-            }));
-            showToast('跟进记录已保存', 'success');
-          }}
-          onUpdateTask={(updated: FollowUpTask) => {
-            setTasks(v => v.map(t => (t.id === updated.id ? updated : t)));
-            showToast('记录已更新', 'success');
-          }}
+          onCreateBusiness={handleWorkspaceCreateBusiness}
+          onGoToBusiness={(task) => goToBusiness(customerCodeParam || '', task, 'workspace')}
+          initialTab={(routerLocation.state as any)?.openTab}
+          onSave={handleWorkspaceQuickSave}
+          onUpdateTask={handleWorkspaceUpdateTask}
           onUpdateAnyTask={(updated: FollowUpTask) => {
             setTasks(v => v.map(t => (t.id === updated.id ? updated : t)));
           }}
+        />
+      )}
+
+      {businessRouteMatch && businessRouteCustomerCode && businessRouteKey && (
+        <BusinessDetailPage
+          customerCode={businessRouteCustomerCode}
+          businessKey={businessRouteKey}
+          tasks={normalizedTasks}
+          hydrated={hydrated}
+          dict={dict.crm.workspace}
+          onBack={() => {
+            const from = (routerLocation.state as any)?.from;
+            if (from === 'workspace') {
+              navigate(`/crm/customer/${encodeURIComponent(businessRouteCustomerCode)}`, { state: { openTab: 'business' } });
+            } else {
+              navigate('/crm?tab=project');
+            }
+          }}
+          onCreateBusiness={handleWorkspaceCreateBusiness}
+          onSave={handleWorkspaceQuickSave}
+          onUpdateTask={handleWorkspaceUpdateTask}
         />
       )}
 
