@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useI18n } from '@gci/i18n';
 import { generateTaskContent } from './services/geminiService';
 import { FollowUpTask, CMOResponse, Project, ProjectType, ProjectStatus, ProjectLogEntry } from './types';
 import { PersistenceService } from './services/persistenceService';
 import { notionSyncService } from './services/notionSync';
+import { getCustomerCode } from './utils/customerCode';
 
 import { ADMIN_IMPORT_TASKS, ADMIN_IMPORT_PROJECTS } from './adminImportData';
 import LeadMasterDetail from './components/LeadMasterDetail';
-import QuickFollowUpPanel from './components/QuickFollowUpPanel';
+import CustomerWorkspacePage from './pages/CustomerWorkspacePage';
 import FollowUpQueue from './components/FollowUpQueue';
 import HistoryView from './components/HistoryView';
 import ProjectProgress from './components/ProjectProgress';
@@ -185,6 +187,15 @@ const _crmValidTabs = ['control', 'dashboard', 'history', 'project', 'internal',
 
 function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoMode?: boolean }) {
   const { dict, lang } = useI18n();
+  const navigate = useNavigate();
+  const routerLocation = useLocation();
+  // Standalone customer workspace route — detected via pathname rather than
+  // a nested <Routes>, so the existing tab UI below stays mounted (just
+  // hidden) instead of unmounting, which keeps its search/filter/scroll
+  // state intact when the user navigates back.
+  const customerRouteMatch = routerLocation.pathname.match(/^\/crm\/customer\/([^/]+)\/?$/);
+  const customerCodeParam = customerRouteMatch ? decodeURIComponent(customerRouteMatch[1]) : null;
+  const goToCustomer = (task: FollowUpTask) => navigate(`/crm/customer/${encodeURIComponent(getCustomerCode(task))}`);
   const isAdminMode = new URLSearchParams(window.location.search).get('admin') === '1';
   const [tasks, setTasks] = useState<FollowUpTask[]>(() => demoMode ? createDemoLeads() : []);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -1180,6 +1191,11 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
 
   return (
     <div className="min-h-screen font-sans pb-36" style={{ background: '#0A1628', color: '#E8F0FF' }}>
+      {/* Existing tabbed UI stays mounted (just hidden) while on the
+          standalone customer workspace route, so its internal search /
+          filter / scroll state survives the round trip without a new
+          global store. */}
+      <div style={{ display: customerCodeParam ? 'none' : undefined }}>
       <nav className="no-print sticky top-0 z-[90] px-3" style={{ background: '#0D1E35', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 py-2.5">
           <div className="flex items-center overflow-x-auto gap-1.5">
@@ -1335,11 +1351,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
             projects={combinedProjectsForView.filter(p => !p.deleted && !p.archivedAt)}
             todayFollowupCount={todayFollowupCount}
             onTabSwitch={(tab) => setActiveTab(tab)}
-            onSelectTask={(task) => {
-              if (demoMode) setActiveTab('dashboard');
-              setSelectedTask(task);
-              setDetailOpen(true);
-            }}
+            onSelectTask={(task) => { setSelectedTask(task); setDetailOpen(true); }}
           />
         )}
 
@@ -1446,29 +1458,16 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
           />
         )}
       </main>
+      </div>
 
-      {selectedTask && detailOpen && (activeTab === 'dashboard' || activeTab === 'comms') && (
-        <QuickFollowUpPanel
-          task={selectedTask}
-          // Other businesses belonging to the same customer — same
-          // contactKey/clientName identity grouping CustomerDirectory.tsx
-          // uses, so "项目与业务" and 客户档案's "关联业务" count stay
-          // consistent with each other.
-          relatedTasks={(() => {
-            const key = (selectedTask.contactKey || '').trim().toLowerCase()
-              || (selectedTask.clientName || '').trim().toLowerCase() || selectedTask.id;
-            return normalizedTasks.filter(t => {
-              if (t.id === selectedTask.id) return false;
-              const tKey = (t.contactKey || '').trim().toLowerCase() || (t.clientName || '').trim().toLowerCase() || t.id;
-              return tKey === key;
-            });
-          })()}
-          onSwitchTask={(t) => setSelectedTask(t)}
-          onUpdateAnyTask={(updated: FollowUpTask) => {
-            setTasks(v => v.map(t => (t.id === updated.id ? updated : t)));
-          }}
-          onClose={() => setDetailOpen(false)}
-          navInfo={navIdx >= 0 ? { current: navIdx + 1, total: navTotal, hasPrev, hasNext, onPrev: goPrev, onNext: goNext } : undefined}
+      {customerCodeParam && (
+        <CustomerWorkspacePage
+          customerCode={customerCodeParam}
+          tasks={normalizedTasks}
+          hydrated={hydrated}
+          dict={dict.crm.workspace}
+          onBack={() => navigate(-1)}
+          onAddBusiness={() => setIntakeModalOpen(true)}
           onSave={(taskId, log) => {
             const now = new Date().toISOString();
             setTasks(prev => prev.map(t => {
@@ -1490,18 +1489,12 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
             }));
             showToast('跟进记录已保存', 'success');
           }}
-          onViewFull={() => setActiveTab('project')}
-          onArchiveTask={archiveTask}
-          onUpdateTask={(updated: any) => {
-            console.log('[CrmModule.onUpdateTask dashboard] id=', updated.id, 'leadId=', updated.leadId, 'nextFollowUpAt=', updated.nextFollowUpAt, 'status=', updated.status);
-            setTasks(v => {
-              const next = v.map(t => (t.id === updated.id ? updated : t));
-              const found = next.some(t => t.id === updated.id);
-              if (!found) console.error('[CrmModule.onUpdateTask] WARN: id not found in tasks array — task may not persist!', updated.id);
-              return next;
-            });
-            setSelectedTask(updated);
+          onUpdateTask={(updated: FollowUpTask) => {
+            setTasks(v => v.map(t => (t.id === updated.id ? updated : t)));
             showToast('记录已更新', 'success');
+          }}
+          onUpdateAnyTask={(updated: FollowUpTask) => {
+            setTasks(v => v.map(t => (t.id === updated.id ? updated : t)));
           }}
         />
       )}
