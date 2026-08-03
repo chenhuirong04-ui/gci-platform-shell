@@ -1471,7 +1471,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
           hydrated={hydrated}
           dict={dict.crm.workspace}
           onBack={() => navigate(-1)}
-          onAddBusiness={() => setIntakeModalOpen(true)}
+          onCreateBusiness={(formData) => { handleAddTask(formData); }}
           onSave={(taskId, log) => {
             const now = new Date().toISOString();
             setTasks(prev => prev.map(t => {
