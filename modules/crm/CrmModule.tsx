@@ -1470,7 +1470,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
           tasks={normalizedTasks}
           hydrated={hydrated}
           dict={dict.crm.workspace}
-          onBack={() => navigate(-1)}
+          onBack={() => navigate('/crm?tab=dashboard')}
           onCreateBusiness={(formData) => { handleAddTask(formData); }}
           onSave={(taskId, log) => {
             const now = new Date().toISOString();
