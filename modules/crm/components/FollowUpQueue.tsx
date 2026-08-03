@@ -26,6 +26,11 @@ interface FollowUpQueueProps {
   onArchiveTask?: (id: string) => void;
   lang: Language;
   onFilteredTasksChange?: (tasks: FollowUpTask[]) => void;
+  // The AI-priority summary block (and its underlying pickAIPriority/aiReason
+  // logic) stays in this file — it's just not rendered on the 沟通记录 page
+  // per that page's redesign. Defaults to shown so any other future caller
+  // is unaffected.
+  hideAiSuggestions?: boolean;
 }
 
 const TRADE_STATUSES: TradeStatus[] = [
@@ -161,6 +166,7 @@ function KanbanView({ tasks, onAction, onUpdateTradeStatus }: {
 // ── Main ──────────────────────────────────────────────────────────────
 const FollowUpQueue: React.FC<FollowUpQueueProps> = ({
   tasks, onAction, onUpdateStatus, onUpdateTradeStatus, onArchiveTask, lang, onFilteredTasksChange,
+  hideAiSuggestions,
 }) => {
   const _t = translations[lang]; void _t;
   const [view, setView]   = useState<'list'|'kanban'>('list');
@@ -311,8 +317,8 @@ const FollowUpQueue: React.FC<FollowUpQueueProps> = ({
   return (
     <div className="space-y-4">
 
-      {/* AI Priority Summary */}
-      {aiPriority.length > 0 && (
+      {/* AI Priority Summary — hidden on 沟通记录 (see hideAiSuggestions) */}
+      {!hideAiSuggestions && aiPriority.length > 0 && (
         <div className="rounded-2xl overflow-hidden" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
           <div className="px-5 py-3.5 flex items-center gap-2" style={{ borderBottom: `1px solid ${BORDER}` }}>
             <Sparkles className="w-4 h-4 shrink-0" style={{ color: GOLD_L }} />

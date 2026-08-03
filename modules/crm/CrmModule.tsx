@@ -1363,6 +1363,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
               onUpdateStatus={updateTaskStatus}
               onUpdateTradeStatus={updateTradeStatus}
               onArchiveTask={archiveTask}
+              hideAiSuggestions
               lang={'zh'}
               onFilteredTasksChange={setNavTasks}
             />
