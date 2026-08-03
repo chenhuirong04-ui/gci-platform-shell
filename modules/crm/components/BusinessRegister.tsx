@@ -72,11 +72,22 @@ export default function BusinessRegister({
   const [stageFilter, setStageFilter] = useState<string>('全部');
   const [countryFilter, setCountryFilter] = useState<string>('全部');
   const [ownerFilter, setOwnerFilter] = useState<string>('全部');
-  const [showArchived, setShowArchived] = useState(false);
+  // 已归档不再是独立的核心Tab — 降级为这里的状态筛选之一，与 当前/已完成/
+  // 已暂停 并列。底层 HistoryView（?tab=history）未改动，恢复/导出等能力
+  // 仍在那里可用。
+  const [statusFilter, setStatusFilter] = useState<'当前' | '已完成' | '已暂停' | '已归档' | '全部'>('当前');
 
-  const active = useMemo(() => tasks.filter(t => showArchived
-    ? (t.status === 'archived' || DONE_STATUSES.has(t.tradeStatus))
-    : t.status !== 'archived'), [tasks, showArchived]);
+  const active = useMemo(() => tasks.filter(t => {
+    switch (statusFilter) {
+      case '全部':   return true;
+      case '已归档': return t.status === 'archived';
+      case '已完成': return t.status !== 'archived' && t.tradeStatus === '已成交';
+      case '已暂停': return t.status !== 'archived' && t.tradeStatus === '暂缓';
+      case '当前':
+      default:
+        return t.status !== 'archived' && t.tradeStatus !== '已成交' && t.tradeStatus !== '暂缓';
+    }
+  }), [tasks, statusFilter]);
 
   const stats = useMemo(() => {
     const all = tasks.filter(t => t.status !== 'deleted');
@@ -135,7 +146,7 @@ export default function BusinessRegister({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-black" style={{ color: T1 }}>项目与业务</h2>
+          <h2 className="text-2xl font-black" style={{ color: T1 }}>全部业务</h2>
           <p className="text-sm font-medium mt-0.5" style={{ color: T2 }}>直接来自 Follow-up Log · 默认按最近更新排序</p>
         </div>
         <button
@@ -185,15 +196,10 @@ export default function BusinessRegister({
           className="px-3 py-2 rounded-xl text-xs font-bold outline-none" style={{ background: CARD2, color: T2, border: `1px solid ${BORDER}` }}>
           {owners.map(v => <option key={v} value={v}>{v === '全部' ? '全部负责人' : v}</option>)}
         </select>
-        <button
-          onClick={() => setShowArchived(v => !v)}
-          className="px-3 py-2 rounded-xl text-xs font-bold transition-all"
-          style={showArchived
-            ? { background: GOLD, color: '#fff' }
-            : { background: CARD2, color: T2, border: `1px solid ${BORDER}` }}
-        >
-          {showArchived ? '仅看已归档' : '不含已归档'}
-        </button>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)}
+          className="px-3 py-2 rounded-xl text-xs font-bold outline-none" style={{ background: CARD2, color: T2, border: `1px solid ${BORDER}` }}>
+          {(['当前', '已完成', '已暂停', '已归档', '全部'] as const).map(v => <option key={v} value={v}>{v}</option>)}
+        </select>
       </div>
 
       {/* List */}

@@ -1182,11 +1182,15 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
     { id: 'internal' as const, label: dict.crm.nav.internalTasks, active: activeTab === 'internal' },
   ].filter(g => !demoMode || g.id === 'control' || g.id === 'customersAndProjects');
 
+  // "客户与项目" now only surfaces two core tabs (全部业务 / 客户名录) per
+  // the 2026-08 IA simplification. 沟通记录/已归档 are no longer shown as
+  // peer nav buttons — their underlying views (FollowUpQueue / HistoryView)
+  // and the activeTab==='comms'|'history' render branches below are
+  // untouched, so old ?tab=comms / ?tab=history links keep working, just
+  // without a persistent button to reach them from inside the app.
   const subTabs = [
     { id: 'project' as const,   label: dict.crm.nav.subNavBusiness },
     { id: 'dashboard' as const, label: dict.crm.nav.subNavCustomers },
-    { id: 'comms' as const,     label: dict.crm.nav.subNavComms },
-    { id: 'history' as const,   label: dict.crm.nav.subNavArchived },
   ];
 
   return (

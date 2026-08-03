@@ -122,7 +122,7 @@ export default function CustomerDirectory({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-black" style={{ color: T1 }}>客户档案</h2>
+          <h2 className="text-2xl font-black" style={{ color: T1 }}>客户名录</h2>
           <p className="text-sm font-medium mt-0.5" style={{ color: T2 }}>
             聚合自项目客户库与小B/C客户池 · 共 {allRecords.length} 位客户
           </p>
