@@ -1351,14 +1351,14 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
             projects={combinedProjectsForView.filter(p => !p.deleted && !p.archivedAt)}
             todayFollowupCount={todayFollowupCount}
             onTabSwitch={(tab) => setActiveTab(tab)}
-            onSelectTask={(task) => { setSelectedTask(task); setDetailOpen(true); }}
+            onSelectTask={(task) => goToCustomer(task)}
           />
         )}
 
         {activeTab === 'dashboard' && (
           <CustomerDirectory
             tasks={normalizedTasks}
-            onSelectTask={(task) => { setSelectedTask(task); setDetailOpen(true); }}
+            onSelectTask={(task) => goToCustomer(task)}
           />
         )}
 
@@ -1371,7 +1371,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
 
             <FollowUpQueue
               tasks={normalizedTasks}
-              onAction={(task) => { setSelectedTask(task); setDetailOpen(true); }}
+              onAction={(task) => goToCustomer(task)}
               onUpdateStatus={updateTaskStatus}
               onUpdateTradeStatus={updateTradeStatus}
               onArchiveTask={archiveTask}
@@ -1404,7 +1404,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
         {activeTab === 'project' && !showProjectKanban && (
           <BusinessRegister
             tasks={normalizedTasks}
-            onSelectTask={(task) => { setSelectedTask(task); setDetailOpen(true); }}
+            onSelectTask={(task) => goToCustomer(task)}
             onOpenKanban={() => setShowProjectKanban(true)}
           />
         )}
