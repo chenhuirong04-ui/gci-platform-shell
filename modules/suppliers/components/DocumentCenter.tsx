@@ -157,15 +157,17 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
       const bucket = resolveStorageBucket(edit.document_type ?? '其他');
       const payload = { ...EMPTY(supplierId), ...edit, supplier_id: supplierId, storage_bucket: bucket, ...storagePatch };
 
-      const dbOk = edit.id
-        ? await updateDocument(edit.id, { ...edit, ...storagePatch })
-        : !!(await createDocument(payload));
-
-      if (!dbOk) {
+      try {
+        if (edit.id) {
+          await updateDocument(edit.id, { ...edit, ...storagePatch });
+        } else {
+          await createDocument(payload);
+        }
+      } catch (dbErr: any) {
         if (storagePatch.storage_bucket && storagePatch.storage_path) {
           await deleteStorageObject(storagePatch.storage_bucket, storagePatch.storage_path);
         }
-        throw new Error(t.errSaveFailed);
+        throw new Error(dbErr?.message || t.errSaveFailed);
       }
 
       setEdit(null);

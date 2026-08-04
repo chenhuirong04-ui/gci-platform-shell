@@ -59,29 +59,51 @@ export async function listDocumentsByCert(certificationId: string): Promise<Supp
   return res.json().catch(() => []);
 }
 
-export async function createDocument(data: Omit<SupplierDocument, 'id'>): Promise<SupplierDocument | null> {
-  const payload = {
+// Postgres `date` columns reject '' (only accept a real date string or null) —
+// the add/edit form leaves these as '' when the user doesn't fill them in.
+function sanitizeDates<T extends { issue_date?: string; expire_date?: string }>(data: T): T {
+  return {
     ...data,
+    issue_date: (data.issue_date || null) as any,
+    expire_date: (data.expire_date || null) as any,
+  };
+}
+
+export async function createDocument(data: Omit<SupplierDocument, 'id'>): Promise<SupplierDocument> {
+  const payload = {
+    ...sanitizeDates(data),
     storage_bucket: data.storage_bucket ?? resolveStorageBucket(data.document_type),
     updated_at: new Date().toISOString(),
   };
-  const res = await sb('/rest/v1/supplier_documents', {
+  const res = await fetch(`${SUPA_URL}/rest/v1/supplier_documents`, {
     method: 'POST',
-    headers: { Prefer: 'return=representation' },
+    headers: {
+      apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}`,
+      'Content-Type': 'application/json', Prefer: 'return=representation',
+    },
     body: JSON.stringify(payload),
   });
-  if (!res) return null;
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`保存文件记录失败（${res.status}）：${text} / Failed to save file record (${res.status})`);
+  }
   const rows = await res.json().catch(() => []);
   return Array.isArray(rows) ? rows[0] : rows;
 }
 
-export async function updateDocument(id: string, patch: Partial<SupplierDocument>): Promise<boolean> {
-  const res = await sb(`/rest/v1/supplier_documents?id=eq.${id}`, {
+export async function updateDocument(id: string, patch: Partial<SupplierDocument>): Promise<void> {
+  const res = await fetch(`${SUPA_URL}/rest/v1/supplier_documents?id=eq.${id}`, {
     method: 'PATCH',
-    headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
+    headers: {
+      apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}`,
+      'Content-Type': 'application/json', Prefer: 'return=minimal',
+    },
+    body: JSON.stringify({ ...sanitizeDates(patch), updated_at: new Date().toISOString() }),
   });
-  return res !== null;
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`保存文件记录失败（${res.status}）：${text} / Failed to save file record (${res.status})`);
+  }
 }
 
 export async function deleteDocument(id: string): Promise<boolean> {
@@ -93,7 +115,7 @@ export async function setVerificationStatus(
   id: string,
   status: DocumentVerificationStatus,
   by?: string,
-): Promise<boolean> {
+): Promise<void> {
   return updateDocument(id, {
     verification_status: status,
     verified_by: by,
