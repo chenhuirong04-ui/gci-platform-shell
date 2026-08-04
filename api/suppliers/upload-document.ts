@@ -51,7 +51,7 @@ export default async function handler(req: Request): Promise<Response> {
     }
     const data = await signRes.json().catch(() => null);
     if (!data?.signedURL) return json({ ok: false, error: 'sign_no_url' }, 502);
-    return json({ ok: true, url: `${SUPA_URL}${data.signedURL}` });
+    return json({ ok: true, url: `${SUPA_URL}/storage/v1${data.signedURL}` });
   }
 
   // ── Issue a short-lived signed upload slot (no file bytes here) ───────────
