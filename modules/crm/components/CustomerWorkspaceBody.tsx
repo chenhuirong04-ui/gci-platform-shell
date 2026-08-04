@@ -96,6 +96,10 @@ export interface WorkspaceDict {
   colorFinishLabel: string; projectScopeLabel: string;
   contractNumberLabel: string; submissionNumberLabel: string; approvalStatusLabel: string; deliveryRequirementLabel: string;
   contentNotLoadedYet: string;
+  sectionCoreBackground: string; coreBackgroundPending: string; materialColorFinishLabel: string;
+  sectionBusinessSummary: string; bizQuoteStatusLabel: string; bizContractStatusLabel: string;
+  bizReceivableStatusLabel: string; bizProjectStageLabel: string; noReliableLinkedRecords: string;
+  sectionFoldedDetails: string; technicalReferenceLabel: string;
   quotesOf: string; refresh: string; loadingQuotes: string; quotesLoadFailed: string; noQuotesFound: string;
   quoteSummary: string; clickToLoadQuotes: string; quoteType: string; currency: string;
   relatedBusiness: string; viewQuoteFile: string;

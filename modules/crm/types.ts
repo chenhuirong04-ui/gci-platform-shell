@@ -227,6 +227,11 @@ export interface ProjectMasterContent {
   submissionNumber?: string;
   approvalStatus?: string;
   deliveryRequirement?: string;
+  // Catch-all for drawing/material-reference-style document numbers that
+  // don't cleanly map to contractNumber/submissionNumber and aren't an
+  // actual material composition (e.g. a line labeled "材料参考号" is a
+  // document ID, not a material — never mislabel it as `material`).
+  technicalReference?: string;
   currentActions?: string[];
   relatedFiles?: string[];
   // Anything not confidently matched to a known field — grouped by the

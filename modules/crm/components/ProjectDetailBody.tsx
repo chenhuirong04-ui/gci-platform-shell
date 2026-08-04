@@ -274,15 +274,17 @@ export default function ProjectDetailBody({ task, tab, onTabChange, editing, onE
   const latestCommMethod = latestComm ? (latestComm.message.match(/^\[(.+?)\]/)?.[1] || '') : ((task as any).followUpMethod || '');
   const latestCommAt = latestComm?.timestamp || task.updatedAt || (task as any).lastFollowUpAt || task.createdAt;
 
-  // 项目背景 rows derived from /api/crm/project-content — combined so two
+  // 项目核心背景 rows derived from /api/crm/project-content — combined so
   // related fields (e.g. product + category) render as one line when both
-  // are present, and the row hides entirely when neither is.
+  // are present, and each row hides entirely when its fields are empty.
   const productLine = [projectContent?.productName, projectContent?.productCategory].filter(Boolean).join(' · ');
   const quantityAreaLine = [projectContent?.quantity, [projectContent?.area, projectContent?.unit].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
-  const colorFinishLine = [projectContent?.color, projectContent?.finish].filter(Boolean).join(' · ');
-  const hasAnyProjectContent = !!(productLine || quantityAreaLine || projectContent?.material || projectContent?.specification || colorFinishLine || projectContent?.scope);
+  const materialColorFinishLine = [projectContent?.material, projectContent?.color, projectContent?.finish].filter(Boolean).join(' · ');
+  const projectLocationLine = master ? [master.city, master.country].filter(Boolean).join(' · ') : '';
+  const hasCoreBackground = !!(productLine || quantityAreaLine || projectContent?.specification || materialColorFinishLine || projectContent?.scope || projectLocationLine);
   const hasPartiesInfo = !!projectContent && [projectContent.ownerCompany, projectContent.pmc, projectContent.consultant, projectContent.supervisor, projectContent.designer, projectContent.mainContractor].some(Boolean);
-  const hasContractInfo = !!projectContent && [projectContent.contractNumber, projectContent.submissionNumber, projectContent.approvalStatus, projectContent.deliveryRequirement].some(Boolean);
+  const hasContractInfo = !!projectContent && [projectContent.contractNumber, projectContent.submissionNumber, projectContent.approvalStatus, projectContent.deliveryRequirement, projectContent.technicalReference].some(Boolean);
+  const hasFoldedDetails = !!master || hasPartiesInfo || hasContractInfo;
 
   return (
     <div>
@@ -361,48 +363,32 @@ export default function ProjectDetailBody({ task, tab, onTabChange, editing, onE
         </div>
       )}
 
-      {/* ── OVERVIEW TAB (项目概况) — three explicit blocks: 项目背景 / 最新情况 / 下一步行动.
-           项目背景 is Business Master data ONLY — never lastContext/tradeStatus/
-           goal, which are Follow-up Log fields shown in the other two blocks. ─── */}
+      {/* ── OVERVIEW TAB (项目概况) — compact first screen: 项目核心背景 / 最新情况 /
+           下一步行动 / 商务摘要. Contact/parties/contract detail is collapsed
+           below so the first screen reads in a few seconds, not as a full
+           resource dump. ─── */}
       {!editing && tab === 'overview' && (
         <div className="max-w-2xl space-y-6">
 
-          {/* 1. 项目背景 — Business Master only */}
+          {/* A. 项目核心背景 — product/spec/scope/location only; never
+               lastContext/tradeStatus/goal (those are Follow-up Log fields
+               shown in the other blocks below). */}
           <div>
-            <SectionHeader title={dict.sectionProjectBackground} action={
+            <SectionHeader title={dict.sectionCoreBackground} action={
               <button disabled title={dict.editProjectMasterDisabledNote}
                 className="text-[10px] font-bold px-2 py-1 rounded-lg opacity-40 cursor-not-allowed"
                 style={{ background: CARD2, color: T3 }}>
                 {dict.editProjectMasterBtn}
               </button>
             } />
-            {!master && (
-              <div className="p-3 rounded-xl mb-2 text-xs font-medium" style={{ background: CARD2, color: T3, border: `1px solid ${BORD}` }}>{dict.noProjectMaster}</div>
-            )}
-            {master && (
-              <>
-                <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.projectTypeLabel} value={master.projectType} empty={dict.na} />
-                <InfoRow icon={<MapPin className="w-3.5 h-3.5" />} label={dict.projectLocationLabel} value={[master.city, master.country].filter(Boolean).join(' · ') || null} empty={dict.na} />
-                <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.contactNameLabel} value={master.contactName} empty={dict.na} />
-                <InfoRow icon={<Phone className="w-3.5 h-3.5" />} label={dict.phone} value={master.contactPhone} empty={dict.na} />
-                <InfoRow icon={<Mail className="w-3.5 h-3.5" />} label={dict.email} value={master.contactEmail} empty={dict.na} />
-                <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.currencyLabel} value={master.currency} empty={dict.na} />
-                <InfoRow icon={<Calendar className="w-3.5 h-3.5" />} label={dict.expectedSigningLabel} value={master.expectedSigningAt ? new Date(master.expectedSigningAt).toLocaleDateString('zh-CN') : null} empty={dict.na} />
-                <InfoRow icon={<Calendar className="w-3.5 h-3.5" />} label={dict.expectedCompletionLabel} value={master.expectedCompletionAt ? new Date(master.expectedCompletionAt).toLocaleDateString('zh-CN') : null} empty={dict.na} />
-              </>
-            )}
-            {/* Product/spec/quantity/parties/contract fields, read from the
-                Business Master page's own content blocks — never fabricated,
-                never borrowed from a Follow-up Log entry. Each row hides
-                when empty instead of piling up "待补充" placeholders. */}
             {productLine && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.productLabel} value={productLine} />}
             {quantityAreaLine && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.quantityAreaLabel} value={quantityAreaLine} />}
-            {projectContent?.material && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.materialLabel} value={projectContent.material} />}
             {projectContent?.specification && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.specificationLabel} value={projectContent.specification} />}
-            {colorFinishLine && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.colorFinishLabel} value={colorFinishLine} />}
+            {materialColorFinishLine && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.materialColorFinishLabel} value={materialColorFinishLine} />}
             {projectContent?.scope && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.projectScopeLabel} value={projectContent.scope} />}
-            {!hasAnyProjectContent && (
-              <div className="p-3 rounded-xl mt-2 text-xs font-medium" style={{ background: CARD2, color: T3, border: `1px solid ${BORD}` }}>{dict.contentNotLoadedYet}</div>
+            {projectLocationLine && <InfoRow icon={<MapPin className="w-3.5 h-3.5" />} label={dict.projectLocationLabel} value={projectLocationLine} />}
+            {!hasCoreBackground && (
+              <div className="p-3 rounded-xl mt-2 text-xs font-medium" style={{ background: CARD2, color: T3, border: `1px solid ${BORD}` }}>{dict.coreBackgroundPending}</div>
             )}
             {master?.projectSituation && (
               <div className="p-3 rounded-xl mt-3" style={{ background: 'rgba(255,255,255,0.03)', border: `1px dashed ${BORD}` }}>
@@ -412,31 +398,7 @@ export default function ProjectDetailBody({ task, tab, onTabChange, editing, onE
             )}
           </div>
 
-          {/* 1b. 项目参与方 — only rendered when the page content actually names one */}
-          {hasPartiesInfo && (
-            <div>
-              <SectionHeader title={dict.sectionProjectParties} />
-              {projectContent?.ownerCompany && <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.ownerCompanyLabel} value={projectContent.ownerCompany} />}
-              {projectContent?.pmc && <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.pmcLabel} value={projectContent.pmc} />}
-              {projectContent?.consultant && <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.consultantLabel} value={projectContent.consultant} />}
-              {projectContent?.supervisor && <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.supervisorLabel} value={projectContent.supervisor} />}
-              {projectContent?.designer && <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.designerLabel} value={projectContent.designer} />}
-              {projectContent?.mainContractor && <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.mainContractorLabel} value={projectContent.mainContractor} />}
-            </div>
-          )}
-
-          {/* 1c. 合同与技术资料 — only rendered when the page content actually has one */}
-          {hasContractInfo && (
-            <div>
-              <SectionHeader title={dict.sectionContractInfo} />
-              {projectContent?.contractNumber && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.contractNumberLabel} value={projectContent.contractNumber} />}
-              {projectContent?.submissionNumber && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.submissionNumberLabel} value={projectContent.submissionNumber} />}
-              {projectContent?.approvalStatus && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.approvalStatusLabel} value={projectContent.approvalStatus} />}
-              {projectContent?.deliveryRequirement && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.deliveryRequirementLabel} value={projectContent.deliveryRequirement} />}
-            </div>
-          )}
-
-          {/* 2. 最新情况 — Follow-up Log's newest valid entry only, filtered via isRealCommLog */}
+          {/* B. 最新情况 — Follow-up Log's newest valid entry only, filtered via isRealCommLog */}
           <div>
             <SectionHeader title={dict.sectionLatestUpdate} action={
               <button onClick={() => onTabChange('comms')}
@@ -445,9 +407,6 @@ export default function ProjectDetailBody({ task, tab, onTabChange, editing, onE
               </button>
             } />
             <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.currentActionStatusLabel} value={task.tradeStatus} empty={dict.na} />
-            {master?.projectStage && (
-              <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.projectStageLabel} value={master.projectStage} empty={dict.na} />
-            )}
             <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.recentFollowUp} value={task.lastContext} empty={dict.noNotes} onClick={openEdit} />
             <InfoRow icon={<Calendar className="w-3.5 h-3.5" />} label={dict.lastFollowUpDateLabel} value={latestCommAt ? new Date(latestCommAt).toLocaleDateString('zh-CN') : null} empty={dict.na} />
             <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.commMethodLabel} value={latestCommMethod || null} empty={dict.noMethodRecorded} />
@@ -455,7 +414,7 @@ export default function ProjectDetailBody({ task, tab, onTabChange, editing, onE
             <InfoRow icon={<Calendar className="w-3.5 h-3.5" />} label={dict.fieldNextFollowUp} value={task.nextFollowUpAt ? new Date(task.nextFollowUpAt).toLocaleDateString('zh-CN') : null} empty={dict.na} onClick={openEdit} />
           </div>
 
-          {/* 3. 下一步行动 — independent field (task.goal), never the project stage
+          {/* C. 下一步行动 — independent field (task.goal), never the project stage
                or a whole follow-up entry */}
           <div>
             <SectionHeader title={dict.sectionNextAction} />
@@ -465,7 +424,55 @@ export default function ProjectDetailBody({ task, tab, onTabChange, editing, onE
             <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.priorityLabel} value={task.priority || null} empty={dict.na} />
           </div>
 
-          <div className="text-[9px] font-bold" style={{ color: T3 }}>{dict.projectContentComingSoon}</div>
+          {/* D. 商务摘要 — compact tiles. Quote/order/receivable totals aren't
+               reliably scoped to a single project (the existing quote/finance
+               endpoints are customer-wide), so those tiles state that
+               honestly instead of borrowing customer-level numbers. */}
+          <div>
+            <SectionHeader title={dict.sectionBusinessSummary} />
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                [dict.bizQuoteStatusLabel, dict.noReliableLinkedRecords],
+                [dict.bizContractStatusLabel, dict.noReliableLinkedRecords],
+                [dict.bizReceivableStatusLabel, dict.noReliableLinkedRecords],
+                [dict.bizProjectStageLabel, master?.projectStage || dict.noReliableLinkedRecords],
+              ].map(([label, value], i) => (
+                <div key={i} className="p-3 rounded-xl" style={{ background: CARD2, border: `1px solid ${BORD}` }}>
+                  <div style={labelStyle}>{label}</div>
+                  <div className="text-xs font-bold mt-0.5" style={{ color: value === dict.noReliableLinkedRecords ? T3 : T1 }}>{value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 折叠区：项目基础与参与方资料 — contact/parties/contract detail,
+               collapsed by default. */}
+          {hasFoldedDetails && (
+            <details className="rounded-xl" style={{ border: `1px solid ${BORD}` }}>
+              <summary className="cursor-pointer px-3 py-2.5 text-[10px] font-black uppercase tracking-widest" style={{ color: T2 }}>
+                {dict.sectionFoldedDetails}
+              </summary>
+              <div className="px-3 pb-1">
+                {master?.contactName && <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.contactNameLabel} value={master.contactName} />}
+                {master?.contactPhone && <InfoRow icon={<Phone className="w-3.5 h-3.5" />} label={dict.phone} value={master.contactPhone} />}
+                {master?.contactEmail && <InfoRow icon={<Mail className="w-3.5 h-3.5" />} label={dict.email} value={master.contactEmail} />}
+                {master?.currency && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.currencyLabel} value={master.currency} />}
+                {master?.expectedSigningAt && <InfoRow icon={<Calendar className="w-3.5 h-3.5" />} label={dict.expectedSigningLabel} value={new Date(master.expectedSigningAt).toLocaleDateString('zh-CN')} />}
+                {master?.expectedCompletionAt && <InfoRow icon={<Calendar className="w-3.5 h-3.5" />} label={dict.expectedCompletionLabel} value={new Date(master.expectedCompletionAt).toLocaleDateString('zh-CN')} />}
+                {projectContent?.ownerCompany && <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.ownerCompanyLabel} value={projectContent.ownerCompany} />}
+                {projectContent?.pmc && <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.pmcLabel} value={projectContent.pmc} />}
+                {projectContent?.consultant && <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.consultantLabel} value={projectContent.consultant} />}
+                {projectContent?.supervisor && <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.supervisorLabel} value={projectContent.supervisor} />}
+                {projectContent?.designer && <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.designerLabel} value={projectContent.designer} />}
+                {projectContent?.mainContractor && <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.mainContractorLabel} value={projectContent.mainContractor} />}
+                {projectContent?.contractNumber && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.contractNumberLabel} value={projectContent.contractNumber} />}
+                {projectContent?.submissionNumber && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.submissionNumberLabel} value={projectContent.submissionNumber} />}
+                {projectContent?.approvalStatus && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.approvalStatusLabel} value={projectContent.approvalStatus} />}
+                {projectContent?.deliveryRequirement && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.deliveryRequirementLabel} value={projectContent.deliveryRequirement} />}
+                {projectContent?.technicalReference && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.technicalReferenceLabel} value={projectContent.technicalReference} />}
+              </div>
+            </details>
+          )}
         </div>
       )}
 

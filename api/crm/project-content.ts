@@ -30,6 +30,7 @@ interface ContentLike {
   productCategory?: string; quantity?: string; area?: string; unit?: string; material?: string;
   specification?: string; color?: string; finish?: string; scope?: string;
   submissionNumber?: string; approvalStatus?: string; deliveryRequirement?: string;
+  technicalReference?: string;
   currentActions?: string[]; relatedFiles?: string[];
   rawSections?: Array<{ title: string; lines: string[] }>;
 }
@@ -62,6 +63,10 @@ const FIELD_PATTERNS: Array<{ field: keyof ContentLike; re: RegExp }> = [
   { field: 'productName', re: fieldRegex('产品|系统|Product|System') },
   { field: 'quantity', re: fieldRegex('数量|Quantity|Qty\\.?') },
   { field: 'area', re: fieldRegex('面积|Area') },
+  // Checked before the bare "材料" pattern below — "材料参考号" is a document
+  // reference number, not a material composition, and would otherwise be
+  // wrongly captured as `material` (the generic keyword is a substring).
+  { field: 'technicalReference', re: fieldRegex('材料参考号|图纸编号|技术文件编号|文件编号|参考号|Reference\\s*No\\.?|Drawing\\s*No\\.?|Document\\s*No\\.?') },
   { field: 'material', re: fieldRegex('材质|材料|Material') },
   { field: 'specification', re: fieldRegex('规格|Specification|Spec\\.?') },
   { field: 'color', re: fieldRegex('颜色|Colou?r') },
