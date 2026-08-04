@@ -156,9 +156,9 @@ function buildTaskFromFollowUpPage(page: any): any | null {
     const businessType = mapBusinessType(businessTypeRaw);
 
     const lastFollowUpAt = extractDate(props['Follow-up Date（跟进日期）'] ?? props['Follow-up Date'] ?? null);
-    const lastContext = extractRichText(props['Follow-up Notes'] ?? props['Follow-up Note'] ?? null);
+    const lastContext = extractRichText(props['Follow-up Notes（跟进内容）'] ?? props['Follow-up Notes'] ?? props['Follow-up Note'] ?? null);
     const followUpMethod = extractSelect(props['Follow-up Method'] ?? props['跟进方式'] ?? null);
-    const owner = extractSelect(props['Follow-up Owner'] ?? props['Owner'] ?? props['跟进人'] ?? null);
+    const owner = extractSelect(props['Follow-up Owner（负责人）'] ?? props['Follow-up Owner'] ?? props['Owner'] ?? props['跟进人'] ?? null);
     const nextFollowUpAt = extractDate(props['Next Follow-up'] ?? props['Next Follow-Up'] ?? null);
     const goal = extractRichText(props['下次行动内容'] ?? props['Next Action'] ?? null);
     const businessCreatedAt = extractDate(props['业务创建时间'] ?? props['Created Date'] ?? null);
