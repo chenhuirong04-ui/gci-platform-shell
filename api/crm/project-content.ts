@@ -50,7 +50,7 @@ function fieldRegex(keywords: string): RegExp {
 // per field — never overwritten by a later, weaker match.
 const FIELD_PATTERNS: Array<{ field: keyof ContentLike; re: RegExp }> = [
   { field: 'contractNumber', re: fieldRegex('合同编号|合同号|Contract\\s*No\\.?|Contract\\s*Number') },
-  { field: 'submissionNumber', re: fieldRegex('材料提交单号|提交单号|Submission\\s*No\\.?') },
+  { field: 'submissionNumber', re: fieldRegex('材料提交单号?|提交单号?|Submission\\s*No\\.?') },
   { field: 'approvalStatus', re: fieldRegex('批准状态|审批状态|Approval\\s*Status') },
   { field: 'deliveryRequirement', re: fieldRegex('交付要求|交货要求|Delivery\\s*Requirement') },
   { field: 'ownerCompany', re: fieldRegex('业主|甲方|Client|Owner|Employer') },
