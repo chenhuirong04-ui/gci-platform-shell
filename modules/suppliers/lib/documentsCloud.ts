@@ -133,47 +133,75 @@ export async function getDocumentUrl(doc: SupplierDocument): Promise<string | nu
 }
 
 // ── Actual file upload to Supabase Storage ───────────────────────────────────
+// Two-phase: (1) ask the server (service-role key) for a short-lived signed
+// upload slot — JSON only, no file bytes; (2) PUT the file straight from the
+// browser to Supabase Storage using that slot. The file body never touches
+// the Vercel function, so there's no serverless body-size ceiling to hit.
 
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15MB
 
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve((reader.result as string).split(',')[1] ?? '');
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
+export type UploadStage = 'authorizing' | 'uploading';
 
-/** Upload a supplier file via the server (service-role key — the browser's
- *  anon key has no Storage RLS grant on the supplier buckets).
+/** Upload a supplier file directly to Supabase Storage via a signed upload URL.
  *  Returns { path, bucket, url } on success, or throws with a real error message. */
 export async function uploadSupplierFile(
   supplierId: string,
   file: File,
   documentType: string,
+  onStage?: (stage: UploadStage) => void,
 ): Promise<{ path: string; bucket: string; url: string }> {
   if (file.size > MAX_UPLOAD_BYTES) {
     throw new Error(`文件过大（${(file.size / 1024 / 1024).toFixed(1)}MB），请上传 15MB 以内的文件 / File too large, please upload under 15MB`);
   }
-  const dataBase64 = await fileToBase64(file);
-  const res = await fetch('/api/suppliers/upload-document', {
+
+  // 1. Request a signed upload slot (metadata only).
+  onStage?.('authorizing');
+  const authRes = await fetch('/api/suppliers/upload-document', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      action: 'upload',
-      supplierId,
-      documentType,
-      fileName: file.name,
-      mimeType: file.type || 'application/octet-stream',
-      dataBase64,
-    }),
+    body: JSON.stringify({ action: 'create-upload-url', supplierId, documentType, fileName: file.name }),
   });
-  const data = await res.json().catch(() => null);
-  if (!res.ok || !data?.ok) {
-    throw new Error(data?.error || `文件上传失败（HTTP ${res.status}）/ Upload failed (HTTP ${res.status})`);
+  const authData = await authRes.json().catch(() => null);
+  if (!authRes.ok || !authData?.ok) {
+    throw new Error(authData?.error || `无法取得上传授权（HTTP ${authRes.status}）/ Failed to get upload authorization`);
   }
-  return { path: data.path, bucket: data.bucket, url: data.url ?? '' };
+  const { bucket, path, token } = authData as { bucket: string; path: string; token: string };
+
+  // 2. Upload the file body straight from the browser to Supabase Storage.
+  onStage?.('uploading');
+  const uploadUrl = `${SUPA_URL}/storage/v1/object/upload/sign/${bucket}/${path}?token=${encodeURIComponent(token)}`;
+  const form = new FormData();
+  form.append('cacheControl', '3600');
+  form.append('', file);
+  const putRes = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}`, 'x-upsert': 'true' },
+    body: form,
+  });
+  if (!putRes.ok) {
+    const txt = await putRes.text().catch(() => '');
+    throw new Error(`Storage 上传失败（${putRes.status}）：${txt} / Storage upload failed (${putRes.status})`);
+  }
+
+  // 3. Signed download URL for immediate use (view button etc.).
+  const url = (await getSignedUrl(bucket, path, 3600)) ?? '';
+  return { path, bucket, url };
+}
+
+/** Best-effort deletion of a storage object — used to clean up an orphaned
+ *  upload when saving the supplier_documents metadata row fails. */
+export async function deleteStorageObject(bucket: string, path: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/suppliers/upload-document', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete-object', bucket, path }),
+    });
+    const data = await res.json().catch(() => null);
+    return res.ok && !!data?.ok;
+  } catch {
+    return false;
+  }
 }
 
 // ── Storage file move (copy + delete) ────────────────────────────────────────

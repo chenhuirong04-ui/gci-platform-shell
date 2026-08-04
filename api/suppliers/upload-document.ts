@@ -1,7 +1,8 @@
 // api/suppliers/upload-document.ts
-// Server-side supplier file storage (product catalogues, licenses, certs).
-// Uses the service-role key so browser clients never need direct Storage RLS access.
-// Auto-provisions the target bucket on first use, so no manual Dashboard step is required.
+// Server-side supplier file storage authorization (product catalogues, licenses, certs).
+// The service-role key stays server-side only — it issues short-lived signed
+// upload/download URLs; actual file bytes travel browser → Supabase Storage
+// directly and never pass through this function (avoids Vercel body-size limits).
 export const config = { runtime: 'edge' };
 
 function json(body: unknown, status = 200) {
@@ -18,15 +19,6 @@ const PRIVATE_DOC_TYPES = new Set([
 function resolveBucket(documentType: string): string {
   return PRIVATE_DOC_TYPES.has(documentType) ? 'suppliers-private' : 'suppliers-public';
 }
-
-function base64ToBytes(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
-const MAX_BYTES = 15 * 1024 * 1024; // 15MB
 
 export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405);
@@ -62,18 +54,12 @@ export default async function handler(req: Request): Promise<Response> {
     return json({ ok: true, url: `${SUPA_URL}${data.signedURL}` });
   }
 
-  // ── Upload a new file ──────────────────────────────────────────────────────
-  if (action === 'upload') {
-    const { supplierId, documentType, fileName, mimeType, dataBase64 } = body as {
-      supplierId?: string; documentType?: string; fileName?: string; mimeType?: string; dataBase64?: string;
+  // ── Issue a short-lived signed upload slot (no file bytes here) ───────────
+  if (action === 'create-upload-url') {
+    const { supplierId, documentType, fileName } = body as {
+      supplierId?: string; documentType?: string; fileName?: string;
     };
-    if (!supplierId || !fileName || !dataBase64) return json({ ok: false, error: 'missing_fields' }, 400);
-
-    let bytes: Uint8Array;
-    try { bytes = base64ToBytes(dataBase64); } catch { return json({ ok: false, error: 'invalid_file_data' }, 400); }
-    if (bytes.length > MAX_BYTES) {
-      return json({ ok: false, error: `文件过大（${(bytes.length / 1024 / 1024).toFixed(1)}MB），请上传 15MB 以内的文件 / File too large, please upload under 15MB` }, 413);
-    }
+    if (!supplierId || !fileName) return json({ ok: false, error: 'missing_fields' }, 400);
 
     const bucket = resolveBucket(documentType || '其他');
 
@@ -92,29 +78,39 @@ export default async function handler(req: Request): Promise<Response> {
     const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
     const path = `suppliers/${supplierId}/${Date.now()}-${safeName}`;
 
-    const uploadRes = await fetch(`${SUPA_URL}/storage/v1/object/${bucket}/${path}`, {
-      method: 'POST',
-      headers: { ...H, 'Content-Type': mimeType || 'application/octet-stream', 'x-upsert': 'true' },
-      body: bytes,
-    });
-    if (!uploadRes.ok) {
-      const text = await uploadRes.text().catch(() => '');
-      return json({ ok: false, error: `文件上传失败（${uploadRes.status}）：${text} / Upload failed (${uploadRes.status})` }, 502);
-    }
-
-    // Best-effort signed URL for immediate use; failure here doesn't fail the upload.
-    let url = '';
-    const signRes = await fetch(`${SUPA_URL}/storage/v1/object/sign/${bucket}/${path}`, {
+    const signRes = await fetch(`${SUPA_URL}/storage/v1/object/upload/sign/${bucket}/${path}`, {
       method: 'POST',
       headers: { ...H, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ expiresIn: 3600 }),
+      body: JSON.stringify({}),
     });
-    if (signRes.ok) {
-      const d = await signRes.json().catch(() => null);
-      if (d?.signedURL) url = `${SUPA_URL}${d.signedURL}`;
+    if (!signRes.ok) {
+      const text = await signRes.text().catch(() => '');
+      return json({ ok: false, error: `无法取得上传授权（${signRes.status}）/ Failed to get upload authorization: ${text}` }, 502);
     }
+    const data = await signRes.json().catch(() => null);
+    if (!data?.url) return json({ ok: false, error: 'no_upload_url_returned' }, 502);
 
-    return json({ ok: true, path, bucket, url });
+    const fullUrl = new URL(`${SUPA_URL}/storage/v1${data.url}`);
+    const token = fullUrl.searchParams.get('token');
+    if (!token) return json({ ok: false, error: 'no_token_returned' }, 502);
+
+    return json({ ok: true, bucket, path, token });
+  }
+
+  // ── Best-effort cleanup of an orphaned object (metadata save failed) ──────
+  if (action === 'delete-object') {
+    const { bucket, path } = body as { bucket?: string; path?: string };
+    if (!bucket || !path) return json({ ok: false, error: 'missing_fields' }, 400);
+    const delRes = await fetch(`${SUPA_URL}/storage/v1/object/${bucket}`, {
+      method: 'DELETE',
+      headers: { ...H, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefixes: [path] }),
+    });
+    if (!delRes.ok) {
+      const text = await delRes.text().catch(() => '');
+      return json({ ok: false, error: `delete failed (${delRes.status}): ${text}` }, 502);
+    }
+    return json({ ok: true });
   }
 
   return json({ ok: false, error: 'unknown_action' }, 400);

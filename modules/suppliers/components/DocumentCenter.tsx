@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useI18n } from '@gci/i18n';
 import type { Supplier, SupplierDocument, DocumentType, DocumentVerificationStatus } from '../types';
 import {
-  createDocument, deleteDocument, listDocuments, updateDocument,
+  createDocument, deleteDocument, deleteStorageObject, listDocuments, updateDocument,
   getDocumentUrl, resolveStorageBucket, uploadSupplierFile,
 } from '../lib/documentsCloud';
 import { getDocStatusLabel, getDocTypeLabel } from '../lib/labelMaps';
@@ -32,6 +32,7 @@ const ALLOWED_TYPES = [
   'image/png',
 ];
 const ALLOWED_EXT = ['.pdf','.xls','.xlsx','.doc','.docx','.jpg','.jpeg','.png'];
+const MAX_FILE_BYTES = 15 * 1024 * 1024; // 15MB
 
 const VSTATUS_COLOR: Record<DocumentVerificationStatus, string> = {
   unverified: '#94a3b8', verified: '#16a34a', rejected: '#dc2626', pending_reupload: '#d97706',
@@ -69,6 +70,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [stageLabel, setStageLabel] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = async () => { setLoading(true); setDocs(await listDocuments(supplierId)); setLoading(false); };
@@ -79,6 +81,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
     setSelectedFile(null);
     setSaveErr(null);
     setUploading(false);
+    setStageLabel('');
   };
 
   const handleView = async (doc: SupplierDocument) => {
@@ -92,6 +95,10 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
   const applyFile = (f: File) => {
     if (!ALLOWED_TYPES.includes(f.type) && !ALLOWED_EXT.some(e => f.name.toLowerCase().endsWith(e))) {
       setSaveErr(t.errUnsupportedType(f.name));
+      return;
+    }
+    if (f.size > MAX_FILE_BYTES) {
+      setSaveErr(t.errFileTooLarge(f.name, (f.size / 1024 / 1024).toFixed(1)));
       return;
     }
     setSelectedFile(f);
@@ -134,7 +141,9 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
 
       if (selectedFile) {
         setUploading(true);
-        const result = await uploadSupplierFile(supplierId, selectedFile, edit.document_type ?? '其他');
+        const result = await uploadSupplierFile(supplierId, selectedFile, edit.document_type ?? '其他', stage => {
+          setStageLabel(stage === 'authorizing' ? t.stagePreparing : t.stageUploading);
+        });
         setUploading(false);
         storagePatch = {
           storage_bucket: result.bucket,
@@ -144,13 +153,19 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
         };
       }
 
+      setStageLabel(t.stageSaving);
       const bucket = resolveStorageBucket(edit.document_type ?? '其他');
       const payload = { ...EMPTY(supplierId), ...edit, supplier_id: supplierId, storage_bucket: bucket, ...storagePatch };
 
-      if (edit.id) {
-        await updateDocument(edit.id, { ...edit, ...storagePatch });
-      } else {
-        await createDocument(payload);
+      const dbOk = edit.id
+        ? await updateDocument(edit.id, { ...edit, ...storagePatch })
+        : !!(await createDocument(payload));
+
+      if (!dbOk) {
+        if (storagePatch.storage_bucket && storagePatch.storage_path) {
+          await deleteStorageObject(storagePatch.storage_bucket, storagePatch.storage_path);
+        }
+        throw new Error(t.errSaveFailed);
       }
 
       setEdit(null);
@@ -168,6 +183,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
     } finally {
       setSaving(false);
       setUploading(false);
+      setStageLabel('');
     }
   };
 
@@ -350,10 +366,10 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
               />
 
               {/* Upload progress indicator */}
-              {uploading && (
+              {stageLabel && (
                 <div style={{ marginTop: 8, background: '#f0f4ff', border: '1px solid #c7d7ff', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: NAVY, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid #c7d7ff', borderTopColor: NAVY, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                  {t.uploadingHint}
+                  {stageLabel}
                   <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                 </div>
               )}
