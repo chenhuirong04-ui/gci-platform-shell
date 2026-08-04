@@ -60,6 +60,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
   const [edit, setEdit] = useState<Partial<SupplierDocument> | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
   const [showLicenseUploader, setShowLicenseUploader] = useState(false);
@@ -124,6 +125,9 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
       return;
     }
 
+    const uploadedNewFile = !!selectedFile;
+    const isCatalog = (edit.document_type ?? '其他') === '产品目录';
+
     setSaving(true); setSaveErr(null);
     try {
       let storagePatch: Partial<SupplierDocument> = {};
@@ -132,11 +136,6 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
         setUploading(true);
         const result = await uploadSupplierFile(supplierId, selectedFile, edit.document_type ?? '其他');
         setUploading(false);
-        if (!result) {
-          setSaveErr(t.errUploadFailed);
-          setSaving(false);
-          return;
-        }
         storagePatch = {
           storage_bucket: result.bucket,
           storage_path: result.path,
@@ -157,6 +156,13 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
       setEdit(null);
       setSelectedFile(null);
       await load();
+
+      if (uploadedNewFile) {
+        setSuccessMsg(isCatalog
+          ? (lang === 'zh' ? '产品目录上传成功' : 'Product catalogue uploaded successfully')
+          : (lang === 'zh' ? '文件上传成功' : 'File uploaded successfully'));
+        setTimeout(() => setSuccessMsg(null), 4000);
+      }
     } catch (e: any) {
       setSaveErr(e?.message ?? t.errSaveFailed);
     } finally {
@@ -196,6 +202,12 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
 
   return (
     <div>
+      {successMsg && (
+        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, fontWeight: 700, color: '#166534' }}>
+          ✓ {successMsg}
+        </div>
+      )}
+
       {/* Primary upload actions */}
       <div style={{ background: '#fffbf0', border: `1.5px dashed ${GOLD}`, borderRadius: 10, padding: '16px 20px', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t.quickUpload}</span>
@@ -234,6 +246,9 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
                       {doc.document_number && <span style={{ fontSize: 11, color: T3, marginLeft: 8 }}>#{doc.document_number}</span>}
                       {doc.file_size && <span style={{ fontSize: 10, color: T3, marginLeft: 8 }}>{formatBytes(doc.file_size)}</span>}
                       <div style={{ fontSize: 11, color: T3, marginTop: 3, display: 'flex', gap: 10 }}>
+                        {doc.storage_path && doc.created_at && (
+                          <span>{t.uploadedAt(new Date(doc.created_at).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }))}</span>
+                        )}
                         {doc.issue_date && <span>{t.issued(doc.issue_date)}</span>}
                         {doc.expire_date && <span style={{ color: ec || T3, fontWeight: ec ? 700 : undefined }}>{t.expires(doc.expire_date)}{ec && ' ⚠'}</span>}
                         {doc.storage_path && <span style={{ color: '#16a34a' }}>{t.uploaded}</span>}

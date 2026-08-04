@@ -106,16 +106,23 @@ export async function setVerificationStatus(
 export async function getSignedUrl(
   bucket: string,
   path: string,
-  expiresInSeconds = 60,
+  expiresInSeconds = 3600,
 ): Promise<string | null> {
-  const res = await sb(`/storage/v1/object/sign/${bucket}/${path}`, {
-    method: 'POST',
-    body: JSON.stringify({ expiresIn: expiresInSeconds }),
-  });
-  if (!res) return null;
-  const data = await res.json().catch(() => null);
-  if (!data?.signedURL) return null;
-  return `${SUPA_URL}${data.signedURL}`;
+  // Routed through the server (service-role key) — the anon key has no
+  // Storage RLS grant on the suppliers-private/suppliers-public buckets.
+  try {
+    const res = await fetch('/api/suppliers/upload-document', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'sign', bucket, path, expiresIn: expiresInSeconds }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ok) return null;
+    return data.url ?? null;
+  } catch (e) {
+    console.error('[documentsCloud] getSignedUrl failed', e);
+    return null;
+  }
 }
 
 export async function getDocumentUrl(doc: SupplierDocument): Promise<string | null> {
@@ -127,40 +134,46 @@ export async function getDocumentUrl(doc: SupplierDocument): Promise<string | nu
 
 // ── Actual file upload to Supabase Storage ───────────────────────────────────
 
-/** Upload a supplier file to the correct private or public bucket.
- *  Returns { path, bucket, url } or null on failure. */
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15MB
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve((reader.result as string).split(',')[1] ?? '');
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+/** Upload a supplier file via the server (service-role key — the browser's
+ *  anon key has no Storage RLS grant on the supplier buckets).
+ *  Returns { path, bucket, url } on success, or throws with a real error message. */
 export async function uploadSupplierFile(
   supplierId: string,
   file: File,
   documentType: string,
-): Promise<{ path: string; bucket: string; url: string } | null> {
-  const bucket = resolveStorageBucket(documentType);
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const path = `suppliers/${supplierId}/${Date.now()}-${safeName}`;
-  const uploadUrl = `${SUPA_URL}/storage/v1/object/${bucket}/${path}`;
-  try {
-    const res = await fetch(uploadUrl, {
-      method: 'POST',
-      headers: {
-        apikey: SUPA_KEY,
-        Authorization: `Bearer ${SUPA_KEY}`,
-        'Content-Type': file.type || 'application/octet-stream',
-        'x-upsert': 'true',
-      },
-      body: file,
-    });
-    if (!res.ok) {
-      const txt = await res.text().catch(() => '');
-      console.error('[documentsCloud] Storage upload failed:', res.status, txt);
-      return null;
-    }
-    // Build a signed URL (private) or public URL
-    const signedUrl = await getSignedUrl(bucket, path, 3600);
-    return { path, bucket, url: signedUrl ?? '' };
-  } catch (e) {
-    console.error('[documentsCloud] upload exception', e);
-    return null;
+): Promise<{ path: string; bucket: string; url: string }> {
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw new Error(`文件过大（${(file.size / 1024 / 1024).toFixed(1)}MB），请上传 15MB 以内的文件 / File too large, please upload under 15MB`);
   }
+  const dataBase64 = await fileToBase64(file);
+  const res = await fetch('/api/suppliers/upload-document', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'upload',
+      supplierId,
+      documentType,
+      fileName: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      dataBase64,
+    }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data?.ok) {
+    throw new Error(data?.error || `文件上传失败（HTTP ${res.status}）/ Upload failed (HTTP ${res.status})`);
+  }
+  return { path: data.path, bucket: data.bucket, url: data.url ?? '' };
 }
 
 // ── Storage file move (copy + delete) ────────────────────────────────────────
