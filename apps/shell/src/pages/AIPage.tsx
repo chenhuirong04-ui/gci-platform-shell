@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useRef } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { DailyWorkbench } from '../components/DailyWorkbench';
 import { useSearchParams } from 'react-router-dom';
 import { colors } from '@gci/design-system';
@@ -63,6 +64,8 @@ function normalizeInventoryQuery(raw: string): string | null {
 // Calls /api/ai/resolve-product which fetches the live product catalog and uses
 // OpenAI to map natural-language input to exact product names from the DB.
 // Falls back to normalizeInventoryQuery if the endpoint fails.
+interface InventoryCandidate { name: string; sku?: string; category?: string }
+
 async function resolveInventoryProduct(
   rawQuery: string,
   base: string,
@@ -73,6 +76,7 @@ async function resolveInventoryProduct(
   notFound: boolean;
   ambiguous: boolean;
   candidates: string[];
+  candidateItems: InventoryCandidate[];
 }> {
   try {
     const res = await fetch(`${base}/api/ai/resolve-product?q=${encodeURIComponent(rawQuery)}`);
@@ -81,6 +85,7 @@ async function resolveInventoryProduct(
       ok: boolean;
       queryType: 'full_inventory' | 'specific_product';
       matchedProducts: string[];
+      matchedItems?: InventoryCandidate[];
       keywords: string[];
       confidence: number;
       ambiguous: boolean;
@@ -89,16 +94,19 @@ async function resolveInventoryProduct(
     if (!data.ok) throw new Error('resolve-product returned ok:false');
 
     if (data.queryType === 'full_inventory') {
-      return { queryType: 'full_inventory', productNames: [], productFilter: '', notFound: false, ambiguous: false, candidates: [] };
+      return { queryType: 'full_inventory', productNames: [], productFilter: '', notFound: false, ambiguous: false, candidates: [], candidateItems: [] };
     }
 
     // specific_product
     const matched = data.matchedProducts || [];
+    const matchedItems = data.matchedItems && data.matchedItems.length === matched.length
+      ? data.matchedItems
+      : matched.map(name => ({ name }));
     if (matched.length === 0) {
-      return { queryType: 'specific_product', productNames: [], productFilter: rawQuery, notFound: true, ambiguous: false, candidates: [] };
+      return { queryType: 'specific_product', productNames: [], productFilter: rawQuery, notFound: true, ambiguous: false, candidates: [], candidateItems: [] };
     }
     if (data.ambiguous && matched.length > 1) {
-      return { queryType: 'specific_product', productNames: [], productFilter: rawQuery, notFound: false, ambiguous: true, candidates: matched };
+      return { queryType: 'specific_product', productNames: [], productFilter: rawQuery, notFound: false, ambiguous: true, candidates: matched, candidateItems: matchedItems };
     }
     // Single strong match (or a small set where all are clearly related)
     return {
@@ -108,15 +116,37 @@ async function resolveInventoryProduct(
       notFound: false,
       ambiguous: false,
       candidates: matched,
+      candidateItems: matchedItems,
     };
   } catch {
     // Fallback to regex normalization
     const keyword = normalizeInventoryQuery(rawQuery);
     if (!keyword) {
-      return { queryType: 'full_inventory', productNames: [], productFilter: '', notFound: false, ambiguous: false, candidates: [] };
+      return { queryType: 'full_inventory', productNames: [], productFilter: '', notFound: false, ambiguous: false, candidates: [], candidateItems: [] };
     }
-    return { queryType: 'specific_product', productNames: [keyword], productFilter: keyword, notFound: false, ambiguous: false, candidates: [keyword] };
+    return { queryType: 'specific_product', productNames: [keyword], productFilter: keyword, notFound: false, ambiguous: false, candidates: [keyword], candidateItems: [{ name: keyword }] };
   }
+}
+
+// ── Deterministic candidate card display cleanup ───────────────────────────────
+// Only strips known noise (SKU repeated inline, duplicated CN/EN halves) and
+// pulls out spec hints already present in the raw name. Never rewrites data.
+function simplifyProductDisplay(raw: string, sku?: string): { title: string; dayNight: string | null; count: string | null } {
+  let name = raw.trim();
+  if (sku) {
+    const esc = sku.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    name = name.replace(new RegExp(esc, 'gi'), '').trim();
+  }
+  // Collapse an exact repeated CN/EN half, e.g. "SPACE7 七度空间 SPACE7 七度空间"
+  const half = Math.floor(name.length / 2);
+  if (name.length > 6 && name.slice(0, half).trim() === name.slice(half).trim()) {
+    name = name.slice(0, half).trim();
+  }
+  const dayNightM = name.match(/日用|夜用|日夜|日间|夜间|day|night/i);
+  const countM = name.match(/(\d+\s*(?:片|包|支|个|pcs))/i);
+  name = name.replace(/\s+/g, ' ').trim();
+  const title = name.length > 28 ? `${name.slice(0, 26)}…` : name;
+  return { title, dayNight: dayNightM ? dayNightM[0] : null, count: countM ? countM[0] : null };
 }
 
 // ── Customer name extraction for quotation history queries ────────────────────
@@ -405,13 +435,14 @@ function parseQuotationDraft(raw: string): {
   };
 }
 
-function CommandPanel({ state, onApprove, onEdit, onCancel }: {
+function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
   state: CmdState;
   onApprove: () => void;
   onEdit: () => void;
   onCancel: () => void;
+  setCmdState: Dispatch<SetStateAction<CmdState | null>>;
 }) {
-  const { dict } = useI18n();
+  const { dict, lang } = useI18n();
   const { raw, match, phase, step } = state;
   const { intent, confidence } = match;
 
@@ -419,6 +450,43 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
   const [writePhase, setWritePhase] = useState<'confirm' | 'sending' | 'done' | 'error'>('confirm');
   const [writeError, setWriteError] = useState<string | null>(null);
   const [writeResult, setWriteResult] = useState<any>(null);
+
+  // Local state for check_inventory candidate selection (SKU picker → fetch)
+  const [invFetching, setInvFetching] = useState<string | null>(null);
+  const [invFetchError, setInvFetchError] = useState<string | null>(null);
+  const [invLastAttempt, setInvLastAttempt] = useState<{ name: string; candidates: string[]; candidateItems: InventoryCandidate[]; rawQuery: string } | null>(null);
+
+  function fetchInventoryFor(name: string, candidates: string[], candidateItems: InventoryCandidate[], rawQuery: string) {
+    setInvFetching(name);
+    setInvFetchError(null);
+    setInvLastAttempt({ name, candidates, candidateItems, rawQuery });
+    const base = typeof window !== 'undefined' ? window.location.origin : '';
+    const qs = `?product=${encodeURIComponent(name)}`;
+    Promise.allSettled([
+      fetch(`${base}/api/ai/inventory-table-alerts${qs}`).then(r => r.json()),
+      fetch(`${base}/api/trade/check-inventory${qs}`).then(r => r.json()),
+    ]).then(([whRes, csRes]) => {
+      setInvFetching(null);
+      const whOk = whRes.status === 'fulfilled';
+      const csOk = csRes.status === 'fulfilled';
+      if (!whOk && !csOk) {
+        setInvFetchError(lang === 'en' ? 'Inventory query failed. Please retry.' : '库存查询失败，请重试。');
+        return;
+      }
+      setCmdState(prev => prev ? { ...prev, resultData: {
+        ok: true,
+        warehouse: whOk ? whRes.value : { ok: false, error: '库存表读取失败' },
+        consignment: csOk ? csRes.value : { ok: false, error: '寄售库存读取失败' },
+        productFilter: name,
+        prevCandidates: candidates,
+        prevCandidateItems: candidateItems,
+        prevRawQuery: rawQuery,
+      } } : prev);
+    }).catch(() => {
+      setInvFetching(null);
+      setInvFetchError(lang === 'en' ? 'Inventory query failed. Please retry.' : '库存查询失败，请重试。');
+    });
+  }
 
   // Local state for register_existing_quotation
   const [regPhase, setRegPhase] = useState<'draft' | 'checking' | 'dupWarn' | 'saving' | 'saved' | 'followUpSaving' | 'followUpDone' | 'error'>('draft');
@@ -492,7 +560,7 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
         <div style={{ padding: '14px 16px', background: 'rgba(255,255,255,0.02)', borderRadius: 10, marginBottom: 16 }}>
           {steps.map((s, i) => {
             const isLast = i === steps.length - 1;
-            const stepState = i < step ? 'done' : i === step ? 'active' : 'pending';
+            const stepState = phase === 'done' ? 'done' : i < step ? 'done' : i === step ? 'active' : 'pending';
             return (
               <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0' }}>
                 <div style={{ width: 18, flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
@@ -533,42 +601,82 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
           )}
 
           {/* ── Inventory: disambiguation ── */}
-          {intent.intentId === 'check_inventory' && state.resultData?.disambiguate && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 12, color: GOLD, fontWeight: 700, marginBottom: 8 }}>找到以下相关产品，请确认要查询哪一款：</div>
-              {(state.resultData.candidates as string[]).map((name: string, i: number) => (
-                <button
-                  key={i}
-                  onClick={() => {
-                    const base = typeof window !== 'undefined' ? window.location.origin : '';
-                    const qs = `?product=${encodeURIComponent(name)}`;
-                    Promise.allSettled([
-                      fetch(`${base}/api/ai/inventory-table-alerts${qs}`).then(r => r.json()),
-                      fetch(`${base}/api/trade/check-inventory${qs}`).then(r => r.json()),
-                    ]).then(([whRes, csRes]) => {
-                      setCmdState(prev => prev ? { ...prev, resultData: {
-                        ok: true,
-                        warehouse: whRes.status === 'fulfilled' ? whRes.value : { ok: false, error: '库存表读取失败' },
-                        consignment: csRes.status === 'fulfilled' ? csRes.value : { ok: false, error: '寄售库存读取失败' },
-                        productFilter: name,
-                      } } : prev);
-                    });
-                  }}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 12px', marginBottom: 4, borderRadius: 7,
-                    border: '1px solid rgba(201,168,76,0.3)', background: 'rgba(201,168,76,0.06)',
-                    color: TEXT, fontSize: 13, cursor: 'pointer' }}
-                >
-                  {i + 1}. {name}
-                </button>
-              ))}
-            </div>
-          )}
+          {intent.intentId === 'check_inventory' && state.resultData?.disambiguate && (() => {
+            const candidates: string[] = state.resultData.candidates || [];
+            const candidateItems: InventoryCandidate[] = (state.resultData.candidateItems?.length === candidates.length
+              ? state.resultData.candidateItems
+              : candidates.map(name => ({ name })));
+            const rawQuery = state.resultData.rawQuery || raw;
+            return (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 12, color: GOLD, fontWeight: 700, marginBottom: 2 }}>
+                  找到多个相关产品，请选择要查询的具体商品。
+                </div>
+                <div style={{ fontSize: 11, color: SUBTLE, marginBottom: 10 }}>
+                  Multiple matching products found. Select a product to check its inventory.
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {candidateItems.map((item, i) => {
+                    const { title, dayNight, count } = simplifyProductDisplay(item.name, item.sku);
+                    const isFetching = invFetching === item.name;
+                    return (
+                      <button
+                        key={i}
+                        title={item.name}
+                        disabled={!!invFetching}
+                        onClick={() => fetchInventoryFor(item.name, candidates, candidateItems, rawQuery)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
+                          padding: '10px 12px', borderRadius: 9,
+                          border: '1px solid rgba(201,168,76,0.3)', background: 'rgba(201,168,76,0.06)',
+                          color: TEXT, fontSize: 13, cursor: invFetching ? 'default' : 'pointer',
+                          opacity: invFetching && !isFetching ? 0.5 : 1,
+                        }}
+                      >
+                        {item.sku && (
+                          <span className="font-mono-label" style={{ fontSize: 10.5, color: GOLD, background: 'rgba(203,168,92,0.12)', border: '1px solid rgba(203,168,92,0.25)', borderRadius: 5, padding: '2px 6px', flexShrink: 0 }}>
+                            {item.sku}
+                          </span>
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
+                          {(dayNight || count || item.category) && (
+                            <div style={{ fontSize: 11, color: MUTED, marginTop: 2, display: 'flex', gap: 8 }}>
+                              {dayNight && <span>{dayNight}</span>}
+                              {count && <span>{count}</span>}
+                              {item.category && <span>{item.category}</span>}
+                            </div>
+                          )}
+                        </div>
+                        {isFetching && <span style={{ fontSize: 11, color: GOLD, flexShrink: 0 }}>查询中…</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                {invFetchError && (
+                  <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 7, background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)' }}>
+                    <span style={{ fontSize: 12, color: '#E0846A', flex: 1 }}>{invFetchError}</span>
+                    <button
+                      onClick={() => invLastAttempt && fetchInventoryFor(invLastAttempt.name, invLastAttempt.candidates, invLastAttempt.candidateItems, invLastAttempt.rawQuery)}
+                      style={{ fontSize: 11, color: GOLD, background: 'rgba(203,168,92,0.1)', border: '1px solid rgba(203,168,92,0.3)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}
+                    >
+                      重试
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* ── Inventory result panel (combined: warehouse + consignment) ── */}
           {intent.intentId === 'check_inventory' && state.resultData && state.resultData.ok && !state.resultData.notFound && !state.resultData.disambiguate && (() => {
             const wh = state.resultData.warehouse;
             const cs = state.resultData.consignment;
             const productFilter = state.resultData.productFilter;
+            const prevCandidates: string[] = state.resultData.prevCandidates || [];
+            const prevCandidateItems: InventoryCandidate[] = state.resultData.prevCandidateItems || [];
+            const prevRawQuery: string = state.resultData.prevRawQuery || productFilter || raw;
+            const retryFetch = () => productFilter && fetchInventoryFor(productFilter, prevCandidates, prevCandidateItems, prevRawQuery);
             const inlineRowStyle = (alertType: string) => ({
               display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7,
               background: alertType === 'outOfStock' ? 'rgba(224,132,106,0.08)' : alertType === 'anomaly' ? 'rgba(143,166,212,0.05)' : alertType === 'lowStock' ? 'rgba(212,168,67,0.07)' : 'rgba(255,255,255,0.02)',
@@ -594,8 +702,11 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                     库存表 · Notion INVENTORY_DB
                   </div>
                   {!wh.ok ? (
-                    <div style={{ fontSize: 12, color: '#E0846A', padding: '8px 10px', borderRadius: 7, background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)' }}>
-                      {wh.error || '库存表读取失败'}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: '#E0846A', padding: '8px 10px', borderRadius: 7, background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)' }}>
+                      <span style={{ flex: 1 }}>{wh.error || '库存表读取失败'}</span>
+                      {productFilter && (
+                        <button onClick={retryFetch} style={{ fontSize: 11, color: GOLD, background: 'rgba(203,168,92,0.1)', border: '1px solid rgba(203,168,92,0.3)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', flexShrink: 0 }}>重试</button>
+                      )}
                     </div>
                   ) : wh.totalRows === 0 ? (
                     <div style={{ fontSize: 12, color: MUTED }}>无匹配产品记录。</div>
@@ -632,8 +743,11 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                     寄售库存 · consignment_stock
                   </div>
                   {!cs.ok ? (
-                    <div style={{ fontSize: 12, color: '#E0846A', padding: '8px 10px', borderRadius: 7, background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)' }}>
-                      {cs.error || '寄售库存读取失败'}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: '#E0846A', padding: '8px 10px', borderRadius: 7, background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)' }}>
+                      <span style={{ flex: 1 }}>{cs.error || '寄售库存读取失败'}</span>
+                      {productFilter && (
+                        <button onClick={retryFetch} style={{ fontSize: 11, color: GOLD, background: 'rgba(203,168,92,0.1)', border: '1px solid rgba(203,168,92,0.3)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', flexShrink: 0 }}>重试</button>
+                      )}
                     </div>
                   ) : cs.total === 0 ? (
                     <div style={{ fontSize: 12, color: MUTED }}>无匹配寄售记录。</div>
@@ -666,6 +780,25 @@ function CommandPanel({ state, onApprove, onEdit, onCancel }: {
                     </>
                   )}
                 </div>
+
+                <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                    {prevCandidates.length > 1 && (
+                      <button
+                        onClick={() => setCmdState(prev => prev ? { ...prev, resultData: {
+                          ok: true, disambiguate: true, candidates: prevCandidates, candidateItems: prevCandidateItems, rawQuery: prevRawQuery,
+                        } } : prev)}
+                        style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: MUTED, fontSize: 12, cursor: 'pointer' }}
+                      >
+                        ← 查询其他候选商品
+                      </button>
+                    )}
+                    <button
+                      onClick={onCancel}
+                      style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: MUTED, fontSize: 12, cursor: 'pointer' }}
+                    >
+                      开始新查询
+                    </button>
+                  </div>
               </div>
             );
           })()}
@@ -2656,7 +2789,7 @@ export function AIPage() {
             }
             // Disambiguation: skip DB fetch, return candidates
             if (resolved.ambiguous) {
-              setCmdState(prev => prev ? { ...prev, resultData: { ok: true, disambiguate: true, candidates: resolved.candidates, rawQuery: raw.trim() } } : prev);
+              setCmdState(prev => prev ? { ...prev, resultData: { ok: true, disambiguate: true, candidates: resolved.candidates, candidateItems: resolved.candidateItems, rawQuery: raw.trim() } } : prev);
               return;
             }
             // Full inventory or matched products — fetch from DB
@@ -3368,7 +3501,7 @@ export function AIPage() {
                 return;
               }
               if (resolved.ambiguous) {
-                setCmdState(prev => prev ? { ...prev, resultData: { ok: true, disambiguate: true, candidates: resolved.candidates, rawQuery: raw.trim() } } : prev);
+                setCmdState(prev => prev ? { ...prev, resultData: { ok: true, disambiguate: true, candidates: resolved.candidates, candidateItems: resolved.candidateItems, rawQuery: raw.trim() } } : prev);
                 return;
               }
               const productParam = resolved.queryType === 'full_inventory' ? null
@@ -3477,6 +3610,7 @@ export function AIPage() {
           onApprove={clearCmd}
           onEdit={clearCmd}
           onCancel={clearCmd}
+          setCmdState={setCmdState}
         />
       )}
 

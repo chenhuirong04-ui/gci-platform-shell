@@ -32,6 +32,7 @@ export interface ResolveResult {
   ok: boolean;
   queryType: 'full_inventory' | 'specific_product';
   matchedProducts: string[];
+  matchedItems?: { name: string; sku?: string; category?: string }[];
   brand?: string | null;
   category?: string | null;
   size?: string | null;
@@ -255,15 +256,17 @@ function regexFallback(query: string, catalog: CatalogItem[]): ResolveResult {
   if (!s) return { ok: true, queryType: 'full_inventory', matchedProducts: [], keywords: [], confidence: 1, ambiguous: false };
 
   const tokens = s.toLowerCase().split(/\s+/).filter(t => t.length >= 1);
-  const matched = catalog.filter(p => {
+  const matchedCatalogItems = catalog.filter(p => {
     const text = [p.name, p.sku, p.category].filter(Boolean).join(' ').toLowerCase();
     return tokens.every(t => text.includes(t));
-  }).map(p => p.name);
+  });
+  const matched = matchedCatalogItems.map(p => p.name);
 
   return {
     ok: true,
     queryType: 'specific_product',
     matchedProducts: matched,
+    matchedItems: matchedCatalogItems.map(p => ({ name: p.name, sku: p.sku, category: p.category })),
     keywords: tokens,
     confidence: matched.length > 0 ? 0.7 : 0.3,
     ambiguous: matched.length > 3,
@@ -318,37 +321,40 @@ export default async function handler(request: Request): Promise<Response> {
     });
   }
 
-  // Map matched indices back to exact product names
-  const matched: string[] = [];
+  // Map matched indices back to exact catalog items
+  let matchedItems: CatalogItem[] = [];
   const indices: number[] = Array.isArray(aiResult.matchedProductIndices) ? aiResult.matchedProductIndices : [];
   for (const idx of indices) {
     const item = catalog[idx - 1]; // 1-indexed
-    if (item) matched.push(item.name);
+    if (item) matchedItems.push(item);
   }
 
   // If AI found no index matches but gave keywords, try keyword matching as fallback
-  if (matched.length === 0 && aiResult.keywords?.length > 0) {
+  if (matchedItems.length === 0 && aiResult.keywords?.length > 0) {
     const tokens = aiResult.keywords.map(k => k.toLowerCase());
     for (const item of catalog) {
       const text = [item.name, item.sku, item.category].filter(Boolean).join(' ').toLowerCase();
       if (tokens.every(t => text.includes(t))) {
-        matched.push(item.name);
+        matchedItems.push(item);
       }
     }
   }
 
   // SKU exact match
-  if (matched.length === 0 && aiResult.sku) {
+  if (matchedItems.length === 0 && aiResult.sku) {
     const skuLower = aiResult.sku.toLowerCase();
     for (const item of catalog) {
-      if (item.sku?.toLowerCase() === skuLower) matched.push(item.name);
+      if (item.sku?.toLowerCase() === skuLower) matchedItems.push(item);
     }
   }
+
+  const matched = matchedItems.map(i => i.name);
 
   return json<ResolveResult>({
     ok: true,
     queryType: 'specific_product',
     matchedProducts: matched,
+    matchedItems: matchedItems.map(i => ({ name: i.name, sku: i.sku, category: i.category })),
     brand: aiResult.brand ?? null,
     category: aiResult.category ?? null,
     size: aiResult.size ?? null,
