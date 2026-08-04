@@ -35,40 +35,50 @@ interface ContentLike {
 }
 
 // Deterministic "label: value" (or "label - value") line matching only.
+// Real Notion labels are rarely the bare keyword — "业主 (Employer):",
+// "PMC/工程师:", "D&B主承包:" all carry a qualifier between the keyword and
+// the colon (or, for D&B, a short prefix before it). Allow a short run of
+// filler characters on both sides so the match still requires the keyword
+// to anchor the line (not appear mid-sentence), without demanding an exact
+// bare label.
+function fieldRegex(keywords: string): RegExp {
+  return new RegExp(`^.{0,8}?(?:${keywords})[^:：]{0,15}[:：]\\s*(.+)$`, 'i');
+}
+
 // Bilingual keyword aliases, checked most-specific first. First match wins
 // per field — never overwritten by a later, weaker match.
 const FIELD_PATTERNS: Array<{ field: keyof ContentLike; re: RegExp }> = [
-  { field: 'contractNumber', re: /^(合同编号|合同号|Contract\s*No\.?|Contract\s*Number)\s*[:：\-]\s*(.+)$/i },
-  { field: 'submissionNumber', re: /^(材料提交单号|提交单号|Submission\s*No\.?)\s*[:：\-]\s*(.+)$/i },
-  { field: 'approvalStatus', re: /^(批准状态|审批状态|Approval\s*Status)\s*[:：\-]\s*(.+)$/i },
-  { field: 'deliveryRequirement', re: /^(交付要求|交货要求|Delivery\s*Requirement)\s*[:：\-]\s*(.+)$/i },
-  { field: 'ownerCompany', re: /^(业主|Client|Owner)\s*[:：\-]\s*(.+)$/i },
-  { field: 'pmc', re: /^(PMC)\s*[:：\-]\s*(.+)$/i },
-  { field: 'consultant', re: /^(顾问|Consultant)\s*[:：\-]\s*(.+)$/i },
-  { field: 'supervisor', re: /^(监理|Supervision|Supervisor)\s*[:：\-]\s*(.+)$/i },
-  { field: 'designer', re: /^(设计方|设计单位|设计|Designer)\s*[:：\-]\s*(.+)$/i },
-  { field: 'mainContractor', re: /^(总包|总承包商?|Main\s*Contractor)\s*[:：\-]\s*(.+)$/i },
-  { field: 'productCategory', re: /^(产品类别|产品类型|Product\s*Category)\s*[:：\-]\s*(.+)$/i },
-  { field: 'productName', re: /^(产品|系统|Product|System)\s*[:：\-]\s*(.+)$/i },
-  { field: 'quantity', re: /^(数量|Quantity|Qty\.?)\s*[:：\-]\s*(.+)$/i },
-  { field: 'area', re: /^(面积|Area)\s*[:：\-]\s*(.+)$/i },
-  { field: 'material', re: /^(材质|材料|Material)\s*[:：\-]\s*(.+)$/i },
-  { field: 'specification', re: /^(规格|Specification|Spec\.?)\s*[:：\-]\s*(.+)$/i },
-  { field: 'color', re: /^(颜色|Colou?r)\s*[:：\-]\s*(.+)$/i },
-  { field: 'finish', re: /^(表面处理|Finish)\s*[:：\-]\s*(.+)$/i },
-  { field: 'scope', re: /^(项目范围|范围|Scope)\s*[:：\-]\s*(.+)$/i },
+  { field: 'contractNumber', re: fieldRegex('合同编号|合同号|Contract\\s*No\\.?|Contract\\s*Number') },
+  { field: 'submissionNumber', re: fieldRegex('材料提交单号|提交单号|Submission\\s*No\\.?') },
+  { field: 'approvalStatus', re: fieldRegex('批准状态|审批状态|Approval\\s*Status') },
+  { field: 'deliveryRequirement', re: fieldRegex('交付要求|交货要求|Delivery\\s*Requirement') },
+  { field: 'ownerCompany', re: fieldRegex('业主|甲方|Client|Owner|Employer') },
+  { field: 'pmc', re: fieldRegex('PMC') },
+  { field: 'supervisor', re: fieldRegex('监理|Supervision|Supervisor') },
+  { field: 'designer', re: fieldRegex('设计|Designer') },
+  { field: 'consultant', re: fieldRegex('顾问|Consultant') },
+  { field: 'mainContractor', re: fieldRegex('总包|总承包商?|主承包商?|Main\\s*Contractor') },
+  { field: 'productCategory', re: fieldRegex('产品类别|产品类型|Product\\s*Category') },
+  { field: 'productName', re: fieldRegex('产品|系统|Product|System') },
+  { field: 'quantity', re: fieldRegex('数量|Quantity|Qty\\.?') },
+  { field: 'area', re: fieldRegex('面积|Area') },
+  { field: 'material', re: fieldRegex('材质|材料|Material') },
+  { field: 'specification', re: fieldRegex('规格|Specification|Spec\\.?') },
+  { field: 'color', re: fieldRegex('颜色|Colou?r') },
+  { field: 'finish', re: fieldRegex('表面处理|Finish') },
+  { field: 'scope', re: fieldRegex('项目范围|范围|Scope') },
 ];
 
-// Assigns the first matching field from a "label: value" line. Returns
-// false (no-op) for prose lines that merely mention a keyword in passing —
-// the anchored ^label pattern only fires on an actual field declaration.
+// Assigns the first matching field from a "label: value" line. No-ops for
+// prose lines that merely mention a keyword in passing — the anchored
+// ^(filler)keyword(filler): pattern only fires on an actual short label.
 function applyLineToContent(line: string, content: ContentLike): void {
   const trimmed = line.trim();
   if (!trimmed) return;
   for (const { field, re } of FIELD_PATTERNS) {
     const m = trimmed.match(re);
-    if (m && m[2] && !(content as any)[field]) {
-      (content as any)[field] = m[2].trim();
+    if (m && m[1] && !(content as any)[field]) {
+      (content as any)[field] = m[1].trim();
       return;
     }
   }
@@ -152,6 +162,10 @@ export default async function handler(request: Request): Promise<Response> {
       const parsed = blockToLine(block);
       if (!parsed || !parsed.text) continue;
       if (parsed.isHeading) {
+        // Headings sometimes carry the field directly (e.g. a heading
+        // literally titled "产品：扩张金属网吊顶") — extract before starting
+        // the new section so the value isn't lost to section-grouping only.
+        applyLineToContent(parsed.text, content);
         current = { title: parsed.text, lines: [] };
         sections.push(current);
       } else {
