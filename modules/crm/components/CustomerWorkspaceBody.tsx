@@ -88,6 +88,14 @@ export interface WorkspaceDict {
   editProjectMasterBtn: string; editProjectMasterDisabledNote: string; updateLatestUpdateBtn: string;
   priorityLabel: string; lastFollowUpDateLabel: string; commMethodLabel: string; noMethodRecorded: string;
   nextActionInputLabel: string; nextActionInputPlaceholder: string;
+  projectCodeBadgeLabel: string; belongsToCustomerLabel: string;
+  sectionProjectParties: string; sectionContractInfo: string;
+  ownerCompanyLabel: string; pmcLabel: string; consultantLabel: string; supervisorLabel: string;
+  designerLabel: string; mainContractorLabel: string;
+  productLabel: string; quantityAreaLabel: string; materialLabel: string; specificationLabel: string;
+  colorFinishLabel: string; projectScopeLabel: string;
+  contractNumberLabel: string; submissionNumberLabel: string; approvalStatusLabel: string; deliveryRequirementLabel: string;
+  contentNotLoadedYet: string;
   quotesOf: string; refresh: string; loadingQuotes: string; quotesLoadFailed: string; noQuotesFound: string;
   quoteSummary: string; clickToLoadQuotes: string; quoteType: string; currency: string;
   relatedBusiness: string; viewQuoteFile: string;

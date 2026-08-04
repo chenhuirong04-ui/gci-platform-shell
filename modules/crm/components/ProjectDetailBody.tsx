@@ -10,8 +10,8 @@
  * set: 项目概况 / 跟进与沟通 / 报价与方案 / 合同与订单 / 文件资料 / 财务与交付.
  */
 
-import React, { useState, useRef } from 'react';
-import type { FollowUpTask, Proposal } from '../types';
+import React, { useState, useRef, useEffect } from 'react';
+import type { FollowUpTask, Proposal, ProjectMasterContent } from '../types';
 import { uploadFileToDrive } from '../services/driveService';
 import { isRealCommLog } from '../utils/commLog';
 import {
@@ -20,6 +20,11 @@ import {
 } from 'lucide-react';
 import { isLikelyNotionPageId } from '../utils/notionId';
 import type { WorkspaceDict } from './CustomerWorkspaceBody';
+
+// Session-level cache for /api/crm/project-content, keyed by projectPageId —
+// module-scoped so it survives tab switches and language toggles without a
+// second request, and is naturally cleared on a full page reload.
+const projectContentCache = new Map<string, ProjectMasterContent>();
 
 const BG    = '#0A1628';
 const CARD2 = '#162A45';
@@ -80,6 +85,29 @@ function SectionHeader({ title, action }: { title: string; action?: React.ReactN
 
 export default function ProjectDetailBody({ task, tab, onTabChange, editing, onEditingChange, dict, onSave, onUpdateTask }: Props) {
   const master = (task as any).projectMaster as import('../types').ProjectMaster | undefined;
+
+  // Business Master page-content (product/spec/parties/contract info) —
+  // fetched once per projectPageId, read-only, never merged into the main
+  // Follow-up Log sync. Failure here must never block the rest of the page.
+  const [projectContent, setProjectContent] = useState<ProjectMasterContent | null>(
+    () => (master?.projectPageId ? projectContentCache.get(master.projectPageId) ?? null : null)
+  );
+  useEffect(() => {
+    const pageId = master?.projectPageId;
+    if (!pageId) { setProjectContent(null); return; }
+    const cached = projectContentCache.get(pageId);
+    if (cached) { setProjectContent(cached); return; }
+    let cancelled = false;
+    fetch(`/api/crm/project-content?projectPageId=${encodeURIComponent(pageId)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (cancelled || !data?.ok || !data.content) return;
+        projectContentCache.set(pageId, data.content);
+        setProjectContent(data.content);
+      })
+      .catch(() => { /* silent — overview falls back to the "not loaded yet" note */ });
+    return () => { cancelled = true; };
+  }, [master?.projectPageId]);
 
   // ── Files (scoped to this business only — no cross-business ambiguity) ──
   const [proposalUploadStatus, setProposalUploadStatus] = useState<'idle' | 'uploading' | 'ok' | 'fail'>('idle');
@@ -232,6 +260,16 @@ export default function ProjectDetailBody({ task, tab, onTabChange, editing, onE
   const latestCommMethod = latestComm ? (latestComm.message.match(/^\[(.+?)\]/)?.[1] || '') : ((task as any).followUpMethod || '');
   const latestCommAt = latestComm?.timestamp || task.updatedAt || (task as any).lastFollowUpAt || task.createdAt;
 
+  // 项目背景 rows derived from /api/crm/project-content — combined so two
+  // related fields (e.g. product + category) render as one line when both
+  // are present, and the row hides entirely when neither is.
+  const productLine = [projectContent?.productName, projectContent?.productCategory].filter(Boolean).join(' · ');
+  const quantityAreaLine = [projectContent?.quantity, [projectContent?.area, projectContent?.unit].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+  const colorFinishLine = [projectContent?.color, projectContent?.finish].filter(Boolean).join(' · ');
+  const hasAnyProjectContent = !!(productLine || quantityAreaLine || projectContent?.material || projectContent?.specification || colorFinishLine || projectContent?.scope);
+  const hasPartiesInfo = !!projectContent && [projectContent.ownerCompany, projectContent.pmc, projectContent.consultant, projectContent.supervisor, projectContent.designer, projectContent.mainContractor].some(Boolean);
+  const hasContractInfo = !!projectContent && [projectContent.contractNumber, projectContent.submissionNumber, projectContent.approvalStatus, projectContent.deliveryRequirement].some(Boolean);
+
   return (
     <div>
       {!editing && (
@@ -339,10 +377,19 @@ export default function ProjectDetailBody({ task, tab, onTabChange, editing, onE
                 <InfoRow icon={<Calendar className="w-3.5 h-3.5" />} label={dict.expectedCompletionLabel} value={master.expectedCompletionAt ? new Date(master.expectedCompletionAt).toLocaleDateString('zh-CN') : null} empty={dict.na} />
               </>
             )}
-            {/* Product/spec/quantity/material/scope aren't structured fields in the
-                Business Master sync yet — show the honest placeholder instead of
-                borrowing a follow-up note to fill the gap. */}
-            <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.productSpecLabel} value={null} empty={dict.projectBackgroundPending} />
+            {/* Product/spec/quantity/parties/contract fields, read from the
+                Business Master page's own content blocks — never fabricated,
+                never borrowed from a Follow-up Log entry. Each row hides
+                when empty instead of piling up "待补充" placeholders. */}
+            {productLine && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.productLabel} value={productLine} />}
+            {quantityAreaLine && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.quantityAreaLabel} value={quantityAreaLine} />}
+            {projectContent?.material && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.materialLabel} value={projectContent.material} />}
+            {projectContent?.specification && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.specificationLabel} value={projectContent.specification} />}
+            {colorFinishLine && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.colorFinishLabel} value={colorFinishLine} />}
+            {projectContent?.scope && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.projectScopeLabel} value={projectContent.scope} />}
+            {!hasAnyProjectContent && (
+              <div className="p-3 rounded-xl mt-2 text-xs font-medium" style={{ background: CARD2, color: T3, border: `1px solid ${BORD}` }}>{dict.contentNotLoadedYet}</div>
+            )}
             {master?.projectSituation && (
               <div className="p-3 rounded-xl mt-3" style={{ background: 'rgba(255,255,255,0.03)', border: `1px dashed ${BORD}` }}>
                 <div className="text-[9px] font-black uppercase tracking-widest mb-1" style={{ color: T3 }}>{dict.historicalNoteLabel}</div>
@@ -350,6 +397,30 @@ export default function ProjectDetailBody({ task, tab, onTabChange, editing, onE
               </div>
             )}
           </div>
+
+          {/* 1b. 项目参与方 — only rendered when the page content actually names one */}
+          {hasPartiesInfo && (
+            <div>
+              <SectionHeader title={dict.sectionProjectParties} />
+              {projectContent?.ownerCompany && <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.ownerCompanyLabel} value={projectContent.ownerCompany} />}
+              {projectContent?.pmc && <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.pmcLabel} value={projectContent.pmc} />}
+              {projectContent?.consultant && <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.consultantLabel} value={projectContent.consultant} />}
+              {projectContent?.supervisor && <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.supervisorLabel} value={projectContent.supervisor} />}
+              {projectContent?.designer && <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.designerLabel} value={projectContent.designer} />}
+              {projectContent?.mainContractor && <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.mainContractorLabel} value={projectContent.mainContractor} />}
+            </div>
+          )}
+
+          {/* 1c. 合同与技术资料 — only rendered when the page content actually has one */}
+          {hasContractInfo && (
+            <div>
+              <SectionHeader title={dict.sectionContractInfo} />
+              {projectContent?.contractNumber && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.contractNumberLabel} value={projectContent.contractNumber} />}
+              {projectContent?.submissionNumber && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.submissionNumberLabel} value={projectContent.submissionNumber} />}
+              {projectContent?.approvalStatus && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.approvalStatusLabel} value={projectContent.approvalStatus} />}
+              {projectContent?.deliveryRequirement && <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.deliveryRequirementLabel} value={projectContent.deliveryRequirement} />}
+            </div>
+          )}
 
           {/* 2. 最新情况 — Follow-up Log's newest valid entry only, filtered via isRealCommLog */}
           <div>

@@ -195,17 +195,44 @@ export interface ProjectMaster {
   nextFollowUpAt: string;
   expectedCompletionAt: string;
   expectedSigningAt: string;
-  // Reserved for a later phase (Notion page body / block-children fetch):
-  // contract number, employer/PMC/supervisor/designer/main-contractor,
-  // engineer instructions, product specs, material submittals, checklist,
-  // file references, and the freeform 跟进记录 section found on the
-  // Business Master page's content. Intentionally left unread for now —
-  // see api/crm/notion-sync.ts.
+  // Fetched on-demand (not part of the main Follow-up Log sync) via
+  // GET /api/crm/project-content?projectPageId=... — see that file for the
+  // block-parsing rules. Session-cached client-side; never persisted here.
   content?: ProjectMasterContent;
 }
 
+// Deterministic, keyword-based extraction from a Business Master Notion
+// page's body blocks (paragraph/heading/list/table/etc — see
+// api/crm/project-content.ts). Every field is optional because extraction
+// only fills a field when a matching "label: value" line/row is found —
+// nothing here is inferred or guessed.
 export interface ProjectMasterContent {
-  sections?: unknown;
+  contractNumber?: string;
+  ownerCompany?: string;
+  pmc?: string;
+  consultant?: string;
+  supervisor?: string;
+  designer?: string;
+  mainContractor?: string;
+  productName?: string;
+  productCategory?: string;
+  quantity?: string;
+  area?: string;
+  unit?: string;
+  material?: string;
+  specification?: string;
+  color?: string;
+  finish?: string;
+  scope?: string;
+  submissionNumber?: string;
+  approvalStatus?: string;
+  deliveryRequirement?: string;
+  currentActions?: string[];
+  relatedFiles?: string[];
+  // Anything not confidently matched to a known field — grouped by the
+  // nearest preceding heading, kept verbatim so no page content is silently
+  // dropped.
+  rawSections?: Array<{ title: string; lines: string[] }>;
 }
 
 export interface AIInsights {
