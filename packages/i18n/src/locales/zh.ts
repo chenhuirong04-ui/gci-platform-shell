@@ -890,6 +890,9 @@ export const zh: typeof en = {
       saveComm: '保存跟进记录',
       savedBadge: '✓ 已保存',
       recentRecords: '最近记录',
+      savedSuccessMessage: '✓ 跟进记录已保存',
+      backToOverviewBtn: '返回项目概况',
+      continueFollowUpBtn: '继续添加跟进',
       // Quotation history
       quotesOf: '{name} 的报价记录',
       refresh: '刷新',

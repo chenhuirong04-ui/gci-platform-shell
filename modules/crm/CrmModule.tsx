@@ -217,7 +217,12 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
       if (t.id !== taskId) return t;
       const updated: FollowUpTask = {
         ...t,
+        // Overview tabs read lastContext/updatedAt directly (not the history
+        // array), so a quick save must update both or the overview keeps
+        // showing the previous follow-up until a full reload.
+        lastContext: log.content,
         nextFollowUpAt: log.nextDate,
+        updatedAt: now,
         history: [
           {
             id: `quick-${Date.now()}`,

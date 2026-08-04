@@ -82,6 +82,7 @@ export interface WorkspaceDict {
   relatedBusinessesLabel: string; currentBadge: string; unnamedBusiness: string; noOtherBusiness: string; noProjectCode: string;
   addBusinessBtn: string; newBusinessTitle: string; createBusinessBtn: string;
   newCommTitle: string; contentPlaceholder: string; saveComm: string; savedBadge: string; recentRecords: string;
+  savedSuccessMessage: string; backToOverviewBtn: string; continueFollowUpBtn: string;
   quotesOf: string; refresh: string; loadingQuotes: string; quotesLoadFailed: string; noQuotesFound: string;
   quoteSummary: string; clickToLoadQuotes: string; quoteType: string; currency: string;
   relatedBusiness: string; viewQuoteFile: string;

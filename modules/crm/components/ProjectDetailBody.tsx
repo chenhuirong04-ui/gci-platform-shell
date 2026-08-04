@@ -199,7 +199,18 @@ export default function ProjectDetailBody({ task, tab, onTabChange, editing, onE
     if (!content.trim()) return;
     onSave(task.id, { method, content: content.trim(), nextDate });
     setSaved(true);
-    setTimeout(() => { setSaved(false); setContent(''); }, 1400);
+  };
+  // "返回项目概况" only switches tabs — task state is already updated via
+  // onSave, so overview reads the fresh lastContext with no reload needed.
+  const handleBackToOverview = () => {
+    setSaved(false);
+    onTabChange('overview');
+  };
+  // "继续添加跟进" stays on this tab and clears the form for the next entry;
+  // re-enables the save button (blocked while `saved` to avoid duplicates).
+  const handleContinueFollowUp = () => {
+    setSaved(false);
+    setContent('');
   };
 
   const recentHistory = (task.history || []).filter(isRealCommLog);
@@ -335,10 +346,23 @@ export default function ProjectDetailBody({ task, tab, onTabChange, editing, onE
               <input type="date" value={nextDate} onChange={e => setNextDate(e.target.value)} className="w-full rounded-xl px-3 py-2 text-sm font-bold outline-none" style={{ background: CARD2, border: `1px solid ${BORD}`, color: T1 }} />
             </div>
           </div>
-          <button onClick={handleSaveNote} disabled={!content.trim()} className="w-full py-3.5 rounded-2xl text-sm font-black transition-all active:scale-[0.98]"
+          <button onClick={handleSaveNote} disabled={!content.trim() || saved} className="w-full py-3.5 rounded-2xl text-sm font-black transition-all active:scale-[0.98]"
             style={saved ? { background: '#10B981', color: '#fff' } : content.trim() ? { background: GOLD, color: '#fff' } : { background: 'rgba(255,255,255,0.06)', color: T3, cursor: 'not-allowed' }}>
             {saved ? dict.savedBadge : dict.saveComm}
           </button>
+          {saved && (
+            <div className="p-4 rounded-2xl flex flex-col gap-3" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}>
+              <div className="text-sm font-black" style={{ color: '#6EE7B7' }}>{dict.savedSuccessMessage}</div>
+              <div className="flex gap-2">
+                <button onClick={handleBackToOverview} className="flex-1 py-2.5 rounded-xl text-xs font-black transition-all hover:opacity-90" style={{ background: GOLD, color: '#fff' }}>
+                  {dict.backToOverviewBtn}
+                </button>
+                <button onClick={handleContinueFollowUp} className="flex-1 py-2.5 rounded-xl text-xs font-black transition-all hover:bg-white/5" style={{ border: `1px solid ${BORD}`, color: T2 }}>
+                  {dict.continueFollowUpBtn}
+                </button>
+              </div>
+            </div>
+          )}
           {recentHistory.length > 0 && (
             <div className="space-y-2">
               <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>{dict.recentRecords}</div>

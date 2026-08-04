@@ -888,6 +888,9 @@ export const en = {
       contentPlaceholder: 'What did the customer say? How did we respond? What\'s next?',
       saveComm: 'Save',
       savedBadge: '✓ Saved',
+      savedSuccessMessage: '✓ Follow-up saved successfully',
+      backToOverviewBtn: 'Back to project overview',
+      continueFollowUpBtn: 'Add another follow-up',
       recentRecords: 'Recent Records',
       // Quotation history
       quotesOf: 'Quotation history for {name}',
