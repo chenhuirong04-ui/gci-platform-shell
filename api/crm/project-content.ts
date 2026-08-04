@@ -82,8 +82,13 @@ function applyLineToContent(line: string, content: ContentLike): void {
   if (!trimmed) return;
   for (const { field, re } of FIELD_PATTERNS) {
     const m = trimmed.match(re);
-    if (m && m[1] && !(content as any)[field]) {
-      (content as any)[field] = m[1].trim();
+    if (m && m[1]) {
+      // A repeated label for a field already captured (e.g. the same
+      // submission number restated under a slightly different label)
+      // still "claims" the line — stop here so it can't fall through to
+      // a later, more generic keyword (which is how a resubmitted
+      // "材料提交单：" line was previously mislabeled as `material`).
+      if (!(content as any)[field]) (content as any)[field] = m[1].trim();
       return;
     }
   }
