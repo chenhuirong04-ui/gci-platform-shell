@@ -30,9 +30,14 @@ const STATUS_PHRASES = new Set([
 function looksLikeStatusPhrase(s: string): boolean {
   return STATUS_PHRASES.has(s.trim().replace(/[，,。.!！\s]+$/g, ''));
 }
-// Real project/business name if there is one; otherwise a short requirement
-// summary — never a bare status phrase (see STATUS_PHRASES above).
+// The real project name from Business Master (🏗️ 项目客户库) takes priority
+// when linked — it's an actual project title, never a Follow-up Log status/
+// next-action phrase. Falls back to Follow-up Log's own inquirySummary/goal
+// (filtered against STATUS_PHRASES) only when no Business Master record is
+// linked. Never uses tradeStatus/goal/nextAction as a stand-in project name.
 function businessName(t: FollowUpTask): string {
+  const projectName = ((t as any).projectMaster?.projectName || '').trim();
+  if (projectName) return projectName;
   const summary = (t.inquirySummary || '').trim();
   if (summary && !looksLikeStatusPhrase(summary)) return summary;
   const goal = (t.goal || '').trim();
@@ -235,9 +240,15 @@ export default function BusinessRegister({
                     </td>
                     <td className="px-3 py-3 max-w-[220px] cursor-pointer" title={businessName(t)} onClick={() => onSelectBusiness(t)}>
                       <div className="flex items-center gap-1.5">
-                        {(t as any).projectCode && (
-                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded shrink-0" style={{ background: 'rgba(255,255,255,0.08)', color: T3 }}>{(t as any).projectCode}</span>
-                        )}
+                        {(() => {
+                          // Real Business Master 项目ID takes priority over the
+                          // locally-generated fallback projectCode (used only
+                          // for businesses created in-app with no Notion link).
+                          const displayCode = (t as any).projectMaster?.projectId || (t as any).projectCode;
+                          return displayCode ? (
+                            <span className="text-[9px] font-black px-1.5 py-0.5 rounded shrink-0" style={{ background: 'rgba(255,255,255,0.08)', color: T3 }}>{displayCode}</span>
+                          ) : null;
+                        })()}
                         <span className="truncate underline decoration-dotted" style={{ color: T2 }}>{businessName(t)}</span>
                       </div>
                     </td>

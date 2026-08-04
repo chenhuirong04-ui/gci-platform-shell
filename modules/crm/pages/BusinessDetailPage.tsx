@@ -2,8 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import type { FollowUpTask } from '../types';
 import { findCustomerByCode } from '../utils/customerCode';
-import CustomerWorkspaceBody from '../components/CustomerWorkspaceBody';
-import type { WorkspaceTab, WorkspaceDict } from '../components/CustomerWorkspaceBody';
+import ProjectDetailBody from '../components/ProjectDetailBody';
+import type { ProjectDetailTab } from '../components/ProjectDetailBody';
+import type { WorkspaceDict } from '../components/CustomerWorkspaceBody';
 
 const CARD   = '#0F1E35';
 const CARD2  = '#162A45';
@@ -12,7 +13,6 @@ const GOLD   = '#B8960C';
 const T1     = '#E8F0FF';
 const T2     = '#7A9CC5';
 const T3     = '#4A6080';
-const TYPE_LABEL: Record<string, string> = { TRADE: '贸易型', PROJECT: '项目型', LOG_ONLY: '内部', INTERNAL: '内部' };
 
 interface Props {
   customerCode: string;
@@ -23,15 +23,13 @@ interface Props {
   onBack: () => void;
   onSave: (taskId: string, log: { method: string; content: string; nextDate: string }) => void;
   onUpdateTask: (task: FollowUpTask) => void;
-  onCreateBusiness: (formData: Partial<FollowUpTask>) => void;
 }
 
 export default function BusinessDetailPage({
-  customerCode, businessKey, tasks, hydrated, dict, onBack, onSave, onUpdateTask, onCreateBusiness,
+  customerCode, businessKey, tasks, hydrated, dict, onBack, onSave, onUpdateTask,
 }: Props) {
-  const [tab, setTab] = useState<WorkspaceTab>('info');
+  const [tab, setTab] = useState<ProjectDetailTab>('overview');
   const [editing, setEditing] = useState(false);
-  const [showAddBusinessForm, setShowAddBusinessForm] = useState(false);
 
   const lookup = useMemo(() => findCustomerByCode(tasks, customerCode), [tasks, customerCode]);
   const group = lookup ? [lookup.task, ...lookup.relatedTasks] : [];
@@ -57,7 +55,13 @@ export default function BusinessDetailPage({
     );
   }
 
-  const projectCode = (businessTask as any).projectCode as string | undefined;
+  const master = (businessTask as any).projectMaster as import('../types').ProjectMaster | undefined;
+  // Real Business Master 项目ID takes priority; never surfaces the raw
+  // Notion page id as if it were a formal project code.
+  const displayProjectId = master?.projectId || (businessTask as any).projectCode || dict.noProjectMaster;
+  const projectName = master?.projectName || businessTask.inquirySummary || businessTask.goal || dict.na;
+  const projectLocation = master ? [master.city, master.country].filter(Boolean).join(' · ') : (businessTask.countryCity || '');
+  const lastUpdatedAt = businessTask.updatedAt || businessTask.createdAt || '';
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
@@ -65,55 +69,53 @@ export default function BusinessDetailPage({
         <ArrowLeft className="w-3.5 h-3.5" /> {dict.backToList}
       </button>
 
-      {/* Top summary — 项目编码/客户编码/客户名称/项目业务名称/当前阶段 */}
+      {/* Top summary — 项目级，不是客户级 */}
       <div className="rounded-[18px] border p-6" style={{ backgroundColor: CARD, borderColor: BORDER }}>
         <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <span className="text-[10px] font-black px-2 py-0.5 rounded" style={{ background: `${GOLD}22`, color: GOLD }}>{projectCode || dict.noProjectCode}</span>
+          <span className="text-[10px] font-black px-2 py-0.5 rounded" style={{ background: `${GOLD}22`, color: GOLD }}>{displayProjectId}</span>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.08)', color: T2 }}>{customerCode}</span>
-          <h1 className="text-2xl font-black" style={{ color: T1 }}>{businessTask.inquirySummary || businessTask.goal || dict.unnamedBusiness}</h1>
+          <h1 className="text-2xl font-black" style={{ color: T1 }}>{projectName}</h1>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${GOLD}18`, color: GOLD }}>{businessTask.tradeStatus || dict.na}</span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
           <div>
-            <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>{dict.customerName}</div>
+            <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>{dict.customerNameLabel}</div>
             <div className="text-sm font-bold mt-0.5" style={{ color: T1 }}>{businessTask.clientName || dict.na}</div>
           </div>
           <div>
-            <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>{dict.customerType}</div>
-            <div className="text-sm font-bold mt-0.5" style={{ color: T1 }}>{TYPE_LABEL[businessTask.businessType] || businessTask.businessType}</div>
+            <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>{dict.projectLocationLabel}</div>
+            <div className="text-sm font-bold mt-0.5" style={{ color: projectLocation ? T1 : T3 }}>{projectLocation || dict.na}</div>
           </div>
           <div>
-            <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>{dict.currentStage}</div>
-            <div className="text-sm font-bold mt-0.5" style={{ color: T1 }}>{businessTask.tradeStatus || dict.na}</div>
+            <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>{dict.projectStageLabel}</div>
+            <div className="text-sm font-bold mt-0.5" style={{ color: master?.projectStage ? T1 : T3 }}>{master?.projectStage || dict.na}</div>
           </div>
           <div>
             <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>{dict.owner}</div>
             <div className="text-sm font-bold mt-0.5" style={{ color: businessTask.owner ? T1 : T3 }}>{businessTask.owner || dict.na}</div>
           </div>
           <div className="col-span-2 md:col-span-4">
-            <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>{dict.mainRequirement}</div>
-            <div className="text-sm font-bold mt-0.5" style={{ color: T1 }}>{businessTask.inquirySummary || businessTask.goal || dict.na}</div>
+            <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>{dict.projectSituationLabel} / {dict.mainRequirement}</div>
+            <div className="text-sm font-bold mt-0.5" style={{ color: T1 }}>{master?.projectSituation || businessTask.inquirySummary || businessTask.goal || dict.na}</div>
+          </div>
+          <div>
+            <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>{dict.lastUpdated}</div>
+            <div className="text-sm font-bold mt-0.5" style={{ color: T1 }}>{lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleDateString('zh-CN') : dict.na}</div>
           </div>
         </div>
       </div>
 
-      {/* Body — same 6-tab implementation as the customer workspace, scoped
-          to just this business (no sibling businesses passed in). */}
+      {/* Body — genuine project-level tabs, not the customer workspace */}
       <div className="rounded-[18px] border p-6" style={{ backgroundColor: CARD, borderColor: BORDER }}>
-        <CustomerWorkspaceBody
+        <ProjectDetailBody
           task={businessTask}
-          relatedTasks={[]}
-          customerCode={customerCode}
           tab={tab}
           onTabChange={setTab}
           editing={editing}
           onEditingChange={setEditing}
-          showAddBusinessForm={showAddBusinessForm}
-          onShowAddBusinessFormChange={setShowAddBusinessForm}
           dict={dict}
           onSave={onSave}
           onUpdateTask={onUpdateTask}
-          onCreateBusiness={onCreateBusiness}
         />
       </div>
     </div>

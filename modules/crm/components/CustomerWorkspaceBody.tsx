@@ -53,6 +53,14 @@ export type WorkspaceTab = 'info' | 'business' | 'action' | 'files' | 'quotes' |
 export interface WorkspaceDict {
   na: string;
   tabInfo: string; tabBusiness: string; tabComms: string; tabFiles: string; tabQuotes: string; tabFinance: string;
+  // Project detail page (ProjectDetailBody) — distinct from the customer
+  // workspace tabs above.
+  tabProjectOverview: string; tabFollowUpComms: string; tabQuotesProposals: string; tabContractsOrders: string;
+  projectIdLabel: string; projectNameLabel: string; customerCodeLabel: string; customerNameLabel: string;
+  projectLocationLabel: string; projectTypeLabel: string; projectStageLabel: string;
+  currentActionStatusLabel: string; projectSituationLabel: string; contactNameLabel: string;
+  currencyLabel: string; expectedCompletionLabel: string; expectedSigningLabel: string;
+  noProjectMaster: string; customerLevelDataNote: string; projectContentComingSoon: string;
   backToList: string;
   actionAddComm: string; actionAddBusiness: string; actionUploadFiles: string; actionEditProfile: string;
   loading: string; notFoundTitle: string; notFoundDesc: string;

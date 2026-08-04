@@ -1547,7 +1547,6 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
               navigate('/crm?tab=project');
             }
           }}
-          onCreateBusiness={handleWorkspaceCreateBusiness}
           onSave={handleWorkspaceQuickSave}
           onUpdateTask={handleWorkspaceUpdateTask}
         />
