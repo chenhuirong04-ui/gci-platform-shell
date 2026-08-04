@@ -516,6 +516,7 @@ export const zh: typeof en = {
       uploadedAt: (d: string) => `上传于：${d}`,
       uploaded: '✓ 已上传',
       viewBtn: '查看',
+      downloadBtn: '下载',
       modalNew: '添加文件记录', modalEdit: '编辑文件',
       fType: '文件类型', fSelectFile: '选择本地文件', fSelectFileRequired: '（必填，或填写外部链接）',
       hasExisting: '✓ 已有上传文件', hasExistingSub: '重新选择文件将替换现有版本',

@@ -34,6 +34,19 @@ const ALLOWED_TYPES = [
 const ALLOWED_EXT = ['.pdf','.xls','.xlsx','.doc','.docx','.jpg','.jpeg','.png'];
 const MAX_FILE_BYTES = 15 * 1024 * 1024; // 15MB
 
+// Document types that carry an official number / issuing body / validity period.
+// Informational files (catalogues, spec sheets, photos...) don't need these fields.
+const CERT_LIKE_TYPES = new Set<DocumentType>([
+  '营业执照','公司注册文件','VAT文件','税务文件','合同','NDA','银行资料','审厂报告','认证证书','检测报告',
+]);
+
+// Browsers can render PDF/images inline; Office formats always trigger a download.
+function isPreviewable(doc: SupplierDocument): boolean {
+  if (doc.mime_type) return doc.mime_type === 'application/pdf' || doc.mime_type.startsWith('image/');
+  const name = (doc.storage_path || doc.document_name || '').toLowerCase();
+  return ['.pdf', '.jpg', '.jpeg', '.png'].some(ext => name.endsWith(ext));
+}
+
 const VSTATUS_COLOR: Record<DocumentVerificationStatus, string> = {
   unverified: '#94a3b8', verified: '#16a34a', rejected: '#dc2626', pending_reupload: '#d97706',
 };
@@ -277,7 +290,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
                     </div>
                     <div style={{ display: 'flex', gap: 6 }}>
                       {(doc.storage_path || doc.file_url) && (
-                        <button onClick={() => handleView(doc)} style={{ fontSize: 12, color: NAVY, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{t.viewBtn}</button>
+                        <button onClick={() => handleView(doc)} style={{ fontSize: 12, color: NAVY, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{isPreviewable(doc) ? t.viewBtn : t.downloadBtn}</button>
                       )}
                       <button onClick={() => openEdit({ ...doc })} style={{ fontSize: 12, color: NAVY, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.edit}</button>
                       {deleteId === doc.id
@@ -393,13 +406,15 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
                 placeholder="https://..." />
             </div>
 
-            {/* 5. Document details */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              <F label={t.fNumber}><input style={INP} value={edit.document_number ?? ''} onChange={e => setEdit(v => ({ ...v!, document_number: e.target.value }))} /></F>
-              <F label={t.fIssuingAuthority}><input style={INP} value={edit.issuing_authority ?? ''} onChange={e => setEdit(v => ({ ...v!, issuing_authority: e.target.value }))} /></F>
-              <F label={t.fIssueDate}><input style={INP} type="date" value={edit.issue_date ?? ''} onChange={e => setEdit(v => ({ ...v!, issue_date: e.target.value }))} /></F>
-              <F label={t.fExpireDate}><input style={INP} type="date" value={edit.expire_date ?? ''} onChange={e => setEdit(v => ({ ...v!, expire_date: e.target.value }))} /></F>
-            </div>
+            {/* 5. Document details — only for certificate-like types (license, cert, contract...) */}
+            {CERT_LIKE_TYPES.has((edit.document_type ?? '营业执照') as DocumentType) && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <F label={t.fNumber}><input style={INP} value={edit.document_number ?? ''} onChange={e => setEdit(v => ({ ...v!, document_number: e.target.value }))} /></F>
+                <F label={t.fIssuingAuthority}><input style={INP} value={edit.issuing_authority ?? ''} onChange={e => setEdit(v => ({ ...v!, issuing_authority: e.target.value }))} /></F>
+                <F label={t.fIssueDate}><input style={INP} type="date" value={edit.issue_date ?? ''} onChange={e => setEdit(v => ({ ...v!, issue_date: e.target.value }))} /></F>
+                <F label={t.fExpireDate}><input style={INP} type="date" value={edit.expire_date ?? ''} onChange={e => setEdit(v => ({ ...v!, expire_date: e.target.value }))} /></F>
+              </div>
+            )}
 
             {/* 6. Verification status */}
             <F label={t.fVerification}>

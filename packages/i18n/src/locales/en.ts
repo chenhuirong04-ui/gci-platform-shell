@@ -515,6 +515,7 @@ export const en = {
       uploadedAt: (d: string) => `Uploaded: ${d}`,
       uploaded: '✓ Uploaded',
       viewBtn: 'View',
+      downloadBtn: 'Download',
       modalNew: 'Add File Record', modalEdit: 'Edit File',
       fType: 'File Type', fSelectFile: 'Select Local File', fSelectFileRequired: '(required, or fill in external link)',
       hasExisting: '✓ File already uploaded', hasExistingSub: 'Selecting a new file will replace the current version',
