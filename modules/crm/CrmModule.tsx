@@ -211,7 +211,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
   // Shared handlers for the customer workspace AND business detail page —
   // defined once so both pages call into the exact same save/update/create
   // logic (no second copy of the follow-up-save or business-create paths).
-  const handleWorkspaceQuickSave = (taskId: string, log: { method: string; content: string; nextDate: string }) => {
+  const handleWorkspaceQuickSave = (taskId: string, log: { method: string; content: string; nextDate: string; nextAction?: string }) => {
     const now = new Date().toISOString();
     setTasks(prev => prev.map(t => {
       if (t.id !== taskId) return t;
@@ -221,6 +221,10 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
         // array), so a quick save must update both or the overview keeps
         // showing the previous follow-up until a full reload.
         lastContext: log.content,
+        // goal doubles as "next action" (see WorkspaceDict.fieldGoal) — only
+        // overwrite it when the form's optional next-action field was filled,
+        // never blank out an existing plan just because this save omitted it.
+        ...(log.nextAction?.trim() ? { goal: log.nextAction.trim() } : {}),
         nextFollowUpAt: log.nextDate,
         updatedAt: now,
         history: [

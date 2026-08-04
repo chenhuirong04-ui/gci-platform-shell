@@ -41,7 +41,7 @@ interface Props {
   editing: boolean;
   onEditingChange: (v: boolean) => void;
   dict: WorkspaceDict;
-  onSave: (taskId: string, log: { method: string; content: string; nextDate: string }) => void;
+  onSave: (taskId: string, log: { method: string; content: string; nextDate: string; nextAction?: string }) => void;
   onUpdateTask?: (task: FollowUpTask) => void;
 }
 
@@ -65,6 +65,15 @@ function InfoRow({ icon, label, value, empty, onClick }: {
         <div style={labelStyle}>{label}</div>
         <div className="text-sm font-medium break-words" style={{ color: value ? T1 : T3 }}>{value || empty || '—'}</div>
       </div>
+    </div>
+  );
+}
+
+function SectionHeader({ title, action }: { title: string; action?: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between mb-2 mt-1">
+      <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>{title}</div>
+      {action}
     </div>
   );
 }
@@ -193,11 +202,12 @@ export default function ProjectDetailBody({ task, tab, onTabChange, editing, onE
 
   const [method, setMethod] = useState(METHODS[0]);
   const [content, setContent] = useState('');
+  const [nextAction, setNextAction] = useState('');
   const [nextDate, setNextDate] = useState(() => { const d = new Date(); d.setDate(d.getDate() + 3); return d.toISOString().split('T')[0]; });
   const [saved, setSaved] = useState(false);
   const handleSaveNote = () => {
     if (!content.trim()) return;
-    onSave(task.id, { method, content: content.trim(), nextDate });
+    onSave(task.id, { method, content: content.trim(), nextDate, nextAction: nextAction.trim() || undefined });
     setSaved(true);
   };
   // "返回项目概况" only switches tabs — task state is already updated via
@@ -211,9 +221,16 @@ export default function ProjectDetailBody({ task, tab, onTabChange, editing, onE
   const handleContinueFollowUp = () => {
     setSaved(false);
     setContent('');
+    setNextAction('');
   };
 
   const recentHistory = (task.history || []).filter(isRealCommLog);
+  // "最新情况" block: derive comm method/date from the newest real log entry
+  // (history is always unshifted, so [0] is latest); Notion-imported tasks
+  // with no local history yet fall back to the raw sync snapshot fields.
+  const latestComm = recentHistory[0];
+  const latestCommMethod = latestComm ? (latestComm.message.match(/^\[(.+?)\]/)?.[1] || '') : ((task as any).followUpMethod || '');
+  const latestCommAt = latestComm?.timestamp || task.updatedAt || (task as any).lastFollowUpAt || task.createdAt;
 
   return (
     <div>
@@ -292,37 +309,78 @@ export default function ProjectDetailBody({ task, tab, onTabChange, editing, onE
         </div>
       )}
 
-      {/* ── OVERVIEW TAB (项目概况) ─── */}
+      {/* ── OVERVIEW TAB (项目概况) — three explicit blocks: 项目背景 / 最新情况 / 下一步行动.
+           项目背景 is Business Master data ONLY — never lastContext/tradeStatus/
+           goal, which are Follow-up Log fields shown in the other two blocks. ─── */}
       {!editing && tab === 'overview' && (
-        <div className="max-w-2xl space-y-0">
-          {master?.projectSituation && (
-            <div className="p-3 rounded-xl mb-4" style={{ background: `${GOLD}0D`, border: `1px solid ${GOLD}25` }}>
-              <div className="text-[9px] font-black uppercase tracking-widest mb-1" style={{ color: GOLD }}>{dict.projectSituationLabel}</div>
-              <div className="text-sm font-medium whitespace-pre-wrap" style={{ color: T1 }}>{master.projectSituation}</div>
-            </div>
-          )}
-          {!master && (
-            <div className="p-3 rounded-xl mb-4 text-xs font-medium" style={{ background: CARD2, color: T3, border: `1px solid ${BORD}` }}>{dict.noProjectMaster}</div>
-          )}
-          <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.currentActionStatusLabel} value={task.tradeStatus} />
-          <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.fieldGoal} value={task.goal} empty={dict.goalPlaceholder} onClick={openEdit} />
-          <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.recentFollowUp} value={task.lastContext} empty={dict.noNotes} onClick={openEdit} />
-          <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.owner} value={task.owner} empty={dict.ownerMissing} onClick={openEdit} />
-          <InfoRow icon={<Calendar className="w-3.5 h-3.5" />} label={dict.fieldNextFollowUp} value={task.nextFollowUpAt ? new Date(task.nextFollowUpAt).toLocaleDateString('zh-CN') : null} empty={dict.na} onClick={openEdit} />
-          {master && (
-            <>
-              <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.projectTypeLabel} value={master.projectType} empty={dict.na} />
+        <div className="max-w-2xl space-y-6">
+
+          {/* 1. 项目背景 — Business Master only */}
+          <div>
+            <SectionHeader title={dict.sectionProjectBackground} action={
+              <button disabled title={dict.editProjectMasterDisabledNote}
+                className="text-[10px] font-bold px-2 py-1 rounded-lg opacity-40 cursor-not-allowed"
+                style={{ background: CARD2, color: T3 }}>
+                {dict.editProjectMasterBtn}
+              </button>
+            } />
+            {!master && (
+              <div className="p-3 rounded-xl mb-2 text-xs font-medium" style={{ background: CARD2, color: T3, border: `1px solid ${BORD}` }}>{dict.noProjectMaster}</div>
+            )}
+            {master && (
+              <>
+                <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.projectTypeLabel} value={master.projectType} empty={dict.na} />
+                <InfoRow icon={<MapPin className="w-3.5 h-3.5" />} label={dict.projectLocationLabel} value={[master.city, master.country].filter(Boolean).join(' · ') || null} empty={dict.na} />
+                <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.contactNameLabel} value={master.contactName} empty={dict.na} />
+                <InfoRow icon={<Phone className="w-3.5 h-3.5" />} label={dict.phone} value={master.contactPhone} empty={dict.na} />
+                <InfoRow icon={<Mail className="w-3.5 h-3.5" />} label={dict.email} value={master.contactEmail} empty={dict.na} />
+                <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.currencyLabel} value={master.currency} empty={dict.na} />
+                <InfoRow icon={<Calendar className="w-3.5 h-3.5" />} label={dict.expectedSigningLabel} value={master.expectedSigningAt ? new Date(master.expectedSigningAt).toLocaleDateString('zh-CN') : null} empty={dict.na} />
+                <InfoRow icon={<Calendar className="w-3.5 h-3.5" />} label={dict.expectedCompletionLabel} value={master.expectedCompletionAt ? new Date(master.expectedCompletionAt).toLocaleDateString('zh-CN') : null} empty={dict.na} />
+              </>
+            )}
+            {/* Product/spec/quantity/material/scope aren't structured fields in the
+                Business Master sync yet — show the honest placeholder instead of
+                borrowing a follow-up note to fill the gap. */}
+            <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.productSpecLabel} value={null} empty={dict.projectBackgroundPending} />
+            {master?.projectSituation && (
+              <div className="p-3 rounded-xl mt-3" style={{ background: 'rgba(255,255,255,0.03)', border: `1px dashed ${BORD}` }}>
+                <div className="text-[9px] font-black uppercase tracking-widest mb-1" style={{ color: T3 }}>{dict.historicalNoteLabel}</div>
+                <div className="text-xs font-medium whitespace-pre-wrap" style={{ color: T2 }}>{master.projectSituation}</div>
+              </div>
+            )}
+          </div>
+
+          {/* 2. 最新情况 — Follow-up Log's newest valid entry only, filtered via isRealCommLog */}
+          <div>
+            <SectionHeader title={dict.sectionLatestUpdate} action={
+              <button onClick={() => onTabChange('comms')}
+                className="text-[10px] font-bold px-2 py-1 rounded-lg transition-colors" style={{ background: `${GOLD}18`, color: GOLD }}>
+                {dict.updateLatestUpdateBtn}
+              </button>
+            } />
+            <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.currentActionStatusLabel} value={task.tradeStatus} empty={dict.na} />
+            {master?.projectStage && (
               <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.projectStageLabel} value={master.projectStage} empty={dict.na} />
-              <InfoRow icon={<MapPin className="w-3.5 h-3.5" />} label={dict.projectLocationLabel} value={[master.city, master.country].filter(Boolean).join(' · ') || null} empty={dict.na} />
-              <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.contactNameLabel} value={master.contactName} empty={dict.na} />
-              <InfoRow icon={<Phone className="w-3.5 h-3.5" />} label={dict.phone} value={master.contactPhone} empty={dict.na} />
-              <InfoRow icon={<Mail className="w-3.5 h-3.5" />} label={dict.email} value={master.contactEmail} empty={dict.na} />
-              <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.currencyLabel} value={master.currency} empty={dict.na} />
-              <InfoRow icon={<Calendar className="w-3.5 h-3.5" />} label={dict.expectedCompletionLabel} value={master.expectedCompletionAt ? new Date(master.expectedCompletionAt).toLocaleDateString('zh-CN') : null} empty={dict.na} />
-              <InfoRow icon={<Calendar className="w-3.5 h-3.5" />} label={dict.expectedSigningLabel} value={master.expectedSigningAt ? new Date(master.expectedSigningAt).toLocaleDateString('zh-CN') : null} empty={dict.na} />
-            </>
-          )}
-          <div className="mt-3 text-[9px] font-bold" style={{ color: T3 }}>{dict.projectContentComingSoon}</div>
+            )}
+            <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.recentFollowUp} value={task.lastContext} empty={dict.noNotes} onClick={openEdit} />
+            <InfoRow icon={<Calendar className="w-3.5 h-3.5" />} label={dict.lastFollowUpDateLabel} value={latestCommAt ? new Date(latestCommAt).toLocaleDateString('zh-CN') : null} empty={dict.na} />
+            <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.commMethodLabel} value={latestCommMethod || null} empty={dict.noMethodRecorded} />
+            <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.owner} value={task.owner} empty={dict.ownerMissing} onClick={openEdit} />
+            <InfoRow icon={<Calendar className="w-3.5 h-3.5" />} label={dict.fieldNextFollowUp} value={task.nextFollowUpAt ? new Date(task.nextFollowUpAt).toLocaleDateString('zh-CN') : null} empty={dict.na} onClick={openEdit} />
+          </div>
+
+          {/* 3. 下一步行动 — independent field (task.goal), never the project stage
+               or a whole follow-up entry */}
+          <div>
+            <SectionHeader title={dict.sectionNextAction} />
+            <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.fieldGoal} value={task.goal} empty={dict.goalPlaceholder} onClick={openEdit} />
+            <InfoRow icon={<User className="w-3.5 h-3.5" />} label={dict.owner} value={task.owner} empty={dict.ownerMissing} onClick={openEdit} />
+            <InfoRow icon={<Calendar className="w-3.5 h-3.5" />} label={dict.fieldNextFollowUp} value={task.nextFollowUpAt ? new Date(task.nextFollowUpAt).toLocaleDateString('zh-CN') : null} empty={dict.na} onClick={openEdit} />
+            <InfoRow icon={<FileText className="w-3.5 h-3.5" />} label={dict.priorityLabel} value={task.priority || null} empty={dict.na} />
+          </div>
+
+          <div className="text-[9px] font-bold" style={{ color: T3 }}>{dict.projectContentComingSoon}</div>
         </div>
       )}
 
@@ -339,6 +397,11 @@ export default function ProjectDetailBody({ task, tab, onTabChange, editing, onE
           <textarea value={content} onChange={e => setContent(e.target.value)} placeholder={dict.contentPlaceholder} rows={5}
             className="w-full p-4 rounded-2xl text-sm font-medium outline-none resize-none" style={{ background: CARD2, border: `1px solid ${BORD}`, color: T1 }}
             onFocus={e => (e.target.style.borderColor = GOLD)} onBlur={e => (e.target.style.borderColor = BORD)} />
+          <div>
+            <p className="text-[9px] font-black uppercase tracking-widest mb-1" style={{ color: T3 }}>{dict.nextActionInputLabel}</p>
+            <input value={nextAction} onChange={e => setNextAction(e.target.value)} placeholder={dict.nextActionInputPlaceholder}
+              className="w-full rounded-xl px-3 py-2.5 text-sm font-medium outline-none" style={{ background: CARD2, border: `1px solid ${BORD}`, color: T1 }} />
+          </div>
           <div className="flex items-center gap-3">
             <Calendar className="w-4 h-4 shrink-0" style={{ color: T3 }} />
             <div className="flex-1">
