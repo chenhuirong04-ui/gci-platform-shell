@@ -723,7 +723,11 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
                   ) : (
                     <>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-                        <span style={{ fontSize: 11, color: MUTED }}>共 <strong style={{ color: TEXT }}>{wh.totalRows}</strong> 件</span>
+                        <span style={{ fontSize: 11, color: MUTED }}>
+                          {lang === 'en'
+                            ? <><strong style={{ color: TEXT }}>{wh.totalRows}</strong> matching product{wh.totalRows === 1 ? '' : 's'}</>
+                            : <>匹配到 <strong style={{ color: TEXT }}>{wh.totalRows}</strong> 款商品</>}
+                        </span>
                         {wh.outOfStockCount > 0 && <span style={{ fontSize: 11, color: '#E0846A', fontWeight: 700 }}>🔴 缺货 {wh.outOfStockCount}</span>}
                         {wh.lowStockCount > 0   && <span style={{ fontSize: 11, color: '#D4A843', fontWeight: 700 }}>🟡 低库存 {wh.lowStockCount}</span>}
                         {wh.anomalyCount > 0    && <span style={{ fontSize: 11, color: '#8FA6D4', fontWeight: 700 }}>⚪ 异常 {wh.anomalyCount}</span>}
