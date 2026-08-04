@@ -99,13 +99,27 @@ export default function ProjectDetailBody({ task, tab, onTabChange, editing, onE
     if (cached) { setProjectContent(cached); return; }
     let cancelled = false;
     fetch(`/api/crm/project-content?projectPageId=${encodeURIComponent(pageId)}`)
-      .then(res => res.json())
-      .then(data => {
-        if (cancelled || !data?.ok || !data.content) return;
-        projectContentCache.set(pageId, data.content);
-        setProjectContent(data.content);
+      .then(async res => {
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.ok) {
+          console.warn('[project-content] fetch failed', res.status, data?.error);
+          return null;
+        }
+        return data;
       })
-      .catch(() => { /* silent — overview falls back to the "not loaded yet" note */ });
+      .then(data => {
+        if (cancelled || !data?.content) return;
+        setProjectContent(data.content);
+        // Only cache a genuinely non-empty result — a transient failure or a
+        // page with no matchable fields shouldn't lock this project out of
+        // ever retrying for the rest of the browser session.
+        const c = data.content as ProjectMasterContent;
+        const hasFields = Object.entries(c).some(([k, v]) =>
+          k !== 'rawSections' && (Array.isArray(v) ? v.length > 0 : !!v)
+        );
+        if (hasFields) projectContentCache.set(pageId, c);
+      })
+      .catch(err => console.warn('[project-content] fetch error', err));
     return () => { cancelled = true; };
   }, [master?.projectPageId]);
 
