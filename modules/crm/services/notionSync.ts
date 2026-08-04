@@ -52,6 +52,10 @@ const NOTION_OVERWRITE_FIELDS: (keyof FollowUpTask)[] = [
   'businessCreatedAt',
   'priority',
   'notionSource', // keeps source marker fresh on every sync
+  // Read-only Business Master snapshot — must refresh every sync (never
+  // user-edited locally), so it belongs with the other Notion-owned fields,
+  // not the local-preserve list below.
+  'projectMaster',
 ];
 
 // Fields that are local-only and must be preserved

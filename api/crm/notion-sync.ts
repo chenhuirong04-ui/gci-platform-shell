@@ -165,9 +165,18 @@ function buildTaskFromFollowUpPage(page: any): any | null {
     const priority = mapPriority(extractSelect(props['优先级'] ?? props['Priority'] ?? null));
     const initialContext = extractRichText(props['项目背景'] ?? props['Background'] ?? null);
 
+    // "项目关联" Relation — the authoritative link to a Business Master
+    // (🏗️ 项目客户库) page. Precise page-id match; the businessId/clientName
+    // string parsing above is a fallback-only signal, never the primary key.
+    const projectRelation = props['项目关联']?.relation;
+    const projectRelationPageId = Array.isArray(projectRelation) && projectRelation[0]?.id
+      ? projectRelation[0].id
+      : '';
+
     return {
       _pageId: page.id,
       _businessId: businessId,
+      _projectRelationPageId: projectRelationPageId,
       clientName,
       tradeStatus,
       businessType,
@@ -227,6 +236,79 @@ function extractContactFromPage(page: any): any {
   }
 }
 
+// ── Extract full Business Master (🏗️ 项目客户库) structured fields ──────────
+// Real schema verified directly via Notion (2026-08): 项目ID, 项目名称(title),
+// 客户名, 联系人, 联系电话, 联系邮件, 城市, 国家地区, 项目类型, 项目阶段,
+// 项目情况, 优先级, 币种, 负责人, 下次跟进日期, 预计完工日期, 预计签约日期.
+// These are DIFFERENT property names than the ones extractContactFromPage
+// guesses (which is why Business Master contact fields were always coming
+// back empty) — read using the confirmed real names only, no more guessing.
+function extractPropertyValue(prop: any): string {
+  if (!prop) return '';
+  try {
+    if (Array.isArray(prop.rich_text)) return prop.rich_text.map((t: any) => t.plain_text ?? '').join('');
+    if (Array.isArray(prop.title)) return prop.title.map((t: any) => t.plain_text ?? '').join('');
+    if (prop.select?.name) return prop.select.name;
+    if (prop.status?.name) return prop.status.name;
+    if (prop.formula) {
+      if (prop.formula.type === 'string') return prop.formula.string ?? '';
+      if (prop.formula.type === 'number') return prop.formula.number != null ? String(prop.formula.number) : '';
+      if (prop.formula.type === 'date') return prop.formula.date?.start ?? '';
+    }
+    if (typeof prop.number === 'number') return String(prop.number);
+    if (prop.email) return prop.email;
+    if (prop.phone_number) return prop.phone_number;
+    if (prop.url) return prop.url;
+    if (prop.date?.start) return prop.date.start;
+  } catch { /* fall through to '' */ }
+  return '';
+}
+
+interface BusinessMasterFields {
+  projectPageId: string;
+  projectId: string;
+  projectName: string;
+  clientName: string;
+  contactName: string;
+  contactPhone: string;
+  contactEmail: string;
+  city: string;
+  country: string;
+  projectType: string;
+  projectStage: string;
+  projectSituation: string;
+  priority: string;
+  currency: string;
+  owner: string;
+  nextFollowUpAt: string;
+  expectedCompletionAt: string;
+  expectedSigningAt: string;
+}
+
+function extractBusinessMasterFields(page: any): BusinessMasterFields {
+  const props = page.properties ?? {};
+  return {
+    projectPageId: page.id,
+    projectId: extractPropertyValue(props['项目ID']),
+    projectName: extractPropertyValue(props['项目名称']),
+    clientName: extractPropertyValue(props['客户名']),
+    contactName: extractPropertyValue(props['联系人']),
+    contactPhone: extractPropertyValue(props['联系电话']),
+    contactEmail: extractPropertyValue(props['联系邮件']),
+    city: extractPropertyValue(props['城市']),
+    country: extractPropertyValue(props['国家地区']),
+    projectType: extractPropertyValue(props['项目类型']),
+    projectStage: extractPropertyValue(props['项目阶段']),
+    projectSituation: extractPropertyValue(props['项目情况']),
+    priority: extractPropertyValue(props['优先级']),
+    currency: extractPropertyValue(props['币种']),
+    owner: extractPropertyValue(props['负责人']),
+    nextFollowUpAt: extractPropertyValue(props['下次跟进日期']),
+    expectedCompletionAt: extractPropertyValue(props['预计完工日期']),
+    expectedSigningAt: extractPropertyValue(props['预计签约日期']),
+  };
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 export default async function handler(request: Request): Promise<Response> {
@@ -262,22 +344,25 @@ export default async function handler(request: Request): Promise<Response> {
       return db2 < da ? -1 : db2 > da ? 1 : 0;
     });
 
-    // 2. Build contact lookup from 项目客户库 (keyed by businessId parsed from title or name)
-    const projectContactMap = new Map<string, any>();
+    // 2. Build Business Master (🏗️ 项目客户库) lookups:
+    //    - projectMasterByPageId: keyed by the page's own Notion id — this is
+    //      what a Follow-up Log's "项目关联" Relation points to, and is the
+    //      AUTHORITATIVE match (see step 5 below).
+    //    - projectContactMap: keyed by 项目ID (fallback to title-parsed
+    //      businessId/clientName) — used ONLY when a Follow-up Log entry has
+    //      no relation set. Same extractBusinessMasterFields() data, just a
+    //      weaker/fallback lookup key.
+    const projectMasterByPageId = new Map<string, BusinessMasterFields>();
+    const projectContactMap = new Map<string, BusinessMasterFields>();
     for (const page of projectPages) {
       try {
-        const contact = extractContactFromPage(page);
+        const master = extractBusinessMasterFields(page);
+        projectMasterByPageId.set(page.id, master);
         const props = page.properties ?? {};
         const titleRaw = extractTitleProperty(props);
         const { businessId, clientName } = parseCustomerTitle(titleRaw);
-        const key = businessId || clientName;
-        if (key) {
-          projectContactMap.set(key.toLowerCase(), {
-            ...contact,
-            clientName: contact.clientNameRaw || clientName,
-            _pageId: page.id,
-          });
-        }
+        const key = master.projectId || businessId || master.clientName || clientName;
+        if (key) projectContactMap.set(key.toLowerCase(), master);
       } catch (e) {
         console.error('[notion-sync] projectPages map error:', e);
       }
@@ -347,17 +432,33 @@ export default async function handler(request: Request): Promise<Response> {
     // A client/business only enters the system if it has a Follow-up Log record.
     const tasks: any[] = [];
     for (const [key, entry] of latestByBizId.entries()) {
-      // Merge contact info: SB overrides project for TRADE
       const sbContact = sbContactMap.get(key);
-      const projectContact = projectContactMap.get(key);
-      const contact = sbContact ?? projectContact ?? {};
 
-      // businessType: SB forces TRADE, else use Follow-up Log field, else project field
+      // Business Master match: the Follow-up Log's "项目关联" Relation is
+      // AUTHORITATIVE (precise page-id lookup). The 项目ID/title/clientName
+      // key match is a fallback ONLY used when no relation is set — it never
+      // overrides a genuine relation match.
+      const masterByRelation = entry._projectRelationPageId
+        ? projectMasterByPageId.get(entry._projectRelationPageId)
+        : undefined;
+      const masterByKey = projectContactMap.get(key);
+      const master = masterByRelation || masterByKey;
+
+      // Merge contact info: SB overrides Business Master for TRADE (SB pool
+      // has WhatsApp; Business Master doesn't — confirmed schema).
+      const contact = sbContact ?? (master ? {
+        countryCity: [master.city, master.country].filter(Boolean).join(' · '),
+        phoneE164: master.contactPhone,
+        whatsapp: '',
+        email: master.contactEmail,
+        clientName: master.clientName,
+      } : {});
+
+      // businessType: SB forces TRADE; Business Master has no 业务类型 field
+      // (confirmed) so PROJECT customers rely entirely on the Follow-up
+      // Log's own 业务类型 field, already captured in entry.businessType.
       let finalBusinessType: 'TRADE' | 'PROJECT' | 'LOG_ONLY' = entry.businessType ?? 'TRADE';
       if (sbContact) finalBusinessType = 'TRADE';
-      else if (projectContact?.businessType) {
-        finalBusinessType = mapBusinessType(projectContact.businessType);
-      }
 
       const pageId = entry._pageId;
 
@@ -407,6 +508,30 @@ export default async function handler(request: Request): Promise<Response> {
         // All records in this loop are Follow-up Log entries.
         // Business Master / SB Pool only enriched the contact fields above.
         notionSource: 'followup' as const,
+        // Static project master data from Business Master — undefined when
+        // no relation/key match exists (older or unlinked records). Never
+        // fabricated; never overwrites the dynamic Follow-up Log fields
+        // above (tradeStatus/goal/nextFollowUpAt/owner/priority).
+        projectMaster: master ? {
+          projectPageId: master.projectPageId,
+          projectId: master.projectId,
+          projectName: master.projectName,
+          clientName: master.clientName,
+          contactName: master.contactName,
+          contactPhone: master.contactPhone,
+          contactEmail: master.contactEmail,
+          city: master.city,
+          country: master.country,
+          projectType: master.projectType,
+          projectStage: master.projectStage,
+          projectSituation: master.projectSituation,
+          priority: master.priority,
+          currency: master.currency,
+          owner: master.owner,
+          nextFollowUpAt: master.nextFollowUpAt,
+          expectedCompletionAt: master.expectedCompletionAt,
+          expectedSigningAt: master.expectedSigningAt,
+        } : undefined,
       };
 
       tasks.push(task);

@@ -165,6 +165,47 @@ export interface FollowUpTask {
   // Older records created before this field existed simply don't have one;
   // display "暂无项目编码" rather than backfilling or fabricating a value.
   projectCode?: string;
+  // Static project master data from Notion's 🏗️ 项目客户库 (Business
+  // Master), matched via the Follow-up Log's "项目关联" Relation (see
+  // api/crm/notion-sync.ts) — falls back to a 项目ID/title/clientName key
+  // match only when no relation is set. Read-only, refreshed every sync
+  // (see NOTION_OVERWRITE_FIELDS in services/notionSync.ts) — never written
+  // back to Notion, never used to overwrite the dynamic Follow-up Log
+  // fields above (tradeStatus/goal/nextFollowUpAt/owner/priority). Undefined
+  // when no Business Master record is linked — never fabricated.
+  projectMaster?: ProjectMaster;
+}
+
+export interface ProjectMaster {
+  projectPageId: string;
+  projectId: string;
+  projectName: string;
+  clientName: string;
+  contactName: string;
+  contactPhone: string;
+  contactEmail: string;
+  city: string;
+  country: string;
+  projectType: string;
+  projectStage: string;
+  projectSituation: string;
+  priority: string;
+  currency: string;
+  owner: string;
+  nextFollowUpAt: string;
+  expectedCompletionAt: string;
+  expectedSigningAt: string;
+  // Reserved for a later phase (Notion page body / block-children fetch):
+  // contract number, employer/PMC/supervisor/designer/main-contractor,
+  // engineer instructions, product specs, material submittals, checklist,
+  // file references, and the freeform 跟进记录 section found on the
+  // Business Master page's content. Intentionally left unread for now —
+  // see api/crm/notion-sync.ts.
+  content?: ProjectMasterContent;
+}
+
+export interface ProjectMasterContent {
+  sections?: unknown;
 }
 
 export interface AIInsights {
