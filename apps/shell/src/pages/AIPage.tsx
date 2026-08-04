@@ -128,6 +128,13 @@ async function resolveInventoryProduct(
   }
 }
 
+// ── Consignment visibility gate ─────────────────────────────────────────────
+// Consignment (寄售) stock is supplementary: only surface it when the user
+// explicitly asked about consignment, or when self-owned inventory had no match.
+function wantsConsignment(query: string): boolean {
+  return /寄售|consign/i.test(query);
+}
+
 // ── Deterministic candidate card display cleanup ───────────────────────────────
 // Only strips known noise (SKU repeated inline, duplicated CN/EN halves) and
 // pulls out spec hints already present in the raw name. Never rewrites data.
@@ -473,10 +480,12 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
         setInvFetchError(lang === 'en' ? 'Inventory query failed. Please retry.' : '库存查询失败，请重试。');
         return;
       }
+      const wh = whOk ? whRes.value : { ok: false, error: '库存表读取失败' };
       setCmdState(prev => prev ? { ...prev, resultData: {
         ok: true,
-        warehouse: whOk ? whRes.value : { ok: false, error: '库存表读取失败' },
+        warehouse: wh,
         consignment: csOk ? csRes.value : { ok: false, error: '寄售库存读取失败' },
+        showConsignment: wantsConsignment(rawQuery) || !wh.ok || (wh.totalRows ?? 0) === 0,
         productFilter: name,
         prevCandidates: candidates,
         prevCandidateItems: candidateItems,
@@ -672,6 +681,7 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
           {intent.intentId === 'check_inventory' && state.resultData && state.resultData.ok && !state.resultData.notFound && !state.resultData.disambiguate && (() => {
             const wh = state.resultData.warehouse;
             const cs = state.resultData.consignment;
+            const showConsignment = state.resultData.showConsignment ?? true;
             const productFilter = state.resultData.productFilter;
             const prevCandidates: string[] = state.resultData.prevCandidates || [];
             const prevCandidateItems: InventoryCandidate[] = state.resultData.prevCandidateItems || [];
@@ -721,10 +731,15 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
                       <div style={{ maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {(wh.alertItems?.length > 0 ? wh.alertItems : wh.alertItems ?? []).map((item: any, i: number) => (
                           <div key={i} style={inlineRowStyle(item.alertType)}>
+                            {item.sku && (
+                              <span className="font-mono-label" style={{ fontSize: 10, color: GOLD, background: 'rgba(203,168,92,0.1)', border: '1px solid rgba(203,168,92,0.22)', borderRadius: 4, padding: '1px 5px', flexShrink: 0 }}>
+                                {item.sku}
+                              </span>
+                            )}
                             <span style={{ flex: 1, fontSize: 13, color: TEXT, fontWeight: 600 }}>{item.productName}</span>
                             <span style={{ fontSize: 12, color: MUTED }}>{item.category || ''}</span>
                             <span style={{ fontSize: 13, fontWeight: 700, color: qtyColor(item.alertType) }}>
-                              {item.currentQty === null ? '—' : `剩 ${item.currentQty}`}
+                              {item.currentQty === null ? '—' : `自有库存 ${item.currentQty}${item.unit || ''}`}
                             </span>
                             {inlineBadge(item.alertType)}
                           </div>
@@ -737,7 +752,9 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
                   )}
                 </div>
 
-                {/* Consignment (Supabase) section */}
+                {/* Consignment (Supabase) section — supplementary only: shown when explicitly
+                    asked for consignment, or when self-owned inventory had no match */}
+                {showConsignment && (
                 <div>
                   <div style={{ fontSize: 10, color: GOLD, fontWeight: 700, letterSpacing: '0.1em', marginBottom: 6 }}>
                     寄售库存 · consignment_stock
@@ -780,6 +797,7 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
                     </>
                   )}
                 </div>
+                )}
 
                 <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
                     {prevCandidates.length > 1 && (
@@ -2801,12 +2819,18 @@ export function AIPage() {
               fetch(`${base}/api/ai/inventory-table-alerts${qs}`).then(r => r.json()),
               fetch(`${base}/api/trade/check-inventory${qs}`).then(r => r.json()),
             ]).then(([whRes, csRes]) => {
-              setCmdState(prev => prev ? { ...prev, resultData: {
-                ok: true,
-                warehouse: whRes.status === 'fulfilled' ? whRes.value : { ok: false, error: '库存表读取失败' },
-                consignment: csRes.status === 'fulfilled' ? csRes.value : { ok: false, error: '寄售库存读取失败' },
-                productFilter: resolved.productFilter || null,
-              } } : prev);
+              setCmdState(prev => {
+                if (!prev) return prev;
+                const wh = whRes.status === 'fulfilled' ? whRes.value : { ok: false, error: '库存表读取失败' };
+                const cs = csRes.status === 'fulfilled' ? csRes.value : { ok: false, error: '寄售库存读取失败' };
+                return { ...prev, resultData: {
+                  ok: true,
+                  warehouse: wh,
+                  consignment: cs,
+                  showConsignment: wantsConsignment(raw.trim()) || !wh.ok || (wh.totalRows ?? 0) === 0,
+                  productFilter: resolved.productFilter || null,
+                } };
+              });
             }).catch(e => console.error('[AI] inventory fetch failed', e));
           });
         },

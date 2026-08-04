@@ -1,12 +1,13 @@
-﻿// /api/ai/inventory-table-alerts
-// Reads Notion INVENTORY_DB for warehouse-level stock alerts.
-// Returns outOfStock / lowStock / anomaly items with adaptive field detection.
+// /api/ai/inventory-table-alerts
+// Reads self-owned warehouse stock via api/_lib/inventoryCatalog — the same
+// canonical Notion INVENTORY_DB + PRODUCT_MASTER reader that backs the real
+// /trade?tab=inventory page (modules/trade/components/InventoryManager.tsx).
 // Read-only. Does NOT write to Notion.
 export const config = { runtime: 'edge' };
 
-const INVENTORY_DB = '2c6d0b13b3b9806db227fc01f723bc40';
+import { fetchInventoryCatalog, type InventoryCatalogRow } from '../_lib/inventoryCatalog';
+
 const LOW_STOCK_DEFAULT = 5;
-const NOTION_BASE = 'https://api.notion.com/v1';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -25,75 +26,17 @@ function json(body: unknown, status = 200) {
 let _cache: { data: any; ts: number } | null = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-// Property name candidates — ordered by priority
-const NAME_CANDS   = ['名称', '产品名称', 'Name', 'Product Name', '品名'];
-const QTY_CANDS    = ['库存数量', '当前库存', '在库数量', '库存', '数量', 'Quantity', 'Stock', '库存量', '现有库存'];
-const MIN_CANDS    = ['最低库存', '安全库存', '最小库存', '库存下限', 'Min Stock', 'Low Stock Threshold', 'Safety Stock'];
-const CAT_CANDS    = ['分类', '类别', '品类', 'Category', '产品分类'];
-const WH_CANDS     = ['仓库', '位置', '存放位置', 'Warehouse', 'Location', '存放仓库'];
-const SKU_CANDS    = ['SKU', 'sku', '货号', '编号', '型号', 'Item Code'];
-const STATUS_CANDS = ['状态', 'Status', '库存状态'];
-
-function findField(props: Record<string, any>, cands: string[]): string | null {
-  for (const c of cands) if (props[c] !== undefined) return c;
-  return null;
-}
-
-function getTitle(page: any, field: string | null): string {
-  if (!field) return '';
-  const p = page.properties[field];
-  if (!p || p.type !== 'title') return '';
-  return (p.title || []).map((t: any) => t.plain_text || '').join('');
-}
-
-function getNumber(page: any, field: string | null): number | null {
-  if (!field) return null;
-  const p = page.properties[field];
-  if (!p || p.type !== 'number' || p.number === null || p.number === undefined) return null;
-  return p.number;
-}
-
-function getText(page: any, field: string | null): string {
-  if (!field) return '';
-  const p = page.properties[field];
-  if (!p) return '';
-  if (p.type === 'rich_text') return (p.rich_text || []).map((t: any) => t.plain_text || '').join('');
-  if (p.type === 'title') return (p.title || []).map((t: any) => t.plain_text || '').join('');
-  if (p.type === 'select') return p.select?.name || '';
-  if (p.type === 'multi_select') return (p.multi_select || []).map((s: any) => s.name).join(', ');
-  if (p.type === 'formula') {
-    const fv = p.formula;
-    if (fv?.type === 'string') return fv.string || '';
-    if (fv?.type === 'number') return String(fv.number ?? '');
-  }
-  return '';
-}
-
-function getSelect(page: any, field: string | null): string {
-  if (!field) return '';
-  const p = page.properties[field];
-  if (!p) return '';
-  if (p.type === 'select') return p.select?.name || '';
-  if (p.type === 'multi_select') return (p.multi_select || []).map((s: any) => s.name).join(', ');
-  return '';
-}
-
 // ── Product match helper ─────────────────────────────────────────────────────
-// Bidirectional + multi-field + multi-token matching.
-// Matches if: keyword is substring of fields, OR any field is substring of keyword,
-// OR every space-separated token appears somewhere in the combined field text.
-function matchItem(productName: string, sku: string, category: string, keyword: string): boolean {
+// Bidirectional + multi-field + multi-token matching against name/EN name/SKU/category.
+function matchItem(row: InventoryCatalogRow, keyword: string): boolean {
   const kw = keyword.toLowerCase().trim();
   if (!kw) return true;
-  const nameLower = (productName || '').toLowerCase().trim();
-  const text = [nameLower, (sku || '').toLowerCase(), (category || '').toLowerCase()]
+  const nameLower = (row.name || '').toLowerCase().trim();
+  const text = [nameLower, (row.nameEN || '').toLowerCase(), (row.sku || '').toLowerCase(), (row.category || '').toLowerCase(), (row.brand || '').toLowerCase()]
     .filter(Boolean).join(' ');
 
-  // 1. keyword is substring of combined fields
   if (text.includes(kw)) return true;
-  // 2. product name is substring of keyword (user typed brand+product, DB only has product part)
   if (nameLower.length >= 2 && kw.includes(nameLower)) return true;
-  // 3. all space-separated tokens must appear somewhere in combined text
   const tokens = kw.split(/\s+/).filter(t => t.length >= 1);
   if (tokens.length > 1 && tokens.every(t => text.includes(t))) return true;
 
@@ -124,115 +67,28 @@ export default async function handler(request: Request): Promise<Response> {
     return json({ ..._cache.data, cached: true });
   }
 
-  const notionHeaders = {
-    Authorization: `Bearer ${token}`,
-    'Notion-Version': '2022-06-28',
-    'Content-Type': 'application/json',
-  };
-
-  // ── Step 1: Fetch DB schema to discover property names ────────────────────
-  let schemaProps: Record<string, any> = {};
+  let catalog: InventoryCatalogRow[];
   try {
-    const schemaRes = await fetch(`${NOTION_BASE}/databases/${INVENTORY_DB}`, { headers: notionHeaders });
-    if (schemaRes.ok) {
-      const schema = await schemaRes.json();
-      schemaProps = schema.properties || {};
-    } else {
-      const errText = await schemaRes.text().catch(() => '');
-      return json({
-        ok: false,
-        error: `Notion 库存表读取失败 (schema ${schemaRes.status})`,
-        detail: errText,
-        source: 'notion',
-        sourceTable: 'INVENTORY_DB',
-        stockScope: 'warehouse_inventory',
-      }, 200);
-    }
-  } catch (e: any) {
-    return json({
-      ok: false,
-      error: `Notion 库存表读取失败，请稍后重试。`,
-      detail: e.message,
-      source: 'notion',
-      sourceTable: 'INVENTORY_DB',
-      stockScope: 'warehouse_inventory',
-    }, 200);
-  }
-
-  // Detect field names
-  const nameField   = findField(schemaProps, NAME_CANDS);
-  const qtyField    = findField(schemaProps, QTY_CANDS);
-  const minField    = findField(schemaProps, MIN_CANDS);
-  const catField    = findField(schemaProps, CAT_CANDS);
-  const whField     = findField(schemaProps, WH_CANDS);
-  const skuField    = findField(schemaProps, SKU_CANDS);
-  const statusField = findField(schemaProps, STATUS_CANDS);
-
-  const warnings: string[] = [];
-  if (!nameField) warnings.push('未找到产品名称字段（候选：名称/产品名称/Name）。');
-  if (!qtyField)  warnings.push('未找到库存数量字段（候选：库存数量/当前库存/数量/Quantity）。所有产品将显示为数据异常。');
-  if (!minField)  warnings.push(`未找到安全库存字段（候选：最低库存/安全库存），当前使用默认低库存阈值 ${LOW_STOCK_DEFAULT}。`);
-
-  // ── Step 2: Paginate through all records ─────────────────────────────────
-  const pages: any[] = [];
-  let cursor: string | undefined;
-  let loopCount = 0;
-  try {
-    do {
-      const body: any = { page_size: 100 };
-      if (cursor) body.start_cursor = cursor;
-      const queryRes = await fetch(`${NOTION_BASE}/databases/${INVENTORY_DB}/query`, {
-        method: 'POST',
-        headers: notionHeaders,
-        body: JSON.stringify(body),
-      });
-      if (!queryRes.ok) {
-        const errText = await queryRes.text().catch(() => '');
-        return json({
-          ok: false,
-          error: `Notion 库存表查询失败 (${queryRes.status})`,
-          detail: errText,
-          source: 'notion',
-          sourceTable: 'INVENTORY_DB',
-          stockScope: 'warehouse_inventory',
-        }, 200);
-      }
-      const qdata = await queryRes.json();
-      pages.push(...(qdata.results || []));
-      cursor = qdata.has_more ? qdata.next_cursor : undefined;
-      loopCount++;
-      if (loopCount > 10) break; // safety: max 1000 rows
-    } while (cursor);
+    catalog = await fetchInventoryCatalog(token);
   } catch (e: any) {
     return json({
       ok: false,
       error: 'Notion 库存表读取失败，请稍后重试。',
-      detail: e.message,
+      detail: e?.message,
       source: 'notion',
       sourceTable: 'INVENTORY_DB',
       stockScope: 'warehouse_inventory',
     }, 200);
   }
 
-  // ── Step 3: Map pages to items and classify ──────────────────────────────
-  const allItems = pages.map(page => {
-    const productName = getTitle(page, nameField);
-    if (!productName) return null;
+  const rowsToUse = productFilter ? catalog.filter(r => matchItem(r, productFilter)) : catalog;
 
-    const sku        = getText(page, skuField);
-    const category   = getSelect(page, catField) || getText(page, catField);
-    const warehouse  = getSelect(page, whField) || getText(page, whField);
-    const statusVal  = getSelect(page, statusField) || getText(page, statusField);
-    const currentQty = getNumber(page, qtyField);
-    const minQty     = getNumber(page, minField);
-    const threshold  = minQty ?? LOW_STOCK_DEFAULT;
-    const updatedAt  = page.last_edited_time || '';
-    const pageId     = page.id;
-
+  const allItems = rowsToUse.map(row => {
+    const threshold = LOW_STOCK_DEFAULT;
     let alertType: 'outOfStock' | 'lowStock' | 'anomaly' | 'normal';
-    if (currentQty === null || isNaN(currentQty)) alertType = 'anomaly';
-    else if (currentQty <= 0) alertType = 'outOfStock';
-    else if (currentQty <= threshold) alertType = 'lowStock';
+    if (row.currentQty === null || Number.isNaN(row.currentQty)) alertType = 'anomaly';
+    else if (row.currentQty <= 0) alertType = 'outOfStock';
+    else if (row.currentQty <= threshold) alertType = 'lowStock';
     else alertType = 'normal';
 
     const actionSuggestion =
@@ -240,13 +96,24 @@ export default async function handler(request: Request): Promise<Response> {
       alertType === 'lowStock'   ? '建议确认是否需要补货' :
       alertType === 'anomaly'    ? '请检查库存记录字段是否完整' : '';
 
-    return { pageId, productName, sku, category, warehouse, currentQty, minQty, threshold, statusVal, updatedAt, alertType, actionSuggestion };
-  }).filter(Boolean) as NonNullable<ReturnType<typeof pages[0]>>[];
+    return {
+      pageId: row.invPageId,
+      productName: row.name || row.nameEN,
+      nameEN: row.nameEN,
+      sku: row.sku,
+      category: row.category,
+      warehouse: row.warehouse,
+      unit: row.unit,
+      currentQty: row.currentQty,
+      threshold,
+      statusVal: row.stockStatus,
+      updatedAt: row.updatedAt,
+      alertType,
+      actionSuggestion,
+    };
+  });
 
-  // Apply product filter if provided (bidirectional + multi-field)
-  const items = productFilter
-    ? allItems.filter(i => matchItem(i.productName, i.sku, i.category, productFilter))
-    : allItems;
+  const items = allItems;
 
   // Sort: outOfStock → anomaly → lowStock → normal
   const sortRank = (t: string) => t === 'outOfStock' ? 0 : t === 'anomaly' ? 1 : t === 'lowStock' ? 2 : 3;
@@ -273,8 +140,6 @@ export default async function handler(request: Request): Promise<Response> {
     lowStockCount,
     anomalyCount,
     lowStockThreshold: LOW_STOCK_DEFAULT,
-    fieldMap: { nameField, qtyField, minField, catField, whField, skuField, statusField },
-    warnings,
     alertItems,
     productFilter: productFilter || null,
     asOf: new Date().toISOString(),
@@ -285,5 +150,3 @@ export default async function handler(request: Request): Promise<Response> {
 
   return json(result);
 }
-
-

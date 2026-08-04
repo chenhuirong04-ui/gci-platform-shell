@@ -5,8 +5,7 @@
 // Never returns prices, costs, or financial data to OpenAI.
 export const config = { runtime: 'edge' };
 
-const NOTION_INVENTORY_DB = '2c6d0b13b3b9806db227fc01f723bc40';
-const NOTION_BASE = 'https://api.notion.com/v1';
+import { fetchInventoryCatalog } from '../_lib/inventoryCatalog';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -23,6 +22,7 @@ function json(body: unknown, status = 200) {
 
 interface CatalogItem {
   name: string;
+  nameEN?: string;
   sku?: string;
   category?: string;
   source: 'notion' | 'consignment';
@@ -44,69 +44,18 @@ export interface ResolveResult {
 }
 
 // ── Notion catalog fetch ────────────────────────────────────────────────────
-// Fetches product identity fields only (name, SKU, category). No qty/price.
+// Reads the same canonical INVENTORY_DB + PRODUCT_MASTER source as the real
+// /trade?tab=inventory page (via api/_lib/inventoryCatalog) — no independent
+// field-name guessing, so SKU/category here always match what's on that page.
 async function fetchNotionCatalog(token: string): Promise<CatalogItem[]> {
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    'Notion-Version': '2022-06-28',
-    'Content-Type': 'application/json',
-  };
-
-  // Fetch schema to detect field names
-  const schemaRes = await fetch(`${NOTION_BASE}/databases/${NOTION_INVENTORY_DB}`, { headers });
-  if (!schemaRes.ok) return [];
-  const schema = await schemaRes.json();
-  const props: Record<string, any> = schema.properties || {};
-
-  const findField = (cands: string[]) => {
-    for (const c of cands) if (props[c] !== undefined) return c;
-    return null;
-  };
-
-  const nameField = findField(['名称', '产品名称', 'Name', 'Product Name', '品名']);
-  const skuField  = findField(['SKU', 'sku', '货号', '编号', '型号', 'Item Code']);
-  const catField  = findField(['分类', '类别', '品类', 'Category', '产品分类']);
-
-  // Paginate pages — up to 200 products
-  const items: CatalogItem[] = [];
-  let cursor: string | undefined;
-  let loops = 0;
-  do {
-    const body: any = { page_size: 100 };
-    if (cursor) body.start_cursor = cursor;
-    const res = await fetch(`${NOTION_BASE}/databases/${NOTION_INVENTORY_DB}/query`, {
-      method: 'POST', headers, body: JSON.stringify(body),
-    });
-    if (!res.ok) break;
-    const data = await res.json();
-    for (const page of data.results || []) {
-      const np = page.properties;
-      // Extract title
-      const titleProp = nameField && np[nameField];
-      const name = titleProp?.type === 'title'
-        ? (titleProp.title || []).map((t: any) => t.plain_text || '').join('').trim()
-        : '';
-      if (!name) continue;
-      // Extract SKU
-      const skuProp = skuField && np[skuField];
-      const sku = skuProp
-        ? (skuProp.rich_text || []).map((t: any) => t.plain_text || '').join('').trim() || undefined
-        : undefined;
-      // Extract category
-      const catProp = catField && np[catField];
-      const category = catProp?.type === 'select'
-        ? (catProp.select?.name || undefined)
-        : catProp?.type === 'multi_select'
-        ? (catProp.multi_select || []).map((s: any) => s.name).join(', ') || undefined
-        : undefined;
-      items.push({ name, sku: sku || undefined, category: category || undefined, source: 'notion' });
-    }
-    cursor = data.has_more ? data.next_cursor : undefined;
-    loops++;
-    if (loops >= 2) break; // max 200 rows for catalog
-  } while (cursor);
-
-  return items;
+  const rows = await fetchInventoryCatalog(token);
+  return rows.map(r => ({
+    name: r.name || r.nameEN,
+    nameEN: r.nameEN,
+    sku: r.sku || undefined,
+    category: r.category || undefined,
+    source: 'notion' as const,
+  }));
 }
 
 // ── Supabase consignment catalog fetch ─────────────────────────────────────
@@ -159,6 +108,7 @@ async function callOpenAI(query: string, catalog: CatalogItem[], apiKey: string)
   const catalogLines = catalog
     .map((p, i) => {
       let line = `${i + 1}. ${p.name}`;
+      if (p.nameEN && p.nameEN !== p.name) line += ` / ${p.nameEN}`;
       if (p.sku) line += ` [${p.sku}]`;
       if (p.category) line += ` (${p.category})`;
       return line;
@@ -257,7 +207,7 @@ function regexFallback(query: string, catalog: CatalogItem[]): ResolveResult {
 
   const tokens = s.toLowerCase().split(/\s+/).filter(t => t.length >= 1);
   const matchedCatalogItems = catalog.filter(p => {
-    const text = [p.name, p.sku, p.category].filter(Boolean).join(' ').toLowerCase();
+    const text = [p.name, p.nameEN, p.sku, p.category].filter(Boolean).join(' ').toLowerCase();
     return tokens.every(t => text.includes(t));
   });
   const matched = matchedCatalogItems.map(p => p.name);
@@ -333,7 +283,7 @@ export default async function handler(request: Request): Promise<Response> {
   if (matchedItems.length === 0 && aiResult.keywords?.length > 0) {
     const tokens = aiResult.keywords.map(k => k.toLowerCase());
     for (const item of catalog) {
-      const text = [item.name, item.sku, item.category].filter(Boolean).join(' ').toLowerCase();
+      const text = [item.name, item.nameEN, item.sku, item.category].filter(Boolean).join(' ').toLowerCase();
       if (tokens.every(t => text.includes(t))) {
         matchedItems.push(item);
       }
