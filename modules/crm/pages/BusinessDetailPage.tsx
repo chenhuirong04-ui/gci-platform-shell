@@ -72,14 +72,19 @@ export default function BusinessDetailPage({
       {/* Top summary — 项目级，不是客户级 */}
       <div className="rounded-[18px] border p-6" style={{ backgroundColor: CARD, borderColor: BORDER }}>
         <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <span className="text-[10px] font-black px-2 py-0.5 rounded" style={{ background: `${GOLD}22`, color: GOLD }}>{displayProjectId}</span>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.08)', color: T2 }}>{customerCode}</span>
+          <span className="text-[10px] font-black px-2 py-0.5 rounded" style={{ background: `${GOLD}22`, color: GOLD }}>{dict.projectCodeBadgeLabel}：{displayProjectId}</span>
+          {/* projectId and customerCode are frequently the same value for
+              PROJECT-type businesses — showing both as identical badges was
+              a duplicate, not two distinct identifiers. */}
+          {customerCode && customerCode !== displayProjectId && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.08)', color: T2 }}>{dict.customerCodeLabel}：{customerCode}</span>
+          )}
           <h1 className="text-2xl font-black" style={{ color: T1 }}>{projectName}</h1>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${GOLD}18`, color: GOLD }}>{businessTask.tradeStatus || dict.na}</span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
           <div>
-            <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>{dict.customerNameLabel}</div>
+            <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>{dict.belongsToCustomerLabel}</div>
             <div className="text-sm font-bold mt-0.5" style={{ color: T1 }}>{businessTask.clientName || dict.na}</div>
           </div>
           <div>
@@ -93,10 +98,6 @@ export default function BusinessDetailPage({
           <div>
             <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>{dict.owner}</div>
             <div className="text-sm font-bold mt-0.5" style={{ color: businessTask.owner ? T1 : T3 }}>{businessTask.owner || dict.na}</div>
-          </div>
-          <div className="col-span-2 md:col-span-4">
-            <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>{dict.projectSituationLabel} / {dict.mainRequirement}</div>
-            <div className="text-sm font-bold mt-0.5" style={{ color: T1 }}>{master?.projectSituation || businessTask.inquirySummary || businessTask.goal || dict.na}</div>
           </div>
           <div>
             <div className="text-[9px] font-black uppercase tracking-widest" style={{ color: T3 }}>{dict.lastUpdated}</div>
