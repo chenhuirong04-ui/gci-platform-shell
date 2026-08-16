@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AIPage } from './pages/AIPage';
 import { InvoicePage } from './pages/InvoicePage';
 import { Systems } from './pages/Systems';
+import { Actions } from './pages/Actions';
 import TradeModule from '../../../modules/trade/TradeModule';
 import CrmModule from '../../../modules/crm/CrmModule';
 import QuotationModule from '../../../modules/quotation/QuotationModule';
@@ -128,6 +129,7 @@ function Shell() {
           <Route path="/ai" element={<AIPage />} />
           <Route path="/invoice" element={<InvoicePage />} />
           <Route path="/systems" element={<Systems />} />
+          <Route path="/actions" element={<Actions />} />
           <Route path="/access-denied" element={<AccessDenied />} />
 
           <Route

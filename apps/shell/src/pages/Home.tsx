@@ -8,6 +8,7 @@ import { InventoryAlertDrawer } from '../components/InventoryAlertDrawer';
 import { ExecutiveDeskToday } from '../components/ExecutiveDeskToday';
 import { AgentsStatus } from '../components/AgentsStatus';
 import { SystemsRegistrySummaryCard } from '../components/SystemsRegistrySummary';
+import { BossActionCenter } from '../components/BossActionCenter';
 
 // ─── localStorage helpers (same keys the Trade + CRM modules use) ──────────
 function safeLocalGet<T = any>(key: string): T[] {
@@ -333,6 +334,9 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
           {buildSummary()}
         </p>
       </div>
+
+      {/* BOSS ACTION CENTER — Task 7 aggregated priority to-do list */}
+      <BossActionCenter />
 
       {/* EXECUTIVE DESK — Task 4 first screen (crm_customers/crm_contacts/crm_followups via Supabase) */}
       <ExecutiveDeskToday />

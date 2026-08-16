@@ -11,9 +11,9 @@ const MUTED = '#7A8494';
 const CARD = 'rgba(255,255,255,0.025)';
 const BORD = 'rgba(255,255,255,0.07)';
 
-type AgentStatus = 'healthy' | 'warning' | 'error' | 'no_data' | 'deferred';
+export type AgentStatus = 'healthy' | 'warning' | 'error' | 'no_data' | 'deferred';
 
-interface AgentCard {
+export interface AgentCard {
   name: string;
   status: AgentStatus;
   lastUpdated: string | null;
@@ -42,7 +42,7 @@ const STATUS_COLOR: Record<AgentStatus, string> = {
 
 // Identification confirmed via direct Vercel/GitHub/Supabase inspection this
 // round (Task 4.1) — never guessed. See conversation record for the audit trail.
-const AGENTS: AgentCard[] = [
+export const AGENTS: AgentCard[] = [
   {
     name: 'MIA / 客户开发 AI',
     status: 'no_data',

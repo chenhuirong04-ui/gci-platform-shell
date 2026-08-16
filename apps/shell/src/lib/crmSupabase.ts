@@ -44,8 +44,14 @@ export interface CrmFollowup {
   owner: string | null;
 }
 
+// GCI operates on Asia/Dubai (UTC+4). Using toISOString() directly on
+// new Date() would return the UTC calendar date, which is wrong for roughly
+// 4 hours a day (UTC 20:00–23:59 is already tomorrow in Dubai) — the same
+// bug class fixed in crmAskGciParsers.ts's weekday parser. Shifting the
+// timestamp by +4h before reading UTC date parts makes this timezone-
+// independent regardless of the browser's own locale.
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return new Date(Date.now() + 4 * 3600 * 1000).toISOString().slice(0, 10);
 }
 
 // ── Action 1: "今天我要跟进谁？" ──────────────────────────────────────────────

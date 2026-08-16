@@ -20,6 +20,8 @@ import {
   parseGmailSearchCommand, parseDriveSearchCommand, parseCustomerContextCommand,
   CALENDAR_TODAY_RE, CALENDAR_TOMORROW_RE, CALENDAR_WEEK_RE, IMPORTANT_EMAILS_RE, CUSTOMER_CONTEXT_RE,
 } from '../ai/googleAskGciParsers';
+import { matchBossActionQueryMode } from '../ai/actionCenterAskGciParsers';
+import { getBossActions, type BossAction } from '../lib/actionCenter';
 
 // ── Inventory query normalizer ────────────────────────────────────────────────
 // Strips command words, punctuation, and trailing "库存" to get the product term.
@@ -2114,6 +2116,57 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
             );
           })()}
 
+          {/* ── Boss Action Center (Task 7): aggregated P1/P2/P3 to-do list ── */}
+          {intent.intentId === 'boss_action_query' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在汇总老板待办…</div>
+          )}
+          {intent.intentId === 'boss_action_query' && state.resultData && state.resultData.ok === false && (
+            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              查询失败:{state.resultData.error}
+            </div>
+          )}
+          {intent.intentId === 'boss_action_query' && state.resultData?.ok && (() => {
+            const all: BossAction[] = state.resultData.actions || [];
+            const mode = state.resultData.mode as string;
+            const PC: Record<string, string> = { P1: '#E0846A', P2: '#D4A843', P3: MUTED };
+            let list: BossAction[] = all;
+            let heading = '今天还有什么没处理';
+            if (mode === 'most_important') {
+              list = all.filter(a => a.priority === 'P1');
+              heading = '今天最重要的事情';
+            } else if (mode === 'do_first') {
+              list = all.slice(0, 1);
+              heading = '现在先处理这个';
+            } else if (mode === 'waiting_decision') {
+              list = all.filter(a => a.priority === 'P1' || a.priority === 'P2');
+              heading = '等你决定的事情';
+            } else {
+              heading = '今天还有什么没处理';
+            }
+            return (
+              <div>
+                <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 8 }}>{heading}</div>
+                {list.length === 0 ? (
+                  <div style={{ fontSize: 13, color: '#6FBF8E' }}>✓ 当前无相关事项。</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {list.map(a => (
+                      <div key={a.id} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 9.5, fontWeight: 700, color: PC[a.priority], background: `${PC[a.priority]}18`, border: `1px solid ${PC[a.priority]}40`, borderRadius: 4, padding: '2px 6px', fontFamily: 'IBM Plex Mono,monospace' }}>
+                            {a.priority}
+                          </span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{a.title}</span>
+                        </div>
+                        <div style={{ fontSize: 12, color: SUBTLE, marginTop: 4 }}>{a.summary}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* ── CRM (Supabase): Today's follow-ups ── */}
           {intent.intentId === 'today_followups_crm' && !state.resultData && (
             <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查询 crm_customers…</div>
@@ -3539,6 +3592,37 @@ export function AIPage() {
             .then(([crm, gmail, drive]) => {
               setCmdState(prev => prev ? { ...prev, resultData: { ok: true, custName, crm, gmail, drive } } : prev);
             })
+            .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: String(e?.message ?? e) } } : prev));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Boss Action Center — Task 7, read-only aggregation. "今天最重要的事情是什么？" /
+    // "我现在先处理什么？" / "有哪些事情在等我决定？" / "今天还有什么没处理？"
+    const bossMode = matchBossActionQueryMode(raw.trim());
+    if (bossMode) {
+      const bossMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'boss_action_query', intentNameZh: '老板待办', intentNameEn: 'Boss Action Center', category: 'query',
+          triggerKeywordsZh: [], triggerKeywordsEn: [], targetTab: 'chat', targetModule: 'Actions',
+          targetRoute: '/actions',
+          readSources: ['crm_customers/crm_followups (Supabase)', 'Gmail (gmail.readonly)', 'Google Calendar (calendar.readonly)', 'quotation_records', 'invoice_drafts', 'consignment_stock', 'executive_system_registry (Supabase)', 'AI Agents Status'],
+          writeTargets: [], requiredFields: [],
+          approvalRequired: false, resultPanel: null, implementationStatus: 'real', notConnectedMessage: '', fallbackBehavior: '',
+        },
+        confidence: 1, raw: raw.trim(), detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: bossMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在汇总 CRM / 邮件 / 日程 / 业务数据…', '正在按 P1/P2/P3 排序…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          getBossActions()
+            .then(res => setCmdState(prev => prev ? { ...prev, resultData: { ...res, mode: bossMode } } : prev))
             .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: String(e?.message ?? e) } } : prev));
         },
       );
