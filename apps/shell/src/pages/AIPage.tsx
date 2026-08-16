@@ -11,6 +11,8 @@ import type { AIIntentMatch } from '../ai/aiRouter';
 import { readCRMTasks, getCRMBriefStats, getCRMCustomerData } from '../lib/crmLocalStore';
 import SupplierSearchResult from '../ai/suppliers/SupplierSearchResult';
 import { searchSuppliers } from '../ai/suppliers/supplierSearchClient';
+import { getTodaysFollowups, findCustomerByName, logFollowup, createCustomerWithContact } from '../lib/crmSupabase';
+import { parseQueryCustomerCommand, parseLogFollowupCommand, parseCreateCrmCustomerCommand } from '../ai/crmAskGciParsers';
 
 // ── Inventory query normalizer ────────────────────────────────────────────────
 // Strips command words, punctuation, and trailing "库存" to get the product term.
@@ -1921,6 +1923,265 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
             </div>
           )}
 
+          {/* ── CRM (Supabase): Today's follow-ups ── */}
+          {intent.intentId === 'today_followups_crm' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查询 crm_customers…</div>
+          )}
+          {intent.intentId === 'today_followups_crm' && state.resultData && !state.resultData.ok && (
+            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              查询失败：{state.resultData.error}
+            </div>
+          )}
+          {intent.intentId === 'today_followups_crm' && state.resultData?.ok && (() => {
+            const rows = state.resultData.rows || [];
+            return (
+              <div>
+                <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>
+                  {state.resultData.date} · 共 <strong style={{ color: TEXT }}>{rows.length}</strong> 位客户需要跟进
+                </div>
+                {rows.length === 0 ? (
+                  <div style={{ fontSize: 13, color: '#6FBF8E' }}>✓ 今天没有安排跟进的客户。</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflowY: 'auto' }}>
+                    {rows.map((c: any) => (
+                      <div key={c.id} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{c.customer_name}</span>
+                          {c.priority && <span style={{ fontSize: 10, color: GOLD, background: 'rgba(203,168,92,0.12)', borderRadius: 4, padding: '1px 6px' }}>{c.priority}</span>}
+                          {c.status && <span style={{ fontSize: 10, color: MUTED }}>{c.status}</span>}
+                          {c.owner && <span style={{ fontSize: 10, color: SUBTLE, marginLeft: 'auto' }}>{c.owner}</span>}
+                        </div>
+                        {c.next_action && <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>下一步：{c.next_action}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* ── CRM (Supabase): Query customer profile ── */}
+          {intent.intentId === 'query_customer_crm' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在检索客户主档…</div>
+          )}
+          {intent.intentId === 'query_customer_crm' && state.resultData && !state.resultData.ok && (
+            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              查询失败：{state.resultData.error}
+            </div>
+          )}
+          {intent.intentId === 'query_customer_crm' && state.resultData?.ok && !state.resultData.found && (
+            <div style={{ padding: '12px 14px', background: 'rgba(224,132,106,0.07)', border: '1px solid rgba(224,132,106,0.25)', borderRadius: 8 }}>
+              {state.resultData.multiple ? (
+                <>
+                  <div style={{ fontSize: 13, color: '#E0846A', fontWeight: 600, marginBottom: 6 }}>找到多个匹配客户，请提供更精确的名称</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {state.resultData.candidates.map((c: any) => (
+                      <div key={c.id} style={{ fontSize: 12, color: MUTED }}>· {c.customer_name}</div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 13, color: '#E0846A', fontWeight: 600 }}>未找到「{state.resultData.query}」</div>
+              )}
+            </div>
+          )}
+          {intent.intentId === 'query_customer_crm' && state.resultData?.ok && state.resultData.found && (() => {
+            const c = state.resultData.customer;
+            const contacts = state.resultData.contacts || [];
+            const followups = state.resultData.followups || [];
+            return (
+              <div>
+                <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, marginBottom: 10 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: TEXT, marginBottom: 6 }}>{c.customer_name}</div>
+                  {[
+                    c.status && ['状态', c.status], c.priority && ['优先级', c.priority],
+                    c.owner && ['负责人', c.owner], c.next_follow_up_at && ['下次跟进', c.next_follow_up_at],
+                    c.next_action && ['下一步', c.next_action],
+                  ].filter(Boolean).map(([label, value]: any, i: number) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, fontSize: 12, padding: '2px 0' }}>
+                      <span style={{ color: SUBTLE, minWidth: 60 }}>{label}</span><span style={{ color: TEXT }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 6 }}>联系人（{contacts.length}）</div>
+                {contacts.length === 0 ? (
+                  <div style={{ fontSize: 12, color: MUTED, marginBottom: 10 }}>暂无联系人记录</div>
+                ) : contacts.map((ct: any) => (
+                  <div key={ct.id} style={{ fontSize: 12, color: TEXT, marginBottom: 4 }}>
+                    {ct.contact_name || '(未命名)'} {ct.phone && `· 电话 ${ct.phone}`} {ct.whatsapp && `· WA ${ct.whatsapp}`} {ct.email && `· ${ct.email}`}
+                  </div>
+                ))}
+                <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, margin: '10px 0 6px' }}>最近跟进（{followups.length}）</div>
+                {followups.length === 0 ? (
+                  <div style={{ fontSize: 12, color: MUTED }}>暂无跟进记录</div>
+                ) : followups.map((f: any) => (
+                  <div key={f.id} style={{ fontSize: 12, color: MUTED, marginBottom: 4 }}>
+                    {f.follow_up_date} · {f.notes || '(无备注)'}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* ── CRM (Supabase): Log follow-up — confirm-before-write ── */}
+          {intent.intentId === 'log_followup_crm' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在匹配客户…</div>
+          )}
+          {intent.intentId === 'log_followup_crm' && state.resultData && (() => {
+            const { parsed, lookup } = state.resultData;
+            if (!parsed.customerName) {
+              return (
+                <div style={{ padding: '12px 14px', background: 'rgba(224,132,106,0.07)', border: '1px solid rgba(224,132,106,0.25)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, color: '#E0846A', fontWeight: 600 }}>无法识别客户名称</div>
+                  <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>请使用格式：「记录 客户名 今天的沟通：内容」</div>
+                </div>
+              );
+            }
+            if (!lookup.found) {
+              return (
+                <div style={{ padding: '12px 14px', background: 'rgba(224,132,106,0.07)', border: '1px solid rgba(224,132,106,0.25)', borderRadius: 8 }}>
+                  {lookup.multiple ? (
+                    <>
+                      <div style={{ fontSize: 13, color: '#E0846A', fontWeight: 600, marginBottom: 6 }}>找到多个同名客户，无法安全归属，请手动前往 CRM 处理</div>
+                      {lookup.candidates.map((c: any) => <div key={c.id} style={{ fontSize: 12, color: MUTED }}>· {c.customer_name}</div>)}
+                    </>
+                  ) : (
+                    <div style={{ fontSize: 13, color: '#E0846A', fontWeight: 600 }}>未找到客户「{parsed.customerName}」，请先新建客户</div>
+                  )}
+                </div>
+              );
+            }
+            const customer = lookup.customer;
+            if (writePhase === 'done' && writeResult) {
+              return (
+                <div style={{ padding: '12px 14px', background: 'rgba(111,191,142,0.07)', border: '1px solid rgba(111,191,142,0.25)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, color: '#6FBF8E', fontWeight: 600, marginBottom: 4 }}>✓ 跟进已记录</div>
+                  <div style={{ fontSize: 12, color: MUTED }}>{customer.customer_name} · 已写入 crm_followups，并同步更新 crm_customers</div>
+                </div>
+              );
+            }
+            if (writePhase === 'error') {
+              return (
+                <div style={{ padding: '12px 14px', background: 'rgba(224,132,106,0.07)', border: '1px solid rgba(224,132,106,0.25)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, color: '#E0846A', fontWeight: 600, marginBottom: 4 }}>写入失败</div>
+                  <div style={{ fontSize: 12, color: MUTED }}>{writeError}</div>
+                </div>
+              );
+            }
+            return (
+              <div>
+                <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, marginBottom: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: TEXT, marginBottom: 6 }}>{customer.customer_name}</div>
+                  <div style={{ fontSize: 12, color: TEXT, marginBottom: 4 }}>跟进内容：{parsed.notes}</div>
+                  {parsed.nextAction && <div style={{ fontSize: 12, color: MUTED }}>下一步：{parsed.nextAction}</div>}
+                  {parsed.nextFollowUpAt && <div style={{ fontSize: 12, color: MUTED }}>下次跟进：{parsed.nextFollowUpAt}</div>}
+                  {parsed.method && <div style={{ fontSize: 12, color: MUTED }}>方式：{parsed.method}</div>}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    disabled={writePhase === 'sending'}
+                    onClick={() => {
+                      setWritePhase('sending');
+                      logFollowup({
+                        customerId: customer.id,
+                        notes: parsed.notes,
+                        nextAction: parsed.nextAction || null,
+                        nextFollowUpAt: parsed.nextFollowUpAt,
+                        method: parsed.method,
+                      }).then(res => {
+                        if (res.ok) { setWritePhase('done'); setWriteResult(res); }
+                        else { setWritePhase('error'); setWriteError(res.error); }
+                      });
+                    }}
+                    style={{ flex: 1, padding: '10px', borderRadius: 9, background: writePhase === 'sending' ? 'rgba(111,191,142,0.2)' : `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: writePhase === 'sending' ? '#6FBF8E' : NAVY, fontSize: 14, fontWeight: 700, cursor: writePhase === 'sending' ? 'not-allowed' : 'pointer' }}
+                  >
+                    {writePhase === 'sending' ? '写入中…' : '确认记录'}
+                  </button>
+                  <button onClick={onCancel} style={{ padding: '10px 18px', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>取消</button>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ── CRM (Supabase): Create customer — confirm-before-write ── */}
+          {intent.intentId === 'create_customer_crm' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在检查重复客户…</div>
+          )}
+          {intent.intentId === 'create_customer_crm' && state.resultData && (() => {
+            const { draft, dupCheck } = state.resultData;
+            if (!draft.customerName) {
+              return (
+                <div style={{ padding: '12px 14px', background: 'rgba(224,132,106,0.07)', border: '1px solid rgba(224,132,106,0.25)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, color: '#E0846A', fontWeight: 600 }}>无法识别客户名称</div>
+                  <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>请使用格式：「新建客户 客户名，联系人XXX，WhatsApp XXX」</div>
+                </div>
+              );
+            }
+            if (writePhase === 'done' && writeResult) {
+              return (
+                <div style={{ padding: '12px 14px', background: 'rgba(111,191,142,0.07)', border: '1px solid rgba(111,191,142,0.25)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, color: '#6FBF8E', fontWeight: 600, marginBottom: 4 }}>✓ 客户已创建</div>
+                  <div style={{ fontSize: 12, color: MUTED }}>已写入 crm_customers{writeResult.contact ? ' + crm_contacts' : ''}</div>
+                </div>
+              );
+            }
+            if (writePhase === 'error') {
+              return (
+                <div style={{ padding: '12px 14px', background: 'rgba(224,132,106,0.07)', border: '1px solid rgba(224,132,106,0.25)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, color: '#E0846A', fontWeight: 600, marginBottom: 4 }}>创建失败</div>
+                  <div style={{ fontSize: 12, color: MUTED }}>{writeError}</div>
+                </div>
+              );
+            }
+            return (
+              <div>
+                {dupCheck?.found && (
+                  <div style={{ padding: '8px 12px', background: 'rgba(224,132,106,0.07)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8, marginBottom: 8, fontSize: 12, color: '#E0846A' }}>
+                    ⚠ 已存在同名客户「{dupCheck.customer.customer_name}」，请确认是否仍要新建。
+                  </div>
+                )}
+                <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, marginBottom: 10 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: TEXT, marginBottom: 8 }}>{draft.customerName}</div>
+                  {[
+                    draft.contactName && ['联系人', draft.contactName],
+                    draft.phone && ['电话', draft.phone],
+                    draft.whatsapp && ['WhatsApp', draft.whatsapp],
+                    draft.email && ['Email', draft.email],
+                  ].filter(Boolean).map(([label, value]: any, i: number) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, fontSize: 12, padding: '2px 0' }}>
+                      <span style={{ color: SUBTLE, minWidth: 70 }}>{label}</span><span style={{ color: TEXT }}>{value}</span>
+                    </div>
+                  ))}
+                  {!draft.contactName && !draft.phone && !draft.whatsapp && !draft.email && (
+                    <div style={{ fontSize: 12, color: SUBTLE }}>无联系人信息 — 不会创建 crm_contacts 记录</div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    disabled={writePhase === 'sending'}
+                    onClick={() => {
+                      setWritePhase('sending');
+                      createCustomerWithContact({
+                        customerName: draft.customerName,
+                        contactName: draft.contactName || undefined,
+                        phone: draft.phone || undefined,
+                        whatsapp: draft.whatsapp || undefined,
+                        email: draft.email || undefined,
+                      }).then(res => {
+                        if (res.ok) { setWritePhase('done'); setWriteResult(res); }
+                        else { setWritePhase('error'); setWriteError(res.error); }
+                      });
+                    }}
+                    style={{ flex: 1, padding: '10px', borderRadius: 9, background: writePhase === 'sending' ? 'rgba(111,191,142,0.2)' : `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: writePhase === 'sending' ? '#6FBF8E' : NAVY, fontSize: 14, fontWeight: 700, cursor: writePhase === 'sending' ? 'not-allowed' : 'pointer' }}
+                  >
+                    {writePhase === 'sending' ? '创建中…' : '确认创建客户'}
+                  </button>
+                  <button onClick={onCancel} style={{ padding: '10px 18px', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>取消</button>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* ── Update follow-up status panel ── */}
           {intent.intentId === 'update_followup_status' && state.resultData && (() => {
             const d = state.resultData;
@@ -2707,6 +2968,192 @@ export function AIPage() {
       setTab('assistant');
       setCmdState(null);
       setInvoiceMode(true);
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // CRM (Supabase) — "今天我要跟进谁？" — reads crm_customers directly. No Notion/localStorage.
+    const CRM_TODAY_FOLLOWUPS_RE = /今天.{0,4}跟进谁|今天谁要跟进|今天要跟进谁|谁要跟进|今天跟进清单|who (?:do i|should i) follow up (?:with )?today/iu;
+    if (CRM_TODAY_FOLLOWUPS_RE.test(t)) {
+      const todayMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'today_followups_crm',
+          intentNameZh: '今日跟进清单',
+          intentNameEn: "Today's Follow-ups",
+          category: 'query',
+          triggerKeywordsZh: [],
+          triggerKeywordsEn: [],
+          targetTab: 'chat',
+          targetModule: 'CRM',
+          targetRoute: '/crm',
+          readSources: ['crm_customers (Supabase)'],
+          writeTargets: [],
+          requiredFields: [],
+          approvalRequired: false,
+          resultPanel: null,
+          implementationStatus: 'real',
+          notConnectedMessage: '',
+          fallbackBehavior: '',
+        },
+        confidence: 1,
+        raw: raw.trim(),
+        detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: todayMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在连接 crm_customers…', '正在筛选今日跟进…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          getTodaysFollowups().then(res => {
+            setCmdState(prev => prev ? { ...prev, resultData: res } : prev);
+          });
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // CRM (Supabase) — "查一下 X" — customer profile + contacts + recent follow-ups.
+    // Exact/contains match only, never fuzzy. Skips if the extracted term looks
+    // like it belongs to another intent (inventory/quotation/supplier/etc).
+    const crmQueryName = parseQueryCustomerCommand(raw.trim());
+    if (crmQueryName) {
+      const queryMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'query_customer_crm',
+          intentNameZh: '查询客户',
+          intentNameEn: 'Query Customer',
+          category: 'query',
+          triggerKeywordsZh: [],
+          triggerKeywordsEn: [],
+          targetTab: 'chat',
+          targetModule: 'CRM',
+          targetRoute: '/crm',
+          readSources: ['crm_customers (Supabase)', 'crm_contacts (Supabase)', 'crm_followups (Supabase)'],
+          writeTargets: [],
+          requiredFields: [],
+          approvalRequired: false,
+          resultPanel: null,
+          implementationStatus: 'real',
+          notConnectedMessage: '',
+          fallbackBehavior: '',
+        },
+        confidence: 1,
+        raw: raw.trim(),
+        detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: queryMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在连接 crm_customers…', '正在检索客户主档…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          findCustomerByName(crmQueryName).then(res => {
+            setCmdState(prev => prev ? { ...prev, resultData: res } : prev);
+          });
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // CRM (Supabase) — "记录 X 今天的沟通：…" — write to crm_followups + sync crm_customers.
+    // Requires explicit confirmation before writing (writePhase in CommandPanel).
+    const CRM_LOG_FOLLOWUP_RE = /^记录.*(?:沟通|跟进记录|通话)|^log.*communication/iu;
+    if (CRM_LOG_FOLLOWUP_RE.test(raw.trim())) {
+      const parsed = parseLogFollowupCommand(raw.trim());
+      const logMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'log_followup_crm',
+          intentNameZh: '记录客户跟进',
+          intentNameEn: 'Log Customer Follow-up',
+          category: 'action',
+          triggerKeywordsZh: [],
+          triggerKeywordsEn: [],
+          targetTab: 'chat',
+          targetModule: 'CRM',
+          targetRoute: '/crm',
+          readSources: ['crm_customers (Supabase)'],
+          writeTargets: ['crm_followups (Supabase)', 'crm_customers (Supabase)'],
+          requiredFields: [],
+          approvalRequired: true,
+          resultPanel: null,
+          implementationStatus: 'real',
+          notConnectedMessage: '',
+          fallbackBehavior: '',
+        },
+        confidence: 1,
+        raw: raw.trim(),
+        detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: logMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在解析跟进内容…', '正在匹配客户…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          if (!parsed.customerName) {
+            setCmdState(prev => prev ? { ...prev, resultData: { ok: true, parsed, lookup: { found: false, multiple: false } } } : prev);
+            return;
+          }
+          findCustomerByName(parsed.customerName).then(lookup => {
+            setCmdState(prev => prev ? { ...prev, resultData: { ok: true, parsed, lookup } } : prev);
+          });
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // CRM (Supabase) — "新建客户 X，联系人…，WhatsApp …" — write to crm_customers (+ crm_contacts).
+    // Requires explicit confirmation before writing (writePhase in CommandPanel).
+    const CRM_CREATE_CUSTOMER_RE = /^新建客户|^创建客户(?!.*Notion)/iu;
+    if (CRM_CREATE_CUSTOMER_RE.test(raw.trim())) {
+      const draft = parseCreateCrmCustomerCommand(raw.trim());
+      const createCrmMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'create_customer_crm',
+          intentNameZh: '新建 CRM 客户',
+          intentNameEn: 'Create CRM Customer',
+          category: 'customer',
+          triggerKeywordsZh: [],
+          triggerKeywordsEn: [],
+          targetTab: 'chat',
+          targetModule: 'CRM',
+          targetRoute: '/crm',
+          readSources: ['crm_customers (Supabase)'],
+          writeTargets: ['crm_customers (Supabase)', 'crm_contacts (Supabase)'],
+          requiredFields: ['customerName'],
+          approvalRequired: true,
+          resultPanel: null,
+          implementationStatus: 'real',
+          notConnectedMessage: '',
+          fallbackBehavior: '',
+        },
+        confidence: 1,
+        raw: raw.trim(),
+        detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: createCrmMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在解析客户信息…', '正在检查重复客户…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          if (!draft.customerName) {
+            setCmdState(prev => prev ? { ...prev, resultData: { ok: true, draft, dupCheck: { found: false, multiple: false } } } : prev);
+            return;
+          }
+          findCustomerByName(draft.customerName).then(dupCheck => {
+            setCmdState(prev => prev ? { ...prev, resultData: { ok: true, draft, dupCheck } } : prev);
+          });
+        },
+      );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
       return;
     }
