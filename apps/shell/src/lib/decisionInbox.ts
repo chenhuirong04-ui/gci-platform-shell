@@ -114,21 +114,21 @@ async function safeFetchJson<T = any>(url: string): Promise<T | { ok: false; err
   }
 }
 
-// GCI operates on Asia/Dubai (UTC+4) — same +4h-shift pattern used by
-// actionCenter.ts / crmSupabase.ts / calendar-events.ts. Never compare raw
-// UTC dates/times, which would be wrong ~4 hours a day.
-function dubaiNowMs(): number {
-  return Date.now() + 4 * 3600 * 1000;
+// GCI operates on Asia/Dubai (UTC+4). The +4h-shift-then-slice pattern below
+// (same as actionCenter.ts / crmSupabase.ts / calendar-events.ts) is ONLY
+// valid for extracting a Dubai *calendar-date string* from an instant — it
+// must never be used as a raw epoch in an absolute-time comparison (e.g.
+// against execution_due_at/decided_at/follow_up_at, which are real, already
+// timezone-correct UTC instants). Comparing a shifted "now" epoch against a
+// real epoch double-counts the offset and makes everything look ~4h more
+// urgent than it is. Absolute comparisons below use the real Date.now();
+// only the *day-string* comparisons route through the shifted helpers.
+function dubaiDateStrOfMs(realMs: number): string {
+  return new Date(realMs + 4 * 3600 * 1000).toISOString().slice(0, 10);
 }
-function dubaiDateStrOfMs(ms: number): string {
-  return new Date(ms).toISOString().slice(0, 10);
-}
-function dubaiDateStrOfIso(iso: string): string {
-  return dubaiDateStrOfMs(new Date(iso).getTime() + 4 * 3600 * 1000);
-}
-function isSameDubaiDay(iso: string | null, nowMs: number): boolean {
+function isSameDubaiDay(iso: string | null, realNowMs: number): boolean {
   if (!iso) return false;
-  return dubaiDateStrOfIso(iso) === dubaiDateStrOfMs(nowMs);
+  return dubaiDateStrOfMs(new Date(iso).getTime()) === dubaiDateStrOfMs(realNowMs);
 }
 
 // Accepts a Chinese relative date phrase ("明天"/"周三"/"3天后"/"2026-08-20"),
@@ -284,7 +284,7 @@ export async function syncDecisionCandidates(): Promise<
     .in('status', ['pending', 'decided']);
   if (error) return { ok: false, error: error.message };
 
-  const nowMs = dubaiNowMs();
+  const nowMs = Date.now();
   const byKey = new Map<string, { status: string; decided_at: string | null; follow_up_at: string | null }[]>();
   for (const r of existing ?? []) {
     const key = `${r.source}|${r.source_ref}`;
@@ -532,7 +532,7 @@ export async function getFollowThroughData(): Promise<
 > {
   const res = await getDecisions();
   if (!res.ok) return res;
-  const nowMs = dubaiNowMs();
+  const nowMs = Date.now();
   const tracked = res.rows.filter((d) => d.status === 'decided' && d.execution_status && d.execution_status !== 'not_required' && d.execution_status !== 'completed');
   const counts: FollowThroughCounts = {
     pending: tracked.filter((d) => d.execution_status === 'pending').length,
@@ -548,7 +548,7 @@ export async function getFollowThroughData(): Promise<
 export async function getDecisionFollowThroughActions(): Promise<FollowThroughItem[]> {
   const res = await getDecisions();
   if (!res.ok) return [];
-  return buildFollowThroughItems(res.rows, dubaiNowMs());
+  return buildFollowThroughItems(res.rows, Date.now());
 }
 
 // Uncapped follow-through list — used by Ask GCI queries ("哪些决定今天到期？",
@@ -558,7 +558,7 @@ export async function getAllFollowThroughItems(): Promise<
 > {
   const res = await getDecisions();
   if (!res.ok) return res;
-  return { ok: true, items: buildFollowThroughItems(res.rows, dubaiNowMs()) };
+  return { ok: true, items: buildFollowThroughItems(res.rows, Date.now()) };
 }
 
 export const DECISION_SOURCE_LABEL: Record<DecisionSource, string> = {
