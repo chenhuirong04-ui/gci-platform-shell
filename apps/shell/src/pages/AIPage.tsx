@@ -2060,6 +2060,11 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
           {intent.intentId === 'customer_context_query' && !state.resultData && (
             <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查询 CRM / Gmail / Drive…</div>
           )}
+          {intent.intentId === 'customer_context_query' && state.resultData && state.resultData.ok === false && (
+            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              查询失败:{state.resultData.error}
+            </div>
+          )}
           {intent.intentId === 'customer_context_query' && state.resultData?.noName && (
             <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
               没有识别到具体客户名,请明确指定,例如:「MAG 最近沟通到哪里了?」
@@ -3414,7 +3419,9 @@ export function AIPage() {
         (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
         () => {
           setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
-          searchGmail(gmailQuery).then(res => setCmdState(prev => prev ? { ...prev, resultData: res } : prev));
+          searchGmail(gmailQuery)
+            .then(res => setCmdState(prev => prev ? { ...prev, resultData: res } : prev))
+            .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: String(e?.message ?? e) } } : prev));
         },
       );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
@@ -3440,7 +3447,9 @@ export function AIPage() {
         (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
         () => {
           setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
-          searchDrive(driveQuery).then(res => setCmdState(prev => prev ? { ...prev, resultData: res } : prev));
+          searchDrive(driveQuery)
+            .then(res => setCmdState(prev => prev ? { ...prev, resultData: res } : prev))
+            .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: String(e?.message ?? e) } } : prev));
         },
       );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
@@ -3466,7 +3475,9 @@ export function AIPage() {
         (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
         () => {
           setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
-          getCalendarEvents(range).then(res => setCmdState(prev => prev ? { ...prev, resultData: res } : prev));
+          getCalendarEvents(range)
+            .then(res => setCmdState(prev => prev ? { ...prev, resultData: res } : prev))
+            .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: String(e?.message ?? e) } } : prev));
         },
       );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
@@ -3491,7 +3502,9 @@ export function AIPage() {
         (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
         () => {
           setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
-          getImportantEmails().then(res => setCmdState(prev => prev ? { ...prev, resultData: res } : prev));
+          getImportantEmails()
+            .then(res => setCmdState(prev => prev ? { ...prev, resultData: res } : prev))
+            .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: String(e?.message ?? e) } } : prev));
         },
       );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
@@ -3522,9 +3535,11 @@ export function AIPage() {
             setCmdState(prev => prev ? { ...prev, resultData: { ok: true, noName: true } } : prev);
             return;
           }
-          Promise.all([findCustomerByName(custName), searchGmail(custName), searchDrive(custName)]).then(([crm, gmail, drive]) => {
-            setCmdState(prev => prev ? { ...prev, resultData: { ok: true, custName, crm, gmail, drive } } : prev);
-          });
+          Promise.all([findCustomerByName(custName), searchGmail(custName), searchDrive(custName)])
+            .then(([crm, gmail, drive]) => {
+              setCmdState(prev => prev ? { ...prev, resultData: { ok: true, custName, crm, gmail, drive } } : prev);
+            })
+            .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: String(e?.message ?? e) } } : prev));
         },
       );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);

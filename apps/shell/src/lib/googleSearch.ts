@@ -32,14 +32,31 @@ export interface CalendarResult {
   meetingLink: string;
 }
 
+// Never throws — a failed fetch or a non-JSON response (e.g. a platform
+// timeout page) always resolves to { ok: false, error }, so callers never
+// need a .catch() and the UI never gets stuck on an unhandled rejection.
+async function safeFetchJson<T>(url: string): Promise<T | { ok: false; error: string }> {
+  try {
+    const res = await fetch(url);
+    const text = await res.text();
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return { ok: false, error: res.ok ? 'Server returned a non-JSON response.' : `Request failed (${res.status}): ${text.slice(0, 200)}` };
+    }
+    return data;
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message ?? e) };
+  }
+}
+
 export async function searchGmail(q: string): Promise<{ ok: true; query: string; results: GmailResult[] } | { ok: false; error: string }> {
-  const res = await fetch(`${base()}/api/google/gmail-search?q=${encodeURIComponent(q)}`);
-  return res.json();
+  return safeFetchJson(`${base()}/api/google/gmail-search?q=${encodeURIComponent(q)}`);
 }
 
 export async function searchDrive(q: string): Promise<{ ok: true; query: string; results: DriveResult[] } | { ok: false; error: string }> {
-  const res = await fetch(`${base()}/api/google/drive-search?q=${encodeURIComponent(q)}`);
-  return res.json();
+  return safeFetchJson(`${base()}/api/google/drive-search?q=${encodeURIComponent(q)}`);
 }
 
 export async function getCalendarEvents(
@@ -47,11 +64,9 @@ export async function getCalendarEvents(
   date?: string,
 ): Promise<{ ok: true; range: string; startDate: string; endDate: string; results: CalendarResult[] } | { ok: false; error: string }> {
   const qs = new URLSearchParams({ range, ...(date ? { date } : {}) });
-  const res = await fetch(`${base()}/api/google/calendar-events?${qs.toString()}`);
-  return res.json();
+  return safeFetchJson(`${base()}/api/google/calendar-events?${qs.toString()}`);
 }
 
 export async function getImportantEmails(): Promise<{ ok: true; rule: string; results: GmailResult[] } | { ok: false; error: string }> {
-  const res = await fetch(`${base()}/api/google/important-emails`);
-  return res.json();
+  return safeFetchJson(`${base()}/api/google/important-emails`);
 }
