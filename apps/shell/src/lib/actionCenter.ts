@@ -8,9 +8,10 @@ import { getImportantEmails, getCalendarEvents } from './googleSearch';
 import { getSystemRegistry } from './systemRegistry';
 import { AGENTS } from '../components/AgentsStatus';
 import { getDecisionFollowThroughActions } from './decisionInbox';
+import { getOpenCommitmentActions } from './commitments';
 
 export type ActionPriority = 'P1' | 'P2' | 'P3';
-export type ActionSource = 'crm' | 'email' | 'calendar' | 'business' | 'systems' | 'agents' | 'decisions';
+export type ActionSource = 'crm' | 'email' | 'calendar' | 'business' | 'systems' | 'agents' | 'decisions' | 'commitments';
 
 export interface BossAction {
   id: string;
@@ -58,6 +59,7 @@ export async function getBossActions(): Promise<
     invoiceSummary,
     inventoryAlerts,
     decisionFollowThrough,
+    commitmentActions,
   ] = await Promise.all([
     getTodaysFollowups(),
     getOverdueFollowups(),
@@ -69,7 +71,13 @@ export async function getBossActions(): Promise<
     safeFetchJson<any>(`${base()}/api/invoice/pending-summary`),
     safeFetchJson<any>(`${base()}/api/trade/check-inventory`),
     getDecisionFollowThroughActions(),
+    getOpenCommitmentActions(),
   ]);
+
+  // A Decision that already has an open Commitment tracking its next step
+  // must not also generate a separate Decision Follow-through action for the
+  // same decision — Commitment wins, per Task 10 §8.
+  const commitmentDecisionIds = new Set(commitmentActions.map((c) => c.relatedDecisionId).filter((id): id is string => !!id));
 
   const actions: BossAction[] = [];
   // Real epoch, not the Dubai-shifted "date-string" epoch — hoursUntilStart
@@ -315,6 +323,7 @@ export async function getBossActions(): Promise<
   // on already-decided items. Never the raw Decision itself (that lives in
   // Decision Inbox); these are distinct "still needs a next step" entries. ──
   for (const it of decisionFollowThrough) {
+    if (commitmentDecisionIds.has(it.decisionId)) continue;
     actions.push({
       id: it.id,
       source: 'decisions',
@@ -327,6 +336,23 @@ export async function getBossActions(): Promise<
       related_system: null,
       action_type: it.kind === 'execution' ? 'decision_execution' : 'decision_follow_up',
       deep_link: '/decisions',
+    });
+  }
+
+  // ── 8. Commitments (Task 10) — explicit promises Chris confirmed. ───────
+  for (const c of commitmentActions) {
+    actions.push({
+      id: c.id,
+      source: 'commitments',
+      category: 'Commitments',
+      title: c.title,
+      summary: c.reason,
+      priority: c.priority,
+      due_at: c.dueAt,
+      related_customer: null,
+      related_system: null,
+      action_type: 'commitment',
+      deep_link: c.sourceLink || '/commitments',
     });
   }
 
@@ -364,4 +390,5 @@ export const SOURCE_LABEL: Record<ActionSource, string> = {
   systems: 'Systems',
   agents: 'Agents',
   decisions: 'Decisions',
+  commitments: 'Commitments',
 };

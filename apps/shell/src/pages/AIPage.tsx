@@ -28,6 +28,12 @@ import {
   DECISION_SOURCE_LABEL, EXECUTION_STATUS_LABEL,
   type ExecutiveDecision, type ExecutionStatus, type FollowThroughItem,
 } from '../lib/decisionInbox';
+import { matchCommitmentQuery, parseUpdateCommitmentStatusCommand } from '../ai/commitmentAskGciParsers';
+import {
+  getCommitments, commitmentDisplayStatus, updateCommitmentStatus,
+  COMMITMENT_SOURCE_LABEL, COMMITMENT_TYPE_LABEL,
+  type ExecutiveCommitment,
+} from '../lib/commitments';
 
 // ── Inventory query normalizer ────────────────────────────────────────────────
 // Strips command words, punctuation, and trailing "库存" to get the product term.
@@ -2377,6 +2383,156 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
             );
           })()}
 
+          {/* ── Commitment Tracker (Task 10): read-only Ask GCI queries ── */}
+          {intent.intentId === 'commitment_query' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查询承诺事项…</div>
+          )}
+          {intent.intentId === 'commitment_query' && state.resultData && state.resultData.ok === false && (
+            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              查询失败:{state.resultData.error}
+            </div>
+          )}
+          {intent.intentId === 'commitment_query' && state.resultData?.ok && (() => {
+            const all: ExecutiveCommitment[] = state.resultData.rows || [];
+            const query = state.resultData.query as { mode: string; name?: string } | undefined;
+            const mode = query?.mode;
+            const nowMs = Date.now();
+            let list: ExecutiveCommitment[] = [];
+            let heading = '';
+            if (mode === 'my_outbound_open') {
+              list = all.filter(c => c.status === 'open' && c.commitment_type === 'outbound');
+              heading = '我答应过别人、还没做的事情';
+            } else if (mode === 'inbound_open') {
+              list = all.filter(c => c.status === 'open' && c.commitment_type === 'inbound');
+              heading = '别人答应我、还没完成的事情';
+            } else if (mode === 'due_today') {
+              // Dubai calendar-date match — shift only for the date-STRING comparison, never for absolute arithmetic.
+              const todayDubai = new Date(nowMs + 4 * 3600000).toISOString().slice(0, 10);
+              list = all.filter(c => c.status === 'open' && c.due_at && new Date(new Date(c.due_at).getTime() + 4 * 3600000).toISOString().slice(0, 10) === todayDubai);
+              heading = '今天到期的承诺';
+            } else if (mode === 'overdue') {
+              list = all.filter(c => commitmentDisplayStatus(c, nowMs) === 'overdue');
+              heading = '已逾期的承诺';
+            } else if (mode === 'history_for') {
+              const name = query?.name || '';
+              list = all.filter(c => c.title.includes(name) || c.commitment_text.includes(name) || (c.counterparty || '').includes(name));
+              heading = `关于「${name}」的承诺记录`;
+            }
+            return (
+              <div>
+                <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 8 }}>{heading}</div>
+                {list.length === 0 ? (
+                  <div style={{ fontSize: 13, color: '#6FBF8E' }}>✓ 没有相关记录。</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {list.map(c => {
+                      const dStatus = commitmentDisplayStatus(c, nowMs);
+                      return (
+                        <div key={c.id} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 9.5, color: '#8FA6D4', background: 'rgba(143,166,212,0.12)', borderRadius: 4, padding: '2px 6px' }}>
+                              {COMMITMENT_SOURCE_LABEL[c.source]}
+                            </span>
+                            <span style={{ fontSize: 9.5, color: dStatus === 'overdue' ? '#E0846A' : MUTED, background: dStatus === 'overdue' ? 'rgba(224,132,106,0.12)' : 'rgba(255,255,255,0.05)', borderRadius: 4, padding: '2px 6px' }}>
+                              {dStatus}
+                            </span>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{c.title}</span>
+                          </div>
+                          <div style={{ fontSize: 12, color: SUBTLE, marginTop: 4 }}>{c.commitment_text}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* ── Commitment status update (Task 10): WRITE, needs confirmation ── */}
+          {intent.intentId === 'commitment_update_status' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查找匹配的承诺…</div>
+          )}
+          {intent.intentId === 'commitment_update_status' && state.resultData && state.resultData.ok === false && (
+            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              查询失败:{state.resultData.error}
+            </div>
+          )}
+          {intent.intentId === 'commitment_update_status' && state.resultData?.notFound && (
+            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              没有找到与「{state.resultData.name}」匹配的未完成承诺。
+            </div>
+          )}
+          {intent.intentId === 'commitment_update_status' && state.resultData?.ambiguous && (() => {
+            const candidates: ExecutiveCommitment[] = state.resultData.candidates || [];
+            return (
+              <div>
+                <div style={{ fontSize: 13, color: '#D4A843', marginBottom: 8 }}>
+                  {state.resultData.name ? `「${state.resultData.name}」匹配到多条承诺，无法直接确定，请明确指定：` : '没有指定是哪一条承诺，请明确指定，例如「把 MAG 这条承诺标记为完成」。当前未完成的承诺：'}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {candidates.slice(0, 8).map(c => (
+                    <div key={c.id} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 12.5, color: TEXT }}>
+                      {c.title} — {c.commitment_text}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+          {intent.intentId === 'commitment_update_status' && state.resultData?.ok && !state.resultData.notFound && !state.resultData.ambiguous && (() => {
+            const c: ExecutiveCommitment = state.resultData.commitment;
+            const targetStatus: 'completed' | 'cancelled' = state.resultData.targetStatus;
+            const targetLabel = targetStatus === 'completed' ? '完成' : '取消';
+
+            if (writePhase === 'done' && writeResult) {
+              return (
+                <div style={{ padding: '12px 14px', background: 'rgba(111,191,142,0.07)', border: '1px solid rgba(111,191,142,0.25)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, color: '#6FBF8E', fontWeight: 600, marginBottom: 4 }}>✓ 承诺状态已更新</div>
+                  <div style={{ fontSize: 12, color: MUTED }}>{c.title} → {targetLabel}</div>
+                </div>
+              );
+            }
+            if (writePhase === 'error') {
+              return (
+                <div style={{ padding: '12px 14px', background: 'rgba(224,132,106,0.07)', border: '1px solid rgba(224,132,106,0.25)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, color: '#E0846A', fontWeight: 600, marginBottom: 4 }}>更新失败</div>
+                  <div style={{ fontSize: 12, color: MUTED }}>{writeError || '未知错误，请前往 /commitments 手动更新。'}</div>
+                </div>
+              );
+            }
+            return (
+              <div>
+                <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: TEXT, marginBottom: 6 }}>{c.title}</div>
+                  <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 6 }}>{c.commitment_text}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+                    <span style={{ padding: '2px 8px', borderRadius: 5, background: 'rgba(255,255,255,0.06)', color: MUTED }}>{COMMITMENT_TYPE_LABEL[c.commitment_type]} · open</span>
+                    <span style={{ color: SUBTLE }}>→</span>
+                    <span style={{ padding: '2px 8px', borderRadius: 5, background: targetStatus === 'completed' ? 'rgba(111,191,142,0.12)' : 'rgba(255,255,255,0.06)', color: targetStatus === 'completed' ? '#6FBF8E' : MUTED, fontWeight: 700 }}>{targetLabel}</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    disabled={writePhase === 'sending'}
+                    onClick={() => {
+                      setWritePhase('sending');
+                      updateCommitmentStatus(c.id, targetStatus)
+                        .then(res => {
+                          if (res.ok) { setWritePhase('done'); setWriteResult(res); }
+                          else { setWritePhase('error'); setWriteError(res.error); }
+                        })
+                        .catch(e => { setWritePhase('error'); setWriteError(String(e?.message ?? e)); });
+                    }}
+                    style={{ flex: 1, padding: '10px', borderRadius: 9, background: writePhase === 'sending' ? 'rgba(111,191,142,0.2)' : `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: writePhase === 'sending' ? '#6FBF8E' : NAVY, fontSize: 14, fontWeight: 700, cursor: writePhase === 'sending' ? 'not-allowed' : 'pointer' }}
+                  >
+                    {writePhase === 'sending' ? '更新中…' : '确认更新'}
+                  </button>
+                  <button onClick={onCancel} style={{ padding: '10px 18px', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>取消</button>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* ── CRM (Supabase): Today's follow-ups ── */}
           {intent.intentId === 'today_followups_crm' && !state.resultData && (
             <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查询 crm_customers…</div>
@@ -3895,6 +4051,98 @@ export function AIPage() {
             const canTransition = canTransitionExecutionStatus(currentStatus, execUpdateCmd.targetStatus);
             setCmdState(prev => prev ? { ...prev, resultData: {
               ok: true, decision: target, currentStatus, targetStatus: execUpdateCmd.targetStatus, canTransition,
+            } } : prev);
+          });
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Commitment Tracker — Task 10, read-only queries over executive_commitments.
+    // "我答应过别人什么还没做？" / "别人答应我的事情有哪些还没完成？" /
+    // "今天有哪些承诺到期？" / "哪些承诺已经逾期？" / "关于 X 我答应过什么？"
+    const commitmentQuery = matchCommitmentQuery(raw.trim());
+    if (commitmentQuery) {
+      const commitmentMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'commitment_query', intentNameZh: '承诺事项', intentNameEn: 'Commitment Tracker', category: 'query',
+          triggerKeywordsZh: [], triggerKeywordsEn: [], targetTab: 'chat', targetModule: 'Commitments',
+          targetRoute: '/commitments',
+          readSources: ['executive_commitments (Supabase)'],
+          writeTargets: [], requiredFields: [],
+          approvalRequired: false, resultPanel: null, implementationStatus: 'real', notConnectedMessage: '', fallbackBehavior: '',
+        },
+        confidence: 1, raw: raw.trim(), detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: commitmentMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在查询承诺事项…', '正在整理结果…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          getCommitments()
+            .then(res => setCmdState(prev => prev ? { ...prev, resultData: { ...res, query: commitmentQuery } } : prev))
+            .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: String(e?.message ?? e) } } : prev));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Commitment status update — Task 10, WRITE action requiring Chris's
+    // explicit confirmation. "把 MAG 这条承诺标记为完成。" Only ever updates
+    // executive_commitments.status — never CRM/Gmail/Decision/Calendar/Agents.
+    // An unspecified/ambiguous reference is never guessed — Chris must be
+    // shown the candidates and pick, or retype with a specific keyword.
+    const commitmentUpdateCmd = parseUpdateCommitmentStatusCommand(raw.trim());
+    if (commitmentUpdateCmd) {
+      const commitmentUpdateMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'commitment_update_status', intentNameZh: '更新承诺状态', intentNameEn: 'Update Commitment Status', category: 'action',
+          triggerKeywordsZh: [], triggerKeywordsEn: [], targetTab: 'chat', targetModule: 'Commitments',
+          targetRoute: '/commitments',
+          readSources: ['executive_commitments (Supabase)'],
+          writeTargets: ['executive_commitments.status'],
+          requiredFields: [],
+          approvalRequired: true, resultPanel: null, implementationStatus: 'real', notConnectedMessage: '', fallbackBehavior: '',
+        },
+        confidence: 1, raw: raw.trim(), detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: commitmentUpdateMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在查找匹配的承诺…', '正在准备确认…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          getCommitments().then(res => {
+            if (!res.ok) {
+              setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: res.error } } : prev);
+              return;
+            }
+            const open = res.rows.filter(c => c.status === 'open');
+            if (!commitmentUpdateCmd.name) {
+              setCmdState(prev => prev ? { ...prev, resultData: { ok: true, ambiguous: true, candidates: open } } : prev);
+              return;
+            }
+            const nameLower = commitmentUpdateCmd.name.toLowerCase();
+            const matches = open.filter(c =>
+              c.title.toLowerCase().includes(nameLower) ||
+              (c.counterparty || '').toLowerCase().includes(nameLower) ||
+              c.commitment_text.toLowerCase().includes(nameLower),
+            );
+            if (matches.length === 0) {
+              setCmdState(prev => prev ? { ...prev, resultData: { ok: true, notFound: true, name: commitmentUpdateCmd.name } } : prev);
+              return;
+            }
+            if (matches.length > 1) {
+              setCmdState(prev => prev ? { ...prev, resultData: { ok: true, ambiguous: true, candidates: matches, name: commitmentUpdateCmd.name } } : prev);
+              return;
+            }
+            setCmdState(prev => prev ? { ...prev, resultData: {
+              ok: true, commitment: matches[0], targetStatus: commitmentUpdateCmd.targetStatus,
             } } : prev);
           });
         },

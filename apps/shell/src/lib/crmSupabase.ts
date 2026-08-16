@@ -299,6 +299,34 @@ export async function getBossDecisions(): Promise<
   return { ok: true, items: deduped };
 }
 
+// ── Task 10: Commitment Tracker — recent follow-up text for candidate scan ──
+// Read-only. Joins the customer name via the FK relationship so callers don't
+// need a second round-trip.
+export interface CrmFollowupWithCustomer extends CrmFollowup {
+  customer_name: string | null;
+}
+
+export async function getRecentFollowupsWithNotes(
+  days = 30,
+): Promise<{ ok: true; rows: CrmFollowupWithCustomer[] } | { ok: false; error: string }> {
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+
+  const { data, error } = await supabase
+    .from('crm_followups')
+    .select('id, customer_id, follow_up_date, next_follow_up_at, method, notes, next_action, status_after, owner, crm_customers(customer_name)')
+    .gte('follow_up_date', since.toISOString().slice(0, 10))
+    .order('follow_up_date', { ascending: false })
+    .limit(200);
+  if (error) return { ok: false, error: error.message };
+
+  const rows: CrmFollowupWithCustomer[] = (data ?? []).map((r: any) => ({
+    ...r,
+    customer_name: r.crm_customers?.customer_name ?? null,
+  }));
+  return { ok: true, rows };
+}
+
 // ── Action 4: create customer (+ optional primary contact) ─────────────────────
 export async function createCustomerWithContact(input: {
   customerName: string;

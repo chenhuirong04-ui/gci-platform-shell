@@ -13,6 +13,7 @@ import { InvoicePage } from './pages/InvoicePage';
 import { Systems } from './pages/Systems';
 import { Actions } from './pages/Actions';
 import { Decisions } from './pages/Decisions';
+import { Commitments } from './pages/Commitments';
 import TradeModule from '../../../modules/trade/TradeModule';
 import CrmModule from '../../../modules/crm/CrmModule';
 import QuotationModule from '../../../modules/quotation/QuotationModule';
@@ -132,6 +133,7 @@ function Shell() {
           <Route path="/systems" element={<Systems />} />
           <Route path="/actions" element={<Actions />} />
           <Route path="/decisions" element={<Decisions />} />
+          <Route path="/commitments" element={<Commitments />} />
           <Route path="/access-denied" element={<AccessDenied />} />
 
           <Route
