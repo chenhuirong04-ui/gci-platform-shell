@@ -26,13 +26,6 @@ export interface BossAction {
   deep_link: string;
 }
 
-// GCI operates on Asia/Dubai (UTC+4) — same +4h-shift pattern used by
-// calendar-events.ts's dubaiDateStr() and crmSupabase.ts's todayISO(). Never
-// compare raw UTC dates/times, which would be wrong ~4 hours a day.
-function dubaiNowMs(): number {
-  return Date.now() + 4 * 3600 * 1000;
-}
-
 async function safeFetchJson<T = any>(url: string): Promise<T | { ok: false; error: string }> {
   try {
     const res = await fetch(url);
@@ -79,7 +72,12 @@ export async function getBossActions(): Promise<
   ]);
 
   const actions: BossAction[] = [];
-  const nowMs = dubaiNowMs();
+  // Real epoch, not the Dubai-shifted "date-string" epoch — hoursUntilStart
+  // below compares against a real, already timezone-correct meeting start
+  // time, so nowMs must be the real current instant (Date.now()). Using the
+  // +4h-shifted epoch here double-counts the offset and makes meetings look
+  // ~4h closer than they are (same bug class fixed in decisionInbox.ts).
+  const nowMs = Date.now();
 
   // ── 1. CRM ───────────────────────────────────────────────────────────
   if (overdue.ok) {
