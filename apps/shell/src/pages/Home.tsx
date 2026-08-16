@@ -5,6 +5,7 @@ import { useI18n } from '@gci/i18n';
 import { statCardSpecs } from '../data/mock';
 import { AIWorkspace } from '../components/AIWorkspace';
 import { InventoryAlertDrawer } from '../components/InventoryAlertDrawer';
+import { ExecutiveDeskToday } from '../components/ExecutiveDeskToday';
 
 // ─── localStorage helpers (same keys the Trade + CRM modules use) ──────────
 function safeLocalGet<T = any>(key: string): T[] {
@@ -330,6 +331,9 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
           {buildSummary()}
         </p>
       </div>
+
+      {/* EXECUTIVE DESK — Task 4 first screen (crm_customers/crm_contacts/crm_followups via Supabase) */}
+      <ExecutiveDeskToday />
 
       {/* AI WORKSPACE */}
       <AIWorkspace />

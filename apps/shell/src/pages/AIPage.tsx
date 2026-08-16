@@ -2596,7 +2596,11 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
             </div>
           )}
 
-          {intent.approvalRequired && (
+          {/* CRM write intents (log_followup_crm / create_customer_crm) render their own
+              dedicated confirm/cancel UI above (see the intent-specific blocks earlier in
+              this component) — skip the generic footer here so there's only one set of
+              confirm buttons, not two. No other intent is affected. */}
+          {intent.approvalRequired && intent.intentId !== 'log_followup_crm' && intent.intentId !== 'create_customer_crm' && (
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={onApprove} style={{ flex: 1, padding: '11px', borderRadius: 9, background: `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: NAVY, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: "'Space Grotesk',sans-serif" }}>
                 {dict.ai.panel.confirm}
@@ -2609,7 +2613,7 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
               </button>
             </div>
           )}
-          {!intent.approvalRequired && (
+          {!intent.approvalRequired && intent.intentId !== 'log_followup_crm' && intent.intentId !== 'create_customer_crm' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
               <button onClick={onCancel} style={{ padding: '10px 18px', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>
                 {dict.ai.panel.close}

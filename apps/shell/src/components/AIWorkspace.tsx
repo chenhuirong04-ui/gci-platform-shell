@@ -6,19 +6,24 @@ import { useI18n } from '@gci/i18n';
 const GOLD = '#CBA85C';
 const GOLD_L = '#E2C988';
 
+// First 4 map directly to the Task 3 Ask GCI CRM actions (crm_customers/
+// crm_contacts/crm_followups via Supabase). These prefill+trigger the same
+// existing Ask GCI intents — no separate logic here.
 const SUGGESTIONS_ZH = [
-  '帮我创建一个新客户',
+  '今天我要跟进谁？',
+  '查客户',
+  '记录客户沟通',
+  '新建客户',
   '生成一份报价单',
   '查一下库存情况',
-  '今天有哪些跟进？',
-  '整理 WhatsApp 消息',
 ];
 const SUGGESTIONS_EN = [
+  'Who do I need to follow up with today?',
+  'Query a customer',
+  'Log a customer follow-up',
   'Create a new customer',
   'Generate a quotation',
   'Check inventory status',
-  'What follow-ups are due today?',
-  'Organize WhatsApp messages',
 ];
 
 // cmd: triggers intent routing on /ai; tab: just switches to that tab

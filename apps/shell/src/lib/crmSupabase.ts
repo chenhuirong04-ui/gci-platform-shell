@@ -165,6 +165,134 @@ export async function logFollowup(input: {
   return { ok: true, followup: followup as CrmFollowup, customer: customer as CrmCustomer };
 }
 
+// ── Executive Desk (Task 4): overdue follow-ups ─────────────────────────────────
+// "Closed/done" statuses are the only ones we can reliably infer from the new
+// crm_customers.status free-text field today — kept intentionally short per
+// Task 4 scope ("don't invent complex rules"). Extend as the status taxonomy
+// for crm_customers solidifies.
+const CLOSED_STATUSES = ['已关闭', '已完成', 'closed', 'done'];
+
+export interface CrmOverdueCustomer extends CrmCustomer {
+  overdueDays: number;
+}
+
+export async function getOverdueFollowups(): Promise<
+  { ok: true; rows: CrmOverdueCustomer[] } | { ok: false; error: string }
+> {
+  const today = todayISO();
+  const { data, error } = await supabase
+    .from('crm_customers')
+    .select('id, customer_name, status, priority, owner, next_follow_up_at, next_action, follow_up_notes, last_follow_up_at')
+    .lt('next_follow_up_at', today)
+    .not('next_follow_up_at', 'is', null);
+  if (error) return { ok: false, error: error.message };
+
+  const todayMs = new Date(today).getTime();
+  const rows = (data ?? [])
+    .filter((c) => !CLOSED_STATUSES.some((s) => (c.status || '').trim().toLowerCase() === s))
+    .map((c) => ({
+      ...c,
+      overdueDays: Math.max(1, Math.round((todayMs - new Date(c.next_follow_up_at as string).getTime()) / 86400000)),
+    }))
+    .sort((a, b) => b.overdueDays - a.overdueDays) as CrmOverdueCustomer[];
+
+  return { ok: true, rows };
+}
+
+// ── Executive Desk (Task 4): new customers in the last N days ──────────────────
+export interface CrmNewCustomerRow {
+  id: string;
+  customer_name: string;
+  created_at: string;
+  source: string | null;
+  business_type: string | null;
+  status: string | null;
+}
+
+export async function getRecentNewCustomers(
+  days = 7
+): Promise<{ ok: true; rows: CrmNewCustomerRow[] } | { ok: false; error: string }> {
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  since.setHours(0, 0, 0, 0);
+
+  const { data, error } = await supabase
+    .from('crm_customers')
+    .select('id, customer_name, created_at, source, business_type, status')
+    .gte('created_at', since.toISOString())
+    .order('created_at', { ascending: false });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, rows: (data ?? []) as CrmNewCustomerRow[] };
+}
+
+// ── Executive Desk (Task 4): "needs Chris's decision" ───────────────────────────
+// Only rules directly answerable from existing crm_customers columns. No
+// fabricated/heuristic rules — if the data can't support a rule, it's omitted.
+export interface BossDecisionItem {
+  id: string;
+  customerName: string;
+  reason: string;
+  detail: string;
+}
+
+export async function getBossDecisions(): Promise<
+  { ok: true; items: BossDecisionItem[] } | { ok: false; error: string }
+> {
+  const [overdueRes, allRes] = await Promise.all([
+    getOverdueFollowups(),
+    supabase
+      .from('crm_customers')
+      .select('id, customer_name, priority, next_action, next_follow_up_at, last_follow_up_at')
+      .limit(500),
+  ]);
+  if (!overdueRes.ok) return { ok: false, error: overdueRes.error };
+  if (allRes.error) return { ok: false, error: allRes.error.message };
+
+  const items: BossDecisionItem[] = [];
+
+  // Rule 1: already-overdue customers (reuse the overdue query — same definition).
+  for (const c of overdueRes.rows) {
+    items.push({ id: c.id, customerName: c.customer_name, reason: '已逾期跟进', detail: `逾期 ${c.overdueDays} 天` });
+  }
+
+  // Rule 2: has a next_action but no next_follow_up_at — action was decided but never scheduled.
+  // Rule 3: priority looks like a "focus" customer (contains 重点, or is exactly 'A') with no
+  // follow-up in 7+ days (or never followed up).
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  for (const c of allRes.data ?? []) {
+    if (c.next_action && !c.next_follow_up_at) {
+      items.push({ id: c.id, customerName: c.customer_name, reason: '有下一步但未设跟进日期', detail: c.next_action });
+    }
+    const priority = (c.priority || '').trim();
+    const isFocus = priority.includes('重点') || priority.toUpperCase() === 'A';
+    if (isFocus) {
+      const last = c.last_follow_up_at ? new Date(c.last_follow_up_at) : null;
+      if (!last || last < sevenDaysAgo) {
+        items.push({
+          id: c.id,
+          customerName: c.customer_name,
+          reason: '重点客户超7天无跟进',
+          detail: last ? `最近跟进 ${c.last_follow_up_at}` : '从未记录跟进',
+        });
+      }
+    }
+  }
+
+  // De-dup identical (customer, reason) pairs — a customer can legitimately
+  // appear once per distinct reason, just not twice for the same one.
+  const seen = new Set<string>();
+  const deduped = items.filter((it) => {
+    const key = `${it.id}|${it.reason}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return { ok: true, items: deduped };
+}
+
 // ── Action 4: create customer (+ optional primary contact) ─────────────────────
 export async function createCustomerWithContact(input: {
   customerName: string;
