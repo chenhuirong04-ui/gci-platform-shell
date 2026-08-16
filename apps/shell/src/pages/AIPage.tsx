@@ -3663,6 +3663,40 @@ export function AIPage() {
       return;
     }
 
+    // Decision Inbox — Task 8, read-only queries over executive_decisions.
+    // "现在有哪些事情等我决定？" / "我还有几个决定没处理？" / "我最近做了哪些决定？" /
+    // "关于 X 我之前做过什么决定？". Never lets Ask GCI decide on Chris's behalf.
+    // Must be checked BEFORE Boss Action Center below — its "waiting_decision"
+    // regex also contains "等我决定" and would otherwise shadow this intent.
+    const decisionQuery = matchDecisionQuery(raw.trim());
+    if (decisionQuery) {
+      const decisionMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'decision_inbox_query', intentNameZh: '老板审批箱', intentNameEn: 'Decision Inbox', category: 'query',
+          triggerKeywordsZh: [], triggerKeywordsEn: [], targetTab: 'chat', targetModule: 'Decisions',
+          targetRoute: '/decisions',
+          readSources: ['executive_decisions (Supabase)'],
+          writeTargets: [], requiredFields: [],
+          approvalRequired: false, resultPanel: null, implementationStatus: 'real', notConnectedMessage: '', fallbackBehavior: '',
+        },
+        confidence: 1, raw: raw.trim(), detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: decisionMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在查询 Decision Inbox…', '正在整理结果…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          getDecisions()
+            .then(res => setCmdState(prev => prev ? { ...prev, resultData: { ...res, query: decisionQuery } } : prev))
+            .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: String(e?.message ?? e) } } : prev));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
     // Boss Action Center — Task 7, read-only aggregation. "今天最重要的事情是什么？" /
     // "我现在先处理什么？" / "有哪些事情在等我决定？" / "今天还有什么没处理？"
     const bossMode = matchBossActionQueryMode(raw.trim());
@@ -3687,38 +3721,6 @@ export function AIPage() {
           setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
           getBossActions()
             .then(res => setCmdState(prev => prev ? { ...prev, resultData: { ...res, mode: bossMode } } : prev))
-            .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: String(e?.message ?? e) } } : prev));
-        },
-      );
-      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
-      return;
-    }
-
-    // Decision Inbox — Task 8, read-only queries over executive_decisions.
-    // "现在有哪些事情等我决定？" / "我还有几个决定没处理？" / "我最近做了哪些决定？" /
-    // "关于 X 我之前做过什么决定？". Never lets Ask GCI decide on Chris's behalf.
-    const decisionQuery = matchDecisionQuery(raw.trim());
-    if (decisionQuery) {
-      const decisionMatch: AIIntentMatch = {
-        intent: {
-          intentId: 'decision_inbox_query', intentNameZh: '老板审批箱', intentNameEn: 'Decision Inbox', category: 'query',
-          triggerKeywordsZh: [], triggerKeywordsEn: [], targetTab: 'chat', targetModule: 'Decisions',
-          targetRoute: '/decisions',
-          readSources: ['executive_decisions (Supabase)'],
-          writeTargets: [], requiredFields: [],
-          approvalRequired: false, resultPanel: null, implementationStatus: 'real', notConnectedMessage: '', fallbackBehavior: '',
-        },
-        confidence: 1, raw: raw.trim(), detectedMissingFields: [],
-      };
-      setTab('chat');
-      setCmdState({ raw: raw.trim(), match: decisionMatch, phase: 'processing', step: 0 });
-      runner.run(
-        ['正在识别指令…', '正在查询 Decision Inbox…', '正在整理结果…'],
-        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
-        () => {
-          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
-          getDecisions()
-            .then(res => setCmdState(prev => prev ? { ...prev, resultData: { ...res, query: decisionQuery } } : prev))
             .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: String(e?.message ?? e) } } : prev));
         },
       );
