@@ -22,6 +22,8 @@ import {
 } from '../ai/googleAskGciParsers';
 import { matchBossActionQueryMode } from '../ai/actionCenterAskGciParsers';
 import { getBossActions, type BossAction } from '../lib/actionCenter';
+import { matchDecisionQuery } from '../ai/decisionAskGciParsers';
+import { getDecisions, DECISION_SOURCE_LABEL, type ExecutiveDecision } from '../lib/decisionInbox';
 
 // ── Inventory query normalizer ────────────────────────────────────────────────
 // Strips command words, punctuation, and trailing "库存" to get the product term.
@@ -2167,6 +2169,68 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
             );
           })()}
 
+          {/* ── Decision Inbox (Task 8): read-only Ask GCI queries ── */}
+          {intent.intentId === 'decision_inbox_query' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查询 Decision Inbox…</div>
+          )}
+          {intent.intentId === 'decision_inbox_query' && state.resultData && state.resultData.ok === false && (
+            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              查询失败:{state.resultData.error}
+            </div>
+          )}
+          {intent.intentId === 'decision_inbox_query' && state.resultData?.ok && (() => {
+            const all: ExecutiveDecision[] = state.resultData.rows || [];
+            const query = state.resultData.query as { mode: string; name?: string } | undefined;
+            const mode = query?.mode;
+            const PC: Record<string, string> = { P1: '#E0846A', P2: '#D4A843', P3: MUTED };
+            let list: ExecutiveDecision[] = [];
+            let heading = '';
+            if (mode === 'pending_count') {
+              list = all.filter(d => d.status === 'pending');
+              heading = `你还有 ${list.length} 个决定没处理`;
+            } else if (mode === 'recent_decided') {
+              list = all.filter(d => d.status === 'decided').slice(0, 5);
+              heading = '最近做的决定';
+            } else if (mode === 'history_for') {
+              const name = query?.name || '';
+              list = all.filter(d => d.title.includes(name) || (d.summary || '').includes(name));
+              heading = `关于「${name}」的决定记录`;
+            } else {
+              list = all.filter(d => d.status === 'pending');
+              heading = '等你决定的事情';
+            }
+            return (
+              <div>
+                <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 8 }}>{heading}</div>
+                {list.length === 0 ? (
+                  <div style={{ fontSize: 13, color: '#6FBF8E' }}>✓ 没有相关记录。</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {list.map(d => (
+                      <div key={d.id} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 9.5, fontWeight: 700, color: PC[d.priority], background: `${PC[d.priority]}18`, border: `1px solid ${PC[d.priority]}40`, borderRadius: 4, padding: '2px 6px', fontFamily: 'IBM Plex Mono,monospace' }}>
+                            {d.priority}
+                          </span>
+                          <span style={{ fontSize: 9.5, color: '#8FA6D4', background: 'rgba(143,166,212,0.12)', borderRadius: 4, padding: '2px 6px' }}>
+                            {DECISION_SOURCE_LABEL[d.source]}
+                          </span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{d.title}</span>
+                        </div>
+                        <div style={{ fontSize: 12, color: SUBTLE, marginTop: 4 }}>Reason: {d.reason}</div>
+                        {d.status !== 'pending' && (
+                          <div style={{ fontSize: 11.5, color: '#6FBF8E', marginTop: 4 }}>
+                            已决定:{d.decision_options.find(o => o.key === d.selected_option)?.label ?? d.selected_option}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* ── CRM (Supabase): Today's follow-ups ── */}
           {intent.intentId === 'today_followups_crm' && !state.resultData && (
             <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查询 crm_customers…</div>
@@ -3623,6 +3687,38 @@ export function AIPage() {
           setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
           getBossActions()
             .then(res => setCmdState(prev => prev ? { ...prev, resultData: { ...res, mode: bossMode } } : prev))
+            .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: String(e?.message ?? e) } } : prev));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Decision Inbox — Task 8, read-only queries over executive_decisions.
+    // "现在有哪些事情等我决定？" / "我还有几个决定没处理？" / "我最近做了哪些决定？" /
+    // "关于 X 我之前做过什么决定？". Never lets Ask GCI decide on Chris's behalf.
+    const decisionQuery = matchDecisionQuery(raw.trim());
+    if (decisionQuery) {
+      const decisionMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'decision_inbox_query', intentNameZh: '老板审批箱', intentNameEn: 'Decision Inbox', category: 'query',
+          triggerKeywordsZh: [], triggerKeywordsEn: [], targetTab: 'chat', targetModule: 'Decisions',
+          targetRoute: '/decisions',
+          readSources: ['executive_decisions (Supabase)'],
+          writeTargets: [], requiredFields: [],
+          approvalRequired: false, resultPanel: null, implementationStatus: 'real', notConnectedMessage: '', fallbackBehavior: '',
+        },
+        confidence: 1, raw: raw.trim(), detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: decisionMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在查询 Decision Inbox…', '正在整理结果…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          getDecisions()
+            .then(res => setCmdState(prev => prev ? { ...prev, resultData: { ...res, query: decisionQuery } } : prev))
             .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: String(e?.message ?? e) } } : prev));
         },
       );
