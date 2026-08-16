@@ -15,6 +15,11 @@ import { getTodaysFollowups, findCustomerByName, logFollowup, createCustomerWith
 import { parseQueryCustomerCommand, parseLogFollowupCommand, parseCreateCrmCustomerCommand } from '../ai/crmAskGciParsers';
 import { getSystemRegistry } from '../lib/systemRegistry';
 import { answerRegistryQuery, REGISTRY_QUERY_RE } from '../ai/registryAskGciParsers';
+import { searchGmail, searchDrive, getCalendarEvents, getImportantEmails } from '../lib/googleSearch';
+import {
+  parseGmailSearchCommand, parseDriveSearchCommand, parseCustomerContextCommand,
+  CALENDAR_TODAY_RE, CALENDAR_TOMORROW_RE, CALENDAR_WEEK_RE, IMPORTANT_EMAILS_RE, CUSTOMER_CONTEXT_RE,
+} from '../ai/googleAskGciParsers';
 
 // ── Inventory query normalizer ────────────────────────────────────────────────
 // Strips command words, punctuation, and trailing "库存" to get the product term.
@@ -1940,6 +1945,170 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
             </div>
           )}
 
+          {/* ── Google (Gmail): search results ── */}
+          {intent.intentId === 'gmail_search' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在搜索 Gmail…</div>
+          )}
+          {intent.intentId === 'gmail_search' && state.resultData && !state.resultData.ok && (
+            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              Gmail 搜索失败:{state.resultData.error}
+            </div>
+          )}
+          {intent.intentId === 'gmail_search' && state.resultData?.ok && (() => {
+            const results = state.resultData.results || [];
+            return results.length === 0 ? (
+              <div style={{ fontSize: 13, color: MUTED }}>暂无相关邮件。</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {results.map((m: any) => (
+                  <a key={m.id} href={m.link} target="_blank" rel="noreferrer" style={{ display: 'block', padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', textDecoration: 'none' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{m.subject || '(无主题)'}</div>
+                    <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{m.sender} · {m.date}</div>
+                    <div style={{ fontSize: 12, color: SUBTLE, marginTop: 4 }}>{m.snippet}</div>
+                  </a>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* ── Google (Drive): search results ── */}
+          {intent.intentId === 'drive_search' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在搜索 Google Drive…</div>
+          )}
+          {intent.intentId === 'drive_search' && state.resultData && !state.resultData.ok && (
+            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              Drive 搜索失败:{state.resultData.error}
+            </div>
+          )}
+          {intent.intentId === 'drive_search' && state.resultData?.ok && (() => {
+            const results = state.resultData.results || [];
+            return results.length === 0 ? (
+              <div style={{ fontSize: 13, color: MUTED }}>暂无相关文件。</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {results.map((f: any) => (
+                  <a key={f.id} href={f.webViewLink} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', textDecoration: 'none' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{f.name}</div>
+                      <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{f.mimeType} · 更新于 {f.modifiedTime ? new Date(f.modifiedTime).toLocaleDateString('zh-CN') : ''}</div>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* ── Google (Calendar): events ── */}
+          {intent.intentId === 'calendar_events' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查询 Google Calendar…</div>
+          )}
+          {intent.intentId === 'calendar_events' && state.resultData && !state.resultData.ok && (
+            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              Calendar 查询失败:{state.resultData.error}
+            </div>
+          )}
+          {intent.intentId === 'calendar_events' && state.resultData?.ok && (() => {
+            const results = state.resultData.results || [];
+            return results.length === 0 ? (
+              <div style={{ fontSize: 13, color: MUTED }}>{state.resultData.startDate} 无日程安排。</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {results.map((e: any, i: number) => (
+                  <div key={i} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{e.title}</div>
+                    <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{e.start} → {e.end}</div>
+                    {e.attendees?.length > 0 && <div style={{ fontSize: 11.5, color: SUBTLE, marginTop: 2 }}>参与人:{e.attendees.join(', ')}</div>}
+                    {(e.location || e.meetingLink) && <div style={{ fontSize: 11.5, color: SUBTLE, marginTop: 2 }}>{e.location} {e.meetingLink}</div>}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* ── Google (Gmail): important emails ── */}
+          {intent.intentId === 'important_emails' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在按规则筛选重要邮件…</div>
+          )}
+          {intent.intentId === 'important_emails' && state.resultData && !state.resultData.ok && (
+            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              查询失败:{state.resultData.error}
+            </div>
+          )}
+          {intent.intentId === 'important_emails' && state.resultData?.ok && (() => {
+            const results = state.resultData.results || [];
+            return (
+              <div>
+                <div style={{ fontSize: 11, color: SUBTLE, marginBottom: 8 }}>规则:未读 · 最近7天 · 排除推广/社交邮件</div>
+                {results.length === 0 ? (
+                  <div style={{ fontSize: 13, color: '#6FBF8E' }}>✓ 没有符合规则的重要邮件。</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {results.map((m: any) => (
+                      <a key={m.id} href={m.link} target="_blank" rel="noreferrer" style={{ display: 'block', padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', textDecoration: 'none' }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{m.subject || '(无主题)'}</div>
+                        <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{m.sender} · {m.date}</div>
+                        <div style={{ fontSize: 12, color: SUBTLE, marginTop: 4 }}>{m.snippet}</div>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* ── Customer context: CRM + Gmail + Drive combined ── */}
+          {intent.intentId === 'customer_context_query' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查询 CRM / Gmail / Drive…</div>
+          )}
+          {intent.intentId === 'customer_context_query' && state.resultData?.noName && (
+            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              没有识别到具体客户名,请明确指定,例如:「MAG 最近沟通到哪里了?」
+            </div>
+          )}
+          {intent.intentId === 'customer_context_query' && state.resultData?.ok && !state.resultData.noName && (() => {
+            const { custName, crm, gmail, drive } = state.resultData;
+            return (
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: TEXT, marginBottom: 10 }}>{custName}</div>
+
+                <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 4 }}>CRM 最近跟进</div>
+                {crm?.ok && crm.found ? (
+                  <div style={{ fontSize: 12, color: TEXT, marginBottom: 12 }}>
+                    {crm.followups?.[0] ? `${crm.followups[0].follow_up_date} · ${crm.followups[0].notes || '(无备注)'}` : '暂无跟进记录'}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: MUTED, marginBottom: 12 }}>暂无(CRM 中未找到该客户)</div>
+                )}
+
+                <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 4 }}>最近邮件</div>
+                {gmail?.ok && gmail.results?.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
+                    {gmail.results.slice(0, 3).map((m: any) => (
+                      <a key={m.id} href={m.link} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: TEXT, textDecoration: 'none' }}>
+                        · {m.subject || '(无主题)'} — {m.date}
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: MUTED, marginBottom: 12 }}>暂无</div>
+                )}
+
+                <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 4 }}>相关文件</div>
+                {drive?.ok && drive.results?.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {drive.results.slice(0, 3).map((f: any) => (
+                      <a key={f.id} href={f.webViewLink} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: TEXT, textDecoration: 'none' }}>
+                        · {f.name}
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: MUTED }}>暂无</div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* ── CRM (Supabase): Today's follow-ups ── */}
           {intent.intentId === 'today_followups_crm' && !state.resultData && (
             <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查询 crm_customers…</div>
@@ -3219,6 +3388,142 @@ export function AIPage() {
             }
             const answer = answerRegistryQuery(raw.trim(), res.rows);
             setCmdState(prev => prev ? { ...prev, resultData: { ok: true, answer } } : prev);
+          });
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Google (Gmail) — "找一下 X 最近的邮件" — Task 5.2, read-only.
+    const gmailQuery = parseGmailSearchCommand(raw.trim());
+    if (gmailQuery) {
+      const gmailMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'gmail_search', intentNameZh: '邮件搜索', intentNameEn: 'Gmail Search', category: 'query',
+          triggerKeywordsZh: [], triggerKeywordsEn: [], targetTab: 'chat', targetModule: 'Google',
+          targetRoute: '', readSources: ['Gmail (gmail.readonly)'], writeTargets: [], requiredFields: [],
+          approvalRequired: false, resultPanel: null, implementationStatus: 'real', notConnectedMessage: '', fallbackBehavior: '',
+        },
+        confidence: 1, raw: raw.trim(), detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: gmailMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在连接 Gmail…', '正在搜索邮件…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          searchGmail(gmailQuery).then(res => setCmdState(prev => prev ? { ...prev, resultData: res } : prev));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Google (Drive) — "找一下 X 的文件" / "找一下我以前做过的 X 方案" — Task 5.2, read-only.
+    const driveQuery = parseDriveSearchCommand(raw.trim());
+    if (driveQuery) {
+      const driveMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'drive_search', intentNameZh: '文件搜索', intentNameEn: 'Drive Search', category: 'query',
+          triggerKeywordsZh: [], triggerKeywordsEn: [], targetTab: 'chat', targetModule: 'Google',
+          targetRoute: '', readSources: ['Google Drive (drive.readonly)'], writeTargets: [], requiredFields: [],
+          approvalRequired: false, resultPanel: null, implementationStatus: 'real', notConnectedMessage: '', fallbackBehavior: '',
+        },
+        confidence: 1, raw: raw.trim(), detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: driveMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在连接 Google Drive…', '正在搜索文件…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          searchDrive(driveQuery).then(res => setCmdState(prev => prev ? { ...prev, resultData: res } : prev));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Google (Calendar) — "今天/明天/本周有什么会议？" — Task 5.2, read-only.
+    if (CALENDAR_TODAY_RE.test(raw.trim()) || CALENDAR_TOMORROW_RE.test(raw.trim()) || CALENDAR_WEEK_RE.test(raw.trim())) {
+      const range: 'today' | 'tomorrow' | 'week' = CALENDAR_TOMORROW_RE.test(raw.trim()) ? 'tomorrow' : CALENDAR_WEEK_RE.test(raw.trim()) ? 'week' : 'today';
+      const calMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'calendar_events', intentNameZh: '日程查询', intentNameEn: 'Calendar Events', category: 'query',
+          triggerKeywordsZh: [], triggerKeywordsEn: [], targetTab: 'chat', targetModule: 'Google',
+          targetRoute: '', readSources: ['Google Calendar (calendar.readonly)'], writeTargets: [], requiredFields: [],
+          approvalRequired: false, resultPanel: null, implementationStatus: 'real', notConnectedMessage: '', fallbackBehavior: '',
+        },
+        confidence: 1, raw: raw.trim(), detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: calMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在连接 Google Calendar…', '正在查询日程…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          getCalendarEvents(range).then(res => setCmdState(prev => prev ? { ...prev, resultData: res } : prev));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Google (Gmail) — "有哪些重要邮件需要我处理？" — Task 5.2, read-only, rule-based.
+    if (IMPORTANT_EMAILS_RE.test(raw.trim())) {
+      const impMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'important_emails', intentNameZh: '重要邮件', intentNameEn: 'Important Emails', category: 'query',
+          triggerKeywordsZh: [], triggerKeywordsEn: [], targetTab: 'chat', targetModule: 'Google',
+          targetRoute: '', readSources: ['Gmail (gmail.readonly)'], writeTargets: [], requiredFields: [],
+          approvalRequired: false, resultPanel: null, implementationStatus: 'real', notConnectedMessage: '', fallbackBehavior: '',
+        },
+        confidence: 1, raw: raw.trim(), detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: impMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在连接 Gmail…', '正在按规则筛选重要邮件…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          getImportantEmails().then(res => setCmdState(prev => prev ? { ...prev, resultData: res } : prev));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Customer context — "X 最近沟通到哪里了？" — combines CRM + Gmail + Drive. Task 5.2, read-only.
+    if (CUSTOMER_CONTEXT_RE.test(raw.trim())) {
+      const custName = parseCustomerContextCommand(raw.trim());
+      const ctxMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'customer_context_query', intentNameZh: '客户上下文', intentNameEn: 'Customer Context', category: 'query',
+          triggerKeywordsZh: [], triggerKeywordsEn: [], targetTab: 'chat', targetModule: 'Google',
+          targetRoute: '', readSources: ['crm_customers (Supabase)', 'Gmail (gmail.readonly)', 'Google Drive (drive.readonly)'],
+          writeTargets: [], requiredFields: [],
+          approvalRequired: false, resultPanel: null, implementationStatus: 'real', notConnectedMessage: '', fallbackBehavior: '',
+        },
+        confidence: 1, raw: raw.trim(), detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: ctxMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在查询 CRM / Gmail / Drive…', '正在整合客户上下文…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          if (!custName) {
+            setCmdState(prev => prev ? { ...prev, resultData: { ok: true, noName: true } } : prev);
+            return;
+          }
+          Promise.all([findCustomerByName(custName), searchGmail(custName), searchDrive(custName)]).then(([crm, gmail, drive]) => {
+            setCmdState(prev => prev ? { ...prev, resultData: { ok: true, custName, crm, gmail, drive } } : prev);
           });
         },
       );
