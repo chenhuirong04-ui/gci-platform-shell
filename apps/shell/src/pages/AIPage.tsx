@@ -3874,7 +3874,6 @@ export function AIPage() {
       };
       setTab('chat');
       setCmdState({ raw: raw.trim(), match: execMatch, phase: 'processing', step: 0 });
-      setWritePhase('confirm');
       runner.run(
         ['正在识别指令…', '正在查找匹配的决定…', '正在准备确认…'],
         (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
