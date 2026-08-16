@@ -22,8 +22,12 @@ import {
 } from '../ai/googleAskGciParsers';
 import { matchBossActionQueryMode } from '../ai/actionCenterAskGciParsers';
 import { getBossActions, type BossAction } from '../lib/actionCenter';
-import { matchDecisionQuery } from '../ai/decisionAskGciParsers';
-import { getDecisions, DECISION_SOURCE_LABEL, type ExecutiveDecision } from '../lib/decisionInbox';
+import { matchDecisionQuery, parseUpdateExecutionStatusCommand } from '../ai/decisionAskGciParsers';
+import {
+  getDecisions, getAllFollowThroughItems, canTransitionExecutionStatus, updateExecutionStatus,
+  DECISION_SOURCE_LABEL, EXECUTION_STATUS_LABEL,
+  type ExecutiveDecision, type ExecutionStatus, type FollowThroughItem,
+} from '../lib/decisionInbox';
 
 // ── Inventory query normalizer ────────────────────────────────────────────────
 // Strips command words, punctuation, and trailing "库存" to get the product term.
@@ -2180,9 +2184,72 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
           )}
           {intent.intentId === 'decision_inbox_query' && state.resultData?.ok && (() => {
             const all: ExecutiveDecision[] = state.resultData.rows || [];
+            const followItems: FollowThroughItem[] = state.resultData.followItems || [];
             const query = state.resultData.query as { mode: string; name?: string } | undefined;
             const mode = query?.mode;
             const PC: Record<string, string> = { P1: '#E0846A', P2: '#D4A843', P3: MUTED };
+
+            // Modes backed by FollowThroughItem[] (derived execution/follow-up gaps).
+            if (mode === 'due_today' || mode === 'blocked') {
+              const list = mode === 'due_today' ? followItems.filter(i => i.dueToday) : followItems.filter(i => i.executionStatus === 'blocked');
+              const heading = mode === 'due_today' ? '今天到期的决定' : '卡住的事情';
+              return (
+                <div>
+                  <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 8 }}>{heading}</div>
+                  {list.length === 0 ? (
+                    <div style={{ fontSize: 13, color: '#6FBF8E' }}>✓ 没有相关记录。</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {list.map(it => (
+                        <div key={it.id} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 9.5, fontWeight: 700, color: PC[it.priority], background: `${PC[it.priority]}18`, border: `1px solid ${PC[it.priority]}40`, borderRadius: 4, padding: '2px 6px', fontFamily: 'IBM Plex Mono,monospace' }}>
+                              {it.priority}
+                            </span>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{it.title}</span>
+                          </div>
+                          <div style={{ fontSize: 12, color: SUBTLE, marginTop: 4 }}>{it.reason}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            // Mode backed by ExecutiveDecision[] with execution details shown.
+            if (mode === 'execution_status_for') {
+              const name = query?.name || '';
+              const nameLower = name.toLowerCase();
+              const list = all.filter(d => d.title.toLowerCase().includes(nameLower) || (d.summary || '').toLowerCase().includes(nameLower));
+              return (
+                <div>
+                  <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 8 }}>{`「${name}」的决定执行情况`}</div>
+                  {list.length === 0 ? (
+                    <div style={{ fontSize: 13, color: '#6FBF8E' }}>✓ 没有相关记录。</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {list.map(d => (
+                        <div key={d.id} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{d.title}</div>
+                          <div style={{ fontSize: 12, color: SUBTLE, marginTop: 4 }}>
+                            {d.status === 'pending' ? '尚未决定' : `已决定:${d.decision_options.find(o => o.key === d.selected_option)?.label ?? d.selected_option}`}
+                          </div>
+                          {d.status === 'decided' && (
+                            <div style={{ fontSize: 11.5, color: MUTED, marginTop: 4 }}>
+                              执行状态:{d.execution_status ? EXECUTION_STATUS_LABEL[d.execution_status] : '未设置'}
+                              {d.assignee ? ` · 负责人:${d.assignee}` : ''}
+                              {d.execution_due_at ? ` · 截止:${new Date(d.execution_due_at).toLocaleDateString('zh-CN')}` : ''}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
             let list: ExecutiveDecision[] = [];
             let heading = '';
             if (mode === 'pending_count') {
@@ -2195,6 +2262,9 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
               const name = query?.name || '';
               list = all.filter(d => d.title.includes(name) || (d.summary || '').includes(name));
               heading = `关于「${name}」的决定记录`;
+            } else if (mode === 'not_started') {
+              list = all.filter(d => d.status === 'decided' && d.execution_status === 'pending');
+              heading = '决定过但还没开始执行的事情';
             } else {
               list = all.filter(d => d.status === 'pending');
               heading = '等你决定的事情';
@@ -2227,6 +2297,82 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
                     ))}
                   </div>
                 )}
+              </div>
+            );
+          })()}
+
+          {/* ── Decision execution status update (Task 9): WRITE, needs confirmation ── */}
+          {intent.intentId === 'decision_update_execution' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查找匹配的决定…</div>
+          )}
+          {intent.intentId === 'decision_update_execution' && state.resultData && state.resultData.ok === false && (
+            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              查询失败:{state.resultData.error}
+            </div>
+          )}
+          {intent.intentId === 'decision_update_execution' && state.resultData?.notFound && (
+            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              没有找到关于「{state.resultData.name}」且已决定的事项。
+            </div>
+          )}
+          {intent.intentId === 'decision_update_execution' && state.resultData?.ok && !state.resultData.notFound && (() => {
+            const d: ExecutiveDecision = state.resultData.decision;
+            const currentStatus: ExecutionStatus = state.resultData.currentStatus;
+            const targetStatus: ExecutionStatus = state.resultData.targetStatus;
+            const canTransition: boolean = state.resultData.canTransition;
+
+            if (writePhase === 'done' && writeResult) {
+              return (
+                <div style={{ padding: '12px 14px', background: 'rgba(111,191,142,0.07)', border: '1px solid rgba(111,191,142,0.25)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, color: '#6FBF8E', fontWeight: 600, marginBottom: 4 }}>✓ 执行状态已更新</div>
+                  <div style={{ fontSize: 12, color: MUTED }}>{d.title} → {EXECUTION_STATUS_LABEL[targetStatus]}</div>
+                </div>
+              );
+            }
+            if (writePhase === 'error') {
+              return (
+                <div style={{ padding: '12px 14px', background: 'rgba(224,132,106,0.07)', border: '1px solid rgba(224,132,106,0.25)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, color: '#E0846A', fontWeight: 600, marginBottom: 4 }}>更新失败</div>
+                  <div style={{ fontSize: 12, color: MUTED }}>{writeError || '未知错误，请前往 /decisions 手动更新。'}</div>
+                </div>
+              );
+            }
+            if (!canTransition) {
+              return (
+                <div style={{ padding: '12px 14px', background: 'rgba(224,132,106,0.07)', border: '1px solid rgba(224,132,106,0.25)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 13, color: '#E0846A', fontWeight: 600, marginBottom: 4 }}>无法直接切换</div>
+                  <div style={{ fontSize: 12, color: MUTED }}>{d.title} 当前执行状态为「{EXECUTION_STATUS_LABEL[currentStatus]}」,不能直接切换到「{EXECUTION_STATUS_LABEL[targetStatus]}」。</div>
+                </div>
+              );
+            }
+            return (
+              <div>
+                <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: TEXT, marginBottom: 6 }}>{d.title}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+                    <span style={{ padding: '2px 8px', borderRadius: 5, background: 'rgba(255,255,255,0.06)', color: MUTED }}>{EXECUTION_STATUS_LABEL[currentStatus]}</span>
+                    <span style={{ color: SUBTLE }}>→</span>
+                    <span style={{ padding: '2px 8px', borderRadius: 5, background: 'rgba(111,191,142,0.12)', color: '#6FBF8E', fontWeight: 700 }}>{EXECUTION_STATUS_LABEL[targetStatus]}</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    disabled={writePhase === 'sending'}
+                    onClick={() => {
+                      setWritePhase('sending');
+                      updateExecutionStatus(d.id, currentStatus, targetStatus)
+                        .then(res => {
+                          if (res.ok) { setWritePhase('done'); setWriteResult(res); }
+                          else { setWritePhase('error'); setWriteError(res.error); }
+                        })
+                        .catch(e => { setWritePhase('error'); setWriteError(String(e?.message ?? e)); });
+                    }}
+                    style={{ flex: 1, padding: '10px', borderRadius: 9, background: writePhase === 'sending' ? 'rgba(111,191,142,0.2)' : `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: writePhase === 'sending' ? '#6FBF8E' : NAVY, fontSize: 14, fontWeight: 700, cursor: writePhase === 'sending' ? 'not-allowed' : 'pointer' }}
+                  >
+                    {writePhase === 'sending' ? '更新中…' : '确认更新'}
+                  </button>
+                  <button onClick={onCancel} style={{ padding: '10px 18px', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 14, cursor: 'pointer' }}>取消</button>
+                </div>
               </div>
             );
           })()}
@@ -3688,9 +3834,70 @@ export function AIPage() {
         (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
         () => {
           setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
-          getDecisions()
-            .then(res => setCmdState(prev => prev ? { ...prev, resultData: { ...res, query: decisionQuery } } : prev))
+          Promise.all([getDecisions(), getAllFollowThroughItems()])
+            .then(([decisionsRes, followRes]) => {
+              if (!decisionsRes.ok) {
+                setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: decisionsRes.error } } : prev);
+                return;
+              }
+              setCmdState(prev => prev ? { ...prev, resultData: {
+                ok: true,
+                rows: decisionsRes.rows,
+                followItems: followRes.ok ? followRes.items : [],
+                query: decisionQuery,
+              } } : prev);
+            })
             .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: String(e?.message ?? e) } } : prev));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Decision execution status update — Task 9, WRITE action requiring
+    // Chris's explicit confirmation. "把 Ray 这个决定标记为进行中。" Only ever
+    // updates executive_decisions.execution_status — never CRM/quotes/
+    // Systems Registry/Gmail/Calendar/Agents.
+    const execUpdateCmd = parseUpdateExecutionStatusCommand(raw.trim());
+    if (execUpdateCmd) {
+      const execMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'decision_update_execution', intentNameZh: '更新决定执行状态', intentNameEn: 'Update Decision Execution', category: 'action',
+          triggerKeywordsZh: [], triggerKeywordsEn: [], targetTab: 'chat', targetModule: 'Decisions',
+          targetRoute: '/decisions',
+          readSources: ['executive_decisions (Supabase)'],
+          writeTargets: ['executive_decisions.execution_status'],
+          requiredFields: [],
+          approvalRequired: true, resultPanel: null, implementationStatus: 'real', notConnectedMessage: '', fallbackBehavior: '',
+        },
+        confidence: 1, raw: raw.trim(), detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: execMatch, phase: 'processing', step: 0 });
+      setWritePhase('confirm');
+      runner.run(
+        ['正在识别指令…', '正在查找匹配的决定…', '正在准备确认…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          getDecisions().then(res => {
+            if (!res.ok) {
+              setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: res.error } } : prev);
+              return;
+            }
+            const nameLower = execUpdateCmd.name.toLowerCase();
+            const matches = res.rows.filter(d => d.status === 'decided' && d.title.toLowerCase().includes(nameLower));
+            if (matches.length === 0) {
+              setCmdState(prev => prev ? { ...prev, resultData: { ok: true, notFound: true, name: execUpdateCmd.name } } : prev);
+              return;
+            }
+            const target = matches.reduce((a, b) => (new Date(a.decided_at || 0).getTime() > new Date(b.decided_at || 0).getTime() ? a : b));
+            const currentStatus: ExecutionStatus = (target.execution_status as ExecutionStatus) || 'pending';
+            const canTransition = canTransitionExecutionStatus(currentStatus, execUpdateCmd.targetStatus);
+            setCmdState(prev => prev ? { ...prev, resultData: {
+              ok: true, decision: target, currentStatus, targetStatus: execUpdateCmd.targetStatus, canTransition,
+            } } : prev);
+          });
         },
       );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);

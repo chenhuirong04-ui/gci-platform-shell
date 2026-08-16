@@ -10,6 +10,7 @@ import { AgentsStatus } from '../components/AgentsStatus';
 import { SystemsRegistrySummaryCard } from '../components/SystemsRegistrySummary';
 import { BossActionCenter } from '../components/BossActionCenter';
 import { DecisionInbox } from '../components/DecisionInbox';
+import { DecisionFollowThrough } from '../components/DecisionFollowThrough';
 
 // ─── localStorage helpers (same keys the Trade + CRM modules use) ──────────
 function safeLocalGet<T = any>(key: string): T[] {
@@ -341,6 +342,9 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
 
       {/* DECISION INBOX — Task 8: judgment-required items only */}
       <DecisionInbox />
+
+      {/* DECISION FOLLOW-THROUGH — Task 9: execution tracking on decided items */}
+      <DecisionFollowThrough />
 
       {/* EXECUTIVE DESK — Task 4 first screen (crm_customers/crm_contacts/crm_followups via Supabase) */}
       <ExecutiveDeskToday />

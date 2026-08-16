@@ -3,6 +3,7 @@
 // option only records the decision to executive_decisions — it never sends
 // email, changes CRM/quotes, deletes systems, or runs anything externally.
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
 import {
@@ -10,6 +11,7 @@ import {
   recordDecision,
   DECISION_SOURCE_LABEL,
   type ExecutiveDecision,
+  type RecordDecisionInput,
 } from '../lib/decisionInbox';
 
 const GOLD = '#CBA85C';
@@ -22,8 +24,19 @@ const BORD = 'rgba(255,255,255,0.07)';
 const PRIORITY_COLOR: Record<string, string> = { P1: RED, P2: AMBER, P3: MUTED };
 const MAX_HOME_ITEMS = 5;
 
-function DecisionCard({ d, onDecide }: { d: ExecutiveDecision; onDecide: (id: string, key: string) => void }) {
+const inputStyle: CSSProperties = {
+  padding: '5px 8px', borderRadius: 6, fontSize: 11, background: 'rgba(255,255,255,0.04)',
+  border: `1px solid ${BORD}`, color: colors.textPrimary, flex: 1, minWidth: 90,
+};
+
+function DecisionCard({ d, onDecide }: { d: ExecutiveDecision; onDecide: (id: string, key: string, input: RecordDecisionInput) => void }) {
   const color = PRIORITY_COLOR[d.priority] ?? MUTED;
+  const [expanded, setExpanded] = useState(false);
+  const [assignee, setAssignee] = useState('');
+  const [dueText, setDueText] = useState('');
+  const [note, setNote] = useState('');
+  const [followUpText, setFollowUpText] = useState('');
+
   return (
     <div style={{ padding: '14px 16px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -39,11 +52,34 @@ function DecisionCard({ d, onDecide }: { d: ExecutiveDecision; onDecide: (id: st
         <span style={{ color: GOLD, fontWeight: 700 }}>Reason: </span>
         {d.reason}
       </div>
+
+      <div
+        onClick={() => setExpanded((v) => !v)}
+        style={{ fontSize: 10.5, color: MUTED, cursor: 'pointer', userSelect: 'none', width: 'fit-content' }}
+      >
+        {expanded ? '− 收起执行安排' : '+ 执行安排 (可选)'}
+      </div>
+      {expanded && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <input style={inputStyle} placeholder="负责人" value={assignee} onChange={(e) => setAssignee(e.target.value)} />
+          <input style={inputStyle} placeholder="完成时间 如: 明天" value={dueText} onChange={(e) => setDueText(e.target.value)} />
+          <input style={inputStyle} placeholder="执行说明" value={note} onChange={(e) => setNote(e.target.value)} />
+          <input style={inputStyle} placeholder="复查时间 如: 周三" value={followUpText} onChange={(e) => setFollowUpText(e.target.value)} />
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
         {d.decision_options.map((opt) => (
           <button
             key={opt.key}
-            onClick={() => onDecide(d.id, opt.key)}
+            onClick={() =>
+              onDecide(d.id, opt.key, {
+                assignee: assignee || undefined,
+                executionDueText: dueText || undefined,
+                executionNote: note || undefined,
+                followUpText: followUpText || undefined,
+              })
+            }
             style={{
               padding: '6px 12px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer',
               background: opt.key === 'later' ? 'rgba(255,255,255,0.04)' : 'rgba(203,168,92,0.12)',
@@ -74,9 +110,9 @@ export function DecisionInbox() {
 
   useEffect(() => { load(); }, []);
 
-  async function handleDecide(id: string, optionKey: string) {
+  async function handleDecide(id: string, optionKey: string, input: RecordDecisionInput) {
     setBusyId(id);
-    const res = await recordDecision(id, optionKey);
+    const res = await recordDecision(id, optionKey, input);
     setBusyId(null);
     if (res.ok) {
       // "later" leaves it pending — keep it visible; anything else resolves it.

@@ -1,16 +1,23 @@
-// GCI Executive Desk — Task 8: /decisions — Decision Inbox history + pending.
-// Read/record only. Selecting an option here only writes to
-// executive_decisions — no external action of any kind.
+// GCI Executive Desk — Task 8/9: /decisions — Decision Inbox history +
+// execution follow-through. Read/record only. Every action here writes only
+// to executive_decisions — no external action of any kind.
 import { useEffect, useMemo, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
 import {
   refreshPendingDecisions,
   getDecisions,
   recordDecision,
+  setExecutionDetails,
+  updateExecutionStatus,
+  canTransitionExecutionStatus,
   DECISION_SOURCE_LABEL,
+  EXECUTION_STATUS_LABEL,
   type ExecutiveDecision,
   type DecisionSource,
+  type ExecutionStatus,
+  type RecordDecisionInput,
 } from '../lib/decisionInbox';
 
 const GOLD = '#CBA85C';
@@ -51,6 +58,109 @@ function formatDate(iso: string | null): string {
 
 const STATUS_LABEL: Record<string, string> = { pending: 'Pending', decided: 'Decided', dismissed: 'Dismissed' };
 const STATUS_COLOR: Record<string, string> = { pending: AMBER, decided: GREEN, dismissed: MUTED };
+const EXEC_COLOR: Record<ExecutionStatus, string> = { not_required: MUTED, pending: MUTED, in_progress: AMBER, completed: GREEN, blocked: RED };
+
+const inputStyle: CSSProperties = {
+  padding: '5px 8px', borderRadius: 6, fontSize: 11, background: 'rgba(255,255,255,0.04)',
+  border: `1px solid ${BORD}`, color: colors.textPrimary, flex: 1, minWidth: 100,
+};
+const smallBtn = (active: boolean): CSSProperties => ({
+  padding: '5px 11px', borderRadius: 7, fontSize: 11, cursor: 'pointer',
+  background: active ? 'rgba(203,168,92,0.14)' : 'rgba(255,255,255,0.04)',
+  border: `1px solid ${active ? 'rgba(203,168,92,0.4)' : BORD}`,
+  color: active ? GOLD : MUTED,
+});
+
+// ── Inline optional execution-plan mini-form, shared shape for pending decisions ──
+function ExecutionPlanFields({ onChange }: { onChange: (v: RecordDecisionInput) => void }) {
+  const [assignee, setAssignee] = useState('');
+  const [dueText, setDueText] = useState('');
+  const [note, setNote] = useState('');
+  const [followUpText, setFollowUpText] = useState('');
+
+  function emit(next: Partial<{ assignee: string; dueText: string; note: string; followUpText: string }>) {
+    const merged = { assignee, dueText, note, followUpText, ...next };
+    onChange({
+      assignee: merged.assignee || undefined,
+      executionDueText: merged.dueText || undefined,
+      executionNote: merged.note || undefined,
+      followUpText: merged.followUpText || undefined,
+    });
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+      <input style={inputStyle} placeholder="负责人" value={assignee} onChange={(e) => { setAssignee(e.target.value); emit({ assignee: e.target.value }); }} />
+      <input style={inputStyle} placeholder="完成时间 如: 明天" value={dueText} onChange={(e) => { setDueText(e.target.value); emit({ dueText: e.target.value }); }} />
+      <input style={inputStyle} placeholder="执行说明" value={note} onChange={(e) => { setNote(e.target.value); emit({ note: e.target.value }); }} />
+      <input style={inputStyle} placeholder="复查时间 如: 周三" value={followUpText} onChange={(e) => { setFollowUpText(e.target.value); emit({ followUpText: e.target.value }); }} />
+    </div>
+  );
+}
+
+function ExecutionStatusPanel({ d, onTransition, onSetDetails }: {
+  d: ExecutiveDecision;
+  onTransition: (id: string, current: ExecutionStatus, next: ExecutionStatus) => void;
+  onSetDetails: (id: string, input: { assignee?: string; executionDueText?: string; executionNote?: string }) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [assignee, setAssignee] = useState('');
+  const [dueText, setDueText] = useState('');
+  const [note, setNote] = useState('');
+
+  if (!d.execution_status || d.execution_status === 'not_required') {
+    return (
+      <div style={{ marginTop: 8 }}>
+        <div onClick={() => setExpanded((v) => !v)} style={{ fontSize: 10.5, color: MUTED, cursor: 'pointer', width: 'fit-content' }}>
+          {expanded ? '− 收起' : '+ 设置执行安排'}
+        </div>
+        {expanded && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+            <input style={inputStyle} placeholder="负责人" value={assignee} onChange={(e) => setAssignee(e.target.value)} />
+            <input style={inputStyle} placeholder="完成时间 如: 明天" value={dueText} onChange={(e) => setDueText(e.target.value)} />
+            <input style={inputStyle} placeholder="执行说明" value={note} onChange={(e) => setNote(e.target.value)} />
+            <button
+              onClick={() => onSetDetails(d.id, { assignee: assignee || undefined, executionDueText: dueText || undefined, executionNote: note || undefined })}
+              style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11, cursor: 'pointer', background: 'rgba(203,168,92,0.14)', border: '1px solid rgba(203,168,92,0.4)', color: GOLD }}
+            >
+              保存
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const color = EXEC_COLOR[d.execution_status];
+  const nextOptions: { key: ExecutionStatus; label: string }[] = [
+    { key: 'in_progress', label: '开始执行' },
+    { key: 'blocked', label: '标记卡住' },
+    { key: 'completed', label: '标记完成' },
+  ].filter((o) => canTransitionExecutionStatus(d.execution_status as ExecutionStatus, o.key));
+
+  return (
+    <div style={{ marginTop: 8, padding: '10px 12px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${BORD}`, borderRadius: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+        <span style={{ fontSize: 9.5, fontWeight: 700, color, background: `${color}18`, border: `1px solid ${color}40`, borderRadius: 4, padding: '2px 6px', fontFamily: 'IBM Plex Mono,monospace' }}>
+          执行:{EXECUTION_STATUS_LABEL[d.execution_status]}
+        </span>
+        {d.assignee && <span style={{ fontSize: 11, color: MUTED }}>负责人:{d.assignee}</span>}
+        {d.execution_due_at && <span style={{ fontSize: 11, color: MUTED }}>截止:{formatDate(d.execution_due_at)}</span>}
+        {d.completed_at && <span style={{ fontSize: 11, color: GREEN }}>完成于:{formatDate(d.completed_at)}</span>}
+      </div>
+      {d.execution_note && <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 6 }}>{d.execution_note}</div>}
+      {nextOptions.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {nextOptions.map((o) => (
+            <button key={o.key} onClick={() => onTransition(d.id, d.execution_status as ExecutionStatus, o.key)} style={smallBtn(false)}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function Decisions() {
   const navigate = useNavigate();
@@ -58,9 +168,10 @@ export function Decisions() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [pendingInputs, setPendingInputs] = useState<Record<string, RecordDecisionInput>>({});
 
   function loadAll() {
-    // Sync candidates once (idempotent), then load the full history.
+    // Sync candidates once (idempotent, cooldown-aware), then load the full history.
     refreshPendingDecisions().then((syncRes) => {
       if (!syncRes.ok) { setError(syncRes.error); return; }
       getDecisions().then((res) => {
@@ -72,11 +183,29 @@ export function Decisions() {
 
   useEffect(() => { loadAll(); }, []);
 
+  function reload() {
+    getDecisions().then((res) => { if (res.ok) setDecisions(res.rows); });
+  }
+
   async function handleDecide(id: string, optionKey: string) {
     setBusyId(id);
-    await recordDecision(id, optionKey);
+    await recordDecision(id, optionKey, pendingInputs[id] || {});
     setBusyId(null);
-    getDecisions().then((res) => { if (res.ok) setDecisions(res.rows); });
+    reload();
+  }
+
+  async function handleTransition(id: string, current: ExecutionStatus, next: ExecutionStatus) {
+    setBusyId(id);
+    await updateExecutionStatus(id, current, next);
+    setBusyId(null);
+    reload();
+  }
+
+  async function handleSetDetails(id: string, input: { assignee?: string; executionDueText?: string; executionNote?: string }) {
+    setBusyId(id);
+    await setExecutionDetails(id, input);
+    setBusyId(null);
+    reload();
   }
 
   const filtered = useMemo(() => {
@@ -156,28 +285,39 @@ export function Decisions() {
                 <span style={{ color: GOLD, fontWeight: 700 }}>Reason: </span>{d.reason}
               </div>
               {d.summary && <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5, marginBottom: 6 }}>{d.summary}</div>}
+              {d.follow_up_at && (
+                <div style={{ fontSize: 11, color: GOLD, marginBottom: 6 }}>复查时间:{formatDate(d.follow_up_at)}</div>
+              )}
 
               {d.status === 'pending' ? (
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-                  {d.decision_options.map((opt) => (
-                    <button
-                      key={opt.key}
-                      onClick={() => handleDecide(d.id, opt.key)}
-                      style={{
-                        padding: '6px 12px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer',
-                        background: opt.key === 'later' ? 'rgba(255,255,255,0.04)' : 'rgba(203,168,92,0.12)',
-                        border: `1px solid ${opt.key === 'later' ? BORD : 'rgba(203,168,92,0.4)'}`,
-                        color: opt.key === 'later' ? MUTED : GOLD,
-                      }}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
+                <>
+                  <ExecutionPlanFields onChange={(v) => setPendingInputs((prev) => ({ ...prev, [d.id]: v }))} />
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                    {d.decision_options.map((opt) => (
+                      <button
+                        key={opt.key}
+                        onClick={() => handleDecide(d.id, opt.key)}
+                        style={{
+                          padding: '6px 12px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer',
+                          background: opt.key === 'later' ? 'rgba(255,255,255,0.04)' : 'rgba(203,168,92,0.12)',
+                          border: `1px solid ${opt.key === 'later' ? BORD : 'rgba(203,168,92,0.4)'}`,
+                          color: opt.key === 'later' ? MUTED : GOLD,
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : d.status === 'decided' ? (
+                <>
+                  <div style={{ fontSize: 11.5, color: GREEN, marginTop: 4 }}>
+                    已选择:{d.decision_options.find((o) => o.key === d.selected_option)?.label ?? d.selected_option} · {formatDate(d.decided_at)}
+                  </div>
+                  <ExecutionStatusPanel d={d} onTransition={handleTransition} onSetDetails={handleSetDetails} />
+                </>
               ) : (
-                <div style={{ fontSize: 11.5, color: GREEN, marginTop: 4 }}>
-                  已选择:{d.decision_options.find((o) => o.key === d.selected_option)?.label ?? d.selected_option} · {formatDate(d.decided_at)}
-                </div>
+                <div style={{ fontSize: 11.5, color: MUTED, marginTop: 4 }}>已忽略</div>
               )}
             </div>
           );

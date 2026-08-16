@@ -7,9 +7,10 @@ import { getTodaysFollowups, getOverdueFollowups, getBossDecisions } from './crm
 import { getImportantEmails, getCalendarEvents } from './googleSearch';
 import { getSystemRegistry } from './systemRegistry';
 import { AGENTS } from '../components/AgentsStatus';
+import { getDecisionFollowThroughActions } from './decisionInbox';
 
 export type ActionPriority = 'P1' | 'P2' | 'P3';
-export type ActionSource = 'crm' | 'email' | 'calendar' | 'business' | 'systems' | 'agents';
+export type ActionSource = 'crm' | 'email' | 'calendar' | 'business' | 'systems' | 'agents' | 'decisions';
 
 export interface BossAction {
   id: string;
@@ -63,6 +64,7 @@ export async function getBossActions(): Promise<
     quotationFollowups,
     invoiceSummary,
     inventoryAlerts,
+    decisionFollowThrough,
   ] = await Promise.all([
     getTodaysFollowups(),
     getOverdueFollowups(),
@@ -73,6 +75,7 @@ export async function getBossActions(): Promise<
     safeFetchJson<any>(`${base()}/api/trade/check-quotation-followups`),
     safeFetchJson<any>(`${base()}/api/invoice/pending-summary`),
     safeFetchJson<any>(`${base()}/api/trade/check-inventory`),
+    getDecisionFollowThroughActions(),
   ]);
 
   const actions: BossAction[] = [];
@@ -310,6 +313,25 @@ export async function getBossActions(): Promise<
     }
   }
 
+  // ── 7. Decision Follow-through (Task 9) — execution gaps + due follow-ups
+  // on already-decided items. Never the raw Decision itself (that lives in
+  // Decision Inbox); these are distinct "still needs a next step" entries. ──
+  for (const it of decisionFollowThrough) {
+    actions.push({
+      id: it.id,
+      source: 'decisions',
+      category: 'Decision Follow-through',
+      title: it.title,
+      summary: it.reason,
+      priority: it.priority,
+      due_at: it.dueAt,
+      related_customer: null,
+      related_system: null,
+      action_type: it.kind === 'execution' ? 'decision_execution' : 'decision_follow_up',
+      deep_link: '/decisions',
+    });
+  }
+
   const order: Record<ActionPriority, number> = { P1: 0, P2: 1, P3: 2 };
   actions.sort((a, b) => {
     if (order[a.priority] !== order[b.priority]) return order[a.priority] - order[b.priority];
@@ -343,4 +365,5 @@ export const SOURCE_LABEL: Record<ActionSource, string> = {
   business: 'Business',
   systems: 'Systems',
   agents: 'Agents',
+  decisions: 'Decisions',
 };

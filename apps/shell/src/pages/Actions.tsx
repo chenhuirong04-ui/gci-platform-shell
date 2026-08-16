@@ -33,6 +33,7 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'business', label: 'Business' },
   { key: 'systems', label: 'Systems' },
   { key: 'agents', label: 'Agents' },
+  { key: 'decisions', label: 'Decisions' },
 ];
 
 function formatDueAt(iso: string | null): string {
