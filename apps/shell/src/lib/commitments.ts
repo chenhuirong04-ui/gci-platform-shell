@@ -329,6 +329,14 @@ export interface CommitmentActionItem {
 }
 
 export async function getOpenCommitmentActions(): Promise<CommitmentActionItem[]> {
+  // Sync structured (Decision-sourced) commitments first — Boss Action
+  // Center's dedup against Decision Follow-through only works if a just-
+  // decided item's commitment has actually been created yet. Without this,
+  // whichever page loads first (Home/Commitments vs Actions) determines
+  // whether the dedup fires, which is wrong — every reader must see the
+  // same up-to-date state.
+  const sync = await syncStructuredCommitments();
+  if (!sync.ok) return [];
   const res = await getCommitments();
   if (!res.ok) return [];
   const nowMs = Date.now();
