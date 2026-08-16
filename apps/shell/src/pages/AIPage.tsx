@@ -13,6 +13,8 @@ import SupplierSearchResult from '../ai/suppliers/SupplierSearchResult';
 import { searchSuppliers } from '../ai/suppliers/supplierSearchClient';
 import { getTodaysFollowups, findCustomerByName, logFollowup, createCustomerWithContact } from '../lib/crmSupabase';
 import { parseQueryCustomerCommand, parseLogFollowupCommand, parseCreateCrmCustomerCommand } from '../ai/crmAskGciParsers';
+import { getSystemRegistry } from '../lib/systemRegistry';
+import { answerRegistryQuery, REGISTRY_QUERY_RE } from '../ai/registryAskGciParsers';
 
 // ── Inventory query normalizer ────────────────────────────────────────────────
 // Strips command words, punctuation, and trailing "库存" to get the product term.
@@ -1923,6 +1925,21 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
             </div>
           )}
 
+          {/* ── Systems Registry (Supabase): Ask GCI query ── */}
+          {intent.intentId === 'systems_registry_query' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查询开发资产 Registry…</div>
+          )}
+          {intent.intentId === 'systems_registry_query' && state.resultData && !state.resultData.ok && (
+            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              查询失败:{state.resultData.error}
+            </div>
+          )}
+          {intent.intentId === 'systems_registry_query' && state.resultData?.ok && (
+            <div style={{ fontSize: 13, color: TEXT, lineHeight: 1.7, padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }}>
+              {state.resultData.answer}
+            </div>
+          )}
+
           {/* ── CRM (Supabase): Today's follow-ups ── */}
           {intent.intentId === 'today_followups_crm' && !state.resultData && (
             <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查询 crm_customers…</div>
@@ -3155,6 +3172,53 @@ export function AIPage() {
           }
           findCustomerByName(draft.customerName).then(dupCheck => {
             setCmdState(prev => prev ? { ...prev, resultData: { ok: true, draft, dupCheck } } : prev);
+          });
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Systems Registry (Supabase) — Task 6 Ask GCI queries over executive_system_registry.
+    if (REGISTRY_QUERY_RE.test(raw.trim())) {
+      const registryMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'systems_registry_query',
+          intentNameZh: '开发资产查询',
+          intentNameEn: 'Systems Registry Query',
+          category: 'query',
+          triggerKeywordsZh: [],
+          triggerKeywordsEn: [],
+          targetTab: 'chat',
+          targetModule: 'Systems',
+          targetRoute: '/systems',
+          readSources: ['executive_system_registry (Supabase)'],
+          writeTargets: [],
+          requiredFields: [],
+          approvalRequired: false,
+          resultPanel: null,
+          implementationStatus: 'real',
+          notConnectedMessage: '',
+          fallbackBehavior: '',
+        },
+        confidence: 1,
+        raw: raw.trim(),
+        detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: registryMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在连接开发资产 Registry…', '正在检索系统记录…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          getSystemRegistry().then(res => {
+            if (!res.ok) {
+              setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: res.error } } : prev);
+              return;
+            }
+            const answer = answerRegistryQuery(raw.trim(), res.rows);
+            setCmdState(prev => prev ? { ...prev, resultData: { ok: true, answer } } : prev);
           });
         },
       );

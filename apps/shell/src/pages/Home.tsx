@@ -7,6 +7,7 @@ import { AIWorkspace } from '../components/AIWorkspace';
 import { InventoryAlertDrawer } from '../components/InventoryAlertDrawer';
 import { ExecutiveDeskToday } from '../components/ExecutiveDeskToday';
 import { AgentsStatus } from '../components/AgentsStatus';
+import { SystemsRegistrySummaryCard } from '../components/SystemsRegistrySummary';
 
 // ─── localStorage helpers (same keys the Trade + CRM modules use) ──────────
 function safeLocalGet<T = any>(key: string): T[] {
@@ -338,6 +339,9 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
 
       {/* AI AGENTS STATUS — Task 4.1 (MIA / Email Assistant / NOON / Growth=Deferred) */}
       <AgentsStatus />
+
+      {/* SYSTEMS / 开发资产 — Task 6 registry summary */}
+      <SystemsRegistrySummaryCard />
 
       {/* AI WORKSPACE */}
       <AIWorkspace />
