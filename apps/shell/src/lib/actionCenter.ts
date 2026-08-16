@@ -136,12 +136,15 @@ export async function getBossActions(): Promise<
   }
 
   // ── 2. Gmail — reuses Task 5.2's explainable rule (unread, last 7 days,
-  // excl. promotions/social). Recent (<=24h) → P1, older → P2. ──────────
+  // excl. promotions/social). This rule has no signal for whether a message
+  // is actually customer-related (it also matches notifications/newsletters
+  // like Vercel/Zoom/bank alerts) — per §3 "if uncertain, downgrade — never
+  // inflate to P1", every result here is P2, never P1. Escalating requires
+  // a real customer-relevance signal, which is out of this round's scope. ──
   if (importantEmails.ok) {
     for (const m of importantEmails.results) {
       const dateMs = new Date(m.date).getTime();
-      const ageHours = Number.isFinite(dateMs) ? (nowMs - dateMs) / 3600000 : null;
-      const priority: ActionPriority = ageHours !== null && ageHours <= 24 ? 'P1' : 'P2';
+      const priority: ActionPriority = 'P2';
       actions.push({
         id: `email-${m.id}`,
         source: 'email',
