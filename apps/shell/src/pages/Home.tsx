@@ -1,17 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { StatCard, AlertRow, QuickActionCard, colors } from '@gci/design-system';
+import { StatCard, colors } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
 import { statCardSpecs } from '../data/mock';
-import { AIWorkspace } from '../components/AIWorkspace';
 import { InventoryAlertDrawer } from '../components/InventoryAlertDrawer';
-import { SystemsRegistrySummaryCard } from '../components/SystemsRegistrySummary';
 import { BusinessAssistantEntry } from '../components/BusinessAssistantEntry';
-import { ExecutiveOverviewCompact } from '../components/ExecutiveOverviewCompact';
+import { BusinessLinesOverview } from '../components/BusinessLinesOverview';
 import { AgentsStatusCompact } from '../components/AgentsStatusCompact';
 import { HomeKpiRow } from '../components/HomeKpiRow';
 import { HomeDashboardCharts } from '../components/HomeDashboardCharts';
 import { HomeTopPriorities } from '../components/HomeTopPriorities';
+import { getAllCustomerNames } from '../lib/crmSupabase';
 
 // ─── localStorage helpers (same keys the Trade + CRM modules use) ──────────
 function safeLocalGet<T = any>(key: string): T[] {
@@ -56,179 +54,6 @@ function loadHomeStats() {
   return { followUpsToday, pendingQuotes, activeOrders, inventoryAlerts: null };
 }
 
-// ─── Priority alerts from real data ────────────────────────────────────────
-// Raw data is language-independent (loaded once on mount). Translated display
-// strings are derived at render time via formatAlert() so language toggles
-// never require re-fetching or re-deriving the underlying alert data.
-interface LiveAlert {
-  dot: string;
-  text: string;
-  ref: string;
-  src: string;
-  sc: string;
-  sb: string;
-  action: string;
-  path: string;
-}
-
-type RawAlert =
-  | { kind: 'overdueFollowup'; clientName: string; overdueDays: number; ref: string }
-  | { kind: 'staleQuote'; clientName: string; age: number; ref: string }
-  | { kind: 'urgentOrder'; clientName: string; daysLeft: number; ref: string };
-
-function loadLiveAlerts(): RawAlert[] {
-  const today = new Date().toISOString().split('T')[0];
-  const alerts: RawAlert[] = [];
-
-  // 1. Overdue CRM follow-ups (top 2) — same active filter as loadHomeStats
-  const crmTasks: any[] = safeLocalGet('ICARE_HISTORY_V1');
-  const overdueFollowups = crmTasks
-    .filter(t =>
-      isActiveFollowup(t, today) &&
-      t.nextFollowUpAt.slice(0, 10) < today &&
-      t?.clientName
-    )
-    .sort((a, b) => a.nextFollowUpAt.localeCompare(b.nextFollowUpAt))
-    .slice(0, 2);
-
-  for (const t of overdueFollowups) {
-    const overdueDays = Math.round(
-      (new Date(today).getTime() - new Date(t.nextFollowUpAt.slice(0, 10)).getTime()) / 86400000
-    );
-    alerts.push({ kind: 'overdueFollowup', clientName: t.clientName, overdueDays, ref: t.id ? t.id.slice(0, 16) : '' });
-  }
-
-  // 2. Quoted orders waiting > 3 days (top 1)
-  const quotes: any[] = safeLocalGet('quotes');
-  const stalequote = quotes
-    .filter(q => q?.status === 'QUOTED' && q?.createdAt)
-    .map(q => ({
-      ...q,
-      age: Math.round((Date.now() - new Date(q.createdAt).getTime()) / 86400000),
-    }))
-    .filter(q => q.age >= 3)
-    .sort((a, b) => b.age - a.age)[0];
-
-  if (stalequote) {
-    const total = stalequote.grandTotal ? `AED ${Number(stalequote.grandTotal).toLocaleString()}` : '';
-    alerts.push({
-      kind: 'staleQuote',
-      clientName: stalequote.clientName || stalequote.client || '',
-      age: stalequote.age,
-      ref: [stalequote.docNo || stalequote.id?.slice(0, 12), total].filter(Boolean).join(' · '),
-    });
-  }
-
-  // 3. Orders close to due date (within 5 days) (top 1)
-  const orders: any[] = safeLocalGet('orders');
-  const urgentOrder = orders
-    .filter(o => o?.status !== 'PAID' && o?.status !== 'VOIDED' && o?.dueDate)
-    .map(o => ({
-      ...o,
-      daysLeft: Math.round((new Date(o.dueDate).getTime() - Date.now()) / 86400000),
-    }))
-    .filter(o => o.daysLeft >= 0 && o.daysLeft <= 5)
-    .sort((a, b) => a.daysLeft - b.daysLeft)[0];
-
-  if (urgentOrder) {
-    alerts.push({
-      kind: 'urgentOrder',
-      clientName: urgentOrder.clientName || urgentOrder.client || '',
-      daysLeft: urgentOrder.daysLeft,
-      ref: [urgentOrder.docNo || urgentOrder.id?.slice(0, 12), urgentOrder.dueDate].filter(Boolean).join(' · '),
-    });
-  }
-
-  return alerts.slice(0, 3);
-}
-
-// Render-time translation — takes raw, language-independent alert data and
-// the current language, and produces the display strings. Pure function,
-// called on every render; never stored in state.
-function formatAlert(a: RawAlert, lang: 'zh' | 'en'): LiveAlert {
-  switch (a.kind) {
-    case 'overdueFollowup':
-      return {
-        dot: '#E0846A',
-        text: lang === 'zh'
-          ? `${a.clientName} — 跟进已逾期 ${a.overdueDays} 天`
-          : `${a.clientName} — follow-up overdue by ${a.overdueDays} day${a.overdueDays !== 1 ? 's' : ''}`,
-        ref: a.ref,
-        src: 'CRM',
-        sc: '#8FA6D4',
-        sb: 'rgba(143,166,212,0.14)',
-        action: lang === 'zh' ? '跟进' : 'Follow up',
-        path: '/crm?tab=dashboard',
-      };
-    case 'staleQuote': {
-      const name = a.clientName || (lang === 'zh' ? '客户' : 'Client');
-      return {
-        dot: '#D4A843',
-        text: lang === 'zh'
-          ? `${name} — 报价已发出 ${a.age} 天未回复`
-          : `${name} — quote sent ${a.age} days ago, no reply`,
-        ref: a.ref,
-        src: 'QUOTATION',
-        sc: '#D4A843',
-        sb: 'rgba(212,168,67,0.12)',
-        action: lang === 'zh' ? '查看' : 'View',
-        path: '/trade?tab=history',
-      };
-    }
-    case 'urgentOrder': {
-      const name = a.clientName || (lang === 'zh' ? '订单' : 'Order');
-      return {
-        dot: '#D4A843',
-        text: lang === 'zh'
-          ? `${name} — 交期还有 ${a.daysLeft} 天`
-          : `${name} — due in ${a.daysLeft} day${a.daysLeft !== 1 ? 's' : ''}`,
-        ref: a.ref,
-        src: 'TRADE',
-        sc: '#8FA6D4',
-        sb: 'rgba(143,166,212,0.14)',
-        action: lang === 'zh' ? '确认' : 'Check',
-        path: '/trade?tab=history',
-      };
-    }
-  }
-}
-
-// ─── Quick Actions config (with real navigation paths) ─────────────────────
-const QUICK_ACTIONS = [
-  {
-    labelKey: 'addClient' as const,
-    icon: '+',
-    ib: 'linear-gradient(135deg,rgba(203,168,92,0.2),rgba(203,168,92,0.08))',
-    ic: '#E2C988',
-    is: '0 4px 16px rgba(203,168,92,0.2)',
-    path: '/crm?tab=dashboard',
-  },
-  {
-    labelKey: 'createQuote' as const,
-    icon: '＄',
-    ib: 'rgba(255,255,255,0.05)',
-    ic: '#C8BDA8',
-    is: 'none',
-    path: '/quotation?mode=customer-quote',
-  },
-  {
-    labelKey: 'uploadBoq' as const,
-    icon: '↑',
-    ib: 'rgba(255,255,255,0.05)',
-    ic: '#C8BDA8',
-    is: 'none',
-    path: '/quotation?mode=customer-quote',
-  },
-  {
-    labelKey: 'createOrder' as const,
-    icon: '▣',
-    ib: 'rgba(255,255,255,0.05)',
-    ic: '#C8BDA8',
-    is: 'none',
-    path: '/trade?tab=quote',
-  },
-];
-
 // ─── Helper components ──────────────────────────────────────────────────────
 function getGreetingKey(hour: number) {
   if (hour < 5) return 'night' as const;
@@ -257,7 +82,6 @@ function SectionHeader({ label, trailing }: { label: string; trailing?: string }
 // ─── Main component ─────────────────────────────────────────────────────────
 export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
   const { dict, lang } = useI18n();
-  const navigate = useNavigate();
   const greeting = dict.greeting[getGreetingKey(new Date().getHours())];
   const greetingLine = lang === 'zh' ? `${greeting}，Chris` : `${greeting}, Chris`;
 
@@ -268,16 +92,13 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
     inventoryAlerts: number | null;
   }>({ followUpsToday: null, pendingQuotes: null, activeOrders: null, inventoryAlerts: null });
 
-  const [liveAlerts, setLiveAlerts] = useState<RawAlert[] | null>(null);
   const [inventoryDrawerOpen, setInventoryDrawerOpen] = useState(false);
+  const [crmTotal, setCrmTotal] = useState<number | null>(null);
 
-  // Data load is language-independent — runs once on mount only. Language
-  // toggles must never re-trigger these requests (see formatAlert() above
-  // for how display text is derived at render time instead).
   useEffect(() => {
     const s = loadHomeStats();
     setStats(s);
-    setLiveAlerts(loadLiveAlerts());
+    getAllCustomerNames().then((res) => { if (res.ok) setCrmTotal(res.rows.length); });
 
     // Fetch combined inventory alert count: warehouse (Notion) + consignment (Supabase)
     const base = typeof window !== 'undefined' ? window.location.origin : '';
@@ -293,29 +114,20 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
     });
   }, []);
 
-  // Dynamic summary line based on real counts
-  function buildSummary() {
-    const { followUpsToday, pendingQuotes, activeOrders } = stats;
-    // If all null = data not yet loaded, fall back to generic
-    if (followUpsToday === null) return dict.workspace.summary;
-    const parts: string[] = [];
-    if (followUpsToday > 0) parts.push(lang === 'zh' ? `${followUpsToday} 件跟进待处理` : `${followUpsToday} follow-up${followUpsToday !== 1 ? 's' : ''} due`);
-    if (pendingQuotes && pendingQuotes > 0) parts.push(lang === 'zh' ? `${pendingQuotes} 份报价进行中` : `${pendingQuotes} quote${pendingQuotes !== 1 ? 's' : ''} in progress`);
-    if (activeOrders && activeOrders > 0) parts.push(lang === 'zh' ? `${activeOrders} 个订单执行中` : `${activeOrders} active order${activeOrders !== 1 ? 's' : ''}`);
-    if (parts.length === 0) return lang === 'zh' ? '今日暂无待处理事项，保持跟进节奏。' : 'No urgent items today. Keep up the follow-up rhythm.';
-    return lang === 'zh' ? `${parts.join('、')}。处理完重点提醒后，按模块继续。` : `${parts.join(', ')}. Work through priority alerts then continue by module.`;
-  }
+  // Task 13: KPI row above already covers 今日客户跟进/逾期事项/等你决定/待执行
+  // with the Supabase-backed live numbers — this line stays a plain greeting
+  // (no restated counts) so it never shows a second, different number for
+  // the same fact.
+  const summaryLine = dict.workspace.summary;
 
-  // Overlay real counts on the statCardSpecs visual configs
-  // mod eyebrow is translated via dict.workspace.*
+  // Overlay real counts on the statCardSpecs visual configs (报价/订单/库存
+  // only — index 0 "followUpsToday" is dropped here since it duplicates the
+  // KPI row's "今日客户跟进").
   const statCards = [
-    { ...statCardSpecs[0], val: stats.followUpsToday !== null ? String(stats.followUpsToday) : '--', mod: dict.workspace.modCrm },
     { ...statCardSpecs[1], val: stats.pendingQuotes  !== null ? String(stats.pendingQuotes)  : '--', mod: dict.workspace.modQuotation },
     { ...statCardSpecs[2], val: stats.activeOrders   !== null ? String(stats.activeOrders)   : '--', mod: dict.workspace.modTrade },
     { ...statCardSpecs[3], val: stats.inventoryAlerts !== null ? String(stats.inventoryAlerts) : '--', mod: dict.workspace.modInventory },
   ];
-
-  const alertsToShow = (liveAlerts ?? []).map(a => formatAlert(a, lang));
 
   return (
     <div style={{ maxWidth: 'var(--content-max-w)', margin: '0 auto', padding: '48px 48px 60px' }}>
@@ -334,25 +146,35 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
           {greetingLine}
         </h1>
         <p style={{ fontSize: 15.5, color: '#7A8494', marginTop: 12, lineHeight: 1.6, maxWidth: 620 }}>
-          {buildSummary()}
+          {summaryLine}
         </p>
       </div>
 
-      {/* 1 — Business Assistant: primary entry point, top of page (Task 12) */}
+      {/* A — Business Assistant: the one primary chat entry point on Home (Task 12/13) */}
       <BusinessAssistantEntry />
 
-      {/* 2 — KPI row: 6 compact numbers, each backed by an existing Task 4/7/8/9/5.2 read */}
+      {/* B — Executive KPI: 6 compact numbers, each backed by an existing Task 4/7/8/9/5.2 read */}
       <HomeKpiRow />
 
-      {/* 3 — Dashboard charts: real 7-day trend + real P1/P2/P3 backlog structure */}
+      {/* C — Business Charts: real 7-day trend + real P1/P2/P3 backlog structure */}
       <HomeDashboardCharts />
 
-      {/* 4 — Top 3 priorities only (not top 5/20) — same live Boss Action list as the charts */}
+      {/* D — Top 3 priorities only (not top 5/20), email source excluded — see HomeTopPriorities.tsx */}
       <HomeTopPriorities />
 
-      {/* 5 — 经营概览: compact KPI/summary cards only, detail lives on /crm, /systems etc. */}
+      {/* E — Business Overview: all business lines (crm_customers.business_type) + core operating metrics */}
       <SectionHeader label="经营概览 · BUSINESS OVERVIEW" />
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 12 }}>
+      <div style={{ marginBottom: 16 }}>
+        <BusinessLinesOverview />
+      </div>
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 44 }}>
+        <div
+          onClick={() => onFlash(dict.toast.enterModule(dict.workspace.modCrm))}
+          style={{ padding: '14px 16px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, cursor: 'pointer', textAlign: 'center' }}
+        >
+          <div style={{ fontSize: 22, fontWeight: 700, color: colors.textPrimary, fontFamily: "'Space Grotesk',sans-serif" }}>{crmTotal === null ? '—' : crmTotal}</div>
+          <div style={{ fontSize: 10.5, color: '#7A8494', marginTop: 4 }}>CRM 客户</div>
+        </div>
         {statCards.map((f, i) => (
           <StatCard
             key={i}
@@ -365,65 +187,15 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
           />
         ))}
       </div>
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 52 }}>
-        <ExecutiveOverviewCompact />
-        <SystemsRegistrySummaryCard />
-        <AgentsStatusCompact />
-      </div>
+
+      {/* F — External Agents: MIA / E-commerce Assistant / Growth Agent — light summary only */}
+      <SectionHeader label="EXTERNAL AGENTS · 外部 AI 员工" />
+      <AgentsStatusCompact />
 
       {/* Inventory alert drawer */}
       {inventoryDrawerOpen && (
         <InventoryAlertDrawer onClose={() => setInventoryDrawerOpen(false)} />
       )}
-
-      {/* Secondary — existing general Ask GCI entry, priority alerts and quick actions kept, pushed below the executive first screen */}
-      <AIWorkspace />
-
-      <SectionHeader
-        label={dict.workspace.priorityAlerts}
-        trailing={alertsToShow.length > 0 ? `${alertsToShow.length} ${dict.workspace.items}` : undefined}
-      />
-      <div
-        style={{
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(255,255,255,0.065)',
-          borderRadius: 16,
-          overflow: 'hidden',
-          marginBottom: 52,
-          backdropFilter: 'blur(4px)',
-        }}
-      >
-        {alertsToShow.length === 0 ? (
-          <div style={{ padding: '36px 24px', textAlign: 'center' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#3A4255', letterSpacing: '0.05em' }}>
-              {lang === 'zh' ? '暂无重点提醒' : 'No priority alerts'}
-            </div>
-            <div style={{ fontSize: 11, color: '#2A3245', marginTop: 6, fontFamily: 'IBM Plex Mono, monospace' }}>
-              {lang === 'zh' ? '所有事项跟进正常' : 'All items on track'}
-            </div>
-          </div>
-        ) : (
-          alertsToShow.map((a, i) => (
-            <AlertRow
-              key={i}
-              data={a}
-              onClick={() => navigate(a.path)}
-            />
-          ))
-        )}
-      </div>
-
-      {/* QUICK ACTIONS */}
-      <SectionHeader label={dict.workspace.quickActions} />
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', gap: 13 }}>
-        {QUICK_ACTIONS.map((q, i) => (
-          <QuickActionCard
-            key={i}
-            data={{ ...q, label: dict.quickActions[q.labelKey] }}
-            onClick={() => navigate(q.path)}
-          />
-        ))}
-      </div>
     </div>
   );
 }

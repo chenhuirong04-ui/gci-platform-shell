@@ -53,7 +53,12 @@ export function HomeTopPriorities() {
     });
   }, []);
 
-  const top3 = (actions ?? []).slice(0, 3);
+  // Task 13: email has no reliable customer-relevance signal (see actionCenter.ts's
+  // comment on the Gmail block — it also matches newsletters/Vercel/Claude/IBKR
+  // notifications), so it's excluded from the Home Top 3 selection specifically.
+  // It's still counted in the "重要客户邮件" KPI and still shown in the full /actions
+  // list — this only keeps generic notifications off the boss's headline view.
+  const top3 = (actions ?? []).filter((a) => a.source !== 'email').slice(0, 3);
 
   return (
     <div style={{ marginBottom: 44 }}>

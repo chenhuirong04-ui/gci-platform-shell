@@ -13,6 +13,12 @@ const BORD = 'rgba(255,255,255,0.07)';
 
 export type AgentStatus = 'healthy' | 'warning' | 'error' | 'no_data' | 'deferred';
 
+export interface AgentChannel {
+  label: string;
+  connected: boolean;
+  note?: string;
+}
+
 export interface AgentCard {
   name: string;
   status: AgentStatus;
@@ -22,6 +28,7 @@ export interface AgentCard {
   issues: string[];
   needsChris: number;
   sourceUrl: string | null;
+  channels?: AgentChannel[];
 }
 
 const STATUS_LABEL: Record<AgentStatus, string> = {
@@ -42,44 +49,44 @@ const STATUS_COLOR: Record<AgentStatus, string> = {
 
 // Identification confirmed via direct Vercel/GitHub/Supabase inspection this
 // round (Task 4.1) — never guessed. See conversation record for the audit trail.
+// Task 13: fixed naming going into the MIA/E-commerce/Growth integration
+// rounds (14.1/14.2). Email Assistant is intentionally NOT listed here —
+// it's a built-in GCI feature (Task 11.1), not an external agent, and its
+// signal already appears as the Home "重要客户邮件" KPI + /email-assistant
+// — listing it again here was a duplicate entry point.
 export const AGENTS: AgentCard[] = [
   {
-    name: 'MIA / 客户开发 AI',
+    name: 'MIA｜客户开发 AI',
     status: 'no_data',
     lastUpdated: null,
-    todaySummary: 'Production 需要登录(邮箱+密码),未提供公开 status API,无法在不接触凭据的前提下读取真实状态。',
+    todaySummary: 'Production 需要登录(邮箱+密码),未提供公开 status API,无法在不接触凭据的前提下读取真实状态。接入前不会显示"今日新开发潜客"等数字。',
     metrics: [],
     issues: ['Production 登录墙(无匿名可读页面)', '仓库内仅有 /api/cron/mia-daily 与 /api/gmail,均非状态查询接口'],
     needsChris: 0,
     sourceUrl: 'https://gci-ai-sales-agent.vercel.app',
   },
   {
-    // Task 11.1 — this is now the real, built-in Email Chat Assistant
-    // (/email-assistant), not the old external "Email Assistant" agent
-    // referenced pre-Task-11 (that project was never identified/UNKNOWN and
-    // is not connected here). No fabricated metrics — no reliable unread/
-    // last-fetch counter exists yet, so this stays a plain availability note.
-    name: 'Email Assistant',
-    status: 'healthy',
-    lastUpdated: null,
-    todaySummary: 'Email Chat Assistant available — 可在邮件助理中查看邮件、讨论内容并起草回复(不自动发送)。',
-    metrics: [],
-    issues: [],
-    needsChris: 0,
-    sourceUrl: '/email-assistant',
-  },
-  {
-    name: 'NOON Agent',
+    // Task 13: renamed from "NOON Agent" — this is the umbrella e-commerce
+    // channel product, of which NOON is only the first channel. No new
+    // channel is actually connected/read this round — Amazon/Tradeling/
+    // Website are plain NOT CONNECTED labels, not fabricated data.
+    name: 'E-commerce Assistant｜电商助理',
     status: 'no_data',
     lastUpdated: null,
-    todaySummary: '未在当前 Vercel / GitHub 账号中找到匹配项目,身份未确认(UNKNOWN)。',
+    todaySummary: '未在当前 Vercel / GitHub 账号中找到匹配项目,身份未确认(UNKNOWN)。渠道读取本轮均未接入。',
     metrics: [],
     issues: ['未定位到 GitHub repo / Production URL / Supabase project'],
     needsChris: 0,
     sourceUrl: null,
+    channels: [
+      { label: 'NOON', connected: true, note: '已有基础' },
+      { label: 'Amazon', connected: false },
+      { label: 'Tradeling', connected: false },
+      { label: 'Website', connected: false },
+    ],
   },
   {
-    name: 'Growth / 社媒 AI',
+    name: 'Growth Agent｜内容增长',
     status: 'deferred',
     lastUpdated: null,
     todaySummary: '数据源(growth_job_runs / growth_publish_jobs)真实存在,但与 Chanya / 25H Bridge 共用同一个 Supabase 项目(fieqffsqvptweetfzvkh)。本阶段不为 Executive Desk 扩大对主产品数据库的访问权限,后续单独接入。',

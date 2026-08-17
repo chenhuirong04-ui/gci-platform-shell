@@ -310,6 +310,36 @@ export async function getAllCustomerNames(): Promise<
   return { ok: true, rows: (data ?? []) as { id: string; customer_name: string }[] };
 }
 
+// ── Task 13: Business Overview — customer count grouped by existing
+// business_type column. No guessing: a customer with no business_type set
+// is counted as UNKNOWN rather than assigned a line. ───────────────────────
+const BUSINESS_LINES = ['25H/AI', 'Trade', 'Workforce/Technical Services', 'Ecommerce', 'Other'] as const;
+
+export interface BusinessLineCount {
+  line: string;
+  count: number;
+}
+
+export async function getBusinessLineBreakdown(): Promise<
+  { ok: true; total: number; lines: BusinessLineCount[]; unknown: number } | { ok: false; error: string }
+> {
+  const { data, error } = await supabase.from('crm_customers').select('business_type').limit(2000);
+  if (error) return { ok: false, error: error.message };
+  const counts = new Map<string, number>(BUSINESS_LINES.map((l) => [l, 0]));
+  let unknown = 0;
+  for (const row of data ?? []) {
+    const bt = (row as any).business_type as string | null;
+    if (bt && counts.has(bt)) counts.set(bt, (counts.get(bt) ?? 0) + 1);
+    else unknown += 1;
+  }
+  return {
+    ok: true,
+    total: (data ?? []).length,
+    lines: BUSINESS_LINES.map((l) => ({ line: l, count: counts.get(l) ?? 0 })),
+    unknown,
+  };
+}
+
 // ── Task 10: Commitment Tracker — recent follow-up text for candidate scan ──
 // Read-only. Joins the customer name via the FK relationship so callers don't
 // need a second round-trip.
