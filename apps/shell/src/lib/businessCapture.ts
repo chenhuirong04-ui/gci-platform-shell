@@ -111,13 +111,28 @@ export async function resolveCaptureItems(
       isNew = raw.type === 'NEW_CUSTOMER' ? r.isNew : false; // CRM_FOLLOWUP never creates — if not found, treat as candidate-less "not found"
     }
 
+    // The classifier only sees the raw text, not the CRM — it can call
+    // something "NEW_CUSTOMER" for a name that already exists exactly
+    // (e.g. asked with no chat context loaded). resolveCustomer() above is
+    // the actual source of truth: an exact single match here always wins
+    // and downgrades this item to CRM_FOLLOWUP against the real customer,
+    // so a "new customer" write can never create a duplicate. An ambiguous
+    // multi-candidate match still needs Chris's pick (§六) before this can
+    // be decided either way — the UI's candidate picker sets the type once
+    // he chooses.
+    let effectiveType: CaptureType = raw.type;
+    if (raw.type === 'NEW_CUSTOMER' && matched) {
+      effectiveType = 'CRM_FOLLOWUP';
+    }
+
     const resolvedNextFollowUpAt = raw.next_follow_up_at ? parseRelativeDateZh(raw.next_follow_up_at) : null;
     const resolvedTodoDueAt = raw.todo_due_at ? parseRelativeDateZh(raw.todo_due_at) : null;
     const resolvedCommitmentDueAt = raw.commitment_due_at ? parseRelativeDateZh(raw.commitment_due_at) : null;
 
     const summaryLines: string[] = [];
     const custName = matched?.customer_name || raw.customer_name || currentCustomer?.customer_name;
-    switch (raw.type) {
+    const downgradedFromNewCustomer = raw.type === 'NEW_CUSTOMER' && matched;
+    switch (effectiveType) {
       case 'NEW_CUSTOMER':
         summaryLines.push(`客户：${raw.customer_name}（新客户）`);
         if (raw.contact_name) summaryLines.push(`联系人：${raw.contact_name}`);
@@ -127,8 +142,13 @@ export async function resolveCaptureItems(
         if (resolvedNextFollowUpAt) summaryLines.push(`我方下一步：${resolvedNextFollowUpAt} 再次联系`);
         break;
       case 'CRM_FOLLOWUP':
-        summaryLines.push(`客户：${custName ?? '(未指定)'}`);
+        summaryLines.push(
+          downgradedFromNewCustomer
+            ? `客户：${custName}（已存在，记为跟进，不会重复建档）`
+            : `客户：${custName ?? '(未指定)'}`
+        );
         if (raw.followup_notes) summaryLines.push(`跟进内容：${raw.followup_notes}`);
+        if (raw.needs_summary && !raw.followup_notes) summaryLines.push(`跟进内容：${raw.needs_summary}`);
         if (raw.next_action) summaryLines.push(`下一步：${raw.next_action}`);
         if (resolvedNextFollowUpAt) summaryLines.push(`下次跟进：${resolvedNextFollowUpAt}`);
         break;
@@ -149,7 +169,7 @@ export async function resolveCaptureItems(
     }
 
     out.push({
-      type: raw.type,
+      type: effectiveType,
       summaryLines,
       raw,
       matchedCustomer: matched,
@@ -205,7 +225,7 @@ export async function confirmCaptureItem(item: ResolvedCaptureItem): Promise<{ o
       if (!item.matchedCustomer) return { ok: false, error: '未找到匹配的客户' };
       const res = await logFollowup({
         customerId: item.matchedCustomer.id,
-        notes: item.raw.followup_notes || item.raw.raw_fragment,
+        notes: item.raw.followup_notes || item.raw.needs_summary || item.raw.raw_fragment,
         nextAction: item.raw.next_action || undefined,
         nextFollowUpAt: item.resolvedNextFollowUpAt || undefined,
       });

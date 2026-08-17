@@ -200,7 +200,17 @@ export function BusinessAssistant() {
   function pickCandidateCustomer(index: number, customer: CrmCustomer) {
     if (!pendingCapture) return;
     const next = [...pendingCapture];
-    next[index] = { ...next[index], matchedCustomer: customer, candidateCustomers: null, isNewCustomer: false };
+    const item = next[index];
+    // Picking an existing candidate always means "record against this real
+    // customer" — never create a duplicate, even if the original text read
+    // like a new-customer introduction.
+    next[index] = {
+      ...item,
+      type: item.type === 'NEW_CUSTOMER' ? 'CRM_FOLLOWUP' : item.type,
+      matchedCustomer: customer,
+      candidateCustomers: null,
+      isNewCustomer: false,
+    };
     setPendingCapture(next);
   }
 
