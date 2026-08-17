@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import type { BSLang } from '../types';
-
-// Uses the same project URL/anon key — supabase-js picks up the auth session
-// stored in localStorage by the main app client (same storage key = same session)
-const _supa = createClient(
-  (import.meta as any).env.VITE_SUPABASE_URL as string,
-  (import.meta as any).env.VITE_SUPABASE_ANON_KEY as string
-);
+// Task 16.1 — this used to call its own createClient() with the same
+// project URL/anon key as apps/shell's client. Two GoTrueClient instances
+// sharing one localStorage session key race on startup ("Multiple
+// GoTrueClient instances detected" — a real, confirmed contributor to the
+// first-load black screen: a corrupted/delayed session read on a cold
+// connection left AuthContext's `loading` stuck). Reusing the single
+// shared client removes the second instance entirely — same session,
+// same behavior, no separate client.
+import { supabase as _supa } from '../../../apps/shell/src/lib/supabase';
 
 interface RefRecord {
   ref_biz_id: string;

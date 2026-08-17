@@ -8,6 +8,7 @@ import { Login } from './pages/Login';
 import { AccessDenied } from './pages/AccessDenied';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { StartupLoading, StartupError } from './components/StartupScreen';
 import { AIPage } from './pages/AIPage';
 import { InvoicePage } from './pages/InvoicePage';
 import { Systems } from './pages/Systems';
@@ -43,7 +44,7 @@ function Shell() {
   const currentUrl = location.pathname + location.search;
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
 
-  const { loading, session, profile, signOut } = useAuth();
+  const { loading, session, profile, signOut, error: authError, retry: retryAuth } = useAuth();
 
   const flash = (msg: string) => {
     setToast(msg);
@@ -93,8 +94,14 @@ function Shell() {
     );
   }
 
-  // Still checking session on first load
-  if (loading) return null;
+  // Still checking session on first load — Task 16.1: a visible state, not
+  // a silent `return null` (which is what produced the black-screen bug).
+  if (loading) return <StartupLoading />;
+
+  // The initial session restore itself failed (network error etc, not a
+  // "not logged in" case) — offer a manual retry instead of a permanent
+  // blank page.
+  if (authError && !session) return <StartupError message={authError} onRetry={retryAuth} />;
 
   // Not authenticated — redirect to login
   if (!session) {
