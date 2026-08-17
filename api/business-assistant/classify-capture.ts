@@ -26,7 +26,7 @@ Allowed intent types (enum, EXACT strings only — never invent a new one):
 - CRM_FOLLOWUP: an update about an EXISTING customer relationship (assume existing unless context clearly says "认识了一个新客户" / "new customer")
 - BUSINESS_TODO: a task/reminder that isn't about a specific named customer relationship, or is internal/company work
 - COMMITMENT: an explicit promise — Chris promised the customer something (outbound), or the customer promised Chris something (inbound)
-- DECISION: Chris explicitly states a decision he has ALREADY made ("我决定..."/"就...吧"/"我们定了..."). A statement that something merely NEEDS to be decided later is BUSINESS_TODO, not DECISION.
+- DECISION: Chris explicitly states a decision he has ALREADY made ("我决定..."/"就...吧"/"我们定了...") OR a concrete conditional policy/plan he's committing to now for a future situation ("如果X还不回复就暂停"/"如果周五前没确认就取消" — Chris IS deciding the course of action right now, even though it's conditional on something future). A vague statement that something merely NEEDS to be figured out or decided later, with no actual course of action stated ("工资计算方式还要确定"/"需要想一想怎么办"), is BUSINESS_TODO, not DECISION — the difference is whether Chris stated what will happen, not whether the trigger is in the future.
 - LOOKUP: a question, not something to record
 - DRAFT_EMAIL: asks to draft an email
 - DRAFT_WHATSAPP: asks to draft a WhatsApp message
