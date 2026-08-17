@@ -114,11 +114,12 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
     });
   }, []);
 
-  // Task 13: KPI row above already covers 今日客户跟进/逾期事项/等你决定/待执行
-  // with the Supabase-backed live numbers — this line stays a plain greeting
-  // (no restated counts) so it never shows a second, different number for
-  // the same fact.
-  const summaryLine = dict.workspace.summary;
+  // Task 13: KPI row below already covers 今日客户跟进/逾期事项/等你决定/待执行
+  // with the live Supabase numbers. dict.workspace.summary is a static
+  // placeholder string from the original design mock ("今天有 2 件逾期事项、1
+  // 份报价待发送...") — real-looking numbers that are NOT live data, so it
+  // must never be rendered. This line stays a plain, number-free greeting.
+  const summaryLine = lang === 'zh' ? '以下是今日经营状况总览。' : "Here's today's business overview.";
 
   // Overlay real counts on the statCardSpecs visual configs (报价/订单/库存
   // only — index 0 "followUpsToday" is dropped here since it duplicates the
