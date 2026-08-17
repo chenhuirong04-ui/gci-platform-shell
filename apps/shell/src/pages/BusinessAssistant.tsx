@@ -250,9 +250,20 @@ export function BusinessAssistant() {
   // customer / follow-up / to-do / commitment / decision / task lifecycle)
   // before falling back to the Task 12 customer/company lookup. Works with
   // no customer loaded yet (ctx may be null).
+  // A bare identifier with no punctuation/spaces ("MAG" / "TestCorpMAG16" /
+  // "Ray") is always a customer switch, never something to capture — even
+  // with a different customer already loaded, the classifier can otherwise
+  // mistake a short standalone name for a passing mention and swallow it
+  // into a content-free CRM_FOLLOWUP instead of switching context.
+  const BARE_NAME_RE = /^[^\s，。！？,.:：；;]{1,24}$/u;
+
   async function handleTopSubmit(text: string) {
     const t = text.trim();
     if (!t) return;
+    if (BARE_NAME_RE.test(t)) {
+      resolve(t);
+      return;
+    }
     const consumed = await tryBusinessCapture(t, ctx?.customer ?? null);
     if (consumed) return;
     const stripped = t.replace(LOOKUP_PREFIX_RE, '').trim() || t;
