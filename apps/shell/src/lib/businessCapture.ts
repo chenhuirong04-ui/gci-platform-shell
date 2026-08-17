@@ -139,6 +139,15 @@ export async function resolveCaptureItems(
         if (raw.business_type) summaryLines.push(`业务：${raw.business_type}`);
         if (raw.needs_summary) summaryLines.push(`当前需求：${raw.needs_summary}`);
         if (raw.followup_notes) summaryLines.push(`本次沟通：${raw.followup_notes}`);
+        // The classifier sometimes attaches an embedded promise
+        // (§一 "他说周四给我项目清单") to this same NEW_CUSTOMER object instead
+        // of emitting a separate COMMITMENT intent — confirmCaptureItem's
+        // NEW_CUSTOMER branch already writes it either way, so the card
+        // must show it either way too, or Chris would confirm a write he
+        // can't see.
+        if (raw.commitment_text && raw.commitment_direction) {
+          summaryLines.push(`${raw.commitment_direction === 'inbound' ? '客户承诺' : '我方承诺'}：${raw.commitment_text}${resolvedCommitmentDueAt ? `（${resolvedCommitmentDueAt}）` : ''}`);
+        }
         if (resolvedNextFollowUpAt) summaryLines.push(`我方下一步：${resolvedNextFollowUpAt} 再次联系`);
         break;
       case 'CRM_FOLLOWUP':
@@ -150,6 +159,9 @@ export async function resolveCaptureItems(
         if (raw.followup_notes) summaryLines.push(`跟进内容：${raw.followup_notes}`);
         if (raw.needs_summary && !raw.followup_notes) summaryLines.push(`跟进内容：${raw.needs_summary}`);
         if (raw.next_action) summaryLines.push(`下一步：${raw.next_action}`);
+        if (raw.commitment_text && raw.commitment_direction) {
+          summaryLines.push(`${raw.commitment_direction === 'inbound' ? '客户承诺' : '我方承诺'}：${raw.commitment_text}${resolvedCommitmentDueAt ? `（${resolvedCommitmentDueAt}）` : ''}`);
+        }
         if (resolvedNextFollowUpAt) summaryLines.push(`下次跟进：${resolvedNextFollowUpAt}`);
         break;
       case 'COMMITMENT':
@@ -230,6 +242,22 @@ export async function confirmCaptureItem(item: ResolvedCaptureItem): Promise<{ o
         nextFollowUpAt: item.resolvedNextFollowUpAt || undefined,
       });
       if (!res.ok) return res;
+      if (item.raw.commitment_text && item.raw.commitment_direction) {
+        const candidate: CommitmentCandidate = {
+          id: `manual-${Date.now()}`,
+          source: 'manual',
+          source_ref: `followup-${item.matchedCustomer.id}-${Date.now()}`,
+          title: `${item.matchedCustomer.customer_name} — ${item.raw.commitment_text}`.slice(0, 120),
+          commitment_text: item.raw.commitment_text,
+          due_at: item.resolvedCommitmentDueAt,
+          counterparty: item.matchedCustomer.customer_name,
+          commitment_type: item.raw.commitment_direction as CommitmentType,
+          source_link: null,
+          priority: 'P2',
+        };
+        const c = await confirmCommitmentCandidate(candidate);
+        if (!c.ok) return c;
+      }
       return { ok: true };
     }
     case 'COMMITMENT': {
