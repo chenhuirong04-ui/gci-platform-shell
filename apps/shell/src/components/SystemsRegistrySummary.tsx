@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
 import { getSystemRegistry, summarize, type SystemRegistrySummary } from '../lib/systemRegistry';
 
-const GOLD = '#CBA85C';
 const MUTED = '#7A8494';
 const CARD = 'rgba(255,255,255,0.025)';
 const BORD = 'rgba(255,255,255,0.07)';
@@ -23,32 +22,24 @@ export function SystemsRegistrySummaryCard() {
   }, []);
 
   return (
-    <div style={{ marginBottom: 52 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
-        <span className="font-mono-label" style={{ fontSize: 10.5, letterSpacing: '0.22em', color: GOLD }}>
-          SYSTEMS · 开发资产
-        </span>
-        <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,rgba(203,168,92,0.36),transparent)' }} />
-      </div>
-      <div
-        onClick={() => navigate('/systems')}
-        style={{ padding: '14px 18px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}
-      >
-        {error ? (
-          <span style={{ fontSize: 12.5, color: '#E0846A' }}>读取失败:{error}</span>
-        ) : !summary ? (
-          <span style={{ fontSize: 12.5, color: MUTED }}>加载中…</span>
-        ) : (
-          <>
-            <Stat label="系统数量" value={summary.total} />
-            <Stat label="Production" value={summary.production} />
-            <Stat label="Development" value={summary.development} />
-            <Stat label="Legacy / Unknown" value={summary.legacyOrUnknown} />
-            <Stat label="待审计" value={summary.needsReview} />
-            <span style={{ marginLeft: 'auto', fontSize: 11, color: MUTED }}>查看列表 →</span>
-          </>
-        )}
-      </div>
+    <div
+      onClick={() => navigate('/systems')}
+      style={{ padding: '14px 18px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}
+    >
+      {error ? (
+        <span style={{ fontSize: 12.5, color: '#E0846A' }}>读取失败:{error}</span>
+      ) : !summary ? (
+        <span style={{ fontSize: 12.5, color: MUTED }}>加载中…</span>
+      ) : (
+        <>
+          <Stat label="系统数量" value={summary.total} />
+          <Stat label="Production" value={summary.production} />
+          <Stat label="Development" value={summary.development} />
+          <Stat label="Legacy / Unknown" value={summary.legacyOrUnknown} />
+          <Stat label="待审计" value={summary.needsReview} />
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: MUTED }}>查看列表 →</span>
+        </>
+      )}
     </div>
   );
 }

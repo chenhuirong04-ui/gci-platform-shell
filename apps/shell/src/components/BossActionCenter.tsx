@@ -16,7 +16,7 @@ const BORD = 'rgba(255,255,255,0.07)';
 
 const PRIORITY_COLOR: Record<ActionPriority, string> = { P1: RED, P2: AMBER, P3: MUTED };
 
-const MAX_HOME_ITEMS = 8;
+const MAX_HOME_ITEMS = 5;
 
 function formatDueAt(iso: string | null): string {
   if (!iso) return '';
@@ -95,7 +95,7 @@ export function BossActionCenter() {
     <div style={{ marginBottom: 52 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
         <span className="font-mono-label" style={{ fontSize: 10.5, letterSpacing: '0.22em', color: GOLD }}>
-          老板待办 · BOSS ACTION CENTER
+          今日商务重点 · TODAY'S FOCUS
         </span>
         <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,rgba(203,168,92,0.36),transparent)' }} />
         {counts && (

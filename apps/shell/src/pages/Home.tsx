@@ -5,14 +5,12 @@ import { useI18n } from '@gci/i18n';
 import { statCardSpecs } from '../data/mock';
 import { AIWorkspace } from '../components/AIWorkspace';
 import { InventoryAlertDrawer } from '../components/InventoryAlertDrawer';
-import { ExecutiveDeskToday } from '../components/ExecutiveDeskToday';
-import { AgentsStatus } from '../components/AgentsStatus';
 import { SystemsRegistrySummaryCard } from '../components/SystemsRegistrySummary';
 import { BossActionCenter } from '../components/BossActionCenter';
-import { DecisionInbox } from '../components/DecisionInbox';
-import { DecisionFollowThrough } from '../components/DecisionFollowThrough';
-import { CommitmentTracker } from '../components/CommitmentTracker';
+import { BossManagementCards } from '../components/BossManagementCards';
 import { BusinessAssistantEntry } from '../components/BusinessAssistantEntry';
+import { ExecutiveOverviewCompact } from '../components/ExecutiveOverviewCompact';
+import { AgentsStatusCompact } from '../components/AgentsStatusCompact';
 
 // ─── localStorage helpers (same keys the Trade + CRM modules use) ──────────
 function safeLocalGet<T = any>(key: string): T[] {
@@ -339,36 +337,18 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
         </p>
       </div>
 
-      {/* BOSS ACTION CENTER — Task 7 aggregated priority to-do list */}
+      {/* A — 今日商务重点 (Task 7 Boss Action Center, top 5 only, "查看全部" → /actions) */}
       <BossActionCenter />
 
-      {/* DECISION INBOX — Task 8: judgment-required items only */}
-      <DecisionInbox />
+      {/* B — 老板管理闭环: 等你决定 / 决策执行 / 承诺事项 (Tasks 8/9/10, compact 3-card row) */}
+      <BossManagementCards />
 
-      {/* DECISION FOLLOW-THROUGH — Task 9: execution tracking on decided items */}
-      <DecisionFollowThrough />
-
-      {/* COMMITMENTS — Task 10: explicit promise tracking */}
-      <CommitmentTracker />
-
-      {/* BUSINESS ASSISTANT — Task 12: customer-centric entry point */}
+      {/* C — Business Assistant (Task 12): primary customer/company entry point */}
       <BusinessAssistantEntry />
 
-      {/* EXECUTIVE DESK — Task 4 first screen (crm_customers/crm_contacts/crm_followups via Supabase) */}
-      <ExecutiveDeskToday />
-
-      {/* AI AGENTS STATUS — Task 4.1 (MIA / Email Assistant / NOON / Growth=Deferred) */}
-      <AgentsStatus />
-
-      {/* SYSTEMS / 开发资产 — Task 6 registry summary */}
-      <SystemsRegistrySummaryCard />
-
-      {/* AI WORKSPACE */}
-      <AIWorkspace />
-
-      {/* TODAY stats */}
-      <SectionHeader label={dict.workspace.today} />
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 52 }}>
+      {/* D — 经营概览: compact KPI/summary cards only, detail lives on /crm, /systems etc. */}
+      <SectionHeader label="经营概览 · BUSINESS OVERVIEW" />
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 12 }}>
         {statCards.map((f, i) => (
           <StatCard
             key={i}
@@ -381,13 +361,20 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
           />
         ))}
       </div>
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 52 }}>
+        <ExecutiveOverviewCompact />
+        <SystemsRegistrySummaryCard />
+        <AgentsStatusCompact />
+      </div>
 
       {/* Inventory alert drawer */}
       {inventoryDrawerOpen && (
         <InventoryAlertDrawer onClose={() => setInventoryDrawerOpen(false)} />
       )}
 
-      {/* PRIORITY ALERTS */}
+      {/* Secondary — existing general Ask GCI entry, priority alerts and quick actions kept, pushed below the executive first screen */}
+      <AIWorkspace />
+
       <SectionHeader
         label={dict.workspace.priorityAlerts}
         trailing={alertsToShow.length > 0 ? `${alertsToShow.length} ${dict.workspace.items}` : undefined}
