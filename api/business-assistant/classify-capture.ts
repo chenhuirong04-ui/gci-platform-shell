@@ -32,7 +32,9 @@ Allowed intent types (enum, EXACT strings only — never invent a new one):
 - DRAFT_WHATSAPP: asks to draft a WhatsApp message
 - UNKNOWN: doesn't fit any of the above
 
-One input can contain MULTIPLE intents — return one array entry per distinct item. Do not merge unrelated items into one.
+One input can contain MULTIPLE intents — return one array entry per distinct item. Do not merge unrelated items into one, and do NOT let fields from one clause leak into a different clause's intent object — each intent's fields describe ONLY its own raw_fragment. If the input lists three separate items (e.g. "A这周再问一下，B也要处理一下，另外周三再找C确认D"), you must return three separate intent objects, one per item — never drop one, never combine two into one object's fields.
+
+If a clause names a specific customer/company AND describes contacting them or a next step with them (e.g. "周三再找TestCorp确认付款方式"), classify that clause as CRM_FOLLOWUP and populate customer_name + next_action + next_follow_up_at for it — do NOT classify it as BUSINESS_TODO (BUSINESS_TODO's own fields are todo_title/todo_business_area/todo_due_at; never populate next_action/next_follow_up_at on a BUSINESS_TODO intent).
 
 IMPORTANT — embedded commitments inside a NEW_CUSTOMER or CRM_FOLLOWUP narrative: if the text ALSO contains the other party promising something with a stated or clearly-relative date — patterns like "他说/客户说/对方说/他们说 ... (周X/下周X/明天/后天/一个日期) ... 会/将/给/发/提供/确认/回复" (or the English equivalent, e.g. "he said he'll send... by Thursday") — you MUST emit that as its OWN separate COMMITMENT intent (commitment_direction: "inbound", commitment_text = what they promised, commitment_due_at = the stated date, customer_name = the same customer/company this conversation is about) IN ADDITION TO the NEW_CUSTOMER/CRM_FOLLOWUP intent. Always set customer_name on that COMMITMENT intent so it's clear who made the promise. Do not only fold it into followup_notes and skip the COMMITMENT intent — a customer promise mentioned in passing is still a real commitment that needs its own row.
 
