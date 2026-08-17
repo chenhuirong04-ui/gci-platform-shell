@@ -1,0 +1,11 @@
+{
+  "name": "@gci/ecommerce-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Task 14.2 — E-commerce Assistant multi-channel foundation. Standalone types + channel-adapter contracts + executive-status aggregation. NOT wired into apps/shell yet (GCI integration = pending — see README). No real channel data lives here; NOON's real capability lives in a separate, currently-unreachable local project (pending reconnect).",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}
