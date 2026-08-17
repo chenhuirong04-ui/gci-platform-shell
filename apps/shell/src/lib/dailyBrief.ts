@@ -52,6 +52,9 @@ const JUNK_SENDER_PATTERNS: RegExp[] = [
   /@tax\.gov\.ae/i,
   /@amazon\.com/i,
   /@network\.ae/i,
+  /@adib\.com/i, // bank KYC/ops threads — internal admin, not a customer
+  /^chenhuirong04/i, // Chris's own inbox self-digest alias
+  /@globalcareinfo\.com/i, // internal/self correspondence, not a customer
 ];
 
 function looksLikeGenericNotification(a: BossAction): boolean {
@@ -196,7 +199,16 @@ export async function getDailyBrief(): Promise<{ ok: true; brief: DailyBrief } |
     return 0;
   });
 
-  const items = deduped.slice(0, 5);
+  // Same precedent as Task 13's Home Top-3: even after the junk-sender
+  // filter above, "important" email (unread + last 7d, no bulk category)
+  // still has no real customer-relevance signal — a cold-outreach pitch or
+  // an internal thread with an unusual sender can slip through. Rather than
+  // risk the boss's headline 5 items being 80% email noise, 'email' is kept
+  // out of the Home Brief specifically; it's still fully visible via the
+  // "重要客户邮件" KPI, the dedicated Ask GCI "今天有哪些邮件需要我处理" mode, and
+  // Today Contact List (Task 15 §七 explicitly wants "customer email needs
+  // reply" there).
+  const items = deduped.filter((it) => it.source !== 'email').slice(0, 5);
 
   const todaysThreeActions = items.slice(0, 3).map((it) => {
     const verb = it.source === 'crm' || it.source === 'business' ? '联系' : it.source === 'email' ? '回复' : it.source === 'decisions' ? '推进' : it.source === 'commitments' ? '兑现' : '处理';
