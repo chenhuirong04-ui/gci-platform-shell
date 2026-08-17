@@ -14,6 +14,7 @@ import { Systems } from './pages/Systems';
 import { Actions } from './pages/Actions';
 import { Decisions } from './pages/Decisions';
 import { Commitments } from './pages/Commitments';
+import { Tasks } from './pages/Tasks';
 import { EmailAssistant } from './pages/EmailAssistant';
 import { BusinessAssistant } from './pages/BusinessAssistant';
 import TradeModule from '../../../modules/trade/TradeModule';
@@ -136,6 +137,7 @@ function Shell() {
           <Route path="/actions" element={<Actions />} />
           <Route path="/decisions" element={<Decisions />} />
           <Route path="/commitments" element={<Commitments />} />
+          <Route path="/tasks" element={<Tasks />} />
           <Route path="/email-assistant" element={<EmailAssistant />} />
           <Route path="/business-assistant" element={<BusinessAssistant />} />
           <Route path="/access-denied" element={<AccessDenied />} />

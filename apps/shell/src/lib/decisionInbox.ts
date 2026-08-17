@@ -355,6 +355,38 @@ export interface RecordDecisionInput {
   followUpText?: string; // raw Chinese relative-date text, e.g. "周三"
 }
 
+// Task 16 §十一 — Chris recording a decision he already made in
+// conversation ("我决定按小时"), as opposed to the system surfacing a
+// pending decision that needs options (Task 8). Inserted directly as
+// status='decided' — there's nothing left to choose. Only ever called
+// after Chris's explicit confirm click; never from a bare "we should
+// figure this out" statement (that stays a Business To-Do — Task 16 §十一).
+export async function createManualDecision(input: {
+  title: string;
+  reason: string;
+  decisionNote: string;
+  relatedCustomerId?: string | null;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data: userRes } = await supabase.auth.getUser();
+  const { error } = await supabase.from('executive_decisions').insert({
+    source: 'business',
+    source_ref: `manual-${Date.now()}`,
+    category: 'Business Assistant',
+    title: input.title,
+    reason: input.reason,
+    priority: 'P3',
+    status: 'decided',
+    decision_options: [{ key: 'manual', label: '已决定' }],
+    selected_option: 'manual',
+    decision_note: input.decisionNote,
+    related_customer_id: input.relatedCustomerId ?? null,
+    decided_at: new Date().toISOString(),
+    decided_by: userRes?.user?.id ?? null,
+  });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
 // Records what Chris decided (+ optional execution plan). Never triggers any
 // external action — this is the only write this module performs for the
 // decision step. "later" (稍后决定) keeps the item pending and only accepts

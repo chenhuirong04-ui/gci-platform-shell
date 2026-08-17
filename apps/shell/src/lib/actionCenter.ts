@@ -10,9 +10,10 @@ import { AGENTS } from '../components/AgentsStatus';
 import { getDecisionFollowThroughActions } from './decisionInbox';
 import { getOpenCommitmentActions } from './commitments';
 import { getMiaStatus } from './mia';
+import { getExecutiveTasks, taskUrgency } from './executiveTasks';
 
 export type ActionPriority = 'P1' | 'P2' | 'P3';
-export type ActionSource = 'crm' | 'email' | 'calendar' | 'business' | 'systems' | 'agents' | 'decisions' | 'commitments' | 'mia';
+export type ActionSource = 'crm' | 'email' | 'calendar' | 'business' | 'systems' | 'agents' | 'decisions' | 'commitments' | 'mia' | 'tasks';
 
 export interface BossAction {
   id: string;
@@ -62,6 +63,7 @@ export async function getBossActions(): Promise<
     decisionFollowThrough,
     commitmentActions,
     miaStatus,
+    executiveTasks,
   ] = await Promise.all([
     getTodaysFollowups(),
     getOverdueFollowups(),
@@ -75,6 +77,7 @@ export async function getBossActions(): Promise<
     getDecisionFollowThroughActions(),
     getOpenCommitmentActions(),
     getMiaStatus(),
+    getExecutiveTasks(),
   ]);
 
   // A Decision that already has an open Commitment tracking its next step
@@ -322,6 +325,28 @@ export async function getBossActions(): Promise<
     }
   }
 
+  // ── 6.4 Business To-Do (Task 16) — priority derived purely from due_at,
+  // same taskUrgency() rule used by /tasks and the Home KPI. Only open/
+  // in_progress tasks ever generate an action; completed/cancelled never do.
+  if (executiveTasks.ok) {
+    for (const t of executiveTasks.rows) {
+      if (t.status !== 'open' && t.status !== 'in_progress') continue;
+      actions.push({
+        id: `task-${t.id}`,
+        source: 'tasks',
+        category: 'Business To-Do',
+        title: t.title,
+        summary: t.description || t.business_area,
+        priority: taskUrgency(t, nowMs),
+        due_at: t.due_at,
+        related_customer: null,
+        related_system: null,
+        action_type: 'business_todo',
+        deep_link: '/tasks',
+      });
+    }
+  }
+
   // ── 6.5 MIA (Task 14.1) — only real blocking errors or a genuine "needs
   // Chris" backlog generate an action. Plain leads_found_today never does —
   // discovering leads is MIA's normal, expected daily output, not a
@@ -448,4 +473,5 @@ export const SOURCE_LABEL: Record<ActionSource, string> = {
   decisions: 'Decisions',
   commitments: 'Commitments',
   mia: 'MIA',
+  tasks: 'To-Do',
 };

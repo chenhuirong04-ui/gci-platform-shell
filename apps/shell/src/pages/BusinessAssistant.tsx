@@ -17,6 +17,16 @@ import {
   parseReminderDraftFromChat, confirmReminderDraft,
   type ChatTurn, type WhatsappDraft, type FollowupDraft, type ReminderDraft,
 } from '../lib/businessAssistant';
+import {
+  classifyCapture, resolveCaptureItems, confirmCaptureItem,
+  matchTaskLifecycleCommand, findOpenTasksByKeyword, completeOrCancelTask,
+  type ResolvedCaptureItem,
+} from '../lib/businessCapture';
+import type { ExecutiveTask } from '../lib/executiveTasks';
+import type { CrmCustomer } from '../lib/crmSupabase';
+
+const CAPTURABLE = new Set(['NEW_CUSTOMER', 'CRM_FOLLOWUP', 'BUSINESS_TODO', 'COMMITMENT', 'DECISION']);
+const LOOKUP_PREFIX_RE = /^(现在看|看看|看一下|查一下|查看|帮我看看|帮我看)\s*/u;
 
 const GOLD = '#CBA85C';
 const RED = '#E0846A';
@@ -76,6 +86,16 @@ export function BusinessAssistant() {
   const [createBusy, setCreateBusy] = useState(false);
   const [createErr, setCreateErr] = useState<string | null>(null);
 
+  // Task 16 — Chat-First Business Capture: works with or without a resolved
+  // customer context. pendingCapture holds one or more items from a single
+  // input (multi-intent split), each confirmed independently or all at once.
+  const [captureLoading, setCaptureLoading] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+  const [pendingCapture, setPendingCapture] = useState<ResolvedCaptureItem[] | null>(null);
+  const [captureBusy, setCaptureBusy] = useState<number | 'all' | null>(null);
+  const [captureDone, setCaptureDone] = useState<Set<number>>(new Set());
+  const [pendingTaskLifecycle, setPendingTaskLifecycle] = useState<{ action: 'completed' | 'cancelled'; matches: ExecutiveTask[] } | null>(null);
+
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const didAutoResolve = useRef(false);
 
@@ -90,6 +110,105 @@ export function BusinessAssistant() {
     setSuggestedAction(null);
     setShowCreateForm(false);
     setCreateErr(null);
+    setPendingCapture(null);
+    setCaptureError(null);
+    setCaptureDone(new Set());
+    setPendingTaskLifecycle(null);
+  }
+
+  // Task 16 §18 — "肯尼亚保姆这个事情完成了。" Checked before capture
+  // classification since it's a lifecycle command on an EXISTING task, not
+  // new content to capture.
+  async function tryTaskLifecycleCommand(text: string): Promise<boolean> {
+    const m = matchTaskLifecycleCommand(text);
+    if (!m) return false;
+    const res = await findOpenTasksByKeyword(m.keyword);
+    if (!res.ok || res.matches.length === 0) return false;
+    setPendingTaskLifecycle({ action: m.action, matches: res.matches });
+    return true;
+  }
+
+  async function handleConfirmTaskLifecycle(taskId: string) {
+    if (!pendingTaskLifecycle) return;
+    setCaptureBusy('all');
+    const res = await completeOrCancelTask(taskId, pendingTaskLifecycle.action);
+    setCaptureBusy(null);
+    if (res.ok) {
+      setChatHistory((prev) => [...prev, { role: 'assistant', content: `✓ 已标记为${pendingTaskLifecycle.action === 'completed' ? '完成' : '取消'}。` }]);
+      setPendingTaskLifecycle(null);
+    } else {
+      setCaptureError(res.error);
+    }
+  }
+
+  // Task 16 §三/§十二 — the unified router. Runs on both the top input
+  // (works with no customer loaded yet) and the chat box (works with a
+  // customer already loaded, so "他"/"这个客户" resolves via ctx.customer).
+  // Returns true if it consumed the input (capture flow shown or lookup
+  // fallback triggered) so callers skip their own default handling.
+  async function tryBusinessCapture(text: string, currentCustomer: CrmCustomer | null): Promise<boolean> {
+    const t = text.trim();
+    if (!t) return false;
+
+    if (await tryTaskLifecycleCommand(t)) return true;
+
+    setCaptureLoading(true);
+    setCaptureError(null);
+    const cls = await classifyCapture(t, currentCustomer?.customer_name ?? null);
+    setCaptureLoading(false);
+    if (!cls.ok) {
+      setCaptureError(cls.error);
+      return false;
+    }
+    const capturable = cls.intents.filter((it) => CAPTURABLE.has(it.type));
+    if (capturable.length === 0) return false;
+
+    const resolved = await resolveCaptureItems(capturable, currentCustomer);
+    setCaptureDone(new Set());
+    setPendingCapture(resolved);
+    return true;
+  }
+
+  async function handleConfirmCaptureItem(index: number) {
+    if (!pendingCapture) return;
+    const item = pendingCapture[index];
+    setCaptureBusy(index);
+    const res = await confirmCaptureItem(item);
+    setCaptureBusy(null);
+    if (res.ok) {
+      setCaptureDone((prev) => new Set(prev).add(index));
+    } else {
+      setCaptureError(res.error);
+    }
+  }
+
+  async function handleConfirmAllCapture() {
+    if (!pendingCapture) return;
+    setCaptureBusy('all');
+    const newlyDone = new Set(captureDone);
+    for (let i = 0; i < pendingCapture.length; i++) {
+      if (newlyDone.has(i)) continue;
+      if (pendingCapture[i].candidateCustomers) continue; // needs Chris to pick first
+      const res = await confirmCaptureItem(pendingCapture[i]);
+      if (res.ok) newlyDone.add(i);
+      else { setCaptureError(res.error); break; }
+    }
+    setCaptureDone(newlyDone);
+    setCaptureBusy(null);
+  }
+
+  function pickCandidateCustomer(index: number, customer: CrmCustomer) {
+    if (!pendingCapture) return;
+    const next = [...pendingCapture];
+    next[index] = { ...next[index], matchedCustomer: customer, candidateCustomers: null, isNewCustomer: false };
+    setPendingCapture(next);
+  }
+
+  function createAsNewInstead(index: number) {
+    if (!pendingCapture) return;
+    const next = [...pendingCapture];
+    next[index] = { ...next[index], matchedCustomer: null, candidateCustomers: null, isNewCustomer: true, type: 'NEW_CUSTOMER' };
+    setPendingCapture(next);
   }
 
   async function resolve(name: string, autoQuestion?: string) {
@@ -115,6 +234,19 @@ export function BusinessAssistant() {
     if (autoQuestion) {
       setTimeout(() => handleSendWithContext(result, autoQuestion), 300);
     }
+  }
+
+  // Task 16 — the top input is now chat-first: try Business Capture (new
+  // customer / follow-up / to-do / commitment / decision / task lifecycle)
+  // before falling back to the Task 12 customer/company lookup. Works with
+  // no customer loaded yet (ctx may be null).
+  async function handleTopSubmit(text: string) {
+    const t = text.trim();
+    if (!t) return;
+    const consumed = await tryBusinessCapture(t, ctx?.customer ?? null);
+    if (consumed) return;
+    const stripped = t.replace(LOOKUP_PREFIX_RE, '').trim() || t;
+    resolve(stripped);
   }
 
   useEffect(() => {
@@ -150,6 +282,14 @@ export function BusinessAssistant() {
         setPendingReminder(reminderDraft);
         return;
       }
+    }
+
+    // Task 16 — continuous-chat capture: "刚跟他聊了，周四再联系" / "我答应明天给他方案"
+    // etc. "他"/"这个客户" resolves via context.customer, passed to the classifier.
+    const captured = await tryBusinessCapture(question, context.customer);
+    if (captured) {
+      setChatHistory((prev) => [...prev, { role: 'user', content: question }]);
+      return;
     }
 
     setChatError(null);
@@ -246,18 +386,98 @@ export function BusinessAssistant() {
         <input
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && inputValue.trim()) resolve(inputValue); }}
-          placeholder="输入客户/公司/项目，或直接告诉我你要做什么…例如 MAG / 帮我看看 Ray"
+          onKeyDown={(e) => { if (e.key === 'Enter' && inputValue.trim() && !captureLoading) handleTopSubmit(inputValue); }}
+          placeholder="输入客户/公司，或直接告诉我发生了什么…例如 MAG / 今天认识了新客户MAG，需要80个工人 / 肯尼亚保姆这周再跟一下"
           style={{ flex: 1, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: TEXT, fontSize: 14 }}
         />
         <button
-          onClick={() => resolve(inputValue)}
-          disabled={!inputValue.trim() || loading}
+          onClick={() => handleTopSubmit(inputValue)}
+          disabled={!inputValue.trim() || loading || captureLoading}
           style={{ padding: '12px 22px', borderRadius: 10, background: `linear-gradient(135deg,${GOLD},#E2C988)`, border: 'none', color: '#080D1E', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
         >
-          查看
+          {captureLoading ? '理解中…' : '发送'}
         </button>
       </div>
+
+      {captureLoading && <div style={{ fontSize: 13, color: MUTED, marginBottom: 16 }}>正在理解…</div>}
+      {captureError && <div style={{ fontSize: 13, color: RED, marginBottom: 16 }}>{captureError}</div>}
+
+      {pendingTaskLifecycle && (
+        <div style={{ padding: '16px 20px', background: 'rgba(203,168,92,0.05)', border: '1px solid rgba(203,168,92,0.25)', borderRadius: 12, marginBottom: 20 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: GOLD, marginBottom: 8 }}>
+            {pendingTaskLifecycle.matches.length > 1 ? '找到多个匹配的待办，请选择：' : `将标记为${pendingTaskLifecycle.action === 'completed' ? '完成' : '取消'}：`}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {pendingTaskLifecycle.matches.map((t) => (
+              <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
+                <span style={{ fontSize: 12.5, color: TEXT }}>{t.title}</span>
+                <button disabled={captureBusy === 'all'} onClick={() => handleConfirmTaskLifecycle(t.id)} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(111,191,142,0.14)', border: '1px solid rgba(111,191,142,0.4)', color: GREEN }}>确认</button>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => setPendingTaskLifecycle(null)} style={{ marginTop: 8, padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>取消</button>
+        </div>
+      )}
+
+      {pendingCapture && pendingCapture.length > 0 && (
+        <div style={{ padding: '16px 20px', background: 'rgba(203,168,92,0.05)', border: '1px solid rgba(203,168,92,0.25)', borderRadius: 12, marginBottom: 20 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: GOLD, marginBottom: 10 }}>
+            商务助理理解为{pendingCapture.length > 1 ? `（共 ${pendingCapture.length} 项）` : ''}：
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+            {pendingCapture.map((item, i) => {
+              const done = captureDone.has(i);
+              return (
+                <div key={i} style={{ padding: '10px 14px', background: done ? 'rgba(111,191,142,0.06)' : 'rgba(255,255,255,0.03)', border: `1px solid ${done ? 'rgba(111,191,142,0.3)' : BORD}`, borderRadius: 9 }}>
+                  <div style={{ fontSize: 10, color: '#8FA6D4', marginBottom: 4 }}>[{i + 1}] {item.type}</div>
+                  {item.summaryLines.map((l, li) => (
+                    <div key={li} style={{ fontSize: 12.5, color: TEXT, lineHeight: 1.6 }}>{l}</div>
+                  ))}
+
+                  {item.candidateCustomers && (
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ fontSize: 11.5, color: AMBER, marginBottom: 6 }}>我找到可能已有的客户：</div>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {item.candidateCustomers.map((c) => (
+                          <button key={c.id} onClick={() => pickCandidateCustomer(i, c)} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
+                            使用「{c.customer_name}」
+                          </button>
+                        ))}
+                        <button onClick={() => createAsNewInstead(i)} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(203,168,92,0.1)', border: '1px solid rgba(203,168,92,0.3)', color: GOLD }}>
+                          创建新客户
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!item.candidateCustomers && !done && (
+                    <button
+                      disabled={captureBusy === i || captureBusy === 'all'}
+                      onClick={() => handleConfirmCaptureItem(i)}
+                      style={{ marginTop: 8, padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(111,191,142,0.14)', border: '1px solid rgba(111,191,142,0.4)', color: GREEN }}
+                    >
+                      {captureBusy === i ? '写入中…' : '确认此项'}
+                    </button>
+                  )}
+                  {done && <div style={{ marginTop: 6, fontSize: 11.5, color: GREEN }}>✓ 已保存</div>}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              disabled={captureBusy === 'all'}
+              onClick={handleConfirmAllCapture}
+              style={{ padding: '7px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#E2C988)`, border: 'none', color: '#080D1E', fontWeight: 700 }}
+            >
+              {captureBusy === 'all' ? '保存中…' : '全部确认'}
+            </button>
+            <button onClick={() => { setPendingCapture(null); setCaptureDone(new Set()); }} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+              取消
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading && <div style={{ fontSize: 13, color: MUTED }}>正在聚合客户数据…</div>}
       {error && <div style={{ fontSize: 13, color: RED }}>读取失败:{error}</div>}
