@@ -13,7 +13,7 @@ const MUTED = '#7A8494';
 const CARD = 'rgba(255,255,255,0.025)';
 const BORD = 'rgba(203,168,92,0.18)';
 
-const SHORTCUTS = ['查客户进展', '查最近报价', '找客户文件', '记录沟通', '设置下次跟进', '写邮件/WhatsApp'];
+const SHORTCUTS = ['查客户', '查报价', '找文件', '记录沟通', '写邮件'];
 
 export function BusinessAssistantEntry() {
   const navigate = useNavigate();
@@ -38,7 +38,7 @@ export function BusinessAssistantEntry() {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') go(); }}
-            placeholder="输入客户/公司/项目，或直接告诉我你要做什么"
+            placeholder="问我：MAG现在什么情况？上次报价多少？今天先跟谁？"
             style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, padding: '13px 48px 13px 16px', fontSize: 14.5, color: colors.textPrimary, outline: 'none', boxSizing: 'border-box', fontFamily: "'Space Grotesk',sans-serif" }}
             onFocus={(e) => (e.target.style.borderColor = 'rgba(203,168,92,0.45)')}
             onBlur={(e) => (e.target.style.borderColor = 'rgba(255,255,255,0.09)')}

@@ -6,11 +6,12 @@ import { statCardSpecs } from '../data/mock';
 import { AIWorkspace } from '../components/AIWorkspace';
 import { InventoryAlertDrawer } from '../components/InventoryAlertDrawer';
 import { SystemsRegistrySummaryCard } from '../components/SystemsRegistrySummary';
-import { BossActionCenter } from '../components/BossActionCenter';
-import { BossManagementCards } from '../components/BossManagementCards';
 import { BusinessAssistantEntry } from '../components/BusinessAssistantEntry';
 import { ExecutiveOverviewCompact } from '../components/ExecutiveOverviewCompact';
 import { AgentsStatusCompact } from '../components/AgentsStatusCompact';
+import { HomeKpiRow } from '../components/HomeKpiRow';
+import { HomeDashboardCharts } from '../components/HomeDashboardCharts';
+import { HomeTopPriorities } from '../components/HomeTopPriorities';
 
 // ─── localStorage helpers (same keys the Trade + CRM modules use) ──────────
 function safeLocalGet<T = any>(key: string): T[] {
@@ -337,16 +338,19 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
         </p>
       </div>
 
-      {/* A — 今日商务重点 (Task 7 Boss Action Center, top 5 only, "查看全部" → /actions) */}
-      <BossActionCenter />
-
-      {/* B — 老板管理闭环: 等你决定 / 决策执行 / 承诺事项 (Tasks 8/9/10, compact 3-card row) */}
-      <BossManagementCards />
-
-      {/* C — Business Assistant (Task 12): primary customer/company entry point */}
+      {/* 1 — Business Assistant: primary entry point, top of page (Task 12) */}
       <BusinessAssistantEntry />
 
-      {/* D — 经营概览: compact KPI/summary cards only, detail lives on /crm, /systems etc. */}
+      {/* 2 — KPI row: 6 compact numbers, each backed by an existing Task 4/7/8/9/5.2 read */}
+      <HomeKpiRow />
+
+      {/* 3 — Dashboard charts: real 7-day trend + real P1/P2/P3 backlog structure */}
+      <HomeDashboardCharts />
+
+      {/* 4 — Top 3 priorities only (not top 5/20) — same live Boss Action list as the charts */}
+      <HomeTopPriorities />
+
+      {/* 5 — 经营概览: compact KPI/summary cards only, detail lives on /crm, /systems etc. */}
       <SectionHeader label="经营概览 · BUSINESS OVERVIEW" />
       <div className="grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 12 }}>
         {statCards.map((f, i) => (

@@ -1,7 +1,7 @@
 // GCI Executive Desk — Task 7: /actions — full Boss Action Center list.
 // Read-only. Filtering only this round, no search.
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { colors } from '@gci/design-system';
 import {
   getBossActions,
@@ -20,10 +20,11 @@ const BORD = 'rgba(255,255,255,0.07)';
 
 const PRIORITY_COLOR: Record<ActionPriority, string> = { P1: RED, P2: AMBER, P3: MUTED };
 
-type Filter = 'all' | ActionPriority | ActionSource;
+type Filter = 'all' | 'overdue' | ActionPriority | ActionSource;
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: '全部' },
+  { key: 'overdue', label: '逾期' },
   { key: 'P1', label: 'P1' },
   { key: 'P2', label: 'P2' },
   { key: 'P3', label: 'P3' },
@@ -59,9 +60,13 @@ function goToAction(navigate: ReturnType<typeof useNavigate>, a: BossAction) {
 
 export function Actions() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [actions, setActions] = useState<BossAction[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>('all');
+  const [filter, setFilter] = useState<Filter>(() => {
+    const f = searchParams.get('filter');
+    return (FILTERS.some((x) => x.key === f) ? (f as Filter) : 'all');
+  });
 
   useEffect(() => {
     getBossActions().then((res) => {
@@ -73,6 +78,10 @@ export function Actions() {
   const filtered = useMemo(() => {
     if (!actions) return [];
     if (filter === 'all') return actions;
+    if (filter === 'overdue') {
+      const now = Date.now();
+      return actions.filter((a) => a.due_at && new Date(a.due_at).getTime() < now);
+    }
     return actions.filter((a) => a.priority === filter || a.source === filter);
   }, [actions, filter]);
 
