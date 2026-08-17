@@ -34,6 +34,8 @@ Allowed intent types (enum, EXACT strings only — never invent a new one):
 
 One input can contain MULTIPLE intents — return one array entry per distinct item. Do not merge unrelated items into one.
 
+IMPORTANT — embedded commitments inside a NEW_CUSTOMER or CRM_FOLLOWUP narrative: if the text ALSO contains the other party promising something with a stated or clearly-relative date — patterns like "他说/客户说/对方说/他们说 ... (周X/下周X/明天/后天/一个日期) ... 会/将/给/发/提供/确认/回复" (or the English equivalent, e.g. "he said he'll send... by Thursday") — you MUST emit that as its OWN separate COMMITMENT intent (commitment_direction: "inbound", commitment_text = what they promised, commitment_due_at = the stated date, customer_name = the same customer/company this conversation is about) IN ADDITION TO the NEW_CUSTOMER/CRM_FOLLOWUP intent. Always set customer_name on that COMMITMENT intent so it's clear who made the promise. Do not only fold it into followup_notes and skip the COMMITMENT intent — a customer promise mentioned in passing is still a real commitment that needs its own row.
+
 For each intent, extract only the fields that are actually stated. Never fabricate a value. Return exactly this JSON shape:
 
 {
