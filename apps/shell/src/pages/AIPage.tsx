@@ -36,6 +36,8 @@ import {
 } from '../lib/commitments';
 import { OPEN_EMAIL_ASSISTANT_RE } from '../ai/emailAssistantAskGciParsers';
 import { matchBusinessAssistantQuery } from '../ai/businessAssistantAskGciParsers';
+import { matchMiaStatusQuery } from '../ai/miaAskGciParsers';
+import { getMiaStatus, type MiaStatus } from '../lib/mia';
 
 // ── Inventory query normalizer ────────────────────────────────────────────────
 // Strips command words, punctuation, and trailing "库存" to get the product term.
@@ -2391,6 +2393,58 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
             );
           })()}
 
+          {/* ── MIA Status (Task 14.1): read-only Ask GCI queries ── */}
+          {intent.intentId === 'mia_status_query' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在读取 MIA 状态…</div>
+          )}
+          {intent.intentId === 'mia_status_query' && state.resultData && state.resultData.ok === false && (
+            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              {state.resultData.status === 'no_data' ? 'MIA 暂无数据(待接入或尚未运行)。' : `读取失败:${state.resultData.error}`}
+            </div>
+          )}
+          {intent.intentId === 'mia_status_query' && state.resultData?.ok && (() => {
+            const d: MiaStatus = state.resultData.data;
+            const statusLabel: Record<string, string> = { healthy: 'Healthy', warning: 'Warning', error: 'Error', no_data: 'No data' };
+            const statusColor: Record<string, string> = { healthy: '#6FBF8E', warning: '#D4A843', error: '#E0846A', no_data: MUTED };
+            return (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <span style={{ fontSize: 9.5, fontWeight: 700, color: statusColor[d.status], background: `${statusColor[d.status]}18`, border: `1px solid ${statusColor[d.status]}40`, borderRadius: 4, padding: '2px 7px' }}>
+                    {statusLabel[d.status]}
+                  </span>
+                  <span style={{ fontSize: 11, color: MUTED }}>最后更新: {d.last_updated ? new Date(d.last_updated).toLocaleString('zh-CN') : '—'}</span>
+                </div>
+                <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 10, fontSize: 12.5, color: TEXT }}>
+                  <span>今日新开发潜客: <strong>{d.leads_found_today}</strong></span>
+                  <span>已研究: <strong>{d.researched_today}</strong></span>
+                  <span>已触达: <strong>{d.contacted_today}</strong></span>
+                  <span>回复: <strong>{d.replies_today}</strong></span>
+                  <span>需 Chris 处理: <strong>{d.needs_chris}</strong></span>
+                  <span>异常: <strong>{d.errors}</strong></span>
+                </div>
+                {d.top_leads.length === 0 ? (
+                  <div style={{ fontSize: 12.5, color: MUTED }}>今天暂无重点 leads。</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {d.top_leads.map((l, i) => (
+                      <div key={i} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{l.company}{l.country ? ` · ${l.country}` : ''}</div>
+                        <div style={{ fontSize: 12, color: SUBTLE, marginTop: 2 }}>{l.current_stage}{l.contact ? ` · ${l.contact}` : ''}</div>
+                        {l.reason && <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>{l.reason}</div>}
+                        {l.next_action && <div style={{ fontSize: 12, color: GOLD, marginTop: 2 }}>建议: {l.next_action}</div>}
+                        {l.source_ref && (
+                          <a href={l.source_ref} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: GOLD, marginTop: 4, display: 'inline-block' }}>
+                            查看 MIA →
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* ── Commitment Tracker (Task 10): read-only Ask GCI queries ── */}
           {intent.intentId === 'commitment_query' && !state.resultData && (
             <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查询承诺事项…</div>
@@ -4081,6 +4135,39 @@ export function AIPage() {
               ok: true, decision: target, currentStatus, targetStatus: execUpdateCmd.targetStatus, canTransition,
             } } : prev);
           });
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // MIA status — Task 14.1, read-only. "MIA 今天开发了多少客户？" /
+    // "MIA 今天联系了多少客户？" / "今天有多少客户回复？" / "哪些 MIA leads 值得我看？" /
+    // "MIA 有没有异常？" / "MIA 有什么需要我处理？" — always goes through GCI's own
+    // server-side adapter (api/mia/executive-status.ts), never touches MIA's
+    // database, never triggers MIA to run or send anything.
+    if (matchMiaStatusQuery(raw.trim())) {
+      const miaMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'mia_status_query', intentNameZh: 'MIA 状态', intentNameEn: 'MIA Status', category: 'query',
+          triggerKeywordsZh: [], triggerKeywordsEn: [], targetTab: 'chat', targetModule: 'MIA',
+          targetRoute: '',
+          readSources: ['MIA /api/executive-status (via GCI server-side adapter)'],
+          writeTargets: [], requiredFields: [],
+          approvalRequired: false, resultPanel: null, implementationStatus: 'real', notConnectedMessage: '', fallbackBehavior: '',
+        },
+        confidence: 1, raw: raw.trim(), detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: miaMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在读取 MIA 状态…', '正在整理结果…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          getMiaStatus()
+            .then(res => setCmdState(prev => prev ? { ...prev, resultData: res } : prev))
+            .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, status: 'no_data', error: String(e?.message ?? e) } } : prev));
         },
       );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);

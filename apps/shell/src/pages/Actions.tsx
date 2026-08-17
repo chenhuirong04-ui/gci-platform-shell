@@ -36,6 +36,7 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'agents', label: 'Agents' },
   { key: 'decisions', label: 'Decisions' },
   { key: 'commitments', label: 'Commitments' },
+  { key: 'mia', label: 'MIA' },
 ];
 
 function formatDueAt(iso: string | null): string {

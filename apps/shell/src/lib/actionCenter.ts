@@ -9,9 +9,10 @@ import { getSystemRegistry } from './systemRegistry';
 import { AGENTS } from '../components/AgentsStatus';
 import { getDecisionFollowThroughActions } from './decisionInbox';
 import { getOpenCommitmentActions } from './commitments';
+import { getMiaStatus } from './mia';
 
 export type ActionPriority = 'P1' | 'P2' | 'P3';
-export type ActionSource = 'crm' | 'email' | 'calendar' | 'business' | 'systems' | 'agents' | 'decisions' | 'commitments';
+export type ActionSource = 'crm' | 'email' | 'calendar' | 'business' | 'systems' | 'agents' | 'decisions' | 'commitments' | 'mia';
 
 export interface BossAction {
   id: string;
@@ -60,6 +61,7 @@ export async function getBossActions(): Promise<
     inventoryAlerts,
     decisionFollowThrough,
     commitmentActions,
+    miaStatus,
   ] = await Promise.all([
     getTodaysFollowups(),
     getOverdueFollowups(),
@@ -72,6 +74,7 @@ export async function getBossActions(): Promise<
     safeFetchJson<any>(`${base()}/api/trade/check-inventory`),
     getDecisionFollowThroughActions(),
     getOpenCommitmentActions(),
+    getMiaStatus(),
   ]);
 
   // A Decision that already has an open Commitment tracking its next step
@@ -319,6 +322,59 @@ export async function getBossActions(): Promise<
     }
   }
 
+  // ── 6.5 MIA (Task 14.1) — only real blocking errors or a genuine "needs
+  // Chris" backlog generate an action. Plain leads_found_today never does —
+  // discovering leads is MIA's normal, expected daily output, not a
+  // boss-level event. Deliberately at most one P1 + one P2 so a bad day
+  // doesn't spam the Action Center with one row per lead. ─────────────────
+  if (miaStatus.ok) {
+    const d = miaStatus.data;
+    if (d.status === 'error') {
+      actions.push({
+        id: 'mia-error',
+        source: 'mia',
+        category: 'MIA',
+        title: 'MIA｜客户开发 AI — 运行异常',
+        summary: `今日异常 ${d.errors} 次，可能阻塞正常运行`,
+        priority: 'P1',
+        due_at: null,
+        related_customer: null,
+        related_system: 'MIA',
+        action_type: 'mia_error',
+        deep_link: '/',
+      });
+    }
+    if (d.needs_chris > 0) {
+      actions.push({
+        id: 'mia-needs-chris',
+        source: 'mia',
+        category: 'MIA',
+        title: `MIA｜客户开发 AI — ${d.needs_chris} 件需要你处理`,
+        summary: `今日回复 ${d.replies_today} 条，其中 ${d.needs_chris} 件等待人工判断`,
+        priority: 'P2',
+        due_at: null,
+        related_customer: null,
+        related_system: 'MIA',
+        action_type: 'mia_needs_chris',
+        deep_link: '/',
+      });
+    } else if (d.status === 'warning') {
+      actions.push({
+        id: 'mia-warning',
+        source: 'mia',
+        category: 'MIA',
+        title: 'MIA｜客户开发 AI — 状态异常',
+        summary: `今日异常 ${d.errors} 次，未阻塞运行但需留意`,
+        priority: 'P2',
+        due_at: null,
+        related_customer: null,
+        related_system: 'MIA',
+        action_type: 'mia_warning',
+        deep_link: '/',
+      });
+    }
+  }
+
   // ── 7. Decision Follow-through (Task 9) — execution gaps + due follow-ups
   // on already-decided items. Never the raw Decision itself (that lives in
   // Decision Inbox); these are distinct "still needs a next step" entries. ──
@@ -391,4 +447,5 @@ export const SOURCE_LABEL: Record<ActionSource, string> = {
   agents: 'Agents',
   decisions: 'Decisions',
   commitments: 'Commitments',
+  mia: 'MIA',
 };
