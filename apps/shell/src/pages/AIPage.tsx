@@ -35,6 +35,7 @@ import {
   type ExecutiveCommitment,
 } from '../lib/commitments';
 import { OPEN_EMAIL_ASSISTANT_RE } from '../ai/emailAssistantAskGciParsers';
+import { matchBusinessAssistantQuery } from '../ai/businessAssistantAskGciParsers';
 
 // ── Inventory query normalizer ────────────────────────────────────────────────
 // Strips command words, punctuation, and trailing "库存" to get the product term.
@@ -3589,6 +3590,18 @@ export function AIPage() {
     // Task 5.2's own Gmail search/important-emails queries below are untouched.
     if (OPEN_EMAIL_ASSISTANT_RE.test(raw.trim())) {
       window.location.assign('/email-assistant');
+      return;
+    }
+
+    // Business Assistant — Task 12 quick entry. "帮我看看 X" / "X现在什么情况" /
+    // "X最近有什么进展" / "X上次报价多少" / "X的文件在哪里" / "记录一下跟X沟通…" /
+    // "下周二提醒我跟X" / "帮我写whatsapp给X" all deep-link into
+    // /business-assistant, which resolves the customer once and (for
+    // record/reminder messages) still requires an explicit confirm click
+    // before writing anything — this is navigation only, no logic duplicated.
+    const businessMatch = matchBusinessAssistantQuery(raw.trim());
+    if (businessMatch) {
+      window.location.assign(`/business-assistant?customer=${encodeURIComponent(businessMatch.name)}&q=${encodeURIComponent(businessMatch.hint)}`);
       return;
     }
 

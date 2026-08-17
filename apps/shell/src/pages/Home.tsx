@@ -12,6 +12,7 @@ import { BossActionCenter } from '../components/BossActionCenter';
 import { DecisionInbox } from '../components/DecisionInbox';
 import { DecisionFollowThrough } from '../components/DecisionFollowThrough';
 import { CommitmentTracker } from '../components/CommitmentTracker';
+import { BusinessAssistantEntry } from '../components/BusinessAssistantEntry';
 
 // ─── localStorage helpers (same keys the Trade + CRM modules use) ──────────
 function safeLocalGet<T = any>(key: string): T[] {
@@ -349,6 +350,9 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
 
       {/* COMMITMENTS — Task 10: explicit promise tracking */}
       <CommitmentTracker />
+
+      {/* BUSINESS ASSISTANT — Task 12: customer-centric entry point */}
+      <BusinessAssistantEntry />
 
       {/* EXECUTIVE DESK — Task 4 first screen (crm_customers/crm_contacts/crm_followups via Supabase) */}
       <ExecutiveDeskToday />

@@ -15,6 +15,7 @@ import { Actions } from './pages/Actions';
 import { Decisions } from './pages/Decisions';
 import { Commitments } from './pages/Commitments';
 import { EmailAssistant } from './pages/EmailAssistant';
+import { BusinessAssistant } from './pages/BusinessAssistant';
 import TradeModule from '../../../modules/trade/TradeModule';
 import CrmModule from '../../../modules/crm/CrmModule';
 import QuotationModule from '../../../modules/quotation/QuotationModule';
@@ -136,6 +137,7 @@ function Shell() {
           <Route path="/decisions" element={<Decisions />} />
           <Route path="/commitments" element={<Commitments />} />
           <Route path="/email-assistant" element={<EmailAssistant />} />
+          <Route path="/business-assistant" element={<BusinessAssistant />} />
           <Route path="/access-denied" element={<AccessDenied />} />
 
           <Route
