@@ -1,0 +1,111 @@
+// GCI Executive Desk — Task 15: Daily Business Brief.
+// Replaces the Task 13 "Top 3 Priorities" slot on Home — same position in
+// the layout, but now deduped across CRM/Quotation/Commitments/Decisions/
+// MIA/Calendar (see lib/dailyBrief.ts) instead of a raw top-3 slice of the
+// Boss Action list, and each item states why it matters, not just a fact.
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { colors } from '@gci/design-system';
+import { getDailyBrief, SOURCE_LABEL, type BriefItem } from '../lib/dailyBrief';
+import type { ActionPriority } from '../lib/actionCenter';
+
+const GOLD = '#CBA85C';
+const RED = '#E0846A';
+const AMBER = '#D4A843';
+const MUTED = '#7A8494';
+const CARD = 'rgba(255,255,255,0.025)';
+const BORD = 'rgba(255,255,255,0.07)';
+
+const PRIORITY_COLOR: Record<ActionPriority, string> = { P1: RED, P2: AMBER, P3: MUTED };
+
+export function HomeDailyBrief() {
+  const navigate = useNavigate();
+  const [items, setItems] = useState<BriefItem[] | null>(null);
+  const [todaysActions, setTodaysActions] = useState<string[]>([]);
+  const [totalDeduped, setTotalDeduped] = useState<number>(0);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getDailyBrief().then((res) => {
+      if (res.ok) {
+        setItems(res.brief.items);
+        setTodaysActions(res.brief.todaysThreeActions);
+        setTotalDeduped(res.brief.allDeduped.length);
+      } else {
+        setError(res.error);
+      }
+    });
+  }, []);
+
+  function go(link: string) {
+    if (link.startsWith('http')) window.open(link, '_blank', 'noopener,noreferrer');
+    else navigate(link);
+  }
+
+  return (
+    <div style={{ marginBottom: 44 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+        <span className="font-mono-label" style={{ fontSize: 10.5, letterSpacing: '0.22em', color: GOLD }}>
+          今日商务简报 · DAILY BUSINESS BRIEF
+        </span>
+        <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,rgba(203,168,92,0.36),transparent)' }} />
+        {totalDeduped > 0 && (
+          <span onClick={() => navigate('/actions')} style={{ fontSize: 11, color: GOLD, cursor: 'pointer' }}>
+            查看全部 ({totalDeduped}) →
+          </span>
+        )}
+      </div>
+
+      {error ? (
+        <div style={{ padding: '18px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, fontSize: 12.5, color: RED }}>读取失败:{error}</div>
+      ) : !items ? (
+        <div style={{ padding: '18px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, fontSize: 12.5, color: MUTED }}>加载中…</div>
+      ) : items.length === 0 ? (
+        <div style={{ padding: '30px 18px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, textAlign: 'center', fontSize: 12.5, color: MUTED }}>
+          今天暂无重点事项
+        </div>
+      ) : (
+        <>
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginBottom: 14 }}>
+            {items.map((it, i) => {
+              const color = PRIORITY_COLOR[it.priority];
+              return (
+                <div key={i} style={{ padding: '14px 16px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <span style={{ fontSize: 9.5, fontWeight: 700, color, background: `${color}18`, border: `1px solid ${color}40`, borderRadius: 4, padding: '2px 6px', fontFamily: 'IBM Plex Mono,monospace' }}>
+                      {it.priority}
+                    </span>
+                    <span style={{ fontSize: 9.5, color: '#8FA6D4', background: 'rgba(143,166,212,0.12)', borderRadius: 4, padding: '2px 6px' }}>
+                      {SOURCE_LABEL[it.source]}
+                    </span>
+                    <span style={{ fontSize: 13.5, fontWeight: 700, color: colors.textPrimary }}>{it.subject}</span>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.4 }}><strong style={{ color: colors.textPrimary }}>事实：</strong>{it.fact}</div>
+                  <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.4 }}><strong style={{ color: colors.textPrimary }}>为什么重要：</strong>{it.whyItMatters}</div>
+                  <div style={{ fontSize: 11.5, color: GOLD }}><strong>建议：</strong>{it.suggestion}</div>
+                  <div
+                    onClick={() => go(it.deepLink)}
+                    style={{ marginTop: 2, alignSelf: 'flex-start', fontSize: 11, color: colors.textPrimary, background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, borderRadius: 7, padding: '5px 12px', cursor: 'pointer' }}
+                  >
+                    查看 →
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {todaysActions.length > 0 && (
+            <div style={{ padding: '12px 16px', background: 'rgba(203,168,92,0.05)', border: '1px solid rgba(203,168,92,0.18)', borderRadius: 12 }}>
+              <div style={{ fontSize: 10.5, color: GOLD, fontWeight: 700, marginBottom: 6 }}>建议今天先做</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {todaysActions.map((a, i) => (
+                  <div key={i} style={{ fontSize: 12.5, color: colors.textPrimary }}>{i + 1}. {a}</div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}

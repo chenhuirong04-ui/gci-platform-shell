@@ -38,6 +38,8 @@ import { OPEN_EMAIL_ASSISTANT_RE } from '../ai/emailAssistantAskGciParsers';
 import { matchBusinessAssistantQuery } from '../ai/businessAssistantAskGciParsers';
 import { matchMiaStatusQuery } from '../ai/miaAskGciParsers';
 import { getMiaStatus, type MiaStatus } from '../lib/mia';
+import { matchDailyBriefQuery } from '../ai/dailyBriefAskGciParsers';
+import { getDailyBrief } from '../lib/dailyBrief';
 
 // ── Inventory query normalizer ────────────────────────────────────────────────
 // Strips command words, punctuation, and trailing "库存" to get the product term.
@@ -2393,6 +2395,143 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
             );
           })()}
 
+          {/* ── Daily Business Brief (Task 15): read-only Ask GCI queries ── */}
+          {intent.intentId === 'daily_brief_query' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在汇总今日事项…</div>
+          )}
+          {intent.intentId === 'daily_brief_query' && state.resultData && state.resultData.ok === false && (
+            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              读取失败:{state.resultData.error}
+            </div>
+          )}
+          {intent.intentId === 'daily_brief_query' && state.resultData?.ok && state.resultData.mode === 'mia' && (() => {
+            const d = state.resultData.data;
+            return (
+              <div>
+                <div style={{ fontSize: 12.5, color: TEXT, marginBottom: 8 }}>
+                  今日新开发潜客 <strong>{d.leads_found_today}</strong>，需要你处理 <strong>{d.needs_chris}</strong> 件
+                </div>
+                {d.top_leads.length === 0 ? (
+                  <div style={{ fontSize: 12.5, color: MUTED }}>今天暂无重点 leads。</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {d.top_leads.map((l: any, i: number) => (
+                      <div key={i} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{l.company}{l.country ? ` · ${l.country}` : ''}</div>
+                        {l.reason && <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>{l.reason}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+          {intent.intentId === 'daily_brief_query' && state.resultData?.ok && state.resultData.mode !== 'mia' && (() => {
+            const brief = state.resultData.brief;
+            const mode = state.resultData.mode as string;
+
+            if (mode === 'top3') {
+              return (
+                <div>
+                  <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 8 }}>建议今天先做</div>
+                  {brief.todaysThreeActions.length === 0 ? (
+                    <div style={{ fontSize: 13, color: '#6FBF8E' }}>✓ 今天暂无重点事项。</div>
+                  ) : brief.todaysThreeActions.map((a: string, i: number) => (
+                    <div key={i} style={{ fontSize: 13, color: TEXT, marginBottom: 4 }}>{i + 1}. {a}</div>
+                  ))}
+                </div>
+              );
+            }
+
+            if (mode === 'contacts') {
+              const list = brief.contactList;
+              return (
+                <div>
+                  <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 8 }}>今日联系清单</div>
+                  {list.length === 0 ? (
+                    <div style={{ fontSize: 13, color: '#6FBF8E' }}>✓ 今天没有必须联系的客户。</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {list.map((c: any, i: number) => (
+                        <div key={i} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{c.subject}</div>
+                          <div style={{ fontSize: 12, color: SUBTLE, marginTop: 2 }}>{c.reason}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            if (mode === 'overdue') {
+              const list = brief.allDeduped.filter((it: any) => it.dueAt && new Date(it.dueAt).getTime() < Date.now());
+              return (
+                <div>
+                  <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 8 }}>已逾期的事项</div>
+                  {list.length === 0 ? (
+                    <div style={{ fontSize: 13, color: '#6FBF8E' }}>✓ 当前没有逾期事项。</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {list.map((it: any, i: number) => (
+                        <div key={i} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{it.subject}</div>
+                          <div style={{ fontSize: 12, color: SUBTLE, marginTop: 2 }}>{it.fact}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            if (mode === 'emails') {
+              const list = brief.allDeduped.filter((it: any) => it.source === 'email');
+              return (
+                <div>
+                  <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 8 }}>需要处理的邮件</div>
+                  {list.length === 0 ? (
+                    <div style={{ fontSize: 13, color: '#6FBF8E' }}>✓ 没有需要处理的客户邮件（系统通知已过滤）。</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {list.map((it: any, i: number) => (
+                        <div key={i} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{it.subject}</div>
+                          <div style={{ fontSize: 12, color: SUBTLE, marginTop: 2 }}>{it.fact}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            // 'brief' and 'remaining' — full/near-full deduped list, same shape Home shows
+            const list = mode === 'remaining' ? brief.allDeduped : brief.items;
+            const heading = mode === 'remaining' ? '今天还没处理的事项' : '今日商务简报';
+            return (
+              <div>
+                <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 8 }}>{heading}</div>
+                {list.length === 0 ? (
+                  <div style={{ fontSize: 13, color: '#6FBF8E' }}>✓ 今天暂无重点事项。</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {list.map((it: any, i: number) => (
+                      <div key={i} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 9.5, fontWeight: 700, color: it.priority === 'P1' ? '#E0846A' : it.priority === 'P2' ? '#D4A843' : MUTED }}>{it.priority}</span>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{it.subject}</span>
+                        </div>
+                        <div style={{ fontSize: 12, color: SUBTLE, marginTop: 2 }}>{it.fact}</div>
+                        {it.suggestion && <div style={{ fontSize: 12, color: GOLD, marginTop: 2 }}>建议: {it.suggestion}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* ── MIA Status (Task 14.1): read-only Ask GCI queries ── */}
           {intent.intentId === 'mia_status_query' && !state.resultData && (
             <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在读取 MIA 状态…</div>
@@ -4168,6 +4307,47 @@ export function AIPage() {
           getMiaStatus()
             .then(res => setCmdState(prev => prev ? { ...prev, resultData: res } : prev))
             .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, status: 'no_data', error: String(e?.message ?? e) } } : prev));
+        },
+      );
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Daily Business Brief — Task 15, read-only. "今天我的商务重点是什么？" /
+    // "今天我先做哪三件事？" / "今天有哪些客户必须联系？" / "哪些事情已经逾期？" /
+    // "今天有哪些邮件需要我处理？" / "MIA 今天有没有值得我看的新客户？" /
+    // "今天还有什么没处理？" / "给我做一份今天的商务简报。" — all resolve through
+    // the exact same lib/dailyBrief.ts getDailyBrief() Home uses, so the
+    // answer here can never disagree with what's shown on Home.
+    const dailyBriefMode = matchDailyBriefQuery(raw.trim());
+    if (dailyBriefMode) {
+      const briefMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'daily_brief_query', intentNameZh: '今日商务简报', intentNameEn: 'Daily Business Brief', category: 'query',
+          triggerKeywordsZh: [], triggerKeywordsEn: [], targetTab: 'chat', targetModule: 'Daily Brief',
+          targetRoute: '',
+          readSources: ['getBossActions() via lib/dailyBrief.ts (deduped)'],
+          writeTargets: [], requiredFields: [],
+          approvalRequired: false, resultPanel: null, implementationStatus: 'real', notConnectedMessage: '', fallbackBehavior: '',
+        },
+        confidence: 1, raw: raw.trim(), detectedMissingFields: [],
+      };
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: briefMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别指令…', '正在汇总今日事项…', '正在整理结果…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          if (dailyBriefMode === 'mia') {
+            getMiaStatus()
+              .then(res => setCmdState(prev => prev ? { ...prev, resultData: { ...res, mode: 'mia' } } : prev))
+              .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, status: 'no_data', error: String(e?.message ?? e), mode: 'mia' } } : prev));
+          } else {
+            getDailyBrief()
+              .then(res => setCmdState(prev => prev ? { ...prev, resultData: { ...res, mode: dailyBriefMode } } : prev))
+              .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: String(e?.message ?? e), mode: dailyBriefMode } } : prev));
+          }
         },
       );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);

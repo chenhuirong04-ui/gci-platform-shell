@@ -8,7 +8,7 @@ import { BusinessLinesOverview } from '../components/BusinessLinesOverview';
 import { AgentsStatusCompact } from '../components/AgentsStatusCompact';
 import { HomeKpiRow } from '../components/HomeKpiRow';
 import { HomeDashboardCharts } from '../components/HomeDashboardCharts';
-import { HomeTopPriorities } from '../components/HomeTopPriorities';
+import { HomeDailyBrief } from '../components/HomeDailyBrief';
 import { getAllCustomerNames } from '../lib/crmSupabase';
 
 // ─── localStorage helpers (same keys the Trade + CRM modules use) ──────────
@@ -160,8 +160,8 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
       {/* C — Business Charts: real 7-day trend + real P1/P2/P3 backlog structure */}
       <HomeDashboardCharts />
 
-      {/* D — Top 3 priorities only (not top 5/20), email source excluded — see HomeTopPriorities.tsx */}
-      <HomeTopPriorities />
+      {/* D — Daily Business Brief (Task 15): deduped across CRM/Quotation/Commitments/Decisions/MIA/Calendar, max 5 */}
+      <HomeDailyBrief />
 
       {/* E — Business Overview: all business lines (crm_customers.business_type) + core operating metrics */}
       <SectionHeader label="经营概览 · BUSINESS OVERVIEW" />
