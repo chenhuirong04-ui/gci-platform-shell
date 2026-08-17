@@ -307,7 +307,9 @@ const COMPLETE_TRIGGER_RE = /(.+?)(?:这个事情|这件事|这个)?(?:完成了
 const CANCEL_TRIGGER_RE = /(.+?)(?:先)?(?:取消了?|不用做了|不做了)$/u;
 
 export function matchTaskLifecycleCommand(text: string): { keyword: string; action: 'completed' | 'cancelled' } | null {
-  const t = text.trim();
+  // Strip trailing punctuation first — "...完成了。"/"...完成了！" otherwise
+  // never matches the `$`-anchored triggers below.
+  const t = text.trim().replace(/[。.！!\s]+$/u, '');
   let m = t.match(COMPLETE_TRIGGER_RE);
   if (m && m[1].trim()) return { keyword: m[1].trim(), action: 'completed' };
   m = t.match(CANCEL_TRIGGER_RE);
