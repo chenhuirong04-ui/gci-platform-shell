@@ -70,3 +70,23 @@ export async function getCalendarEvents(
 export async function getImportantEmails(): Promise<{ ok: true; rule: string; results: GmailResult[] } | { ok: false; error: string }> {
   return safeFetchJson(`${base()}/api/google/important-emails`);
 }
+
+// Task 11.1 — Email Chat Assistant: full thread content (subject/from/to/date
+// + plain-text body, HTML safely converted server-side, attachments listed
+// by name/type only — never fetched/decoded). gmail.readonly only.
+export interface GmailThreadMessage {
+  id: string;
+  from: string;
+  to: string;
+  subject: string;
+  date: string;
+  snippet: string;
+  body: string;
+  attachments: { filename: string; mimeType: string; size: number }[];
+}
+
+export async function getGmailThread(
+  threadId: string,
+): Promise<{ ok: true; threadId: string; messages: GmailThreadMessage[] } | { ok: false; error: string }> {
+  return safeFetchJson(`${base()}/api/google/gmail-thread?threadId=${encodeURIComponent(threadId)}`);
+}

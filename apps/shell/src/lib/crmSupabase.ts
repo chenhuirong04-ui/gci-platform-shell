@@ -299,6 +299,17 @@ export async function getBossDecisions(): Promise<
   return { ok: true, items: deduped };
 }
 
+// ── Task 11.1: Email Chat Assistant — lightweight name list for client-side
+// sender/customer matching in the email list. Names only, no PII beyond
+// what's already shown elsewhere in the CRM UI. ────────────────────────────
+export async function getAllCustomerNames(): Promise<
+  { ok: true; rows: { id: string; customer_name: string }[] } | { ok: false; error: string }
+> {
+  const { data, error } = await supabase.from('crm_customers').select('id, customer_name').limit(1000);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, rows: (data ?? []) as { id: string; customer_name: string }[] };
+}
+
 // ── Task 10: Commitment Tracker — recent follow-up text for candidate scan ──
 // Read-only. Joins the customer name via the FK relationship so callers don't
 // need a second round-trip.

@@ -34,6 +34,7 @@ import {
   COMMITMENT_SOURCE_LABEL, COMMITMENT_TYPE_LABEL,
   type ExecutiveCommitment,
 } from '../lib/commitments';
+import { OPEN_EMAIL_ASSISTANT_RE } from '../ai/emailAssistantAskGciParsers';
 
 // ── Inventory query normalizer ────────────────────────────────────────────────
 // Strips command words, punctuation, and trailing "库存" to get the product term.
@@ -1975,11 +1976,14 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {results.map((m: any) => (
-                  <a key={m.id} href={m.link} target="_blank" rel="noreferrer" style={{ display: 'block', padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', textDecoration: 'none' }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{m.subject || '(无主题)'}</div>
-                    <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{m.sender} · {m.date}</div>
-                    <div style={{ fontSize: 12, color: SUBTLE, marginTop: 4 }}>{m.snippet}</div>
-                  </a>
+                  <div key={m.id} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <a href={m.link} target="_blank" rel="noreferrer" style={{ display: 'block', textDecoration: 'none' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{m.subject || '(无主题)'}</div>
+                      <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{m.sender} · {m.date}</div>
+                      <div style={{ fontSize: 12, color: SUBTLE, marginTop: 4 }}>{m.snippet}</div>
+                    </a>
+                    <a href={`/email-assistant?threadId=${encodeURIComponent(m.threadId)}`} style={{ fontSize: 10.5, color: GOLD, textDecoration: 'none' }}>在邮件助理中打开 →</a>
+                  </div>
                 ))}
               </div>
             );
@@ -2058,11 +2062,14 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {results.map((m: any) => (
-                      <a key={m.id} href={m.link} target="_blank" rel="noreferrer" style={{ display: 'block', padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', textDecoration: 'none' }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{m.subject || '(无主题)'}</div>
-                        <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{m.sender} · {m.date}</div>
-                        <div style={{ fontSize: 12, color: SUBTLE, marginTop: 4 }}>{m.snippet}</div>
-                      </a>
+                      <div key={m.id} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <a href={m.link} target="_blank" rel="noreferrer" style={{ display: 'block', textDecoration: 'none' }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{m.subject || '(无主题)'}</div>
+                          <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{m.sender} · {m.date}</div>
+                          <div style={{ fontSize: 12, color: SUBTLE, marginTop: 4 }}>{m.snippet}</div>
+                        </a>
+                        <a href={`/email-assistant?threadId=${encodeURIComponent(m.threadId)}`} style={{ fontSize: 10.5, color: GOLD, textDecoration: 'none' }}>在邮件助理中打开 →</a>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -3574,6 +3581,14 @@ export function AIPage() {
       setBillingProfileInitialText(raw);
       setBillingProfileMode(true);
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Email Chat Assistant — Task 11.1 quick entry. "打开邮件助理" /
+    // "和我讨论这封邮件" / "帮我回复这封邮件" just navigate to /email-assistant;
+    // Task 5.2's own Gmail search/important-emails queries below are untouched.
+    if (OPEN_EMAIL_ASSISTANT_RE.test(raw.trim())) {
+      window.location.assign('/email-assistant');
       return;
     }
 

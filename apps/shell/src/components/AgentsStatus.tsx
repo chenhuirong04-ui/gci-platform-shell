@@ -54,14 +54,19 @@ export const AGENTS: AgentCard[] = [
     sourceUrl: 'https://gci-ai-sales-agent.vercel.app',
   },
   {
+    // Task 11.1 — this is now the real, built-in Email Chat Assistant
+    // (/email-assistant), not the old external "Email Assistant" agent
+    // referenced pre-Task-11 (that project was never identified/UNKNOWN and
+    // is not connected here). No fabricated metrics — no reliable unread/
+    // last-fetch counter exists yet, so this stays a plain availability note.
     name: 'Email Assistant',
-    status: 'no_data',
+    status: 'healthy',
     lastUpdated: null,
-    todaySummary: '未在当前 Vercel / GitHub 账号中找到匹配项目,身份未确认(UNKNOWN)。',
+    todaySummary: 'Email Chat Assistant available — 可在邮件助理中查看邮件、讨论内容并起草回复(不自动发送)。',
     metrics: [],
-    issues: ['未定位到 GitHub repo / Production URL / Supabase project'],
+    issues: [],
     needsChris: 0,
-    sourceUrl: null,
+    sourceUrl: '/email-assistant',
   },
   {
     name: 'NOON Agent',
