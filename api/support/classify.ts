@@ -1,10 +1,13 @@
 // Vercel Edge Runtime — Task 18.2 GIA Support Inbox: ticket classification.
 // Takes raw customer content (from an email thread or manual/WhatsApp
 // entry) and returns a structured classification. For CHANYA-product
-// issues, first pulls Chanya's own executive-status (same read-only
-// adapter as api/chanya/executive-status.ts — never guesses system state
-// from the customer's claim alone). Never sends, drafts-save, or writes
-// anything — pure classification.
+// issues, reads Chanya's own executive-status through the ONE canonical
+// adapter (api/chanya/executive-status.ts) — this function calls that
+// adapter over HTTP exactly like the browser's getChanyaStatus() does, it
+// never re-implements the Chanya fetch/auth itself and never sees
+// CHANYA_EXECUTIVE_STATUS_SECRET (Task 18.2.1 fix: an earlier version
+// duplicated that fetch here, which is exactly what's being avoided now).
+// Never sends, drafts-save, or writes anything — pure classification.
 export const config = { runtime: 'edge' };
 
 const CORS = {
@@ -20,23 +23,17 @@ function json(body: unknown, status = 200) {
   });
 }
 
-const CHANYA_BASE_URL = process.env.CHANYA_BASE_URL || 'https://chanya.globalcareinfo.com';
-
-// Same adapter call as api/chanya/executive-status.ts, inlined here so
-// classification is a single edge-function hop rather than one function
-// calling another over HTTP. Never exposes the secret or raw DB access.
-async function fetchChanyaStatus(): Promise<string | null> {
-  const secret = process.env.CHANYA_EXECUTIVE_STATUS_SECRET;
-  if (!secret) return null;
+// Calls the one canonical Chanya adapter (same endpoint the Home page and
+// getChanyaStatus() use) — never a second implementation of the Chanya
+// fetch/auth logic, never direct DB access, never the raw secret.
+async function fetchChanyaStatus(requestOrigin: string): Promise<{ raw: string | null; ok: boolean } > {
   try {
-    const res = await fetch(`${CHANYA_BASE_URL}/api/executive-status`, {
-      headers: { Authorization: `Bearer ${secret}` },
-    });
-    if (!res.ok) return null;
+    const res = await fetch(`${requestOrigin}/api/chanya/executive-status`);
     const data = await res.json();
-    return JSON.stringify(data);
+    if (data?.ok) return { raw: JSON.stringify(data), ok: true };
+    return { raw: null, ok: false };
   } catch {
-    return null;
+    return { raw: null, ok: false };
   }
 }
 
@@ -84,13 +81,14 @@ export default async function handler(request: Request): Promise<Response> {
   // Only bother reading Chanya's status if the ticket is plausibly a Chanya
   // issue — no reason to fetch it for a TRADE/WORKFORCE ticket.
   const mightBeChanya = body.hintedProduct === 'CHANYA' || /chanya/i.test(rawContent) || /minute|分钟|额度|subscription|订阅/i.test(rawContent);
-  const chanyaStatusJson = mightBeChanya ? await fetchChanyaStatus() : null;
+  const requestOrigin = new URL(request.url).origin;
+  const chanyaResult = mightBeChanya ? await fetchChanyaStatus(requestOrigin) : { raw: null, ok: false };
 
   let userContent = `Customer name: ${body.customerName || '(unknown)'}\nRaw message:\n${rawContent}`;
-  if (chanyaStatusJson) {
-    userContent += `\n\n<<<CHANYA_SYSTEM_STATUS>>>\n${chanyaStatusJson}\n<<<END_CHANYA_SYSTEM_STATUS>>>`;
+  if (chanyaResult.raw) {
+    userContent += `\n\n<<<CHANYA_SYSTEM_STATUS>>>\n${chanyaResult.raw}\n<<<END_CHANYA_SYSTEM_STATUS>>>`;
   } else if (mightBeChanya) {
-    userContent += `\n\n(Chanya system status was not available — CHANYA_EXECUTIVE_STATUS_SECRET not configured or Chanya's endpoint is not live yet. Do not guess system state.)`;
+    userContent += `\n\n(Chanya system status was not available via the GCI adapter — see its own error for why. Do not guess system state.)`;
   }
 
   try {
@@ -129,7 +127,7 @@ export default async function handler(request: Request): Promise<Response> {
       why_important: parsed.why_important || '',
       suggested_action: parsed.suggested_action || '',
       needs_chris: Boolean(parsed.needs_chris),
-      system_status_context: chanyaStatusJson ? '已读取 Chanya 实时状态数据' : (mightBeChanya ? '未能读取 Chanya 状态（接口未部署或未配置）' : null),
+      system_status_context: chanyaResult.ok ? '已读取 Chanya 实时状态数据' : (mightBeChanya ? '未能读取 Chanya 状态（adapter 未返回有效数据，详见其自身错误信息）' : null),
     });
   } catch (e: any) {
     return json({ ok: false, error: String(e?.message ?? e) }, 500);
