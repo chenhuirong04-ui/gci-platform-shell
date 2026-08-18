@@ -451,6 +451,10 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
 
   const syncFromNotion = async () => {
     if (demoMode) return;
+    // Legacy CRM Cleanup: once Chris clears ICARE_HISTORY_V1, this flag stops
+    // every sync path (init load, 10-min interval, post-submit, manual button)
+    // from silently re-pulling the same 25 legacy records back from Notion.
+    if (isLegacySyncDisabled()) return;
     setSyncStatus('syncing');
     try {
       const result = await notionSyncService.sync();
@@ -1320,13 +1324,13 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
             )}
             {!demoMode && <button
               onClick={() => syncFromNotion()}
-              disabled={syncStatus === 'syncing'}
+              disabled={syncStatus === 'syncing' || isLegacySyncDisabled()}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black text-white transition-all disabled:opacity-50"
               style={{ backgroundColor: '#B8960C' }}
-              title={dict.crm.sync.syncTooltip}
+              title={isLegacySyncDisabled() ? 'Legacy 同步已停用（Task 17.1 清理）' : dict.crm.sync.syncTooltip}
             >
               <RefreshCw className={`w-3 h-3 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
-              {syncStatus === 'syncing' ? dict.crm.sync.syncing : dict.crm.sync.sync}
+              {isLegacySyncDisabled() ? 'Legacy 同步已停用' : (syncStatus === 'syncing' ? dict.crm.sync.syncing : dict.crm.sync.sync)}
             </button>}
             {!demoMode && isAdminMode && (
               <button
@@ -1676,10 +1680,101 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
 // sync (ICARE_HISTORY_V1) and is kept reachable for historical records only
 // — never delete anything here, just make the distinction unmissable at
 // the top of every tab. No routing/logic changes below this banner.
+//
+// Legacy CRM Cleanup (explicit Chris request): export ICARE_HISTORY_V1 as a
+// JSON backup, then let Chris clear it from his own browser's localStorage —
+// confirm-gated, same pattern as every other destructive action in this
+// app. Clearing also flips GCI_LEGACY_SYNC_DISABLED_V1, which
+// syncFromNotion() checks before every pull (init load, 10-min interval,
+// post-submit, manual button) — without that flag, the very next Notion
+// sync would silently re-populate the same records right back.
+const LEGACY_SYNC_DISABLED_KEY = 'GCI_LEGACY_SYNC_DISABLED_V1';
+function isLegacySyncDisabled(): boolean {
+  try { return localStorage.getItem(LEGACY_SYNC_DISABLED_KEY) === '1'; } catch { return false; }
+}
+
 function LegacyCrmBanner() {
+  const [backedUp, setBackedUp] = React.useState(false);
+  const [confirming, setConfirming] = React.useState(false);
+  const [err, setErr] = React.useState<string | null>(null);
+  const [cleared, setCleared] = React.useState(() => {
+    try { return !localStorage.getItem('ICARE_HISTORY_V1') && isLegacySyncDisabled(); } catch { return false; }
+  });
+  const [count] = React.useState(() => {
+    try {
+      const arr = JSON.parse(localStorage.getItem('ICARE_HISTORY_V1') || '[]');
+      return Array.isArray(arr) ? arr.length : 0;
+    } catch { return 0; }
+  });
+
+  function handleExportBackup() {
+    try {
+      const raw = localStorage.getItem('ICARE_HISTORY_V1') || '[]';
+      const blob = new Blob([raw], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `icare_history_v1_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setBackedUp(true);
+      setErr(null);
+    } catch (e: any) {
+      setErr('备份失败: ' + String(e?.message ?? e));
+    }
+  }
+
+  function handleClear() {
+    try {
+      localStorage.removeItem('ICARE_HISTORY_V1');
+      localStorage.setItem(LEGACY_SYNC_DISABLED_KEY, '1');
+      setCleared(true);
+      setConfirming(false);
+      setTimeout(() => window.location.reload(), 600);
+    } catch (e: any) {
+      setErr('清空失败: ' + String(e?.message ?? e));
+    }
+  }
+
+  if (cleared) {
+    return (
+      <div style={{ padding: '10px 20px', background: 'rgba(212,168,67,0.08)', borderBottom: '1px solid rgba(212,168,67,0.25)', color: '#D4A843', fontSize: 12.5, fontWeight: 600, textAlign: 'center' }}>
+        历史客户记录 / Legacy — 正式客户请使用 GIA（Business Assistant）。旧 ICARE_HISTORY_V1 客户/跟进数据已清空，Legacy 同步已停用。
+      </div>
+    );
+  }
+
   return (
     <div style={{ padding: '10px 20px', background: 'rgba(212,168,67,0.08)', borderBottom: '1px solid rgba(212,168,67,0.25)', color: '#D4A843', fontSize: 12.5, fontWeight: 600, textAlign: 'center' }}>
-      历史客户记录 / Legacy — 正式客户请使用 GIA（Business Assistant），本页数据不再是主档
+      <div>历史客户记录 / Legacy — 正式客户请使用 GIA（Business Assistant），本页数据不再是主档（共 {count} 条）</div>
+      <div style={{ marginTop: 8, display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' }}>
+        <button onClick={handleExportBackup} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(212,168,67,0.4)', color: '#D4A843', fontWeight: 700 }}>
+          ⬇ 导出备份 (JSON){backedUp ? ' ✓' : ''}
+        </button>
+        {!confirming ? (
+          <button
+            disabled={!backedUp}
+            onClick={() => setConfirming(true)}
+            title={!backedUp ? '请先导出备份' : ''}
+            style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11, cursor: backedUp ? 'pointer' : 'not-allowed', opacity: backedUp ? 1 : 0.4, background: 'rgba(224,132,106,0.1)', border: '1px solid rgba(224,132,106,0.4)', color: '#E0846A', fontWeight: 700 }}
+          >
+            清空 Legacy 客户数据…
+          </button>
+        ) : (
+          <>
+            <span style={{ fontSize: 11, fontWeight: 400, color: '#E0846A' }}>确认清空这 {count} 条 Legacy 数据？已导出备份，Supabase 新 CRM 不受影响</span>
+            <button onClick={handleClear} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11, cursor: 'pointer', background: 'rgba(224,132,106,0.16)', border: '1px solid rgba(224,132,106,0.5)', color: '#E0846A', fontWeight: 700 }}>
+              确认清空
+            </button>
+            <button onClick={() => setConfirming(false)} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: '#7A8494', fontWeight: 400 }}>
+              取消
+            </button>
+          </>
+        )}
+      </div>
+      {err && <div style={{ marginTop: 6, fontSize: 11, color: '#E0846A', fontWeight: 400 }}>{err}</div>}
     </div>
   );
 }
