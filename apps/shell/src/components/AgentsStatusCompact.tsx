@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { colors } from '@gci/design-system';
 import { AGENTS, type AgentStatus } from './AgentsStatus';
 import { getMiaStatus, type MiaStatus } from '../lib/mia';
+import { getChanyaStatus, type ChanyaStatus } from '../lib/chanya';
 
 const GOLD = '#CBA85C';
 const RED = '#E0846A';
@@ -28,18 +29,21 @@ const STATUS_COLOR: Record<AgentStatus, string> = {
 
 export function AgentsStatusCompact() {
   const [mia, setMia] = useState<MiaStatus | null>(null);
+  const [chanya, setChanya] = useState<ChanyaStatus | null>(null);
 
   useEffect(() => {
     getMiaStatus().then((res) => { if (res.ok) setMia(res.data); });
+    getChanyaStatus().then((res) => { if (res.ok) setChanya(res.data); });
   }, []);
 
   const isMia = (name: string) => name.startsWith('MIA');
+  const isChanya = (name: string) => name.startsWith('Chanya');
 
   return (
     <div style={{ padding: '14px 18px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
         {AGENTS.map((a) => {
-          const status: AgentStatus = isMia(a.name) && mia ? mia.status : a.status;
+          const status: AgentStatus = isMia(a.name) && mia ? mia.status : isChanya(a.name) && chanya ? chanya.status : a.status;
           return (
             <div key={a.name} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 160 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5 }}>
@@ -58,6 +62,21 @@ export function AgentsStatusCompact() {
                 <div style={{ fontSize: 9.5, color: MUTED }}>Last updated: {new Date(mia.last_updated).toLocaleString('zh-CN')}</div>
               )}
               {isMia(a.name) && !mia && (
+                <div style={{ fontSize: 10.5, color: MUTED }}>{a.todaySummary}</div>
+              )}
+              {isChanya(a.name) && chanya && (
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 10.5, color: MUTED }}>
+                  <span>今日新注册 <strong style={{ color: colors.textPrimary }}>{chanya.new_signups_today}</strong></span>
+                  <span>新付费 <strong style={{ color: colors.textPrimary }}>{chanya.new_paid_today}</strong></span>
+                  <span>收入 <strong style={{ color: colors.textPrimary }}>{chanya.currency} {chanya.revenue_today}</strong></span>
+                  <span>支付失败 <strong style={{ color: chanya.payment_failures_today > 0 ? RED : colors.textPrimary }}>{chanya.payment_failures_today}</strong></span>
+                  <span>需处理 <strong style={{ color: chanya.needs_chris > 0 ? AMBER : colors.textPrimary }}>{chanya.needs_chris}</strong></span>
+                </div>
+              )}
+              {isChanya(a.name) && chanya?.last_updated && (
+                <div style={{ fontSize: 9.5, color: MUTED }}>Last updated: {new Date(chanya.last_updated).toLocaleString('zh-CN')}</div>
+              )}
+              {isChanya(a.name) && !chanya && (
                 <div style={{ fontSize: 10.5, color: MUTED }}>{a.todaySummary}</div>
               )}
               {a.channels && (

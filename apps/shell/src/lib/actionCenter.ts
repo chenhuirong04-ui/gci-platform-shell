@@ -10,10 +10,11 @@ import { AGENTS } from '../components/AgentsStatus';
 import { getDecisionFollowThroughActions } from './decisionInbox';
 import { getOpenCommitmentActions } from './commitments';
 import { getMiaStatus } from './mia';
+import { getChanyaStatus } from './chanya';
 import { getExecutiveTasks, taskUrgency } from './executiveTasks';
 
 export type ActionPriority = 'P1' | 'P2' | 'P3';
-export type ActionSource = 'crm' | 'email' | 'calendar' | 'business' | 'systems' | 'agents' | 'decisions' | 'commitments' | 'mia' | 'tasks';
+export type ActionSource = 'crm' | 'email' | 'calendar' | 'business' | 'systems' | 'agents' | 'decisions' | 'commitments' | 'mia' | 'chanya' | 'tasks';
 
 export interface BossAction {
   id: string;
@@ -64,6 +65,7 @@ export async function getBossActions(): Promise<
     commitmentActions,
     miaStatus,
     executiveTasks,
+    chanyaStatus,
   ] = await Promise.all([
     getTodaysFollowups(),
     getOverdueFollowups(),
@@ -78,6 +80,7 @@ export async function getBossActions(): Promise<
     getOpenCommitmentActions(),
     getMiaStatus(),
     getExecutiveTasks(),
+    getChanyaStatus(),
   ]);
 
   // A Decision that already has an open Commitment tracking its next step
@@ -400,6 +403,60 @@ export async function getBossActions(): Promise<
     }
   }
 
+  // ── 6.6 Chanya (Task 18.1) — same discipline as MIA: normal operation
+  // (new signups, routine paid conversions) never generates an action, only
+  // real payment failures, system errors, subscription anomalies, or an
+  // actual needs_chris backlog. Safe no-op today since getChanyaStatus()
+  // returns ok:false until Chanya deploys its own /api/executive-status. ──
+  if (chanyaStatus.ok) {
+    const c = chanyaStatus.data;
+    if (c.status === 'error') {
+      actions.push({
+        id: 'chanya-error',
+        source: 'chanya',
+        category: 'Chanya',
+        title: 'Chanya｜运营监控 — 系统异常',
+        summary: c.issues.length > 0 ? c.issues.join('；') : '系统状态异常，可能阻塞正常运行',
+        priority: 'P1',
+        due_at: null,
+        related_customer: null,
+        related_system: 'Chanya',
+        action_type: 'chanya_error',
+        deep_link: '/',
+      });
+    }
+    if (c.payment_failures_today > 0) {
+      actions.push({
+        id: 'chanya-payment-failures',
+        source: 'chanya',
+        category: 'Chanya',
+        title: `Chanya｜运营监控 — ${c.payment_failures_today} 笔支付失败`,
+        summary: `今日 ${c.payment_failures_today} 笔支付失败，可能导致订阅中断`,
+        priority: 'P2',
+        due_at: null,
+        related_customer: null,
+        related_system: 'Chanya',
+        action_type: 'chanya_payment_failure',
+        deep_link: '/',
+      });
+    }
+    if (c.needs_chris > 0) {
+      actions.push({
+        id: 'chanya-needs-chris',
+        source: 'chanya',
+        category: 'Chanya',
+        title: `Chanya｜运营监控 — ${c.needs_chris} 件需要你处理`,
+        summary: `今日有 ${c.needs_chris} 件需要人工判断（订阅/账户异常等）`,
+        priority: 'P2',
+        due_at: null,
+        related_customer: null,
+        related_system: 'Chanya',
+        action_type: 'chanya_needs_chris',
+        deep_link: '/',
+      });
+    }
+  }
+
   // ── 7. Decision Follow-through (Task 9) — execution gaps + due follow-ups
   // on already-decided items. Never the raw Decision itself (that lives in
   // Decision Inbox); these are distinct "still needs a next step" entries. ──
@@ -473,5 +530,6 @@ export const SOURCE_LABEL: Record<ActionSource, string> = {
   decisions: 'Decisions',
   commitments: 'Commitments',
   mia: 'MIA',
+  chanya: 'Chanya',
   tasks: 'To-Do',
 };

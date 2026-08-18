@@ -73,6 +73,7 @@ const REPRESENTATION_RANK: Record<ActionSource, number> = {
   commitments: 2,
   decisions: 3,
   mia: 4,
+  chanya: 4,
   calendar: 5,
   email: 6,
   agents: 7,

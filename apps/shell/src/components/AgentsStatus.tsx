@@ -86,6 +86,21 @@ export const AGENTS: AgentCard[] = [
     ],
   },
   {
+    // Task 18.1 — Chanya Executive Monitor. Read-only status via
+    // api/chanya/executive-status.ts -> Chanya's own /api/executive-status
+    // (same adapter pattern as MIA). Confirmed via a live GET that this
+    // endpoint does not exist yet on Chanya's side (404) — not guessed.
+    // Falls back to this honest "no_data" entry until it's deployed there.
+    name: 'Chanya｜运营监控',
+    status: 'no_data',
+    lastUpdated: null,
+    todaySummary: 'Chanya (25H Bridge) 尚未提供 /api/executive-status 接口(实测 404,非猜测)。GCI 侧 adapter 与 Boss Action 联动已就绪,一旦 Chanya 部署该接口即可显示真实数字,无需再改 GCI 代码。',
+    metrics: [],
+    issues: ['Chanya 生产环境无公开 status API'],
+    needsChris: 0,
+    sourceUrl: 'https://chanya.globalcareinfo.com',
+  },
+  {
     name: 'Growth Agent｜内容增长',
     status: 'deferred',
     lastUpdated: null,

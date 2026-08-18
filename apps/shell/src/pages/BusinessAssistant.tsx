@@ -28,6 +28,8 @@ import {
   DEFAULT_TARGET_FOLDER_ID, DEFAULT_TARGET_FOLDER_NAME,
   type FileClassification, type GiaFileRegistryRow,
 } from '../lib/giaFiles';
+import { getChanyaStatus } from '../lib/chanya';
+import { matchChanyaStatusQuery, formatChanyaStatusReply } from '../ai/chanyaAskGciParsers';
 import type { ExecutiveTask } from '../lib/executiveTasks';
 import type { CrmCustomer } from '../lib/crmSupabase';
 
@@ -175,6 +177,18 @@ export function BusinessAssistant() {
       return `GIA 文件库中暂未登记，但在 Drive 中找到：\n${lines.join('\n')}`;
     }
     return null;
+  }
+
+  // Task 18.1 — "Chanya今天有多少新用户？" / "今天有人付款吗？" / "Chanya今天
+  // 收入多少？" / "有没有支付失败？" / "有没有用户需要我处理？" / "Chanya系统
+  // 有没有异常？". Read-only, always answers when the question is clearly
+  // about Chanya (unlike file search, no need to gate on a non-empty result —
+  // "not connected yet" is itself a valid, honest answer to show).
+  async function tryChanyaStatusQuery(text: string): Promise<string | null> {
+    if (!matchChanyaStatusQuery(text)) return null;
+    const res = await getChanyaStatus();
+    if (res.ok) return formatChanyaStatusReply(res.data, null);
+    return formatChanyaStatusReply(null, res.error);
   }
 
   function handlePickFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -388,6 +402,11 @@ export function BusinessAssistant() {
       setFileSearchReply(searchReply);
       return;
     }
+    const chanyaReply = await tryChanyaStatusQuery(t);
+    if (chanyaReply) {
+      setFileSearchReply(chanyaReply);
+      return;
+    }
     const consumed = await tryBusinessCapture(t, ctx?.customer ?? null);
     if (consumed) return;
     const stripped = t.replace(LOOKUP_PREFIX_RE, '').trim() || t;
@@ -434,6 +453,14 @@ export function BusinessAssistant() {
     const searchReply = await tryFileSearch(question);
     if (searchReply) {
       setChatHistory((prev) => [...prev, { role: 'user', content: question }, { role: 'assistant', content: searchReply }]);
+      return;
+    }
+
+    // Task 18.1 — same Chanya status check as the top input, works mid-
+    // conversation too.
+    const chanyaReply = await tryChanyaStatusQuery(question);
+    if (chanyaReply) {
+      setChatHistory((prev) => [...prev, { role: 'user', content: question }, { role: 'assistant', content: chanyaReply }]);
       return;
     }
 
