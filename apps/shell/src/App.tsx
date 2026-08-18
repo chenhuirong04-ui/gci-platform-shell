@@ -19,6 +19,7 @@ import { Tasks } from './pages/Tasks';
 import { EmailAssistant } from './pages/EmailAssistant';
 import { BusinessAssistant } from './pages/BusinessAssistant';
 import { CrmCustomers } from './pages/CrmCustomers';
+import { SupportInbox } from './pages/SupportInbox';
 import TradeModule from '../../../modules/trade/TradeModule';
 import CrmModule from '../../../modules/crm/CrmModule';
 import QuotationModule from '../../../modules/quotation/QuotationModule';
@@ -156,6 +157,7 @@ function Shell() {
               </ProtectedRoute>
             }
           />
+          <Route path="/support-inbox" element={<SupportInbox />} />
           <Route path="/access-denied" element={<AccessDenied />} />
 
           <Route

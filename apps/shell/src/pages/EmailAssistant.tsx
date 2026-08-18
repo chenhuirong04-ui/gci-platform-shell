@@ -14,6 +14,7 @@ import {
   triageEmails, dubaiDateStr, todayDubaiStr, yesterdayDubaiStr,
   type ChatTurn, type DraftShape, type EmailSummary, type EmailCategory, type TriageResult,
 } from '../lib/emailAssistant';
+import { classifySupportMessage, createTicket, type TicketClassification } from '../lib/supportTickets';
 
 const GOLD = '#CBA85C';
 const RED = '#E0846A';
@@ -74,6 +75,13 @@ export function EmailAssistant() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [showOriginal, setShowOriginal] = useState(false);
+
+  // Task 18.2 — "转为客服工单": reuses this thread's content, runs the same
+  // classify() used by the Support Inbox's manual entry, then a single
+  // insert into support_tickets. Never sends anything.
+  const [ticketBusy, setTicketBusy] = useState(false);
+  const [ticketErr, setTicketErr] = useState<string | null>(null);
+  const [ticketCreated, setTicketCreated] = useState(false);
 
   const [chatHistory, setChatHistory] = useState<ChatTurn[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -165,6 +173,8 @@ export function EmailAssistant() {
     setEmailSummary(null);
     setSummaryError(null);
     setShowOriginal(false);
+    setTicketErr(null);
+    setTicketCreated(false);
     // Never carry the previous email's conversation into a new thread.
     setChatHistory([]);
     setChatInput('');
@@ -202,6 +212,39 @@ export function EmailAssistant() {
     if (tier === 'must') return { ...data, needsChris: true };
     if (tier === 'ignored') return { ...data, needsChris: false };
     return data;
+  }
+
+  // Task 18.2 — "转为客服工单". Classifies the thread's first message
+  // through the same support classifier the Support Inbox's manual entry
+  // uses, then a single insert into support_tickets. Read-only against
+  // Gmail; the only write is that one insert.
+  async function handleConvertToTicket() {
+    if (!selected || !threadMessages || threadMessages.length === 0) return;
+    setTicketBusy(true);
+    setTicketErr(null);
+    const first = threadMessages[0];
+    const senderName = extractSenderName(first.from);
+    const emailMatch = first.from.match(/<([^>]+)>/);
+    const senderEmail = emailMatch ? emailMatch[1] : (first.from.includes('@') ? first.from : null);
+
+    const cls = await classifySupportMessage(`${first.subject}\n\n${first.body}`, undefined, senderName);
+    if (!cls.ok) {
+      setTicketBusy(false);
+      setTicketErr(cls.error);
+      return;
+    }
+    const res = await createTicket({
+      channel: 'email',
+      customerName: senderName || null,
+      customerEmail: senderEmail,
+      rawContent: `${first.subject}\n\n${first.body}`,
+      classification: cls.data as TicketClassification,
+      sourceThreadId: selected.threadId,
+      sourceMessageId: first.id,
+    });
+    setTicketBusy(false);
+    if (res.ok) setTicketCreated(true);
+    else setTicketErr(res.error);
   }
 
   // Deep-link support: /email-assistant?threadId=... from Ask GCI / Gmail results.
@@ -267,6 +310,13 @@ export function EmailAssistant() {
         <h1 style={{ fontSize: 20, fontWeight: 700, color: TEXT, margin: 0, fontFamily: "'Space Grotesk',sans-serif" }}>
           Email Assistant / 邮件聊天助理
         </h1>
+        <div style={{ flex: 1 }} />
+        <button
+          onClick={() => navigate('/support-inbox')}
+          style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 13, cursor: 'pointer' }}
+        >
+          客服收件箱 →
+        </button>
       </div>
 
       <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
@@ -489,6 +539,17 @@ export function EmailAssistant() {
                         <div style={{ fontSize: 12.5, color: MUTED, lineHeight: 1.6 }}><strong style={{ color: TEXT }}>建议下一步:</strong>{emailSummary.nextStep}</div>
                       </div>
                     ) : null}
+
+                    <div style={{ marginBottom: 12 }}>
+                      {ticketCreated ? (
+                        <span style={{ fontSize: 11.5, color: GREEN }}>✓ 已转为客服工单</span>
+                      ) : (
+                        <button disabled={ticketBusy} onClick={handleConvertToTicket} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
+                          {ticketBusy ? '转换中…' : '转为客服工单 →'}
+                        </button>
+                      )}
+                      {ticketErr && <span style={{ fontSize: 11, color: RED, marginLeft: 8 }}>{ticketErr}</span>}
+                    </div>
 
                     <div
                       onClick={() => setShowOriginal((v) => !v)}

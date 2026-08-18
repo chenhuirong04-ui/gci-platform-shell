@@ -12,9 +12,10 @@ import { getOpenCommitmentActions } from './commitments';
 import { getMiaStatus } from './mia';
 import { getChanyaStatus } from './chanya';
 import { getExecutiveTasks, taskUrgency } from './executiveTasks';
+import { getUrgentTicketCounts } from './supportTickets';
 
 export type ActionPriority = 'P1' | 'P2' | 'P3';
-export type ActionSource = 'crm' | 'email' | 'calendar' | 'business' | 'systems' | 'agents' | 'decisions' | 'commitments' | 'mia' | 'chanya' | 'tasks';
+export type ActionSource = 'crm' | 'email' | 'calendar' | 'business' | 'systems' | 'agents' | 'decisions' | 'commitments' | 'mia' | 'chanya' | 'support' | 'tasks';
 
 export interface BossAction {
   id: string;
@@ -66,6 +67,7 @@ export async function getBossActions(): Promise<
     miaStatus,
     executiveTasks,
     chanyaStatus,
+    ticketCounts,
   ] = await Promise.all([
     getTodaysFollowups(),
     getOverdueFollowups(),
@@ -81,6 +83,7 @@ export async function getBossActions(): Promise<
     getMiaStatus(),
     getExecutiveTasks(),
     getChanyaStatus(),
+    getUrgentTicketCounts(),
   ]);
 
   // A Decision that already has an open Commitment tracking its next step
@@ -457,6 +460,57 @@ export async function getBossActions(): Promise<
     }
   }
 
+  // ── 6.7 Support Inbox (Task 18.2) — only P1 open tickets, an explicit
+  // needs_chris flag, or tickets left open 24h+ generate an action. A
+  // normal trickle of P2/P3 tickets being worked through never does. ──────
+  if (ticketCounts.ok) {
+    if (ticketCounts.p1Open > 0) {
+      actions.push({
+        id: 'support-p1',
+        source: 'support',
+        category: 'Support',
+        title: `客服工单｜${ticketCounts.p1Open} 件 P1 未解决`,
+        summary: `有 ${ticketCounts.p1Open} 件高优先级客服工单（付款/账户/系统类）未解决`,
+        priority: 'P1',
+        due_at: null,
+        related_customer: null,
+        related_system: 'Support Inbox',
+        action_type: 'support_p1',
+        deep_link: '/support-inbox',
+      });
+    }
+    if (ticketCounts.needsChris > 0) {
+      actions.push({
+        id: 'support-needs-chris',
+        source: 'support',
+        category: 'Support',
+        title: `客服工单｜${ticketCounts.needsChris} 件需要你处理`,
+        summary: `有 ${ticketCounts.needsChris} 件工单需要你亲自判断`,
+        priority: 'P2',
+        due_at: null,
+        related_customer: null,
+        related_system: 'Support Inbox',
+        action_type: 'support_needs_chris',
+        deep_link: '/support-inbox',
+      });
+    }
+    if (ticketCounts.staleOpen > 0) {
+      actions.push({
+        id: 'support-stale',
+        source: 'support',
+        category: 'Support',
+        title: `客服工单｜${ticketCounts.staleOpen} 件超 24 小时未处理`,
+        summary: `有 ${ticketCounts.staleOpen} 件待处理工单超过 24 小时未开始处理`,
+        priority: 'P2',
+        due_at: null,
+        related_customer: null,
+        related_system: 'Support Inbox',
+        action_type: 'support_stale',
+        deep_link: '/support-inbox',
+      });
+    }
+  }
+
   // ── 7. Decision Follow-through (Task 9) — execution gaps + due follow-ups
   // on already-decided items. Never the raw Decision itself (that lives in
   // Decision Inbox); these are distinct "still needs a next step" entries. ──
@@ -531,5 +585,6 @@ export const SOURCE_LABEL: Record<ActionSource, string> = {
   commitments: 'Commitments',
   mia: 'MIA',
   chanya: 'Chanya',
+  support: 'Support',
   tasks: 'To-Do',
 };
