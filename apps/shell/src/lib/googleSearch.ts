@@ -13,6 +13,7 @@ export interface GmailResult {
   date: string;
   snippet: string;
   link: string;
+  unread?: boolean;
 }
 
 export interface DriveResult {
@@ -51,8 +52,9 @@ async function safeFetchJson<T>(url: string): Promise<T | { ok: false; error: st
   }
 }
 
-export async function searchGmail(q: string): Promise<{ ok: true; query: string; results: GmailResult[] } | { ok: false; error: string }> {
-  return safeFetchJson(`${base()}/api/google/gmail-search?q=${encodeURIComponent(q)}`);
+export async function searchGmail(q: string, max?: number): Promise<{ ok: true; query: string; results: GmailResult[] } | { ok: false; error: string }> {
+  const qs = new URLSearchParams({ q, ...(max ? { max: String(max) } : {}) });
+  return safeFetchJson(`${base()}/api/google/gmail-search?${qs.toString()}`);
 }
 
 export async function searchDrive(q: string): Promise<{ ok: true; query: string; results: DriveResult[] } | { ok: false; error: string }> {

@@ -112,3 +112,64 @@ export async function resolveCustomerContext(
 export function threadMessagesForChat(messages: GmailThreadMessage[]): EmailChatThreadMessage[] {
   return messages.map((m) => ({ from: m.from, to: m.to, subject: m.subject, date: m.date, body: m.body }));
 }
+
+// ── Summary-first redesign: one AI call per opened thread (never per list
+// row, never a bulk scan) — the 中文摘要/为什么重要/建议下一步 block shown
+// above the collapsed original. ──────────────────────────────────────────
+export interface EmailSummary {
+  summary: string;
+  why: string;
+  nextStep: string;
+  needsChris: boolean;
+}
+
+export async function summarizeEmailThread(
+  thread: EmailChatThreadMessage[],
+): Promise<{ ok: true; data: EmailSummary } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(`${base()}/api/email-assistant/summarize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ thread }),
+    });
+    const text = await res.text();
+    const data = JSON.parse(text);
+    if (!data.ok) return { ok: false, error: data.error || 'summarize failed' };
+    return { ok: true, data: { summary: data.summary, why: data.why, nextStep: data.nextStep, needsChris: data.needsChris } };
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message ?? e) };
+  }
+}
+
+// ── Rule-based category tabs — deterministic, zero AI cost, so a 30-day
+// list of dozens of emails never needs a bulk classification call. Mirrors
+// the six buckets Chris already uses. Customer match takes priority over
+// keyword rules (a supplier-sounding subject from a known customer should
+// still land under 客户/业务).
+export type EmailCategory = 'gov' | 'bank' | 'customer' | 'platform' | 'contract' | 'supplier' | 'other';
+
+export const EMAIL_CATEGORIES: { key: EmailCategory; label: string }[] = [
+  { key: 'gov', label: '政府/合规' },
+  { key: 'bank', label: '银行/财务' },
+  { key: 'customer', label: '客户/业务' },
+  { key: 'platform', label: '平台/系统' },
+  { key: 'contract', label: '合同/付款' },
+  { key: 'supplier', label: '供应商/员工' },
+];
+
+const CATEGORY_KEYWORD_RULES: { cat: EmailCategory; keywords: string[] }[] = [
+  { cat: 'gov', keywords: ['.gov', 'gov.ae', 'moec', 'freezone', 'free zone', 'dmcc', 'immigration', 'visa', 'trade license', 'compliance', 'customs'] },
+  { cat: 'bank', keywords: ['bank', 'hsbc', 'emirates nbd', 'adcb', 'mashreq', 'rakbank', 'wio', 'statement', 'swift', 'iban', 'account balance'] },
+  { cat: 'platform', keywords: ['vercel', 'supabase', 'github', 'notion', 'openai', 'anthropic', 'google workspace', 'no-reply', 'noreply', 'notification', 'deployment'] },
+  { cat: 'contract', keywords: ['contract', 'agreement', 'invoice', 'payment', 'purchase order', ' po ', '合同', '付款', '发票', '协议'] },
+  { cat: 'supplier', keywords: ['supplier', 'vendor', 'employee', 'payroll', 'hr@', 'staff'] },
+];
+
+export function categorizeEmail(sender: string, subject: string, customerNames: string[]): EmailCategory {
+  const text = `${sender} ${subject}`.toLowerCase();
+  if (customerNames.some((n) => n.length >= 2 && text.includes(n.toLowerCase()))) return 'customer';
+  for (const rule of CATEGORY_KEYWORD_RULES) {
+    if (rule.keywords.some((k) => text.includes(k))) return rule.cat;
+  }
+  return 'other';
+}

@@ -9,7 +9,10 @@ export default async function handler(request: Request): Promise<Response> {
 
   const url = new URL(request.url);
   const q = url.searchParams.get('q')?.trim();
-  const max = Math.min(Number(url.searchParams.get('max')) || 8, 15);
+  // Ceiling raised 15 -> 60 for the Email Assistant's 30-day scoped list
+  // (Task: summary-first redesign). Default stays 8 — every existing caller
+  // that doesn't pass max= is unaffected.
+  const max = Math.min(Number(url.searchParams.get('max')) || 8, 60);
   if (!q) return json({ ok: false, error: 'Missing q' }, 400);
 
   const auth = await getGoogleAccessToken();
@@ -41,6 +44,7 @@ export default async function handler(request: Request): Promise<Response> {
           date: extractHeader(headers, 'Date'),
           snippet: m.snippet || '',
           link: `https://mail.google.com/mail/u/0/#all/${m.threadId}`,
+          unread: Array.isArray(m.labelIds) && m.labelIds.includes('UNREAD'),
         };
       }),
     );

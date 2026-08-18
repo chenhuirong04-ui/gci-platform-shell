@@ -6,26 +6,30 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { colors } from '@gci/design-system';
-import { searchGmail, getImportantEmails, getGmailThread, type GmailResult, type GmailThreadMessage } from '../lib/googleSearch';
+import { searchGmail, getGmailThread, type GmailResult, type GmailThreadMessage } from '../lib/googleSearch';
 import { getAllCustomerNames } from '../lib/crmSupabase';
-import { sendEmailAssistantChat, resolveCustomerContext, threadMessagesForChat, extractSenderName, type ChatTurn, type DraftShape } from '../lib/emailAssistant';
+import {
+  sendEmailAssistantChat, resolveCustomerContext, threadMessagesForChat, extractSenderName,
+  summarizeEmailThread, categorizeEmail, EMAIL_CATEGORIES,
+  type ChatTurn, type DraftShape, type EmailSummary, type EmailCategory,
+} from '../lib/emailAssistant';
 
 const GOLD = '#CBA85C';
 const RED = '#E0846A';
+const GREEN = '#6FBF8E';
 const MUTED = '#7A8494';
 const SUBTLE = '#5A6A84';
 const TEXT = colors.textPrimary;
 const CARD = 'rgba(255,255,255,0.025)';
 const BORD = 'rgba(255,255,255,0.07)';
 
-type ListFilter = 'recent' | 'important' | 'unread' | 'customer';
-
-const FILTERS: { key: ListFilter; label: string }[] = [
-  { key: 'recent', label: 'Recent' },
-  { key: 'important', label: 'Important' },
-  { key: 'unread', label: 'Unread' },
-  { key: 'customer', label: 'Customer' },
-];
+// Summary-first redesign: scope is fixed to the last 30 days (no long-term
+// archive browsing here — that's what Gmail itself is for), sorted needs-
+// Chris-first by default, filtered by the same six categories Chris
+// already uses. No "Recent/Important/Unread" filter chips anymore — those
+// concepts are now just the default sort + the category tabs.
+const GMAIL_SCOPE_QUERY = 'newer_than:30d in:inbox';
+const GMAIL_SCOPE_MAX = 60;
 
 const QUICK_PROMPTS = [
   { label: '这封邮件什么意思？', text: '这封邮件什么意思？他真正想要什么？' },
@@ -48,7 +52,7 @@ export function EmailAssistant() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const [filter, setFilter] = useState<ListFilter>('recent');
+  const [category, setCategory] = useState<EmailCategory | 'all'>('all');
   const [emails, setEmails] = useState<GmailResult[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [customerNames, setCustomerNames] = useState<string[]>([]);
@@ -57,6 +61,10 @@ export function EmailAssistant() {
   const [threadMessages, setThreadMessages] = useState<GmailThreadMessage[] | null>(null);
   const [threadError, setThreadError] = useState<string | null>(null);
   const [customerContext, setCustomerContext] = useState<{ summary: string | null; customerName: string | null } | null>(null);
+  const [emailSummary, setEmailSummary] = useState<EmailSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [showOriginal, setShowOriginal] = useState(false);
 
   const [chatHistory, setChatHistory] = useState<ChatTurn[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -74,25 +82,25 @@ export function EmailAssistant() {
   useEffect(() => {
     setEmails(null);
     setListError(null);
-    let query: Promise<{ ok: true; results: GmailResult[] } | { ok: false; error: string }>;
-    if (filter === 'important') {
-      query = getImportantEmails();
-    } else if (filter === 'unread') {
-      query = searchGmail('is:unread newer_than:30d');
-    } else {
-      query = searchGmail('newer_than:14d in:inbox');
-    }
-    query.then((res) => {
+    searchGmail(GMAIL_SCOPE_QUERY, GMAIL_SCOPE_MAX).then((res) => {
       if (res.ok) setEmails(res.results);
       else setListError(res.error);
     });
-  }, [filter]);
+  }, []);
 
+  // Default sort: needs-Chris-first (unread as the cheap, explainable proxy
+  // — no bulk AI classification for a 30-day list), then most recent first.
+  // Category tabs filter on top of that same sort, never replace it.
   const displayedEmails = useMemo(() => {
     if (!emails) return [];
-    if (filter !== 'customer') return emails;
-    return emails.filter((m) => customerNames.some((name) => name.length >= 2 && m.sender.toLowerCase().includes(name.toLowerCase())));
-  }, [emails, filter, customerNames]);
+    const filtered = category === 'all'
+      ? emails
+      : emails.filter((m) => categorizeEmail(m.sender, m.subject, customerNames) === category);
+    return [...filtered].sort((a, b) => {
+      if (!!a.unread !== !!b.unread) return a.unread ? -1 : 1;
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+  }, [emails, category, customerNames]);
 
   function isCustomerMatch(sender: string): string | null {
     return customerNames.find((name) => name.length >= 2 && sender.toLowerCase().includes(name.toLowerCase())) || null;
@@ -103,6 +111,9 @@ export function EmailAssistant() {
     setThreadMessages(null);
     setThreadError(null);
     setCustomerContext(null);
+    setEmailSummary(null);
+    setSummaryError(null);
+    setShowOriginal(false);
     // Never carry the previous email's conversation into a new thread.
     setChatHistory([]);
     setChatInput('');
@@ -114,6 +125,14 @@ export function EmailAssistant() {
         setThreadMessages(res.messages);
         const first = res.messages[0];
         if (first) resolveCustomerContext(first.from).then(setCustomerContext);
+
+        // One AI call, once, when the thread opens — never per list row.
+        setSummaryLoading(true);
+        summarizeEmailThread(threadMessagesForChat(res.messages)).then((sres) => {
+          setSummaryLoading(false);
+          if (sres.ok) setEmailSummary(sres.data);
+          else setSummaryError(sres.error);
+        });
       } else {
         setThreadError(res.error);
       }
@@ -130,6 +149,12 @@ export function EmailAssistant() {
         setSelected({ id: first.id, threadId, sender: first.from, subject: first.subject, date: first.date, snippet: first.snippet, link: '' });
         setThreadMessages(res.messages);
         resolveCustomerContext(first.from).then(setCustomerContext);
+        setSummaryLoading(true);
+        summarizeEmailThread(threadMessagesForChat(res.messages)).then((sres) => {
+          setSummaryLoading(false);
+          if (sres.ok) setEmailSummary(sres.data);
+          else setSummaryError(sres.error);
+        });
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -182,19 +207,31 @@ export function EmailAssistant() {
       <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
         {/* ── Left: email list ── */}
         <div style={{ width: 300, flexShrink: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div style={{ fontSize: 10.5, color: SUBTLE, marginBottom: 8 }}>最近 30 天 · 未读优先</div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-            {FILTERS.map((f) => (
+            <button
+              onClick={() => setCategory('all')}
+              style={{
+                padding: '5px 11px', borderRadius: 16, fontSize: 11.5, cursor: 'pointer',
+                background: category === 'all' ? 'rgba(203,168,92,0.16)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${category === 'all' ? 'rgba(203,168,92,0.5)' : BORD}`,
+                color: category === 'all' ? GOLD : MUTED,
+              }}
+            >
+              全部
+            </button>
+            {EMAIL_CATEGORIES.map((c) => (
               <button
-                key={f.key}
-                onClick={() => setFilter(f.key)}
+                key={c.key}
+                onClick={() => setCategory(c.key)}
                 style={{
                   padding: '5px 11px', borderRadius: 16, fontSize: 11.5, cursor: 'pointer',
-                  background: filter === f.key ? 'rgba(203,168,92,0.16)' : 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${filter === f.key ? 'rgba(203,168,92,0.5)' : BORD}`,
-                  color: filter === f.key ? GOLD : MUTED,
+                  background: category === c.key ? 'rgba(203,168,92,0.16)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${category === c.key ? 'rgba(203,168,92,0.5)' : BORD}`,
+                  color: category === c.key ? GOLD : MUTED,
                 }}
               >
-                {f.label}
+                {c.label}
               </button>
             ))}
           </div>
@@ -216,17 +253,21 @@ export function EmailAssistant() {
                     style={{
                       padding: '11px 14px', borderBottom: `1px solid ${BORD}`, cursor: 'pointer',
                       background: active ? 'rgba(203,168,92,0.08)' : 'transparent',
+                      display: 'flex', alignItems: 'flex-start', gap: 8,
                     }}
                   >
-                    <div style={{ fontSize: 12, fontWeight: 700, color: TEXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {extractSenderName(m.sender)}
-                    </div>
-                    <div style={{ fontSize: 12, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
-                      {m.subject || '(无主题)'}
-                    </div>
-                    <div style={{ fontSize: 10.5, color: SUBTLE, marginTop: 4, display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <span>{formatEmailDate(m.date)}</span>
-                      {match && <span style={{ color: GOLD, background: 'rgba(203,168,92,0.12)', borderRadius: 3, padding: '1px 5px' }}>{match}</span>}
+                    {m.unread && <span style={{ width: 6, height: 6, borderRadius: '50%', background: GOLD, marginTop: 5, flexShrink: 0 }} />}
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 12, fontWeight: m.unread ? 700 : 500, color: TEXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {extractSenderName(m.sender)}
+                      </div>
+                      <div style={{ fontSize: 12, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
+                        {m.subject || '(无主题)'}
+                      </div>
+                      <div style={{ fontSize: 10.5, color: SUBTLE, marginTop: 4, display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <span>{formatEmailDate(m.date)}</span>
+                        {match && <span style={{ color: GOLD, background: 'rgba(203,168,92,0.12)', borderRadius: 3, padding: '1px 5px' }}>{match}</span>}
+                      </div>
                     </div>
                   </div>
                 );
@@ -243,31 +284,64 @@ export function EmailAssistant() {
             </div>
           ) : (
             <>
-              {/* Thread detail */}
-              <div style={{ maxHeight: '38%', overflowY: 'auto', border: `1px solid ${BORD}`, borderRadius: 12, background: CARD, padding: '14px 16px', flexShrink: 0 }}>
+              {/* Thread detail — summary first, original text collapsed by default */}
+              <div style={{ maxHeight: '48%', overflowY: 'auto', border: `1px solid ${BORD}`, borderRadius: 12, background: CARD, padding: '14px 16px', flexShrink: 0 }}>
                 {threadError ? (
                   <div style={{ fontSize: 12.5, color: RED }}>读取失败:{threadError}</div>
                 ) : !threadMessages ? (
                   <div style={{ fontSize: 12.5, color: MUTED }}>加载邮件内容…</div>
                 ) : (
-                  threadMessages.map((m, i) => (
-                    <div key={m.id} style={{ marginBottom: i < threadMessages.length - 1 ? 16 : 0, paddingBottom: i < threadMessages.length - 1 ? 14 : 0, borderBottom: i < threadMessages.length - 1 ? `1px solid ${BORD}` : 'none' }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: TEXT, marginBottom: 4 }}>{m.subject || '(无主题)'}</div>
-                      <div style={{ fontSize: 11, color: MUTED, marginBottom: 8 }}>
-                        From: {m.from} · To: {m.to} · {formatEmailDate(m.date)}
-                      </div>
-                      <div style={{ fontSize: 12.5, color: TEXT, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{m.body}</div>
-                      {m.attachments.length > 0 && (
-                        <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                          {m.attachments.map((a, ai) => (
-                            <span key={ai} style={{ fontSize: 10.5, color: MUTED, background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, borderRadius: 5, padding: '3px 8px' }}>
-                              📎 {a.filename}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                  <>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: TEXT, marginBottom: 10 }}>
+                      {threadMessages[0]?.subject || '(无主题)'}
                     </div>
-                  ))
+
+                    {summaryLoading ? (
+                      <div style={{ fontSize: 12, color: MUTED, marginBottom: 12 }}>正在生成摘要…</div>
+                    ) : summaryError ? (
+                      <div style={{ fontSize: 12, color: RED, marginBottom: 12 }}>摘要生成失败:{summaryError}</div>
+                    ) : emailSummary ? (
+                      <div style={{ marginBottom: 14, padding: '11px 13px', background: 'rgba(203,168,92,0.05)', border: '1px solid rgba(203,168,92,0.2)', borderRadius: 9 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+                            background: emailSummary.needsChris ? 'rgba(224,132,106,0.16)' : 'rgba(111,191,142,0.14)',
+                            color: emailSummary.needsChris ? RED : GREEN,
+                          }}>
+                            {emailSummary.needsChris ? '需要处理' : '无需处理'}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 12.5, color: TEXT, lineHeight: 1.6, marginBottom: 6 }}><strong>摘要:</strong>{emailSummary.summary}</div>
+                        <div style={{ fontSize: 12.5, color: MUTED, lineHeight: 1.6, marginBottom: 6 }}><strong style={{ color: TEXT }}>为什么重要:</strong>{emailSummary.why}</div>
+                        <div style={{ fontSize: 12.5, color: MUTED, lineHeight: 1.6 }}><strong style={{ color: TEXT }}>建议下一步:</strong>{emailSummary.nextStep}</div>
+                      </div>
+                    ) : null}
+
+                    <div
+                      onClick={() => setShowOriginal((v) => !v)}
+                      style={{ fontSize: 11.5, color: GOLD, cursor: 'pointer', marginBottom: showOriginal ? 10 : 0, userSelect: 'none' }}
+                    >
+                      {showOriginal ? '− 收起原文' : '+ 查看原文'}
+                    </div>
+
+                    {showOriginal && threadMessages.map((m, i) => (
+                      <div key={m.id} style={{ marginBottom: i < threadMessages.length - 1 ? 16 : 0, paddingBottom: i < threadMessages.length - 1 ? 14 : 0, borderBottom: i < threadMessages.length - 1 ? `1px solid ${BORD}` : 'none', paddingTop: 10, borderTop: `1px solid ${BORD}` }}>
+                        <div style={{ fontSize: 11, color: MUTED, marginBottom: 8 }}>
+                          From: {m.from} · To: {m.to} · {formatEmailDate(m.date)}
+                        </div>
+                        <div style={{ fontSize: 12.5, color: TEXT, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{m.body}</div>
+                        {m.attachments.length > 0 && (
+                          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {m.attachments.map((a, ai) => (
+                              <span key={ai} style={{ fontSize: 10.5, color: MUTED, background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, borderRadius: 5, padding: '3px 8px' }}>
+                                📎 {a.filename}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </>
                 )}
                 {customerContext?.customerName && (
                   <div style={{ marginTop: 10, fontSize: 10.5, color: GOLD }}>✓ 已匹配 CRM 客户:{customerContext.customerName}</div>
