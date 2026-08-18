@@ -559,7 +559,7 @@ export function BusinessAssistant() {
           ← 返回
         </button>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: TEXT, margin: 0, fontFamily: "'Space Grotesk',sans-serif" }}>
-          Business Assistant / 商务助理
+          GIA｜GCI 智能商务助理
         </h1>
       </div>
 

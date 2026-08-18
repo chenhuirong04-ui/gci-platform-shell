@@ -1670,6 +1670,20 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
   );
 }
 
+// Task 17.1 — legacy CRM cleanup: crm_customers/crm_contacts/crm_followups
+// (Supabase, via Business Assistant / GIA) is now the one正式 customer
+// master. This module still reads/writes its own localStorage + Notion
+// sync (ICARE_HISTORY_V1) and is kept reachable for historical records only
+// — never delete anything here, just make the distinction unmissable at
+// the top of every tab. No routing/logic changes below this banner.
+function LegacyCrmBanner() {
+  return (
+    <div style={{ padding: '10px 20px', background: 'rgba(212,168,67,0.08)', borderBottom: '1px solid rgba(212,168,67,0.25)', color: '#D4A843', fontSize: 12.5, fontWeight: 600, textAlign: 'center' }}>
+      历史客户记录 / Legacy — 正式客户请使用 GIA（Business Assistant），本页数据不再是主档
+    </div>
+  );
+}
+
 /* =========================
    Root — Gate + ErrorBoundary，与原 App() 完全一致，
    只是 AppInner 改名 CrmInner 且不再渲染 AppShell。
@@ -1677,6 +1691,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
 export default function CrmModule({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoMode?: boolean } = {}) {
   return (
     <ErrorBoundary>
+      <LegacyCrmBanner />
       <CrmInner initialTab={initialTab} demoMode={demoMode} />
     </ErrorBoundary>
   );

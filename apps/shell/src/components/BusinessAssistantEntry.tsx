@@ -28,7 +28,7 @@ export function BusinessAssistantEntry() {
     <div style={{ marginBottom: 44 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
         <span className="font-mono-label" style={{ fontSize: 10.5, letterSpacing: '0.22em', color: GOLD }}>
-          商务助理 · BUSINESS ASSISTANT
+          GIA · GCI INTELLIGENT ASSISTANT
         </span>
         <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,rgba(203,168,92,0.36),transparent)' }} />
       </div>

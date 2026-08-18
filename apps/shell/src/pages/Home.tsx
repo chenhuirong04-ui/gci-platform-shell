@@ -11,33 +11,17 @@ import { HomeDashboardCharts } from '../components/HomeDashboardCharts';
 import { HomeDailyBrief } from '../components/HomeDailyBrief';
 import { getAllCustomerNames } from '../lib/crmSupabase';
 
-// ─── localStorage helpers (same keys the Trade + CRM modules use) ──────────
+// ─── localStorage helpers (Trade module only — Task 17.1 removed the ────────
+// legacy ICARE_HISTORY_V1 read here: it was computed but never rendered
+// (see statCards below), and crm_customers/Supabase is now the one CRM
+// source of truth for anything actually shown on Home).
 function safeLocalGet<T = any>(key: string): T[] {
   try { return JSON.parse(localStorage.getItem(key) || '[]') || []; }
   catch { return []; }
 }
 
-// ─── Active follow-up filter — mirrors buildDashboardStats exactly ──────────
-// Any change here must also be reflected in dashboardStats.ts FOLLOWUP_EXCLUDED.
-const FOLLOWUP_EXCLUDED = ['暂缓', '已成交', '已归档', '已关闭', '执行中'];
-
-function isActiveFollowup(t: any, today: string): boolean {
-  if (!t?.nextFollowUpAt) return false;
-  if (t.nextFollowUpAt.slice(0, 10) > today) return false;
-  if (t?.status === 'archived' || t?.status === 'deleted' || t?.status === 'completed') return false;
-  if (FOLLOWUP_EXCLUDED.includes(t?.tradeStatus || '')) return false;
-  if (t?.notionSource === 'contact_only') return false;
-  return true;
-}
-
 // ─── Derived counts from real data ─────────────────────────────────────────
 function loadHomeStats() {
-  const today = new Date().toISOString().split('T')[0];
-
-  // CRM: active follow-ups due today (same definition as CRM dashboard + DailyWorkbench)
-  const crmTasks: any[] = safeLocalGet('ICARE_HISTORY_V1');
-  const followUpsToday = crmTasks.filter(t => isActiveFollowup(t, today)).length;
-
   // Trade: non-terminal quotes
   const quotes: any[] = safeLocalGet('quotes');
   const pendingQuotes = quotes.filter(q =>
@@ -51,7 +35,7 @@ function loadHomeStats() {
   ).length;
 
   // Inventory: returned separately via API fetch (see useEffect below)
-  return { followUpsToday, pendingQuotes, activeOrders, inventoryAlerts: null };
+  return { pendingQuotes, activeOrders, inventoryAlerts: null };
 }
 
 // ─── Helper components ──────────────────────────────────────────────────────
@@ -86,11 +70,10 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
   const greetingLine = lang === 'zh' ? `${greeting}，Chris` : `${greeting}, Chris`;
 
   const [stats, setStats] = useState<{
-    followUpsToday: number | null;
     pendingQuotes: number | null;
     activeOrders: number | null;
     inventoryAlerts: number | null;
-  }>({ followUpsToday: null, pendingQuotes: null, activeOrders: null, inventoryAlerts: null });
+  }>({ pendingQuotes: null, activeOrders: null, inventoryAlerts: null });
 
   const [inventoryDrawerOpen, setInventoryDrawerOpen] = useState(false);
   const [crmTotal, setCrmTotal] = useState<number | null>(null);
@@ -122,8 +105,9 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
   const summaryLine = lang === 'zh' ? '以下是今日经营状况总览。' : "Here's today's business overview.";
 
   // Overlay real counts on the statCardSpecs visual configs (报价/订单/库存
-  // only — index 0 "followUpsToday" is dropped here since it duplicates the
-  // KPI row's "今日客户跟进").
+  // only — index 0 of statCardSpecs is the old "followUpsToday" slot,
+  // dropped here since it duplicates the KPI row's "今日客户跟进" (and, as
+  // of Task 17.1, its legacy ICARE_HISTORY_V1 data source is gone entirely).
   const statCards = [
     { ...statCardSpecs[1], val: stats.pendingQuotes  !== null ? String(stats.pendingQuotes)  : '--', mod: dict.workspace.modQuotation },
     { ...statCardSpecs[2], val: stats.activeOrders   !== null ? String(stats.activeOrders)   : '--', mod: dict.workspace.modTrade },
