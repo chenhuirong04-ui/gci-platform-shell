@@ -67,7 +67,7 @@ export async function getTodaysFollowups(): Promise<
   const date = todayISO();
   const { data, error } = await supabase
     .from('crm_customers')
-    .select('id, customer_name, status, priority, owner, next_follow_up_at, next_action, follow_up_notes')
+    .select('*, crm_contacts(contact_name, is_primary)')
     .eq('next_follow_up_at', date)
     .eq('is_active', true)
     .order('customer_name', { ascending: true });
@@ -203,7 +203,7 @@ export async function getOverdueFollowups(): Promise<
   const today = todayISO();
   const { data, error } = await supabase
     .from('crm_customers')
-    .select('id, customer_name, status, priority, owner, next_follow_up_at, next_action, follow_up_notes, last_follow_up_at')
+    .select('*, crm_contacts(contact_name, is_primary)')
     .lt('next_follow_up_at', today)
     .not('next_follow_up_at', 'is', null)
     .eq('is_active', true);
@@ -315,6 +315,25 @@ export async function getBossDecisions(): Promise<
   });
 
   return { ok: true, items: deduped };
+}
+
+// ── Task 17.2: Supabase CRM directory (客户名录 / 已停用客户) — read-only
+// list with the primary contact embedded, for the new CRM page's table.
+export interface CrmCustomerWithContact extends CrmCustomer {
+  crm_contacts?: { contact_name: string | null; is_primary: boolean }[];
+}
+
+export async function getCustomerDirectory(isActive: boolean): Promise<
+  { ok: true; rows: CrmCustomerWithContact[] } | { ok: false; error: string }
+> {
+  const { data, error } = await supabase
+    .from('crm_customers')
+    .select('*, crm_contacts(contact_name, is_primary)')
+    .eq('is_active', isActive)
+    .order('customer_name', { ascending: true })
+    .limit(500);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, rows: (data ?? []) as CrmCustomerWithContact[] };
 }
 
 // ── Task 11.1: Email Chat Assistant — lightweight name list for client-side

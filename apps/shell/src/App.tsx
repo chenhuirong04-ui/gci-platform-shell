@@ -18,6 +18,7 @@ import { Commitments } from './pages/Commitments';
 import { Tasks } from './pages/Tasks';
 import { EmailAssistant } from './pages/EmailAssistant';
 import { BusinessAssistant } from './pages/BusinessAssistant';
+import { CrmCustomers } from './pages/CrmCustomers';
 import TradeModule from '../../../modules/trade/TradeModule';
 import CrmModule from '../../../modules/crm/CrmModule';
 import QuotationModule from '../../../modules/quotation/QuotationModule';
@@ -147,6 +148,14 @@ function Shell() {
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/email-assistant" element={<EmailAssistant />} />
           <Route path="/business-assistant" element={<BusinessAssistant />} />
+          <Route
+            path="/crm-customers"
+            element={
+              <ProtectedRoute module="crm">
+                <CrmCustomers />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/access-denied" element={<AccessDenied />} />
 
           <Route

@@ -57,7 +57,11 @@ export const sections: SectionDef[] = [
       // same underlying Follow-up Log data — collapsed into two. Old ?tab=
       // values still resolve inside CrmModule.tsx for bookmark compatibility.
       { code: 'BO', nameKey: 'businessOverview', path: '/crm?tab=control' },
-      { code: 'CP', nameKey: 'customersAndProjects', count: '5', badgeColor: '#E2C988', badgeBg: 'rgba(203,168,92,0.16)', path: '/crm?tab=project' },
+      // Task 17.2 — repointed from legacy /crm?tab=project (localStorage/
+      // Notion) to the new Supabase-backed CRM page. Legacy Projects/
+      // internal tasks remain reachable via 业务总览 (BO, still /crm) —
+      // this entry is customer-only now, matching what it's actually for.
+      { code: 'CP', nameKey: 'customersAndProjects', path: '/crm-customers' },
     ],
   },
   {
