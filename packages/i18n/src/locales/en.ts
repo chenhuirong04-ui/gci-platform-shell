@@ -28,7 +28,7 @@ export const en = {
     financeLedger: 'Finance Ledger',
     invoiceManager: 'Invoice Manager',
     supplierLibrary: 'Supplier Library',
-    aiAssistant: 'AI Assistant',
+    aiAssistant: 'Legacy AI Tools',
     settings: 'Settings',
   },
   header: {

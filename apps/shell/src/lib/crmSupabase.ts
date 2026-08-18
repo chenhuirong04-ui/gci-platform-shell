@@ -76,6 +76,13 @@ export async function getTodaysFollowups(): Promise<
 }
 
 // ── Action 2: "查一下 X" — exact match first, then contains. No fuzzy matching. ──
+// Task 17.1 decision 1: the exact-name match is deliberately NOT filtered by
+// is_active — this is what lets Chris look up (and restore) an archived
+// customer by name, and what stops Business Capture from creating a
+// duplicate when a name he mentions matches an archived record. The
+// contains-fallback (ambiguous, multi-candidate "did you mean" suggestion
+// list) IS filtered to active-only — that's a passive suggestion surface,
+// not an explicit lookup, so archived customers shouldn't populate it.
 export async function findCustomerByName(query: string): Promise<
   | { ok: true; found: true; customer: CrmCustomer; contacts: CrmContact[]; followups: CrmFollowup[] }
   | { ok: true; found: false; multiple: true; candidates: CrmCustomer[]; query: string }
@@ -99,6 +106,7 @@ export async function findCustomerByName(query: string): Promise<
       .from('crm_customers')
       .select('*')
       .ilike('customer_name', `%${q}%`)
+      .eq('is_active', true)
       .limit(10);
     if (e2) return { ok: false, error: e2.message };
     candidates = (containsData ?? []) as CrmCustomer[];
@@ -234,6 +242,7 @@ export async function getRecentNewCustomers(
     .from('crm_customers')
     .select('id, customer_name, created_at, source, business_type, status')
     .gte('created_at', since.toISOString())
+    .eq('is_active', true)
     .order('created_at', { ascending: false });
   if (error) return { ok: false, error: error.message };
   return { ok: true, rows: (data ?? []) as CrmNewCustomerRow[] };
@@ -257,6 +266,7 @@ export async function getBossDecisions(): Promise<
     supabase
       .from('crm_customers')
       .select('id, customer_name, priority, next_action, next_follow_up_at, last_follow_up_at')
+      .eq('is_active', true)
       .limit(500),
   ]);
   if (!overdueRes.ok) return { ok: false, error: overdueRes.error };

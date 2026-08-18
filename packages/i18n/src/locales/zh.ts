@@ -30,7 +30,7 @@ export const zh: typeof en = {
     financeLedger: '财务账',
     invoiceManager: '发票管理',
     supplierLibrary: '供应商库',
-    aiAssistant: 'AI 助手',
+    aiAssistant: '历史 AI 工具 / Legacy',
     settings: '设置',
   },
   header: {
