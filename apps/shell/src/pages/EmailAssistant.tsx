@@ -181,13 +181,27 @@ export function EmailAssistant() {
         setSummaryLoading(true);
         summarizeEmailThread(threadMessagesForChat(res.messages)).then((sres) => {
           setSummaryLoading(false);
-          if (sres.ok) setEmailSummary(sres.data);
+          if (sres.ok) setEmailSummary(alignNeedsChrisWithTriage(email.id, sres.data));
           else setSummaryError(sres.error);
         });
       } else {
         setThreadError(res.error);
       }
     });
+  }
+
+  // Homepage triage and the detail badge must never disagree about the
+  // same email — if this one was already triaged today, its tier is the
+  // source of truth for the 需要处理/无需处理 badge (must/ignored are
+  // unambiguous; "important" and untriaged emails keep the detail
+  // summarizer's own judgment, since that call sees the full body while
+  // triage only sees a snippet). The richer summary/why/nextStep text
+  // always stays the detail summarizer's own — it has more context.
+  function alignNeedsChrisWithTriage(emailId: string, data: EmailSummary): EmailSummary {
+    const tier = triageMap?.[emailId]?.tier;
+    if (tier === 'must') return { ...data, needsChris: true };
+    if (tier === 'ignored') return { ...data, needsChris: false };
+    return data;
   }
 
   // Deep-link support: /email-assistant?threadId=... from Ask GCI / Gmail results.
@@ -203,7 +217,7 @@ export function EmailAssistant() {
         setSummaryLoading(true);
         summarizeEmailThread(threadMessagesForChat(res.messages)).then((sres) => {
           setSummaryLoading(false);
-          if (sres.ok) setEmailSummary(sres.data);
+          if (sres.ok) setEmailSummary(alignNeedsChrisWithTriage(first.id, sres.data));
           else setSummaryError(sres.error);
         });
       }
