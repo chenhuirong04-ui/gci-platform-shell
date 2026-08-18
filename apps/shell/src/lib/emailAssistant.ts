@@ -165,6 +165,65 @@ const CATEGORY_KEYWORD_RULES: { cat: EmailCategory; keywords: string[] }[] = [
   { cat: 'supplier', keywords: ['supplier', 'vendor', 'employee', 'payroll', 'hr@', 'staff'] },
 ];
 
+// ── Today-only triage — one bulk AI call over today's Dubai-date emails
+// (metadata + snippet only), never the full 30-day list. ────────────────
+export type EmailTier = 'must' | 'important' | 'ignored';
+
+export interface TriageResult {
+  id: string;
+  tier: EmailTier;
+  chineseTitle: string;
+  summary: string;
+  why: string;
+  nextStep: string;
+  importantReason: string;
+}
+
+export interface TriageInputEmail {
+  id: string;
+  sender: string;
+  subject: string;
+  snippet: string;
+  date: string;
+}
+
+export async function triageEmails(
+  emails: TriageInputEmail[],
+): Promise<{ ok: true; results: TriageResult[] } | { ok: false; error: string }> {
+  if (emails.length === 0) return { ok: true, results: [] };
+  try {
+    const res = await fetch(`${base()}/api/email-assistant/triage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emails }),
+    });
+    const text = await res.text();
+    const data = JSON.parse(text);
+    if (!data.ok) return { ok: false, error: data.error || 'triage failed' };
+    return { ok: true, results: data.results as TriageResult[] };
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message ?? e) };
+  }
+}
+
+// Asia/Dubai (UTC+4) calendar-date helpers — same +4h shift-then-slice
+// pattern used across the app (crmSupabase.ts todayISO, businessCapture.ts
+// dubaiToday). Only ever used to bucket by calendar day for display, never
+// for absolute time-difference math.
+export function dubaiDateStr(dateHeader: string): string {
+  const d = new Date(dateHeader);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Date(d.getTime() + 4 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+export function todayDubaiStr(): string {
+  return new Date(Date.now() + 4 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+export function yesterdayDubaiStr(): string {
+  return new Date(Date.now() + 4 * 3600 * 1000 - 86400000).toISOString().slice(0, 10);
+}
+
 export function categorizeEmail(sender: string, subject: string, customerNames: string[]): EmailCategory {
   const text = `${sender} ${subject}`.toLowerCase();
   if (customerNames.some((n) => n.length >= 2 && text.includes(n.toLowerCase()))) return 'customer';

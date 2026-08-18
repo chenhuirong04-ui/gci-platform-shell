@@ -11,7 +11,8 @@ import { getAllCustomerNames } from '../lib/crmSupabase';
 import {
   sendEmailAssistantChat, resolveCustomerContext, threadMessagesForChat, extractSenderName,
   summarizeEmailThread, categorizeEmail, EMAIL_CATEGORIES,
-  type ChatTurn, type DraftShape, type EmailSummary, type EmailCategory,
+  triageEmails, dubaiDateStr, todayDubaiStr, yesterdayDubaiStr,
+  type ChatTurn, type DraftShape, type EmailSummary, type EmailCategory, type TriageResult,
 } from '../lib/emailAssistant';
 
 const GOLD = '#CBA85C';
@@ -57,6 +58,14 @@ export function EmailAssistant() {
   const [listError, setListError] = useState<string | null>(null);
   const [customerNames, setCustomerNames] = useState<string[]>([]);
 
+  // "今天只看今天" — default landing tab is today's 3-tier triage; 昨天/更早
+  // are a deliberate opt-in via this switcher, never crowding the homepage.
+  const [dayTab, setDayTab] = useState<'today' | 'yesterday' | 'earlier'>('today');
+  const [triageMap, setTriageMap] = useState<Record<string, TriageResult> | null>(null);
+  const [triageLoading, setTriageLoading] = useState(false);
+  const [triageError, setTriageError] = useState<string | null>(null);
+  const [showIgnored, setShowIgnored] = useState(false);
+
   const [selected, setSelected] = useState<GmailResult | null>(null);
   const [threadMessages, setThreadMessages] = useState<GmailThreadMessage[] | null>(null);
   const [threadError, setThreadError] = useState<string | null>(null);
@@ -88,19 +97,61 @@ export function EmailAssistant() {
     });
   }, []);
 
-  // Default sort: needs-Chris-first (unread as the cheap, explainable proxy
-  // — no bulk AI classification for a 30-day list), then most recent first.
+  // Bucket by Asia/Dubai calendar day — today's triage is the default
+  // landing view; 昨天/更早 stay one click away instead of crowding it.
+  const buckets = useMemo(() => {
+    const today = todayDubaiStr();
+    const yesterday = yesterdayDubaiStr();
+    const t: GmailResult[] = [], y: GmailResult[] = [], e: GmailResult[] = [];
+    for (const m of emails || []) {
+      const d = dubaiDateStr(m.date);
+      if (d === today) t.push(m);
+      else if (d === yesterday) y.push(m);
+      else e.push(m);
+    }
+    return { today: t, yesterday: y, earlier: e };
+  }, [emails]);
+
+  // One bulk triage call over TODAY's emails only, once, when the list
+  // first loads — never per row, never for yesterday/earlier.
+  useEffect(() => {
+    if (!emails || triageMap || triageLoading) return;
+    if (buckets.today.length === 0) {
+      setTriageMap({});
+      return;
+    }
+    setTriageLoading(true);
+    triageEmails(buckets.today.map((m) => ({ id: m.id, sender: m.sender, subject: m.subject, snippet: m.snippet, date: m.date }))).then((res) => {
+      setTriageLoading(false);
+      if (res.ok) {
+        const map: Record<string, TriageResult> = {};
+        res.results.forEach((r) => { map[r.id] = r; });
+        setTriageMap(map);
+      } else {
+        setTriageError(res.error);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emails]);
+
+  const mustList = buckets.today.filter((m) => triageMap?.[m.id]?.tier === 'must').slice(0, 5);
+  const importantList = buckets.today.filter((m) => triageMap?.[m.id]?.tier === 'important');
+  const ignoredList = buckets.today.filter((m) => triageMap?.[m.id]?.tier === 'ignored');
+
+  // Default sort for the 昨天/更早 flat list views: needs-Chris-first
+  // (unread as the cheap, explainable proxy), then most recent first.
   // Category tabs filter on top of that same sort, never replace it.
+  const dayBucketEmails = dayTab === 'yesterday' ? buckets.yesterday : dayTab === 'earlier' ? buckets.earlier : [];
   const displayedEmails = useMemo(() => {
-    if (!emails) return [];
     const filtered = category === 'all'
-      ? emails
-      : emails.filter((m) => categorizeEmail(m.sender, m.subject, customerNames) === category);
+      ? dayBucketEmails
+      : dayBucketEmails.filter((m) => categorizeEmail(m.sender, m.subject, customerNames) === category);
     return [...filtered].sort((a, b) => {
       if (!!a.unread !== !!b.unread) return a.unread ? -1 : 1;
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
-  }, [emails, category, customerNames]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dayBucketEmails, category, customerNames]);
 
   function isCustomerMatch(sender: string): string | null {
     return customerNames.find((name) => name.length >= 2 && sender.toLowerCase().includes(name.toLowerCase())) || null;
@@ -205,75 +256,183 @@ export function EmailAssistant() {
       </div>
 
       <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
-        {/* ── Left: email list ── */}
-        <div style={{ width: 300, flexShrink: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <div style={{ fontSize: 10.5, color: SUBTLE, marginBottom: 8 }}>最近 30 天 · 未读优先</div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setCategory('all')}
-              style={{
-                padding: '5px 11px', borderRadius: 16, fontSize: 11.5, cursor: 'pointer',
-                background: category === 'all' ? 'rgba(203,168,92,0.16)' : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${category === 'all' ? 'rgba(203,168,92,0.5)' : BORD}`,
-                color: category === 'all' ? GOLD : MUTED,
-              }}
-            >
-              全部
-            </button>
-            {EMAIL_CATEGORIES.map((c) => (
+        {/* ── Left: today's triage, or a date-scoped flat list ── */}
+        <div style={{ width: dayTab === 'today' ? 460 : 300, flexShrink: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            {([['today', '今天'], ['yesterday', '昨天'], ['earlier', '更早']] as const).map(([key, label]) => (
               <button
-                key={c.key}
-                onClick={() => setCategory(c.key)}
+                key={key}
+                onClick={() => setDayTab(key)}
                 style={{
-                  padding: '5px 11px', borderRadius: 16, fontSize: 11.5, cursor: 'pointer',
-                  background: category === c.key ? 'rgba(203,168,92,0.16)' : 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${category === c.key ? 'rgba(203,168,92,0.5)' : BORD}`,
-                  color: category === c.key ? GOLD : MUTED,
+                  padding: '6px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontWeight: dayTab === key ? 700 : 400,
+                  background: dayTab === key ? `linear-gradient(135deg,${GOLD},#E2C988)` : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${dayTab === key ? 'transparent' : BORD}`,
+                  color: dayTab === key ? '#080D1E' : MUTED,
                 }}
               >
-                {c.label}
+                {label}
               </button>
             ))}
           </div>
-          <div style={{ flex: 1, overflowY: 'auto', border: `1px solid ${BORD}`, borderRadius: 12, background: CARD }}>
-            {listError ? (
-              <div style={{ padding: 16, fontSize: 12.5, color: RED }}>读取失败:{listError}</div>
-            ) : !emails ? (
-              <div style={{ padding: 16, fontSize: 12.5, color: MUTED }}>加载中…</div>
-            ) : displayedEmails.length === 0 ? (
-              <div style={{ padding: 16, fontSize: 12.5, color: MUTED }}>暂无邮件</div>
-            ) : (
-              displayedEmails.map((m) => {
-                const match = isCustomerMatch(m.sender);
-                const active = selected?.threadId === m.threadId;
-                return (
-                  <div
-                    key={m.id}
-                    onClick={() => openThread(m)}
+
+          {listError && <div style={{ padding: 16, fontSize: 12.5, color: RED }}>读取失败:{listError}</div>}
+
+          {!listError && dayTab === 'today' && (
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {!emails ? (
+                <div style={{ padding: 16, fontSize: 12.5, color: MUTED }}>加载中…</div>
+              ) : (
+                <>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: GOLD, marginBottom: 8, letterSpacing: '0.04em' }}>
+                      今日必须处理{mustList.length > 0 ? ` · ${mustList.length}` : ''}
+                    </div>
+                    {triageLoading ? (
+                      <div style={{ fontSize: 12, color: MUTED, padding: '10px 0' }}>正在分析今天的邮件…</div>
+                    ) : triageError ? (
+                      <div style={{ fontSize: 12, color: RED, padding: '10px 0' }}>分析失败:{triageError}</div>
+                    ) : mustList.length === 0 ? (
+                      <div style={{ fontSize: 12, color: MUTED, padding: '10px 0' }}>今天没有必须处理的邮件。</div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {mustList.map((m) => {
+                          const t = triageMap?.[m.id];
+                          const active = selected?.threadId === m.threadId;
+                          return (
+                            <div
+                              key={m.id}
+                              onClick={() => openThread(m)}
+                              style={{ padding: '12px 14px', borderRadius: 10, cursor: 'pointer', background: active ? 'rgba(203,168,92,0.1)' : CARD, border: `1px solid ${active ? 'rgba(203,168,92,0.4)' : BORD}` }}
+                            >
+                              <div style={{ fontSize: 13, fontWeight: 700, color: TEXT, marginBottom: 5 }}>{t?.chineseTitle || m.subject || '(无主题)'}</div>
+                              <div style={{ fontSize: 12, color: TEXT, lineHeight: 1.6, marginBottom: 3 }}>{t?.summary}</div>
+                              <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.6, marginBottom: 3 }}><span style={{ color: SUBTLE }}>为什么重要:</span>{t?.why}</div>
+                              <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.6, marginBottom: 6 }}><span style={{ color: SUBTLE }}>建议下一步:</span>{t?.nextStep}</div>
+                              <div style={{ fontSize: 10.5, color: SUBTLE }}>{extractSenderName(m.sender)} · {formatEmailDate(m.date)}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, marginBottom: 8, letterSpacing: '0.04em' }}>
+                      今日重要{importantList.length > 0 ? ` · ${importantList.length}` : ''}
+                    </div>
+                    {importantList.length === 0 && !triageLoading ? (
+                      <div style={{ fontSize: 12, color: MUTED, padding: '4px 0' }}>暂无。</div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {importantList.map((m) => {
+                          const t = triageMap?.[m.id];
+                          const active = selected?.threadId === m.threadId;
+                          return (
+                            <div
+                              key={m.id}
+                              onClick={() => openThread(m)}
+                              style={{ padding: '9px 12px', borderRadius: 9, cursor: 'pointer', background: active ? 'rgba(203,168,92,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${BORD}` }}
+                            >
+                              <div style={{ fontSize: 12, fontWeight: 600, color: TEXT }}>{extractSenderName(m.sender)} · {m.subject || '(无主题)'}</div>
+                              {t?.importantReason && <div style={{ fontSize: 11, color: MUTED, marginTop: 3 }}>{t.importantReason}</div>}
+                              <div style={{ fontSize: 10, color: SUBTLE, marginTop: 3 }}>{formatEmailDate(m.date)}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div
+                      onClick={() => setShowIgnored((v) => !v)}
+                      style={{ fontSize: 11.5, color: SUBTLE, cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      已自动忽略 · {ignoredList.length} 封 {ignoredList.length > 0 ? (showIgnored ? '（收起）' : '（展开查看）') : ''}
+                    </div>
+                    {showIgnored && ignoredList.length > 0 && (
+                      <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {ignoredList.map((m) => (
+                          <div key={m.id} onClick={() => openThread(m)} style={{ fontSize: 11, color: SUBTLE, cursor: 'pointer', padding: '4px 0' }}>
+                            {extractSenderName(m.sender)} · {m.subject || '(无主题)'} · {formatEmailDate(m.date)}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {!listError && dayTab !== 'today' && (
+            <>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => setCategory('all')}
+                  style={{
+                    padding: '5px 11px', borderRadius: 16, fontSize: 11.5, cursor: 'pointer',
+                    background: category === 'all' ? 'rgba(203,168,92,0.16)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${category === 'all' ? 'rgba(203,168,92,0.5)' : BORD}`,
+                    color: category === 'all' ? GOLD : MUTED,
+                  }}
+                >
+                  全部
+                </button>
+                {EMAIL_CATEGORIES.map((c) => (
+                  <button
+                    key={c.key}
+                    onClick={() => setCategory(c.key)}
                     style={{
-                      padding: '11px 14px', borderBottom: `1px solid ${BORD}`, cursor: 'pointer',
-                      background: active ? 'rgba(203,168,92,0.08)' : 'transparent',
-                      display: 'flex', alignItems: 'flex-start', gap: 8,
+                      padding: '5px 11px', borderRadius: 16, fontSize: 11.5, cursor: 'pointer',
+                      background: category === c.key ? 'rgba(203,168,92,0.16)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${category === c.key ? 'rgba(203,168,92,0.5)' : BORD}`,
+                      color: category === c.key ? GOLD : MUTED,
                     }}
                   >
-                    {m.unread && <span style={{ width: 6, height: 6, borderRadius: '50%', background: GOLD, marginTop: 5, flexShrink: 0 }} />}
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: 12, fontWeight: m.unread ? 700 : 500, color: TEXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {extractSenderName(m.sender)}
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto', border: `1px solid ${BORD}`, borderRadius: 12, background: CARD }}>
+                {!emails ? (
+                  <div style={{ padding: 16, fontSize: 12.5, color: MUTED }}>加载中…</div>
+                ) : displayedEmails.length === 0 ? (
+                  <div style={{ padding: 16, fontSize: 12.5, color: MUTED }}>{dayTab === 'yesterday' ? '昨天没有邮件。' : '没有更早的邮件（最近 30 天内）。'}</div>
+                ) : (
+                  displayedEmails.map((m) => {
+                    const match = isCustomerMatch(m.sender);
+                    const active = selected?.threadId === m.threadId;
+                    return (
+                      <div
+                        key={m.id}
+                        onClick={() => openThread(m)}
+                        style={{
+                          padding: '11px 14px', borderBottom: `1px solid ${BORD}`, cursor: 'pointer',
+                          background: active ? 'rgba(203,168,92,0.08)' : 'transparent',
+                          display: 'flex', alignItems: 'flex-start', gap: 8,
+                        }}
+                      >
+                        {m.unread && <span style={{ width: 6, height: 6, borderRadius: '50%', background: GOLD, marginTop: 5, flexShrink: 0 }} />}
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: 12, fontWeight: m.unread ? 700 : 500, color: TEXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {extractSenderName(m.sender)}
+                          </div>
+                          <div style={{ fontSize: 12, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
+                            {m.subject || '(无主题)'}
+                          </div>
+                          <div style={{ fontSize: 10.5, color: SUBTLE, marginTop: 4, display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <span>{formatEmailDate(m.date)}</span>
+                            {match && <span style={{ color: GOLD, background: 'rgba(203,168,92,0.12)', borderRadius: 3, padding: '1px 5px' }}>{match}</span>}
+                          </div>
+                        </div>
                       </div>
-                      <div style={{ fontSize: 12, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
-                        {m.subject || '(无主题)'}
-                      </div>
-                      <div style={{ fontSize: 10.5, color: SUBTLE, marginTop: 4, display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <span>{formatEmailDate(m.date)}</span>
-                        {match && <span style={{ color: GOLD, background: 'rgba(203,168,92,0.12)', borderRadius: 3, padding: '1px 5px' }}>{match}</span>}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* ── Right: thread + chat ── */}
