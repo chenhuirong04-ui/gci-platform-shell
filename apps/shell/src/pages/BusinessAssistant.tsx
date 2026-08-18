@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { colors } from '@gci/design-system';
-import { createCustomerWithContact } from '../lib/crmSupabase';
+import { createCustomerWithContact, setCustomerActive } from '../lib/crmSupabase';
 import {
   resolveBusinessContext, buildBusinessSummaryFacts, buildContextSummaryForAI,
   type BusinessContext,
@@ -85,6 +85,13 @@ export function BusinessAssistant() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createBusy, setCreateBusy] = useState(false);
   const [createErr, setCreateErr] = useState<string | null>(null);
+
+  // CRM Customer Archive — soft deactivate/restore, confirm-gated like
+  // every other write on this page. Never deletes anything.
+  const [showArchiveForm, setShowArchiveForm] = useState(false);
+  const [archiveReason, setArchiveReason] = useState('');
+  const [archiveBusy, setArchiveBusy] = useState(false);
+  const [archiveErr, setArchiveErr] = useState<string | null>(null);
 
   // Task 16 — Chat-First Business Capture: works with or without a resolved
   // customer context. pendingCapture holds one or more items from a single
@@ -387,6 +394,34 @@ export function BusinessAssistant() {
     }
   }
 
+  async function handleArchiveCustomer() {
+    if (!ctx?.customer) return;
+    setArchiveBusy(true);
+    setArchiveErr(null);
+    const res = await setCustomerActive(ctx.customer.id, false, archiveReason.trim() || undefined);
+    setArchiveBusy(false);
+    if (res.ok) {
+      setCtx((prev) => (prev ? { ...prev, customer: res.customer } : prev));
+      setShowArchiveForm(false);
+      setArchiveReason('');
+    } else {
+      setArchiveErr(res.error);
+    }
+  }
+
+  async function handleRestoreCustomer() {
+    if (!ctx?.customer) return;
+    setArchiveBusy(true);
+    setArchiveErr(null);
+    const res = await setCustomerActive(ctx.customer.id, true);
+    setArchiveBusy(false);
+    if (res.ok) {
+      setCtx((prev) => (prev ? { ...prev, customer: res.customer } : prev));
+    } else {
+      setArchiveErr(res.error);
+    }
+  }
+
   const facts = ctx ? buildBusinessSummaryFacts(ctx) : null;
 
   return (
@@ -557,6 +592,21 @@ export function BusinessAssistant() {
               )}
             </div>
 
+            {ctx.customer && !ctx.customer.is_active && (
+              <div style={{ padding: '12px 16px', background: 'rgba(224,132,106,0.06)', border: `1px solid ${RED}40`, borderRadius: 12, marginBottom: 14 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: RED, marginBottom: 4 }}>此客户已停用</div>
+                <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 8 }}>
+                  {ctx.customer.archived_at ? `停用于 ${formatDate(ctx.customer.archived_at)}` : ''}
+                  {ctx.customer.archive_reason ? ` · ${ctx.customer.archive_reason}` : ''}
+                  ——历史跟进/报价/承诺记录均未删除，随时可恢复。
+                </div>
+                {archiveErr && <div style={{ fontSize: 11.5, color: RED, marginBottom: 6 }}>{archiveErr}</div>}
+                <button disabled={archiveBusy} onClick={handleRestoreCustomer} style={{ padding: '6px 14px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer', background: 'rgba(111,191,142,0.14)', border: '1px solid rgba(111,191,142,0.4)', color: GREEN }}>
+                  {archiveBusy ? '恢复中…' : '恢复客户'}
+                </button>
+              </div>
+            )}
+
             {ctx.customer && (
               <div style={{ padding: '14px 16px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, marginBottom: 14 }}>
                 <SectionLabel>CRM</SectionLabel>
@@ -565,6 +615,31 @@ export function BusinessAssistant() {
                   {ctx.customer.next_action && <>下一步:{ctx.customer.next_action}<br /></>}
                   {ctx.contacts.length > 0 && <>联系人:{ctx.contacts.map((c) => c.contact_name).filter(Boolean).join('、')}</>}
                 </div>
+                {ctx.customer.is_active && (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${BORD}` }}>
+                    {!showArchiveForm ? (
+                      <span onClick={() => setShowArchiveForm(true)} style={{ fontSize: 11, color: MUTED, cursor: 'pointer' }}>
+                        停用客户…
+                      </span>
+                    ) : (
+                      <div>
+                        <input
+                          value={archiveReason}
+                          onChange={(e) => setArchiveReason(e.target.value)}
+                          placeholder="停用原因（可选）"
+                          style={{ width: '100%', padding: '6px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: TEXT, fontSize: 11.5, marginBottom: 6, boxSizing: 'border-box' }}
+                        />
+                        {archiveErr && <div style={{ fontSize: 11.5, color: RED, marginBottom: 6 }}>{archiveErr}</div>}
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button disabled={archiveBusy} onClick={handleArchiveCustomer} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(224,132,106,0.12)', border: `1px solid ${RED}40`, color: RED }}>
+                            {archiveBusy ? '停用中…' : '确认停用'}
+                          </button>
+                          <button onClick={() => { setShowArchiveForm(false); setArchiveReason(''); }} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>取消</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

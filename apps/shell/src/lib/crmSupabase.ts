@@ -19,6 +19,12 @@ export interface CrmCustomer {
   next_follow_up_at: string | null;
   follow_up_notes: string | null;
   next_action: string | null;
+  // CRM Customer Archive — soft-deactivate only, never a physical delete.
+  // Defaults to true for every existing/new row; archiving never touches
+  // crm_contacts/crm_followups/quotations/commitments history.
+  is_active: boolean;
+  archived_at: string | null;
+  archive_reason: string | null;
   [key: string]: any;
 }
 
@@ -63,6 +69,7 @@ export async function getTodaysFollowups(): Promise<
     .from('crm_customers')
     .select('id, customer_name, status, priority, owner, next_follow_up_at, next_action, follow_up_notes')
     .eq('next_follow_up_at', date)
+    .eq('is_active', true)
     .order('customer_name', { ascending: true });
   if (error) return { ok: false, error: error.message };
   return { ok: true, date, rows: (data ?? []) as CrmCustomer[] };
@@ -190,7 +197,8 @@ export async function getOverdueFollowups(): Promise<
     .from('crm_customers')
     .select('id, customer_name, status, priority, owner, next_follow_up_at, next_action, follow_up_notes, last_follow_up_at')
     .lt('next_follow_up_at', today)
-    .not('next_follow_up_at', 'is', null);
+    .not('next_follow_up_at', 'is', null)
+    .eq('is_active', true);
   if (error) return { ok: false, error: error.message };
 
   const todayMs = new Date(today).getTime();
@@ -305,7 +313,7 @@ export async function getBossDecisions(): Promise<
 export async function getAllCustomerNames(): Promise<
   { ok: true; rows: { id: string; customer_name: string }[] } | { ok: false; error: string }
 > {
-  const { data, error } = await supabase.from('crm_customers').select('id, customer_name').limit(1000);
+  const { data, error } = await supabase.from('crm_customers').select('id, customer_name').eq('is_active', true).limit(1000);
   if (error) return { ok: false, error: error.message };
   return { ok: true, rows: (data ?? []) as { id: string; customer_name: string }[] };
 }
@@ -323,7 +331,7 @@ export interface BusinessLineCount {
 export async function getBusinessLineBreakdown(): Promise<
   { ok: true; total: number; lines: BusinessLineCount[]; unknown: number } | { ok: false; error: string }
 > {
-  const { data, error } = await supabase.from('crm_customers').select('business_type').limit(2000);
+  const { data, error } = await supabase.from('crm_customers').select('business_type').eq('is_active', true).limit(2000);
   if (error) return { ok: false, error: error.message };
   const counts = new Map<string, number>(BUSINESS_LINES.map((l) => [l, 0]));
   let unknown = 0;
@@ -411,4 +419,29 @@ export async function createCustomerWithContact(input: {
   if (ctErr) return { ok: false, error: `Customer created but contact failed: ${ctErr.message}` };
 
   return { ok: true, customer: customer as CrmCustomer, contact: contact as CrmContact };
+}
+
+// ── CRM Customer Archive — soft deactivate/restore only. Never deletes the
+// customer row, never touches crm_contacts/crm_followups or any
+// quotation/commitment/decision history — those stay exactly as they are,
+// and reactivating (is_active back to true) restores full visibility with
+// nothing to "recover" because nothing was ever removed. Only ever called
+// after Chris's explicit confirm click. ─────────────────────────────────
+export async function setCustomerActive(
+  customerId: string,
+  isActive: boolean,
+  reason?: string,
+): Promise<{ ok: true; customer: CrmCustomer } | { ok: false; error: string }> {
+  const { data, error } = await supabase
+    .from('crm_customers')
+    .update({
+      is_active: isActive,
+      archived_at: isActive ? null : new Date().toISOString(),
+      archive_reason: isActive ? null : (reason || null),
+    })
+    .eq('id', customerId)
+    .select()
+    .single();
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, customer: data as CrmCustomer };
 }
