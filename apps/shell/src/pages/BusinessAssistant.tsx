@@ -22,6 +22,12 @@ import {
   matchTaskLifecycleCommand, findOpenTasksByKeyword, completeOrCancelTask,
   type ResolvedCaptureItem,
 } from '../lib/businessCapture';
+import {
+  classifyFileDescription, uploadFileToDrive, registerFile, findCurrentRegistryEntry,
+  searchFileRegistryByQuery, searchDriveFallback, looksLikeFileSeek,
+  DEFAULT_TARGET_FOLDER_ID, DEFAULT_TARGET_FOLDER_NAME,
+  type FileClassification, type GiaFileRegistryRow,
+} from '../lib/giaFiles';
 import type { ExecutiveTask } from '../lib/executiveTasks';
 import type { CrmCustomer } from '../lib/crmSupabase';
 
@@ -103,6 +109,20 @@ export function BusinessAssistant() {
   const [captureDone, setCaptureDone] = useState<Set<number>>(new Set());
   const [pendingTaskLifecycle, setPendingTaskLifecycle] = useState<{ action: 'completed' | 'cancelled'; matches: ExecutiveTask[] } | null>(null);
 
+  // Task 17 — GIA File Inbox: chat-first upload + registry search. Works
+  // with or without a resolved customer, same as Business Capture.
+  const [showUploadPanel, setShowUploadPanel] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadDescription, setUploadDescription] = useState('');
+  const [uploadClassification, setUploadClassification] = useState<FileClassification | null>(null);
+  const [uploadIsCurrent, setUploadIsCurrent] = useState(true);
+  const [uploadVersionConflict, setUploadVersionConflict] = useState<GiaFileRegistryRow | null>(null);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [uploadErr, setUploadErr] = useState<string | null>(null);
+  const [uploadResult, setUploadResult] = useState<{ webViewLink: string; displayName: string } | null>(null);
+  const [fileSearchReply, setFileSearchReply] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const didAutoResolve = useRef(false);
 
@@ -121,6 +141,7 @@ export function BusinessAssistant() {
     setCaptureError(null);
     setCaptureDone(new Set());
     setPendingTaskLifecycle(null);
+    setFileSearchReply(null);
   }
 
   // Task 16 §18 — "肯尼亚保姆这个事情完成了。" Checked before capture
@@ -133,6 +154,96 @@ export function BusinessAssistant() {
     if (!res.ok || res.matches.length === 0) return false;
     setPendingTaskLifecycle({ action: m.action, matches: res.matches });
     return true;
+  }
+
+  // Task 17 §6 — "找Highway最新营业执照" / "客户要产品目录" / "找MAG的方案" /
+  // "Ray上次报价在哪里". Rule-based only (no AI call), and only "consumed"
+  // when a search actually returns a hit — an accidental keyword match on
+  // unrelated chat (e.g. bare "要") is harmless and falls through untouched
+  // to normal capture/AI handling, so this can never regress existing
+  // behavior on an empty or non-matching registry.
+  async function tryFileSearch(text: string): Promise<string | null> {
+    if (!looksLikeFileSeek(text)) return null;
+    const registryHits = await searchFileRegistryByQuery(text);
+    if (registryHits.length > 0) {
+      const lines = registryHits.slice(0, 5).map((h) => `${h.is_current ? '✓ 当前版本' : '（旧版本）'} ${h.display_name} — ${h.drive_url}`);
+      return `在 GIA 文件库中找到：\n${lines.join('\n')}`;
+    }
+    const driveHits = await searchDriveFallback(text);
+    if (driveHits.length > 0) {
+      const lines = driveHits.slice(0, 5).map((h) => `${h.name} — ${h.webViewLink}`);
+      return `GIA 文件库中暂未登记，但在 Drive 中找到：\n${lines.join('\n')}`;
+    }
+    return null;
+  }
+
+  function handlePickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    setUploadFile(e.target.files?.[0] ?? null);
+    setUploadClassification(null);
+    setUploadResult(null);
+    setUploadErr(null);
+    setUploadVersionConflict(null);
+  }
+
+  function handleClassifyUpload() {
+    if (!uploadFile) return;
+    setUploadClassification(classifyFileDescription(uploadDescription, uploadFile.name));
+    setUploadVersionConflict(null);
+    setUploadErr(null);
+  }
+
+  // Version rule (Task 17 §7): if this is stated as the latest version and
+  // the registry already has a same-type/company current file, confirm
+  // first — first click only surfaces the conflict, second click (conflict
+  // already shown) proceeds to actually replace it. The old file is never
+  // deleted, only flipped to is_current=false.
+  async function handleConfirmUpload() {
+    if (!uploadFile || !uploadClassification) return;
+    setUploadErr(null);
+
+    if (uploadIsCurrent && !uploadVersionConflict) {
+      setUploadBusy(true);
+      const existing = await findCurrentRegistryEntry(uploadClassification.documentType, uploadClassification.companyName);
+      setUploadBusy(false);
+      if (existing) {
+        setUploadVersionConflict(existing);
+        return;
+      }
+    }
+
+    setUploadBusy(true);
+    const up = await uploadFileToDrive(uploadFile, DEFAULT_TARGET_FOLDER_ID, uploadFile.name);
+    if (!up.ok) {
+      setUploadErr(up.error);
+      setUploadBusy(false);
+      return;
+    }
+
+    const reg = await registerFile({
+      fileName: uploadFile.name,
+      displayName: uploadClassification.displayName,
+      documentType: uploadClassification.documentType,
+      businessArea: uploadClassification.businessArea,
+      companyName: uploadClassification.companyName,
+      customerId: ctx?.customer?.id ?? null,
+      driveFileId: up.fileId,
+      driveUrl: up.webViewLink,
+      driveFolder: DEFAULT_TARGET_FOLDER_NAME,
+      isCurrent: uploadIsCurrent,
+      tags: uploadClassification.tags,
+    });
+    setUploadBusy(false);
+    if (!reg.ok) {
+      setUploadErr(reg.error);
+      return;
+    }
+
+    setUploadResult({ webViewLink: up.webViewLink, displayName: uploadClassification.displayName });
+    setUploadFile(null);
+    setUploadDescription('');
+    setUploadClassification(null);
+    setUploadVersionConflict(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   async function handleConfirmTaskLifecycle(taskId: string) {
@@ -267,8 +378,14 @@ export function BusinessAssistant() {
   async function handleTopSubmit(text: string) {
     const t = text.trim();
     if (!t) return;
+    setFileSearchReply(null);
     if (BARE_NAME_RE.test(t)) {
       resolve(t);
+      return;
+    }
+    const searchReply = await tryFileSearch(t);
+    if (searchReply) {
+      setFileSearchReply(searchReply);
       return;
     }
     const consumed = await tryBusinessCapture(t, ctx?.customer ?? null);
@@ -310,6 +427,14 @@ export function BusinessAssistant() {
         setPendingReminder(reminderDraft);
         return;
       }
+    }
+
+    // Task 17 — same file-search check as the top input, so it also works
+    // mid-conversation ("找一下他的报价单在哪里" while a customer is loaded).
+    const searchReply = await tryFileSearch(question);
+    if (searchReply) {
+      setChatHistory((prev) => [...prev, { role: 'user', content: question }, { role: 'assistant', content: searchReply }]);
+      return;
     }
 
     // Task 16 — continuous-chat capture: "刚跟他聊了，周四再联系" / "我答应明天给他方案"
@@ -453,7 +578,75 @@ export function BusinessAssistant() {
         >
           {captureLoading ? '理解中…' : '发送'}
         </button>
+        <button
+          onClick={() => setShowUploadPanel((v) => !v)}
+          style={{ padding: '12px 16px', borderRadius: 10, background: showUploadPanel ? 'rgba(203,168,92,0.14)' : 'rgba(255,255,255,0.05)', border: `1px solid ${showUploadPanel ? 'rgba(203,168,92,0.4)' : 'rgba(255,255,255,0.12)'}`, color: showUploadPanel ? GOLD : MUTED, fontSize: 13, cursor: 'pointer' }}
+        >
+          📎 文件
+        </button>
       </div>
+
+      {showUploadPanel && (
+        <div style={{ padding: '16px 20px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, marginBottom: 20 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: GOLD, marginBottom: 10 }}>GIA 文件收纳 · 上传并登记</div>
+          <input ref={fileInputRef} type="file" onChange={handlePickFile} style={{ marginBottom: 10, fontSize: 12.5, color: MUTED, display: 'block' }} />
+          <input
+            value={uploadDescription}
+            onChange={(e) => setUploadDescription(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && uploadFile) handleClassifyUpload(); }}
+            placeholder="这是什么文件？例如：Highway 营业执照 / GCI 产品目录 最新版"
+            style={{ width: '100%', padding: '9px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: TEXT, fontSize: 13, marginBottom: 10, boxSizing: 'border-box' }}
+          />
+          <button disabled={!uploadFile} onClick={handleClassifyUpload} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 12, cursor: uploadFile ? 'pointer' : 'not-allowed', background: 'rgba(203,168,92,0.14)', border: '1px solid rgba(203,168,92,0.4)', color: GOLD, opacity: uploadFile ? 1 : 0.5 }}>
+            识别
+          </button>
+
+          {uploadClassification && (
+            <div style={{ marginTop: 14, padding: '12px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: 9, border: `1px solid ${BORD}` }}>
+              <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 4 }}>文件名:<span style={{ color: TEXT }}> {uploadFile?.name}</span></div>
+              <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 4 }}>类型:<span style={{ color: TEXT }}> {uploadClassification.documentTypeLabel}</span></div>
+              <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 4 }}>公司:<span style={{ color: TEXT }}> {uploadClassification.companyName || '未识别'}</span></div>
+              <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 4 }}>业务:<span style={{ color: TEXT }}> {uploadClassification.businessArea || '未分类'}</span></div>
+              <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 4 }}>目标目录:<span style={{ color: TEXT }}> GCI_MASTER_LIBRARY / {DEFAULT_TARGET_FOLDER_NAME}</span></div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: MUTED, marginTop: 6, cursor: 'pointer' }}>
+                <input type="checkbox" checked={uploadIsCurrent} onChange={(e) => { setUploadIsCurrent(e.target.checked); setUploadVersionConflict(null); }} />
+                设为该类型/公司的最新版本
+              </label>
+
+              {uploadVersionConflict && (
+                <div style={{ marginTop: 10, padding: '8px 10px', background: 'rgba(212,168,67,0.08)', borderRadius: 7 }}>
+                  <div style={{ fontSize: 11.5, color: AMBER }}>
+                    已存在当前版本「{uploadVersionConflict.display_name}」，确认后将替换为最新（旧文件不会被删除，仍可在 Drive 中打开）。
+                  </div>
+                </div>
+              )}
+
+              {uploadErr && <div style={{ fontSize: 11.5, color: RED, marginTop: 8 }}>{uploadErr}</div>}
+
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <button disabled={uploadBusy} onClick={handleConfirmUpload} style={{ padding: '6px 14px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer', background: 'rgba(111,191,142,0.14)', border: '1px solid rgba(111,191,142,0.4)', color: GREEN }}>
+                  {uploadBusy ? '处理中…' : uploadVersionConflict ? '确认替换并上传' : '确认上传并登记'}
+                </button>
+                <button onClick={() => { setUploadClassification(null); setUploadVersionConflict(null); }} style={{ padding: '6px 14px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>取消</button>
+              </div>
+            </div>
+          )}
+
+          {uploadResult && (
+            <div style={{ marginTop: 10, fontSize: 12, color: GREEN }}>
+              ✓ 已上传并登记:{uploadResult.displayName} — <a href={uploadResult.webViewLink} target="_blank" rel="noreferrer" style={{ color: GOLD }}>在 Drive 中打开</a>
+            </div>
+          )}
+        </div>
+      )}
+
+      {fileSearchReply && (
+        <div style={{ padding: '16px 20px', background: 'rgba(203,168,92,0.05)', border: '1px solid rgba(203,168,92,0.25)', borderRadius: 12, marginBottom: 20 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: GOLD, marginBottom: 8 }}>GIA 文件查找结果</div>
+          <div style={{ fontSize: 12.5, color: TEXT, whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{fileSearchReply}</div>
+          <button onClick={() => setFileSearchReply(null)} style={{ marginTop: 10, padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>关闭</button>
+        </div>
+      )}
 
       {captureLoading && <div style={{ fontSize: 13, color: MUTED, marginBottom: 16 }}>正在理解…</div>}
       {captureError && <div style={{ fontSize: 13, color: RED, marginBottom: 16 }}>{captureError}</div>}

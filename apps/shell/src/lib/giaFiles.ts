@@ -1,0 +1,201 @@
+// GCI Executive Desk — Task 17: GIA File Inbox & Smart Library.
+// Metadata-only registry over files GIA itself uploads to Drive via the
+// drive.file-scoped write endpoints. No full-text analysis by default —
+// classification is rule-based off Chris's own description + filename.
+import { supabase } from './supabase';
+
+export interface GiaFileRegistryRow {
+  id: string;
+  file_name: string;
+  display_name: string;
+  document_type: string;
+  business_area: string | null;
+  company_name: string | null;
+  customer_id: string | null;
+  drive_file_id: string;
+  drive_url: string;
+  drive_folder: string | null;
+  is_current: boolean;
+  tags: string[] | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Confirmed via the Task 17 Phase A live audit — existing GCI_MASTER_LIBRARY
+// / 00_Inbox_To_Sort. No large-scale reorg of old files this round; every
+// GIA upload lands here until a later step defines finer routing.
+export const DEFAULT_TARGET_FOLDER_ID = '1wbJGE0M9SWWXL6flS5pQtNZzbxKwJbxm';
+export const DEFAULT_TARGET_FOLDER_NAME = '00_Inbox_To_Sort';
+
+const DOC_TYPE_RULES: { type: string; label: string; keywords: string[] }[] = [
+  { type: 'license', label: '营业执照', keywords: ['营业执照', '执照', 'license', 'trade license'] },
+  { type: 'vat_trn', label: 'VAT/TRN 税务登记', keywords: ['vat', 'trn', '税务登记', '增值税'] },
+  { type: 'company_profile', label: '公司简介', keywords: ['公司简介', 'company profile'] },
+  { type: 'catalog', label: '产品目录', keywords: ['产品目录', '目录', 'catalog', 'catalogue'] },
+  { type: 'contract_template', label: '合同模板', keywords: ['合同模板', 'contract template'] },
+  { type: 'quote_template', label: '报价模板', keywords: ['报价模板', 'quote template', 'quotation template'] },
+  { type: 'agreement', label: '服务/佣金协议', keywords: ['服务协议', '佣金协议', 'agreement', 'commission agreement'] },
+  { type: 'brand_asset', label: 'Logo/抬头纸', keywords: ['logo', 'letterhead', '抬头纸'] },
+  { type: 'bank_details', label: '银行资料', keywords: ['银行资料', '银行账户', 'bank details', 'bank account'] },
+  { type: 'quotation', label: '报价单', keywords: ['报价单', '报价', 'quotation', 'quote'] },
+  { type: 'proposal', label: '方案', keywords: ['方案', 'proposal'] },
+];
+
+export interface FileClassification {
+  documentType: string;
+  documentTypeLabel: string;
+  companyName: string | null;
+  businessArea: string | null;
+  displayName: string;
+  tags: string[];
+}
+
+// Rule-based only — no AI/full-text call. If Chris already said what the
+// file is, classify straight from his words; only filename is used as a
+// secondary signal, never file content.
+export function classifyFileDescription(description: string, fileName: string): FileClassification {
+  const text = `${description} ${fileName}`;
+  const matched = DOC_TYPE_RULES.find((r) => r.keywords.some((k) => text.toLowerCase().includes(k.toLowerCase())));
+  const documentType = matched?.type ?? 'other';
+  const documentTypeLabel = matched?.label ?? '其他';
+
+  const companyName = extractCompanyName(description) || extractCompanyName(fileName);
+  const businessArea = /workforce|保姆|工人|劳务/i.test(text) ? 'WORKFORCE'
+    : /trade|贸易|进出口/i.test(text) ? 'TRADE'
+    : /25h[_-]?ai/i.test(text) ? '25H_AI'
+    : /行政|admin|公司资料|公司文件/i.test(text) ? 'COMPANY_ADMIN'
+    : null;
+
+  const displayName = description.trim() || fileName;
+  const tags = [documentTypeLabel, companyName].filter((v): v is string => Boolean(v));
+
+  return { documentType, documentTypeLabel, companyName, businessArea, displayName, tags };
+}
+
+const KNOWN_COMPANIES = ['GCI', 'Highway', 'iCare', 'Velora', 'ORICA', 'MAG'];
+function extractCompanyName(text: string): string | null {
+  for (const c of KNOWN_COMPANIES) {
+    if (text.toLowerCase().includes(c.toLowerCase())) return c;
+  }
+  const m = text.match(/[A-Z][a-zA-Z0-9&]{2,}/);
+  return m ? m[0] : null;
+}
+
+export async function createFolderIfMissing(
+  name: string,
+  parentId: string,
+): Promise<{ ok: true; folderId: string } | { ok: false; error: string }> {
+  try {
+    const res = await fetch('/api/google/drive-create-folder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, parentId }),
+    });
+    const data = await res.json();
+    if (!data.ok) return { ok: false, error: data.error || 'Create folder failed' };
+    return { ok: true, folderId: data.folder.id };
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message ?? e) };
+  }
+}
+
+export async function uploadFileToDrive(
+  file: File,
+  targetFolderId: string,
+  fileName: string,
+): Promise<{ ok: true; fileId: string; webViewLink: string } | { ok: false; error: string }> {
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('targetFolderId', targetFolderId);
+    form.append('fileName', fileName);
+    const res = await fetch('/api/google/drive-upload-file', { method: 'POST', body: form });
+    const data = await res.json();
+    if (!data.ok) return { ok: false, error: data.error || 'Upload failed' };
+    return { ok: true, fileId: data.file.id, webViewLink: data.file.webViewLink };
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message ?? e) };
+  }
+}
+
+export async function findCurrentRegistryEntry(documentType: string, companyName: string | null): Promise<GiaFileRegistryRow | null> {
+  let query = supabase.from('gia_file_registry').select('*').eq('document_type', documentType).eq('is_current', true);
+  if (companyName) query = query.eq('company_name', companyName);
+  const { data } = await query.limit(1).maybeSingle();
+  return (data as GiaFileRegistryRow) || null;
+}
+
+export async function registerFile(row: {
+  fileName: string; displayName: string; documentType: string; businessArea: string | null;
+  companyName: string | null; customerId: string | null; driveFileId: string; driveUrl: string;
+  driveFolder: string | null; isCurrent: boolean; tags: string[];
+}): Promise<{ ok: true; row: GiaFileRegistryRow } | { ok: false; error: string }> {
+  if (row.isCurrent) {
+    const existing = await findCurrentRegistryEntry(row.documentType, row.companyName);
+    if (existing) {
+      await supabase.from('gia_file_registry').update({ is_current: false, updated_at: new Date().toISOString() }).eq('id', existing.id);
+    }
+  }
+  const { data, error } = await supabase.from('gia_file_registry').insert({
+    file_name: row.fileName,
+    display_name: row.displayName,
+    document_type: row.documentType,
+    business_area: row.businessArea,
+    company_name: row.companyName,
+    customer_id: row.customerId,
+    drive_file_id: row.driveFileId,
+    drive_url: row.driveUrl,
+    drive_folder: row.driveFolder,
+    is_current: row.isCurrent,
+    tags: row.tags,
+  }).select().single();
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, row: data as GiaFileRegistryRow };
+}
+
+// Rule-based search — matches a recognized document type and/or a known
+// company name in the query text, never a raw fuzzy substring search over
+// the whole sentence (keeps false-positive noise out, keeps this a no-op
+// when nothing recognizable is present so it never hijacks unrelated chat).
+export async function searchFileRegistryByQuery(text: string): Promise<GiaFileRegistryRow[]> {
+  const rule = DOC_TYPE_RULES.find((r) => r.keywords.some((k) => text.toLowerCase().includes(k.toLowerCase())));
+  const company = extractCompanyName(text);
+  if (!rule && !company) return [];
+
+  let query = supabase.from('gia_file_registry').select('*');
+  if (rule) query = query.eq('document_type', rule.type);
+  if (company) query = query.eq('company_name', company);
+  const { data } = await query.order('is_current', { ascending: false }).order('created_at', { ascending: false }).limit(10);
+  return (data as GiaFileRegistryRow[]) || [];
+}
+
+// Drive fallback (per Task 17 §6 priority: Registry → Drive) when nothing
+// registered yet matches. Read-only, drive.readonly — same endpoint the
+// existing Ask GCI file lookups already use.
+export async function searchDriveFallback(text: string): Promise<{ id: string; name: string; webViewLink: string }[]> {
+  const rule = DOC_TYPE_RULES.find((r) => r.keywords.some((k) => text.toLowerCase().includes(k.toLowerCase())));
+  const company = extractCompanyName(text);
+  const q = [company, rule?.label].filter(Boolean).join(' ');
+  if (!q) return [];
+  try {
+    const res = await fetch(`/api/google/drive-search?q=${encodeURIComponent(q)}&max=5`);
+    const data = await res.json();
+    if (!data.ok) return [];
+    return data.results || [];
+  } catch {
+    return [];
+  }
+}
+
+// Trigger for the chat-first "find a file" flow — requires an explicit
+// seeking cue (找/查找/查一下/搜索/要/需要) near a recognized document-type
+// word, e.g. "找Highway最新营业执照" / "客户要产品目录" / "Ray上次报价在哪里".
+// Deliberately narrow: callers only treat this as consumed when a search
+// actually returns a result, so an accidental keyword match on unrelated
+// chat (e.g. "要" in some other sentence) is harmless — it just falls
+// through to normal capture/AI chat handling.
+const FILE_SEEK_RE = /(找|查找|查一下|搜索|要|需要).{0,20}(执照|许可证|vat|trn|税务登记|简介|profile|目录|catalog|合同模板|报价模板|协议|agreement|logo|letterhead|银行资料|报价|方案|proposal|quotation)/i;
+
+export function looksLikeFileSeek(text: string): boolean {
+  return FILE_SEEK_RE.test(text);
+}
