@@ -38,9 +38,15 @@ export interface ChanyaStatus {
   issues: string[];
 }
 
+// GCI Home Final Cleanup §3 — same root-cause fix as getMiaStatus(): bound
+// at the source so every caller (Home KPI row, Agents Status card,
+// getBossActions()) is protected, not just call sites that happen to wrap it.
 export async function getChanyaStatus(): Promise<{ ok: true; data: ChanyaStatus } | { ok: false; status: ChanyaAgentStatus; error: string }> {
   try {
-    const res = await fetch(`${base()}/api/chanya/executive-status`);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(`${base()}/api/chanya/executive-status`, { signal: controller.signal });
+    clearTimeout(timer);
     const data = await res.json();
     if (data?.ok) return { ok: true, data: data as ChanyaStatus };
     return { ok: false, status: (data?.status as ChanyaAgentStatus) ?? 'no_data', error: data?.error ?? 'Unknown error' };

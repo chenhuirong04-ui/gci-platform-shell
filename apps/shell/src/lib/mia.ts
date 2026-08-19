@@ -122,9 +122,17 @@ export interface MiaStatus {
   needs_chris_items?: MiaNeedsChrisItem[];
 }
 
+// GCI Home Final Cleanup §3 — this call chain (Home KPI row, Agents Status
+// card, and getBossActions()) had no timeout anywhere, so a slow/hanging
+// MIA production endpoint (already known to be login-gated) could block
+// whichever card called this directly for 6-9s+. Fixed at the root here so
+// every caller is bounded, not just the ones that happened to wrap it.
 export async function getMiaStatus(): Promise<{ ok: true; data: MiaStatus } | { ok: false; status: MiaAgentStatus; error: string }> {
   try {
-    const res = await fetch(`${base()}/api/mia/executive-status`);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(`${base()}/api/mia/executive-status`, { signal: controller.signal });
+    clearTimeout(timer);
     const data = await res.json();
     if (!data?.ok) return { ok: false, status: (data?.status as MiaAgentStatus) ?? 'no_data', error: data?.error ?? 'Unknown error' };
     const mapped: MiaStatus = {
