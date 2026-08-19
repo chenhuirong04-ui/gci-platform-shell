@@ -12,6 +12,7 @@ import { parseRelativeDateZh } from '../ai/crmAskGciParsers';
 import { confirmCommitmentCandidate, type CommitmentCandidate, type CommitmentType } from './commitments';
 import { createManualDecision } from './decisionInbox';
 import { createExecutiveTask, getExecutiveTasks, updateExecutiveTaskStatus, updateExecutiveTaskDueDate, type TaskBusinessArea, type ExecutiveTask } from './executiveTasks';
+import { createBusinessMemory, type MemoryCategory } from './businessMemory';
 
 function base(): string {
   return typeof window !== 'undefined' ? window.location.origin : '';
@@ -22,7 +23,7 @@ function dubaiToday(): string {
 }
 
 export type CaptureType =
-  | 'NEW_CUSTOMER' | 'CRM_FOLLOWUP' | 'BUSINESS_TODO' | 'COMMITMENT' | 'DECISION'
+  | 'NEW_CUSTOMER' | 'CRM_FOLLOWUP' | 'BUSINESS_TODO' | 'COMMITMENT' | 'DECISION' | 'BUSINESS_MEMORY'
   | 'LOOKUP' | 'DRAFT_EMAIL' | 'DRAFT_WHATSAPP' | 'UNKNOWN';
 
 export interface RawCaptureIntent {
@@ -43,6 +44,10 @@ export interface RawCaptureIntent {
   todo_title: string | null;
   todo_business_area: TaskBusinessArea | null;
   todo_due_at: string | null;
+  memory_category: MemoryCategory | null;
+  memory_title: string | null;
+  memory_content: string | null;
+  memory_company: string | null;
   raw_fragment: string;
 }
 
@@ -190,6 +195,12 @@ export async function resolveCaptureItems(
         summaryLines.push(`业务领域：${raw.todo_business_area ?? 'OTHER'}`);
         if (resolvedTodoDueAt) summaryLines.push(`到期：${resolvedTodoDueAt}`);
         break;
+      case 'BUSINESS_MEMORY':
+        summaryLines.push(`长期业务规则：${raw.memory_title ?? raw.raw_fragment}`);
+        summaryLines.push(`分类：${raw.memory_category ?? 'other'}`);
+        if (raw.memory_company) summaryLines.push(`适用主体：${raw.memory_company}`);
+        summaryLines.push(`规则内容：${raw.memory_content ?? raw.raw_fragment}`);
+        break;
     }
 
     out.push({
@@ -323,6 +334,19 @@ export async function confirmCaptureItem(item: ResolvedCaptureItem): Promise<{ o
         businessArea: raw.todo_business_area ?? 'OTHER',
         dueAt: item.resolvedTodoDueAt,
         relatedCustomerId: item.matchedCustomer?.id ?? null,
+      });
+      if (!res.ok) return res;
+      return { ok: true };
+    }
+    case 'BUSINESS_MEMORY': {
+      const { raw } = item;
+      const res = await createBusinessMemory({
+        category: raw.memory_category ?? 'other',
+        title: raw.memory_title ?? raw.raw_fragment,
+        content: raw.memory_content ?? raw.raw_fragment,
+        companyName: raw.memory_company ?? null,
+        customerId: item.matchedCustomer?.id ?? null,
+        rawFragment: raw.raw_fragment,
       });
       if (!res.ok) return res;
       return { ok: true };

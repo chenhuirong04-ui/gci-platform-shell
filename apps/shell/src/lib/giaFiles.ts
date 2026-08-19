@@ -73,7 +73,7 @@ export function classifyFileDescription(description: string, fileName: string): 
 }
 
 const KNOWN_COMPANIES = ['GCI', 'Highway', 'iCare', 'Velora', 'ORICA', 'MAG'];
-function extractCompanyName(text: string): string | null {
+export function extractCompanyName(text: string): string | null {
   for (const c of KNOWN_COMPANIES) {
     if (text.toLowerCase().includes(c.toLowerCase())) return c;
   }

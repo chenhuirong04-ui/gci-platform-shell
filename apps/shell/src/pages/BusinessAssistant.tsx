@@ -32,10 +32,15 @@ import {
 } from '../lib/giaFiles';
 import { getChanyaStatus } from '../lib/chanya';
 import { matchChanyaStatusQuery, formatChanyaStatusReply } from '../ai/chanyaAskGciParsers';
+import {
+  looksLikeMemoryQuery, queryBusinessMemoryByText, searchActiveBusinessMemory,
+  type GiaBusinessMemoryRow,
+} from '../lib/businessMemory';
+import { extractCompanyName } from '../lib/giaFiles';
 import type { ExecutiveTask } from '../lib/executiveTasks';
 import type { CrmCustomer } from '../lib/crmSupabase';
 
-const CAPTURABLE = new Set(['NEW_CUSTOMER', 'CRM_FOLLOWUP', 'BUSINESS_TODO', 'COMMITMENT', 'DECISION']);
+const CAPTURABLE = new Set(['NEW_CUSTOMER', 'CRM_FOLLOWUP', 'BUSINESS_TODO', 'COMMITMENT', 'DECISION', 'BUSINESS_MEMORY']);
 const LOOKUP_PREFIX_RE = /^(现在看|看看|看一下|查一下|查看|帮我看看|帮我看)\s*/u;
 
 const GOLD = '#CBA85C';
@@ -210,6 +215,69 @@ export function BusinessAssistant() {
     const res = await getChanyaStatus();
     if (res.ok) return formatChanyaStatusReply(res.data, null);
     return formatChanyaStatusReply(null, res.error);
+  }
+
+  // GIA Foundation §B — Business Memory query: "Highway 劳务怎么算？" reads
+  // back a previously confirmed long-lived rule. Rule-based only (no AI
+  // call), only "consumed" when a known company name AND a rule-query
+  // phrasing are both present — same narrow-consumption pattern as file
+  // search, so it never hijacks unrelated chat.
+  function formatMemoryRows(rows: GiaBusinessMemoryRow[]): string {
+    const lines = rows.map((r) => `【${r.title}】${r.content}${r.company_name ? `（适用主体：${r.company_name}）` : ''}`);
+    return `Business Memory 中记录的规则：\n${lines.join('\n')}`;
+  }
+
+  async function tryBusinessMemoryQuery(text: string): Promise<string | null> {
+    if (!looksLikeMemoryQuery(text)) return null;
+    const rows = await queryBusinessMemoryByText(text);
+    if (rows.length === 0) {
+      const company = extractCompanyName(text);
+      return company
+        ? `Business Memory 中暂未记录 ${company} 相关的规则。`
+        : `Business Memory 中未找到匹配的规则（未识别出具体公司/主体名称）。`;
+    }
+    return formatMemoryRows(rows);
+  }
+
+  // GIA Foundation §C — "帮我给这个客户准备劳工报价": combine the currently
+  // loaded CRM customer + Business Memory (pricing rules) + File Registry
+  // (quote templates / licenses) into one answer. Never fabricates a
+  // number — surfaces exactly what's on file and calls out what's missing.
+  const QUOTE_PREP_TRIGGER_RE = /(准备|整理|出|做)(?:.{0,6})?(劳工|劳务|用工|人力)报价/u;
+
+  async function tryQuotePrepCommand(text: string, customer: CrmCustomer | null): Promise<string | null> {
+    if (!QUOTE_PREP_TRIGGER_RE.test(text)) return null;
+    if (!customer) return '需要先在上方加载一个客户，才能为其准备劳工报价。';
+
+    const pricingRows = await searchActiveBusinessMemory({ category: 'pricing', businessArea: 'WORKFORCE' });
+    const entity = pricingRows[0]?.company_name ?? null;
+
+    const templateHits = await searchFileRegistryByQuery('劳务报价模板');
+    const currentTemplate = templateHits.find((h) => h.is_current && (!entity || h.company_name === entity)) ?? templateHits.find((h) => h.is_current);
+
+    const licenseHits = entity ? await searchFileRegistryByQuery(`${entity}营业执照`) : [];
+    const currentLicense = licenseHits.find((h) => h.is_current);
+
+    const missing: string[] = [];
+    if (!entity) missing.push('应使用的公司主体（Business Memory 中暂无相关主体规则）');
+    if (pricingRows.length === 0) missing.push('该客户所属业务的报价计算规则');
+    if (!currentTemplate) missing.push('最新报价模板');
+    if (entity && !currentLicense) missing.push(`${entity} 最新营业执照`);
+    missing.push('人数、工种、合同期限等具体报价参数（需与客户确认）');
+
+    const lines: string[] = [];
+    lines.push(`客户：${customer.customer_name}${customer.country ? `（${customer.country}）` : ''}`);
+    lines.push(`建议使用主体：${entity ?? '未在 Business Memory 中找到主体规则，需要你确认'}`);
+    if (pricingRows.length > 0) {
+      lines.push('当前报价规则：');
+      pricingRows.forEach((r) => lines.push(`  【${r.title}】${r.content}`));
+    } else {
+      lines.push('当前报价规则：Business Memory 中暂无记录');
+    }
+    lines.push(`最新报价模板：${currentTemplate ? `${currentTemplate.display_name} — ${currentTemplate.drive_url}` : '未在文件库中找到'}`);
+    if (entity) lines.push(`最新执照：${currentLicense ? `${currentLicense.display_name} — ${currentLicense.drive_url}` : '未在文件库中找到'}`);
+    lines.push(`还缺：${missing.join('；')}`);
+    return lines.join('\n');
   }
 
   function handlePickFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -428,10 +496,16 @@ export function BusinessAssistant() {
     const t = text.trim();
     if (!t) return;
     setFileSearchReply(null);
-    // A bare-looking string ("SHADI这件事下周再提醒我") can still be a task
-    // lifecycle/reschedule command with no spaces or listed punctuation —
-    // check those first so they aren't swallowed as a customer-name switch.
-    if (BARE_NAME_RE.test(t) && !matchTaskLifecycleCommand(t) && !matchTaskRescheduleCommand(t)) {
+    // A bare-looking string ("SHADI这件事下周再提醒我" / "帮我给这个客户准备劳工报价")
+    // can still be a task lifecycle/reschedule/quote-prep command with no
+    // spaces or listed punctuation — check those first so they aren't
+    // swallowed as a customer-name switch.
+    if (
+      BARE_NAME_RE.test(t) &&
+      !matchTaskLifecycleCommand(t) &&
+      !matchTaskRescheduleCommand(t) &&
+      !QUOTE_PREP_TRIGGER_RE.test(t)
+    ) {
       resolve(t);
       return;
     }
@@ -443,6 +517,16 @@ export function BusinessAssistant() {
     const chanyaReply = await tryChanyaStatusQuery(t);
     if (chanyaReply) {
       setFileSearchReply(chanyaReply);
+      return;
+    }
+    const memoryReply = await tryBusinessMemoryQuery(t);
+    if (memoryReply) {
+      setFileSearchReply(memoryReply);
+      return;
+    }
+    const quotePrepReply = await tryQuotePrepCommand(t, ctx?.customer ?? null);
+    if (quotePrepReply) {
+      setFileSearchReply(quotePrepReply);
       return;
     }
     const consumed = await tryBusinessCapture(t, ctx?.customer ?? null);
@@ -499,6 +583,21 @@ export function BusinessAssistant() {
     const chanyaReply = await tryChanyaStatusQuery(question);
     if (chanyaReply) {
       setChatHistory((prev) => [...prev, { role: 'user', content: question }, { role: 'assistant', content: chanyaReply }]);
+      return;
+    }
+
+    // GIA Foundation §B — Business Memory query, works mid-conversation too.
+    const memoryReply = await tryBusinessMemoryQuery(question);
+    if (memoryReply) {
+      setChatHistory((prev) => [...prev, { role: 'user', content: question }, { role: 'assistant', content: memoryReply }]);
+      return;
+    }
+
+    // GIA Foundation §C — "帮我给这个客户准备劳工报价", combines CRM +
+    // Business Memory + File Registry for the loaded customer.
+    const quotePrepReply = await tryQuotePrepCommand(question, context.customer);
+    if (quotePrepReply) {
+      setChatHistory((prev) => [...prev, { role: 'user', content: question }, { role: 'assistant', content: quotePrepReply }]);
       return;
     }
 

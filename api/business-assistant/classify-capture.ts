@@ -27,6 +27,7 @@ Allowed intent types (enum, EXACT strings only — never invent a new one):
 - BUSINESS_TODO: a task/reminder that isn't about a specific named customer relationship, or is internal/company work
 - COMMITMENT: an explicit promise — Chris promised the customer something (outbound), or the customer promised Chris something (inbound)
 - DECISION: Chris explicitly states a decision he has ALREADY made ("我决定..."/"就...吧"/"我们定了...") OR a concrete conditional policy/plan he's committing to now for a future situation ("如果X还不回复就暂停"/"如果周五前没确认就取消" — Chris IS deciding the course of action right now, even though it's conditional on something future). A vague statement that something merely NEEDS to be figured out or decided later, with no actual course of action stated ("工资计算方式还要确定"/"需要想一想怎么办"), is BUSINESS_TODO, not DECISION — the difference is whether Chris stated what will happen, not whether the trigger is in the future.
+- BUSINESS_MEMORY: Chris states a LONG-LIVED, reusable business rule that should apply going forward, not a one-off event — pricing rules, service models, fixed processes, company rules, product rules. Trigger patterns: "记住..." / "以后都按这个..." / "以后就..." / "这个业务规则是..." / "长期这样..." (or English: "remember that...", "from now on...", "the rule is..."). Distinguish from DECISION (a specific decision about a specific situation, often about one customer/deal) and BUSINESS_TODO (a task to do) — BUSINESS_MEMORY is a standing rule Chris wants applied every time going forward, e.g. "记住，以后 Highway 劳务报价按26天、每天10小时计算" or "以后所有贸易客户的付款条件都是30%订金".
 - LOOKUP: a question, not something to record
 - DRAFT_EMAIL: asks to draft an email
 - DRAFT_WHATSAPP: asks to draft a WhatsApp message
@@ -43,7 +44,7 @@ For each intent, extract only the fields that are actually stated. Never fabrica
 {
   "intents": [
     {
-      "type": "NEW_CUSTOMER" | "CRM_FOLLOWUP" | "BUSINESS_TODO" | "COMMITMENT" | "DECISION" | "LOOKUP" | "DRAFT_EMAIL" | "DRAFT_WHATSAPP" | "UNKNOWN",
+      "type": "NEW_CUSTOMER" | "CRM_FOLLOWUP" | "BUSINESS_TODO" | "COMMITMENT" | "DECISION" | "BUSINESS_MEMORY" | "LOOKUP" | "DRAFT_EMAIL" | "DRAFT_WHATSAPP" | "UNKNOWN",
       "customer_name": string | null,
       "contact_name": string | null,
       "country": string | null,
@@ -60,6 +61,10 @@ For each intent, extract only the fields that are actually stated. Never fabrica
       "todo_title": string | null,
       "todo_business_area": "25H_AI" | "TRADE" | "WORKFORCE" | "ECOMMERCE" | "COMPANY_ADMIN" | "OTHER" | null,
       "todo_due_at": string | null,         // same relative-phrase convention, or null if no date was stated — never guess one
+      "memory_category": "pricing" | "service_model" | "process" | "company_rule" | "product_rule" | "other" | null,
+      "memory_title": string | null,        // short human label for the rule, e.g. "Highway 劳务报价计算方式"
+      "memory_content": string | null,      // the rule itself, stated plainly
+      "memory_company": string | null,      // which company/entity this rule applies to, if named (e.g. "Highway")
       "raw_fragment": string                 // the portion of the original text this intent came from
     }
   ]
@@ -116,7 +121,7 @@ export default async function handler(req: Request): Promise<Response> {
       return json({ ok: false, error: 'Classifier returned invalid JSON' }, 502);
     }
 
-    const ALLOWED = new Set(['NEW_CUSTOMER', 'CRM_FOLLOWUP', 'BUSINESS_TODO', 'COMMITMENT', 'DECISION', 'LOOKUP', 'DRAFT_EMAIL', 'DRAFT_WHATSAPP', 'UNKNOWN']);
+    const ALLOWED = new Set(['NEW_CUSTOMER', 'CRM_FOLLOWUP', 'BUSINESS_TODO', 'COMMITMENT', 'DECISION', 'BUSINESS_MEMORY', 'LOOKUP', 'DRAFT_EMAIL', 'DRAFT_WHATSAPP', 'UNKNOWN']);
     const intents = Array.isArray(parsed?.intents) ? parsed.intents.filter((it: any) => it && ALLOWED.has(it.type)) : [];
 
     return json({ ok: true, intents });
