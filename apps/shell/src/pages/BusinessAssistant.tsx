@@ -249,7 +249,11 @@ export function BusinessAssistant() {
     if (!QUOTE_PREP_TRIGGER_RE.test(text)) return null;
     if (!customer) return '需要先在上方加载一个客户，才能为其准备劳工报价。';
 
-    const pricingRows = await searchActiveBusinessMemory({ category: 'pricing', businessArea: 'WORKFORCE' });
+    // Business Memory capture doesn't currently record business_area (the
+    // classifier only extracts category/title/content/company for a memory
+    // rule), so filtering this query by businessArea would silently miss
+    // every rule ever captured — category alone is the real filter here.
+    const pricingRows = await searchActiveBusinessMemory({ category: 'pricing' });
     const entity = pricingRows[0]?.company_name ?? null;
 
     const templateHits = await searchFileRegistryByQuery('劳务报价模板');
