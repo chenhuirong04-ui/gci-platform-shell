@@ -485,13 +485,18 @@ async function fetchBossActions(): Promise<
         deep_link: '/',
       });
     }
-    if (c.needs_chris > 0) {
+    // needs_chris from Chanya's executive-status is a boolean flag (not a
+    // count) — the API has never returned a number here. It was previously
+    // interpolated as if it were one ("今天有 true 件..."). Only ever show
+    // a fixed sentence, never a fabricated count, unless the API actually
+    // starts returning a real number.
+    if (c.needs_chris) {
       actions.push({
         id: 'chanya-needs-chris',
         source: 'chanya',
         category: 'Chanya',
-        title: `Chanya｜运营监控 — ${c.needs_chris} 件需要你处理`,
-        summary: `今日有 ${c.needs_chris} 件需要人工判断（订阅/账户异常等）`,
+        title: 'Chanya｜运营监控 — 需要 Chris 关注',
+        summary: 'Chanya 需要 Chris 关注（订阅/账户异常等）',
         priority: 'P2',
         due_at: null,
         related_customer: null,
