@@ -3,17 +3,22 @@
 //    functions), bucketed client-side by Dubai calendar day. No fabricated
 //    trend: if there's no real signal across the 7 days, an empty state is
 //    shown instead of a flat-zero chart.
-// B. 当前待办结构 — P1/P2/P3 breakdown of the live Boss Action list (Task 7),
-//    same summarizeActions() used everywhere else these counts appear.
-// Uses recharts, already a dependency (apps/shell/package.json) and already
-// used elsewhere in the repo (modules/trade/components/HomeDashboard.tsx) —
-// no new charting library added.
+// B. 当前业务事项结构 — GCI Home Final Cleanup §2: replaces the old P1/P2/P3
+//    backlog pie with a business-meaning category breakdown (执照/公司服务,
+//    系统开发/AI项目, 客户跟进, 报价/合同, 劳务/Workforce, 供应商/采购,
+//    客服/售后, 内部事项/其他) of the same live Boss Action list (Task 7).
+//    Priority (P1/P2/P3) is unchanged underneath — every BossAction still
+//    carries it — this only changes what Home groups by. Clicking a
+//    category expands the real items inline (客户/项目, 事项, 状态, 下一步).
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { getSevenDayTrend, type TrendDay } from '../lib/homeTrends';
-import { getBossActions, summarizeActions, type ActionCounts } from '../lib/actionCenter';
+import {
+  getBossActions, summarizeBusinessStructure, BUSINESS_STRUCTURE_CATEGORIES,
+  type BossAction, type BusinessStructureCategory,
+} from '../lib/actionCenter';
 
 const GOLD = '#CBA85C';
 const RED = '#E0846A';
@@ -78,54 +83,67 @@ function TrendChart() {
   );
 }
 
-function BacklogChart() {
+const PRIORITY_COLOR: Record<string, string> = { P1: RED, P2: AMBER, P3: MUTED };
+
+function BusinessStructureChart() {
   const navigate = useNavigate();
-  const [counts, setCounts] = useState<ActionCounts | null>(null);
+  const [actions, setActions] = useState<BossAction[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<BusinessStructureCategory | null>(null);
 
   useEffect(() => {
     getBossActions().then((res) => {
-      if (res.ok) setCounts(summarizeActions(res.actions));
+      if (res.ok) setActions(res.actions);
       else setError(res.error);
     });
   }, []);
 
-  const total = counts ? counts.p1 + counts.p2 + counts.p3 : 0;
-  const data = counts ? [
-    { key: 'P1', value: counts.p1, color: RED },
-    { key: 'P2', value: counts.p2, color: AMBER },
-    { key: 'P3', value: counts.p3, color: MUTED },
-  ] : [];
+  const byCategory = actions ? summarizeBusinessStructure(actions) : null;
+  const total = actions ? actions.length : 0;
+  const maxCount = byCategory ? Math.max(1, ...BUSINESS_STRUCTURE_CATEGORIES.map((c) => byCategory[c].length)) : 1;
 
   return (
-    <ChartCard title="当前待办结构 · P1 / P2 / P3" onOpen={() => navigate('/actions')}>
+    <ChartCard title="当前业务事项结构" onOpen={() => navigate('/actions')}>
       {error ? (
         <div style={{ fontSize: 12, color: RED, padding: '20px 0', textAlign: 'center' }}>读取失败:{error}</div>
-      ) : !counts ? (
+      ) : !byCategory ? (
         <div style={{ fontSize: 12, color: MUTED, padding: '20px 0', textAlign: 'center' }}>加载中…</div>
       ) : total === 0 ? (
         <div style={{ fontSize: 12, color: MUTED, padding: '30px 0', textAlign: 'center' }}>暂无待办事项</div>
       ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ width: 130, height: 130, flexShrink: 0 }}>
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={data} dataKey="value" nameKey="key" innerRadius={38} outerRadius={60} paddingAngle={2} onClick={() => navigate('/actions')} style={{ cursor: 'pointer' }}>
-                  {data.map((d) => <Cell key={d.key} fill={d.color} />)}
-                </Pie>
-                <Tooltip contentStyle={{ background: '#14161C', border: `1px solid ${BORD}`, borderRadius: 8, fontSize: 12 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {data.map((d) => (
-              <div key={d.key} onClick={() => navigate('/actions')} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: d.color }} />
-                <span style={{ color: colors.textPrimary, fontWeight: 600 }}>{d.key}</span>
-                <span style={{ color: MUTED }}>{d.value}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {BUSINESS_STRUCTURE_CATEGORIES.map((cat) => {
+            const items = byCategory[cat];
+            const isOpen = expanded === cat;
+            return (
+              <div key={cat}>
+                <div
+                  onClick={() => items.length > 0 && setExpanded(isOpen ? null : cat)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 2px', cursor: items.length > 0 ? 'pointer' : 'default', opacity: items.length > 0 ? 1 : 0.4 }}
+                >
+                  <span style={{ fontSize: 11.5, color: colors.textPrimary, width: 112, flexShrink: 0 }}>{cat}</span>
+                  <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ width: `${(items.length / maxCount) * 100}%`, height: '100%', background: GOLD, borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: MUTED, width: 18, textAlign: 'right', flexShrink: 0 }}>{items.length}</span>
+                </div>
+                {isOpen && (
+                  <div style={{ margin: '4px 0 8px 4px', padding: '8px 10px', background: 'rgba(255,255,255,0.025)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {items.map((a) => (
+                      <div key={a.id} onClick={() => a.deep_link && navigate(a.deep_link)} style={{ cursor: a.deep_link ? 'pointer' : 'default', fontSize: 11.5, lineHeight: 1.5 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: PRIORITY_COLOR[a.priority] ?? MUTED, flexShrink: 0 }} />
+                          <span style={{ color: colors.textPrimary, fontWeight: 600 }}>{a.related_customer || a.related_system || '—'}</span>
+                          <span style={{ color: MUTED }}>· {a.title}</span>
+                        </div>
+                        {a.summary && <div style={{ color: MUTED, marginLeft: 12 }}>下一步：{a.summary}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       )}
     </ChartCard>
@@ -136,7 +154,7 @@ export function HomeDashboardCharts() {
   return (
     <div className="grid" style={{ gridTemplateColumns: 'repeat(2,1fr)', gap: 12, marginBottom: 20 }}>
       <TrendChart />
-      <BacklogChart />
+      <BusinessStructureChart />
     </div>
   );
 }

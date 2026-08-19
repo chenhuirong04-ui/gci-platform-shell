@@ -29,6 +29,10 @@ export interface BossAction {
   related_system: string | null;
   action_type: string;
   deep_link: string;
+  // GCI Home Final Cleanup §2 — only populated for source==='tasks' (from
+  // executive_tasks.business_area); used to bucket Business To-Do items
+  // into the Home "当前业务事项结构" categories (e.g. WORKFORCE → 劳务).
+  business_area?: string | null;
 }
 
 async function safeFetchJson<T = any>(url: string): Promise<T | { ok: false; error: string }> {
@@ -49,9 +53,43 @@ function base(): string {
   return typeof window !== 'undefined' ? window.location.origin : '';
 }
 
+// Home Loading Performance — root cause #1: getBossActions() is called
+// independently by HomeKpiRow, HomeDashboardCharts, and HomeDailyBrief (via
+// dailyBrief.ts) on every Home mount — 3+ full re-runs of the same 15-source
+// aggregation per page load. Share one in-flight call across all callers
+// within a short window instead of re-fetching everything N times.
+let inflight: Promise<{ ok: true; actions: BossAction[] } | { ok: false; error: string }> | null = null;
+let inflightAt = 0;
+const DEDUPE_WINDOW_MS = 15000;
+
+// Root cause #2: MIA/Chanya (and Gmail/Calendar) have no timeout anywhere in
+// their call chain — a slow/hanging upstream blocks the whole Promise.all
+// indefinitely, stalling every Home card at once. Bound each of the
+// known-slow calls so one bad source can never hold up the rest; a timeout
+// degrades to the same {ok:false} shape callers already handle (renders as
+// that module's own "unavailable" state, same as a real fetch failure).
+function withTimeout<T>(p: Promise<T>, ms: number, onTimeout: T): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(onTimeout), ms);
+    p.then((v) => { clearTimeout(timer); resolve(v); }, () => { clearTimeout(timer); resolve(onTimeout); });
+  });
+}
+
 export async function getBossActions(): Promise<
   { ok: true; actions: BossAction[] } | { ok: false; error: string }
 > {
+  const now = Date.now();
+  if (inflight && now - inflightAt < DEDUPE_WINDOW_MS) return inflight;
+  inflightAt = now;
+  inflight = fetchBossActions();
+  inflight.finally(() => { inflight = null; });
+  return inflight;
+}
+
+async function fetchBossActions(): Promise<
+  { ok: true; actions: BossAction[] } | { ok: false; error: string }
+> {
+  const SLOW_SOURCE_TIMEOUT_MS = 5000;
   const [
     todaysFollowups,
     overdue,
@@ -72,17 +110,17 @@ export async function getBossActions(): Promise<
     getTodaysFollowups(),
     getOverdueFollowups(),
     getBossDecisions(),
-    getImportantEmails(),
-    getCalendarEvents('today'),
+    withTimeout(getImportantEmails(), SLOW_SOURCE_TIMEOUT_MS, { ok: false, error: 'timeout' } as any),
+    withTimeout(getCalendarEvents('today'), SLOW_SOURCE_TIMEOUT_MS, { ok: false, error: 'timeout' } as any),
     getSystemRegistry(),
     safeFetchJson<any>(`${base()}/api/trade/check-quotation-followups`),
     safeFetchJson<any>(`${base()}/api/invoice/pending-summary`),
     safeFetchJson<any>(`${base()}/api/trade/check-inventory`),
     getDecisionFollowThroughActions(),
     getOpenCommitmentActions(),
-    getMiaStatus(),
+    withTimeout(getMiaStatus(), SLOW_SOURCE_TIMEOUT_MS, { ok: false, status: 'no_data', error: 'timeout' } as any),
     getExecutiveTasks(),
-    getChanyaStatus(),
+    withTimeout(getChanyaStatus(), SLOW_SOURCE_TIMEOUT_MS, { ok: false, status: 'no_data', error: 'timeout' } as any),
     getUrgentTicketCounts(),
   ]);
 
@@ -349,6 +387,7 @@ export async function getBossActions(): Promise<
         related_system: null,
         action_type: 'business_todo',
         deep_link: '/tasks',
+        business_area: t.business_area,
       });
     }
   }
@@ -575,6 +614,42 @@ export function summarizeActions(actions: BossAction[]): ActionCounts {
     p2: actions.filter((a) => a.priority === 'P2').length,
     p3: actions.filter((a) => a.priority === 'P3').length,
   };
+}
+
+// GCI Home Final Cleanup §2 — "当前业务事项结构": replaces the raw P1/P2/P3
+// backlog pie on Home with a business-meaning breakdown. getBossActions()
+// only ever emits open/unfinished items (completed/cancelled tasks, decided
+// decisions, resolved tickets etc. are already excluded upstream), so no
+// extra "unfinished" filter is needed here — every action in the list
+// already qualifies. Priority (P1/P2/P3) stays on each BossAction unchanged;
+// this only changes what Home groups by, not what's stored.
+export const BUSINESS_STRUCTURE_CATEGORIES = [
+  '执照 / 公司服务',
+  '系统开发 / AI项目',
+  '客户跟进',
+  '报价 / 合同',
+  '劳务 / Workforce',
+  '供应商 / 采购',
+  '客服 / 售后',
+  '内部事项 / 其他',
+] as const;
+export type BusinessStructureCategory = (typeof BUSINESS_STRUCTURE_CATEGORIES)[number];
+
+export function categorizeAction(a: BossAction): BusinessStructureCategory {
+  if (a.business_area === 'WORKFORCE') return '劳务 / Workforce';
+  if (a.business_area === 'COMPANY_ADMIN') return '执照 / 公司服务';
+  if (a.source === 'crm') return '客户跟进';
+  if (a.source === 'business' && (a.category === 'Quotation' || a.category === 'Invoice')) return '报价 / 合同';
+  if (a.source === 'business' && a.category === 'Inventory') return '供应商 / 采购';
+  if (a.source === 'systems' || a.source === 'agents' || a.source === 'mia' || a.source === 'chanya') return '系统开发 / AI项目';
+  if (a.source === 'support') return '客服 / 售后';
+  return '内部事项 / 其他';
+}
+
+export function summarizeBusinessStructure(actions: BossAction[]): Record<BusinessStructureCategory, BossAction[]> {
+  const out = Object.fromEntries(BUSINESS_STRUCTURE_CATEGORIES.map((c) => [c, [] as BossAction[]])) as Record<BusinessStructureCategory, BossAction[]>;
+  for (const a of actions) out[categorizeAction(a)].push(a);
+  return out;
 }
 
 export const SOURCE_LABEL: Record<ActionSource, string> = {

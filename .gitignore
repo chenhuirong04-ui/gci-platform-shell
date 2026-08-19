@@ -28,6 +28,9 @@ dist-ssr
 # Local env files — never commit secrets
 .env
 .env.local
+
+# Production data backups — contain real business content, local only
+backups/
 .env.*.local
 
 .env*
