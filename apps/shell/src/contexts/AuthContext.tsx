@@ -16,6 +16,10 @@ interface AuthState {
   profile: UserProfile | null;
   /** true while the initial session check is in flight */
   loading: boolean;
+  /** Task 18.3 — true only while a resolved session's profile row is still
+   * being fetched. Decoupled from `loading` on purpose: a slow/failing
+   * profile query must never hold up session restore itself (see below). */
+  profileLoading: boolean;
   /** Task 16.1 — set only if the initial session restore itself failed
    * (network error, thrown exception, etc.) — never set for the normal
    * "not logged in" case, which just resolves session:null. */
@@ -39,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: null,
     profile: null,
     loading: true,
+    profileLoading: false,
     error: null,
   });
   const [retryTick, setRetryTick] = useState(0);
@@ -63,46 +68,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    // Task 16.1 — root cause of the first-load black screen: this promise
-    // chain previously had no .catch(). A cold-start network hiccup (or any
-    // thrown exception anywhere in the chain, including inside
-    // loadProfile) rejected it silently, `loading` never flipped to false,
-    // and App.tsx/ProtectedRoute.tsx's `if (loading) return null` rendered
-    // a permanently blank screen — exactly the "works after one manual
-    // refresh" symptom, since a refresh just gives the retry a clean
-    // network path. Every branch below now unconditionally resolves
-    // `loading: false`, and a real failure surfaces as `error` (handled by
-    // App.tsx's fallback UI) instead of hanging.
+    // Task 18.3 — root cause of the recurring "会话加载超时" on Production:
+    // the previous chain awaited loadProfile() BEFORE ever resolving
+    // `loading: false`, so a slow (not even failing — just slow) user_profiles
+    // query held up session restore itself. Any occasional latency there
+    // (RLS check, cold connection, etc.) could push the combined
+    // getSession()+loadProfile() time past the 10s defensive timeout, which
+    // then classified a perfectly valid, already-resolved session as a
+    // failure. Fix: resolve `loading: false` the moment the session itself
+    // is known — profile fetches in the background afterward via its own
+    // `profileLoading` flag, which ProtectedRoute treats as a brief loading
+    // state rather than a permission denial.
+    //
+    // (Task 16.1 history preserved: every branch below still unconditionally
+    // resolves `loading: false`, so a thrown exception anywhere can't leave
+    // it stuck and silently blank the screen again.)
+    function applySession(session: Session | null) {
+      if (cancelled) return;
+      setState((prev) => ({
+        ...prev,
+        session,
+        user: session?.user ?? null,
+        loading: false,
+        error: null,
+        profile: session?.user ? prev.profile : null,
+        profileLoading: !!session?.user,
+      }));
+      if (session?.user) {
+        const userId = session.user.id;
+        loadProfile(userId).then((profile) => {
+          if (cancelled) return;
+          setState((prev) => (prev.user?.id === userId ? { ...prev, profile, profileLoading: false } : prev));
+        });
+      }
+    }
+
     supabase.auth.getSession()
-      .then(async ({ data: { session }, error: sessionError }) => {
+      .then(({ data: { session }, error: sessionError }) => {
         if (cancelled) return;
         if (sessionError) throw sessionError;
-        const profile = session?.user ? await loadProfile(session.user.id) : null;
-        if (cancelled) return;
-        setState({ session, user: session?.user ?? null, profile, loading: false, error: null });
+        applySession(session);
       })
       .catch((e) => {
         if (cancelled) return;
-        setState({ session: null, user: null, profile: null, loading: false, error: String(e?.message ?? e) });
+        setState({ session: null, user: null, profile: null, loading: false, profileLoading: false, error: String(e?.message ?? e) });
       });
 
     // Keep in sync with Supabase auth state changes (sign in / sign out / token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (cancelled) return;
-      try {
-        const profile = session?.user ? await loadProfile(session.user.id) : null;
-        if (cancelled) return;
-        setState({ session, user: session?.user ?? null, profile, loading: false, error: null });
-      } catch (e: any) {
-        if (cancelled) return;
-        setState({ session: null, user: null, profile: null, loading: false, error: String(e?.message ?? e) });
-      }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      applySession(session);
     });
 
     // Defensive fallback per Task 16.1 §三 — if something outside the
     // chain above still leaves loading stuck (a case we haven't
     // anticipated), never let the app hang indefinitely with no visible
-    // state past a reasonable wait.
+    // state past a reasonable wait. Now that profile load no longer blocks
+    // this, getSession() itself should resolve well under 10s in any
+    // ordinary case — this timeout only fires for a genuinely hung request.
     const timeout = setTimeout(() => {
       if (cancelled) return;
       setState((prev) => (prev.loading ? { ...prev, loading: false, error: prev.error ?? '会话加载超时' } : prev));
@@ -116,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [retryTick]);
 
   function retry() {
-    setState({ session: null, user: null, profile: null, loading: true, error: null });
+    setState({ session: null, user: null, profile: null, loading: true, profileLoading: false, error: null });
     setRetryTick((t) => t + 1);
   }
 
