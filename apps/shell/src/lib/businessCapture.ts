@@ -11,7 +11,7 @@ import {
 import { parseRelativeDateZh } from '../ai/crmAskGciParsers';
 import { confirmCommitmentCandidate, type CommitmentCandidate, type CommitmentType } from './commitments';
 import { createManualDecision } from './decisionInbox';
-import { createExecutiveTask, getExecutiveTasks, updateExecutiveTaskStatus, type TaskBusinessArea, type ExecutiveTask } from './executiveTasks';
+import { createExecutiveTask, getExecutiveTasks, updateExecutiveTaskStatus, updateExecutiveTaskDueDate, type TaskBusinessArea, type ExecutiveTask } from './executiveTasks';
 
 function base(): string {
   return typeof window !== 'undefined' ? window.location.origin : '';
@@ -358,4 +358,26 @@ export async function findOpenTasksByKeyword(keyword: string): Promise<{ ok: tru
 
 export async function completeOrCancelTask(id: string, action: 'completed' | 'cancelled'): Promise<{ ok: true } | { ok: false; error: string }> {
   return updateExecutiveTaskStatus(id, action);
+}
+
+// GIA Foundation §A.4 — "SHADI这件事下周再提醒我" / "肯尼亚保姆延期到周五" /
+// "报价的事改到明天". Distinct from complete/cancel — this only ever
+// changes due_at, never status.
+const RESCHEDULE_TRIGGER_RES: RegExp[] = [
+  /^(.{1,24}?)(?:这件事|这个事情|这个)(.+?)(?:再)?提醒我$/u,
+  /^(.{1,24}?)(?:延期|改期|推迟|往后推)到(.+)$/u,
+  /^(.{1,24}?)(?:改到|挪到)(.+)$/u,
+];
+
+export function matchTaskRescheduleCommand(text: string): { keyword: string; whenPhrase: string } | null {
+  const t = text.trim().replace(/[。.！!\s]+$/u, '');
+  for (const re of RESCHEDULE_TRIGGER_RES) {
+    const m = t.match(re);
+    if (m && m[1]?.trim() && m[2]?.trim()) return { keyword: m[1].trim(), whenPhrase: m[2].trim() };
+  }
+  return null;
+}
+
+export async function rescheduleTask(id: string, dueAt: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  return updateExecutiveTaskDueDate(id, dueAt);
 }

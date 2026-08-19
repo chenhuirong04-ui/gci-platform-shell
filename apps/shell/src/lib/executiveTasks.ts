@@ -65,6 +65,18 @@ export async function createExecutiveTask(input: {
   return { ok: true, task: data as ExecutiveTask };
 }
 
+// GIA Foundation §A.3/A.4 — reschedule ("SHADI这件事下周再提醒我"), separate
+// from status changes. Never touches status — a task can be rescheduled
+// any number of times while staying open/in_progress.
+export async function updateExecutiveTaskDueDate(
+  id: string,
+  dueAt: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { error } = await supabase.from('executive_tasks').update({ due_at: dueAt, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
 export async function updateExecutiveTaskStatus(
   id: string,
   status: TaskStatus,

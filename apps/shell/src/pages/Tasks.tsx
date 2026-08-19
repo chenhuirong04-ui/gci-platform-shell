@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
 import {
-  getExecutiveTasks, updateExecutiveTaskStatus, taskUrgency, BUSINESS_AREA_LABEL,
+  getExecutiveTasks, updateExecutiveTaskStatus, updateExecutiveTaskDueDate, taskUrgency, BUSINESS_AREA_LABEL,
   type ExecutiveTask, type TaskBusinessArea, type TaskStatus,
 } from '../lib/executiveTasks';
 
@@ -62,6 +62,8 @@ export function Tasks() {
   const [view, setView] = useState<ViewFilter>('today');
   const [area, setArea] = useState<AreaFilter>('all');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [rescheduleId, setRescheduleId] = useState<string | null>(null);
+  const [dateDraft, setDateDraft] = useState('');
 
   function load() {
     getExecutiveTasks().then((res) => { if (res.ok) setTasks(res.rows); else setError(res.error); });
@@ -74,6 +76,17 @@ export function Tasks() {
     const res = await updateExecutiveTaskStatus(id, status);
     setBusyId(null);
     if (res.ok) load();
+  }
+
+  async function saveReschedule(id: string) {
+    setBusyId(id);
+    const res = await updateExecutiveTaskDueDate(id, dateDraft || null);
+    setBusyId(null);
+    if (res.ok) {
+      setRescheduleId(null);
+      setDateDraft('');
+      load();
+    }
   }
 
   const filtered = useMemo(() => {
@@ -114,7 +127,7 @@ export function Tasks() {
           ← 返回
         </button>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: colors.textPrimary, margin: 0, fontFamily: "'Space Grotesk',sans-serif" }}>
-          Business To-Do / 商务待办
+          我的待办 / Business To-Do
         </h1>
       </div>
 
@@ -162,12 +175,31 @@ export function Tasks() {
               </div>
               {t.description && <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5, marginBottom: 8 }}>{t.description}</div>}
               {!isDone && (
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   {t.status === 'open' && (
                     <button disabled={busyId === t.id} onClick={() => setStatus(t.id, 'in_progress')} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>标记进行中</button>
                   )}
                   <button disabled={busyId === t.id} onClick={() => setStatus(t.id, 'completed')} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(111,191,142,0.14)', border: '1px solid rgba(111,191,142,0.4)', color: GREEN }}>标记完成</button>
                   <button disabled={busyId === t.id} onClick={() => setStatus(t.id, 'cancelled')} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>取消</button>
+                  {rescheduleId === t.id ? (
+                    <>
+                      <input
+                        type="date"
+                        value={dateDraft}
+                        onChange={(e) => setDateDraft(e.target.value)}
+                        style={{ padding: '4px 8px', borderRadius: 7, fontSize: 11.5, background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: colors.textPrimary }}
+                      />
+                      <button disabled={busyId === t.id} onClick={() => saveReschedule(t.id)} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(203,168,92,0.14)', border: '1px solid rgba(203,168,92,0.4)', color: GOLD }}>保存日期</button>
+                      <button onClick={() => { setRescheduleId(null); setDateDraft(''); }} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>取消编辑</button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => { setRescheduleId(t.id); setDateDraft(t.due_at ? t.due_at.slice(0, 10) : ''); }}
+                      style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}
+                    >
+                      延期/改期
+                    </button>
+                  )}
                 </div>
               )}
             </div>

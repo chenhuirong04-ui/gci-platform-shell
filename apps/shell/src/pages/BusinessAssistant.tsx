@@ -20,8 +20,10 @@ import {
 import {
   classifyCapture, resolveCaptureItems, confirmCaptureItem,
   matchTaskLifecycleCommand, findOpenTasksByKeyword, completeOrCancelTask,
+  matchTaskRescheduleCommand, rescheduleTask,
   type ResolvedCaptureItem,
 } from '../lib/businessCapture';
+import { parseRelativeDateZh } from '../ai/crmAskGciParsers';
 import {
   classifyFileDescription, uploadFileToDrive, registerFile, findCurrentRegistryEntry,
   searchFileRegistryByQuery, searchDriveFallback, looksLikeFileSeek,
@@ -110,6 +112,11 @@ export function BusinessAssistant() {
   const [captureBusy, setCaptureBusy] = useState<number | 'all' | null>(null);
   const [captureDone, setCaptureDone] = useState<Set<number>>(new Set());
   const [pendingTaskLifecycle, setPendingTaskLifecycle] = useState<{ action: 'completed' | 'cancelled'; matches: ExecutiveTask[] } | null>(null);
+  // GIA Foundation §A.4 — "SHADI这件事下周再提醒我" reschedules an existing
+  // task's due_at only, never its status. resolvedDate null means the
+  // phrase couldn't be parsed into a date — shown so Chris can fix wording
+  // rather than silently doing nothing.
+  const [pendingTaskReschedule, setPendingTaskReschedule] = useState<{ whenPhrase: string; resolvedDate: string | null; matches: ExecutiveTask[] } | null>(null);
 
   // Task 17 — GIA File Inbox: chat-first upload + registry search. Works
   // with or without a resolved customer, same as Business Capture.
@@ -143,6 +150,7 @@ export function BusinessAssistant() {
     setCaptureError(null);
     setCaptureDone(new Set());
     setPendingTaskLifecycle(null);
+    setPendingTaskReschedule(null);
     setFileSearchReply(null);
   }
 
@@ -155,6 +163,19 @@ export function BusinessAssistant() {
     const res = await findOpenTasksByKeyword(m.keyword);
     if (!res.ok || res.matches.length === 0) return false;
     setPendingTaskLifecycle({ action: m.action, matches: res.matches });
+    return true;
+  }
+
+  // GIA Foundation §A.4 — "SHADI这件事下周再提醒我". Only status-preserving
+  // date changes; checked alongside the lifecycle command since both are
+  // updates to an EXISTING task, not new content to capture.
+  async function tryTaskRescheduleCommand(text: string): Promise<boolean> {
+    const m = matchTaskRescheduleCommand(text);
+    if (!m) return false;
+    const res = await findOpenTasksByKeyword(m.keyword);
+    if (!res.ok || res.matches.length === 0) return false;
+    const resolvedDate = parseRelativeDateZh(m.whenPhrase);
+    setPendingTaskReschedule({ whenPhrase: m.whenPhrase, resolvedDate, matches: res.matches });
     return true;
   }
 
@@ -273,6 +294,19 @@ export function BusinessAssistant() {
     }
   }
 
+  async function handleConfirmTaskReschedule(taskId: string) {
+    if (!pendingTaskReschedule || !pendingTaskReschedule.resolvedDate) return;
+    setCaptureBusy('all');
+    const res = await rescheduleTask(taskId, pendingTaskReschedule.resolvedDate);
+    setCaptureBusy(null);
+    if (res.ok) {
+      setChatHistory((prev) => [...prev, { role: 'assistant', content: `✓ 已改期至 ${pendingTaskReschedule.resolvedDate}。` }]);
+      setPendingTaskReschedule(null);
+    } else {
+      setCaptureError(res.error);
+    }
+  }
+
   // Task 16 §三/§十二 — the unified router. Runs on both the top input
   // (works with no customer loaded yet) and the chat box (works with a
   // customer already loaded, so "他"/"这个客户" resolves via ctx.customer).
@@ -283,6 +317,7 @@ export function BusinessAssistant() {
     if (!t) return false;
 
     if (await tryTaskLifecycleCommand(t)) return true;
+    if (await tryTaskRescheduleCommand(t)) return true;
 
     setCaptureLoading(true);
     setCaptureError(null);
@@ -692,6 +727,29 @@ export function BusinessAssistant() {
             ))}
           </div>
           <button onClick={() => setPendingTaskLifecycle(null)} style={{ marginTop: 8, padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>取消</button>
+        </div>
+      )}
+
+      {pendingTaskReschedule && (
+        <div style={{ padding: '16px 20px', background: 'rgba(203,168,92,0.05)', border: '1px solid rgba(203,168,92,0.25)', borderRadius: 12, marginBottom: 20 }}>
+          {!pendingTaskReschedule.resolvedDate ? (
+            <div style={{ fontSize: 12.5, color: RED }}>无法识别日期"{pendingTaskReschedule.whenPhrase}"，请换个说法（例如"周五"/"下周一"/"明天"）。</div>
+          ) : (
+            <>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: GOLD, marginBottom: 8 }}>
+                {pendingTaskReschedule.matches.length > 1 ? '找到多个匹配的待办，请选择：' : `将改期至 ${pendingTaskReschedule.resolvedDate}：`}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {pendingTaskReschedule.matches.map((t) => (
+                  <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
+                    <span style={{ fontSize: 12.5, color: TEXT }}>{t.title}</span>
+                    <button disabled={captureBusy === 'all'} onClick={() => handleConfirmTaskReschedule(t.id)} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(111,191,142,0.14)', border: '1px solid rgba(111,191,142,0.4)', color: GREEN }}>确认</button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          <button onClick={() => setPendingTaskReschedule(null)} style={{ marginTop: 8, padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>取消</button>
         </div>
       )}
 
