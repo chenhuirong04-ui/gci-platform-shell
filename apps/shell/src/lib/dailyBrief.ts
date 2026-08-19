@@ -146,6 +146,9 @@ function whyItMatters(a: BossAction): string {
     case 'mia_error': return 'MIA 可能已停止正常开发新客户';
     case 'mia_needs_chris': return '有真实回复，只有你能判断如何回应';
     case 'mia_warning': return 'MIA 出现异常，需要留意是否影响明天的产出';
+    case 'chanya_error': return 'Chanya 系统状态异常，可能影响客户正常使用';
+    case 'chanya_payment_failure': return '支付失败可能导致客户订阅中断';
+    case 'chanya_needs_chris': return '有账户/订阅类问题只有你能判断如何处理';
     case 'calendar_meeting': return '会议即将开始';
     case 'inventory_alert': return '可能影响交付或现金流';
     case 'invoice_review': return '发票卡在审批，影响回款节奏';
@@ -167,6 +170,9 @@ function suggestion(a: BossAction): string {
     case 'mia_error': return '检查 MIA 运行状态';
     case 'mia_needs_chris': return '今天回复或判断这条线索';
     case 'mia_warning': return '留意 MIA 后续运行情况';
+    case 'chanya_error': return '检查 Chanya 运行状态';
+    case 'chanya_payment_failure': return '今天核实支付失败原因';
+    case 'chanya_needs_chris': return '今天查看并处理这条问题';
     case 'calendar_meeting': return '提前确认材料/是否需要准备';
     case 'inventory_alert': return '今天安排补货或核实';
     case 'invoice_review': return '今天审批或退回';
