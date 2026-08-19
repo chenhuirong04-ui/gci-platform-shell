@@ -17,6 +17,10 @@ const CARD = 'rgba(255,255,255,0.025)';
 const BORD = 'rgba(255,255,255,0.07)';
 
 const PRIORITY_COLOR: Record<ActionPriority, string> = { P1: RED, P2: AMBER, P3: MUTED };
+// Home Daily Brief §一 — P1/P2/P3 stay as the internal sort key (unchanged
+// everywhere else in the app) but are never shown as raw codes on Home;
+// Chris sees the plain-language meaning instead.
+const PRIORITY_LABEL: Record<ActionPriority, string> = { P1: '立即处理', P2: '需要关注', P3: '一般事项' };
 
 export function HomeDailyBrief() {
   const navigate = useNavigate();
@@ -24,6 +28,7 @@ export function HomeDailyBrief() {
   const [todaysActions, setTodaysActions] = useState<string[]>([]);
   const [totalDeduped, setTotalDeduped] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
+  const [showRaw, setShowRaw] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     getDailyBrief().then((res) => {
@@ -72,17 +77,32 @@ export function HomeDailyBrief() {
               return (
                 <div key={i} style={{ padding: '14px 16px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                    <span style={{ fontSize: 9.5, fontWeight: 700, color, background: `${color}18`, border: `1px solid ${color}40`, borderRadius: 4, padding: '2px 6px', fontFamily: 'IBM Plex Mono,monospace' }}>
-                      {it.priority}
+                    <span style={{ fontSize: 9.5, fontWeight: 700, color, background: `${color}18`, border: `1px solid ${color}40`, borderRadius: 4, padding: '2px 6px' }}>
+                      {PRIORITY_LABEL[it.priority]}
                     </span>
                     <span style={{ fontSize: 9.5, color: '#8FA6D4', background: 'rgba(143,166,212,0.12)', borderRadius: 4, padding: '2px 6px' }}>
                       {SOURCE_LABEL[it.source]}
                     </span>
                     <span style={{ fontSize: 13.5, fontWeight: 700, color: colors.textPrimary }}>{it.subject}</span>
                   </div>
-                  <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.4 }}><strong style={{ color: colors.textPrimary }}>事实：</strong>{it.fact}</div>
+                  <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.4 }}><strong style={{ color: colors.textPrimary }}>发生了什么：</strong>{it.fact}</div>
                   <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.4 }}><strong style={{ color: colors.textPrimary }}>为什么重要：</strong>{it.whyItMatters}</div>
-                  <div style={{ fontSize: 11.5, color: GOLD }}><strong>建议：</strong>{it.suggestion}</div>
+                  <div style={{ fontSize: 11.5, color: GOLD }}><strong>建议你做什么：</strong>{it.suggestion}</div>
+                  {it.rawFact && (
+                    <div>
+                      <span
+                        onClick={() => setShowRaw((prev) => { const next = new Set(prev); next.has(i) ? next.delete(i) : next.add(i); return next; })}
+                        style={{ fontSize: 10.5, color: MUTED, cursor: 'pointer', textDecoration: 'underline' }}
+                      >
+                        {showRaw.has(i) ? '收起原始信息' : '查看原始信息'}
+                      </span>
+                      {showRaw.has(i) && (
+                        <div style={{ fontSize: 10.5, color: MUTED, marginTop: 4, padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, fontFamily: 'IBM Plex Mono,monospace' }}>
+                          {it.rawFact}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div
                     onClick={() => go(it.deepLink)}
                     style={{ marginTop: 2, alignSelf: 'flex-start', fontSize: 11, color: colors.textPrimary, background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, borderRadius: 7, padding: '5px 12px', cursor: 'pointer' }}

@@ -18,6 +18,12 @@ export interface BriefItem {
   deepLink: string;
   source: ActionSource;
   dueAt: string | null;
+  // Home Daily Brief §六 — when `fact` is a translated/rewritten version of
+  // raw technical text (currently: Systems Registry notes, often in
+  // English), the untouched original is kept here so the UI can offer
+  // "查看原始信息" without ever putting raw English in the primary line.
+  // null when `fact` already IS the raw source text (nothing to hide).
+  rawFact: string | null;
 }
 
 export interface ContactItem {
@@ -97,6 +103,38 @@ function businessKey(a: BossAction): string {
   return `__standalone__${a.id}`;
 }
 
+// Home Daily Brief §三 — Systems Registry `notes` is free text Chris/an
+// engineer typed when the system was registered, often in English
+// technical shorthand ("Uses growth_* tables..."). This is the only place
+// in the Brief where raw untranslated text was leaking through to "发生了
+// 什么". Known review-status systems get a specific, real-business-meaning
+// translation; anything else gets an honest generic Chinese line instead of
+// its raw notes — the raw notes are never dropped, just moved to rawFact
+// for a "查看原始信息" toggle instead of the headline.
+const SYSTEM_REVIEW_TEXT: Record<string, { fact: string; why: string; suggestion: string }> = {
+  'Chanya Growth Agent': {
+    fact: 'Growth Agent 当前仍在使用 Chanya 共用数据库中的 growth_* 表。',
+    why: '系统边界还没有完全确认，后续维护和权限可能混在一起。',
+    suggestion: '确认是否继续共用数据库，或计划独立。',
+  },
+  'MIA / GCI AI Sales Agent': {
+    fact: 'MIA 的 Production 环境仍需账号密码登录，对应的 Supabase 项目也还没有确认。',
+    why: '目前无法直接核实 MIA 的真实运行状态，可能影响后续对接和数据核对。',
+    suggestion: '确认登录方式，并核实对应的 Supabase 项目归属。',
+  },
+};
+
+function systemReviewText(a: BossAction): { fact: string; why: string; suggestion: string } {
+  const known = a.related_system ? SYSTEM_REVIEW_TEXT[a.related_system] : undefined;
+  if (known) return known;
+  const name = a.related_system || '该系统';
+  return {
+    fact: `「${name}」的资产状态仍待确认。`,
+    why: '系统资产状态尚未确认，可能存在维护或权限风险。',
+    suggestion: '核实该系统是否仍在使用，并决定保留或归档。',
+  };
+}
+
 function whyItMatters(a: BossAction): string {
   switch (a.action_type) {
     case 'quotation_followup': return '项目长期停滞，可能流失';
@@ -113,7 +151,7 @@ function whyItMatters(a: BossAction): string {
     case 'invoice_review': return '发票卡在审批，影响回款节奏';
     case 'agent_decision': return '需要你决定资产去留';
     case 'agent_warning': return '需要留意是否影响正常运行';
-    case 'systems_review': case 'systems_audit': return '系统资产状态待确认';
+    case 'systems_review': case 'systems_audit': return systemReviewText(a).why;
     default: return a.priority === 'P1' ? '优先级最高，今天需要处理' : '需要关注';
   }
 }
@@ -132,8 +170,21 @@ function suggestion(a: BossAction): string {
     case 'calendar_meeting': return '提前确认材料/是否需要准备';
     case 'inventory_alert': return '今天安排补货或核实';
     case 'invoice_review': return '今天审批或退回';
+    case 'systems_review': case 'systems_audit': return systemReviewText(a).suggestion;
     default: return a.priority === 'P1' ? '今天优先处理' : '按计划推进';
   }
+}
+
+// Home Daily Brief §二 — "发生了什么": for systems_review/systems_audit this
+// overrides the raw Systems Registry notes with a real Chinese business
+// description; every other action_type's summary is already a Chinese,
+// business-worded sentence built in actionCenter.ts, so it's used as-is.
+function factFor(a: BossAction): { fact: string; rawFact: string | null } {
+  if (a.action_type === 'systems_review' || a.action_type === 'systems_audit') {
+    const raw = a.summary || a.title;
+    return { fact: systemReviewText(a).fact, rawFact: raw };
+  }
+  return { fact: a.summary || a.title, rawFact: null };
 }
 
 function deepLinkFor(a: BossAction, key: string): string {
@@ -180,10 +231,12 @@ export async function getDailyBrief(): Promise<{ ok: true; brief: DailyBrief } |
       return 0;
     })[0];
 
+    const { fact, rawFact } = factFor(rep);
     deduped.push({
       priority: rep.priority,
       subject: rep.related_customer || rep.title.split(' — ')[0] || rep.title,
-      fact: rep.summary || rep.title,
+      fact,
+      rawFact,
       whyItMatters: whyItMatters(rep),
       suggestion: suggestion(rep),
       deepLink: deepLinkFor(rep, key),
