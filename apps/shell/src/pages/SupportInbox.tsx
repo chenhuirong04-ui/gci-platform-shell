@@ -1,9 +1,12 @@
 // GCI Executive Desk — Task 18.2: GIA Support Inbox.
 // Email support reuses existing Gmail read capability via "转为客服工单"
 // on the Email Assistant detail page (feeds a thread in here). WhatsApp
-// has no API integration this round — manual entry only (structural
-// placeholder, per spec). Every reply is a draft only — nothing here
-// ever sends an Email or WhatsApp message, changes a subscription, adds
+// intake (GIA WhatsApp Intake V1) reads real messages captured by
+// api/whatsapp/webhook.ts — this page never sends anything itself; a
+// "WhatsApp Draft" is generated for review only, always shown as 未发送.
+// Manual ticket entry (below) still exists for anything outside the
+// automated intake. Every reply is a draft only — nothing here ever
+// sends an Email or WhatsApp message, changes a subscription, adds
 // minutes, or issues a refund.
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -12,6 +15,10 @@ import {
   listTickets, updateTicketStatus, classifySupportMessage, createTicket, draftTicketReply,
   type SupportTicket, type SupportStatus, type SupportChannel, type TicketClassification, type TicketDraft,
 } from '../lib/supportTickets';
+import {
+  getWhatsAppMessages, CLASSIFICATION_LABEL,
+  type WhatsAppMessageRow,
+} from '../lib/whatsapp';
 
 const GOLD = '#CBA85C';
 const RED = '#E0846A';
@@ -22,13 +29,14 @@ const TEXT = colors.textPrimary;
 const CARD = 'rgba(255,255,255,0.025)';
 const BORD = 'rgba(255,255,255,0.07)';
 
-type ViewKey = 'open' | 'in_progress' | 'resolved' | 'needs_chris';
+type ViewKey = 'open' | 'in_progress' | 'resolved' | 'needs_chris' | 'whatsapp';
 
 const VIEWS: { key: ViewKey; label: string }[] = [
   { key: 'open', label: '待处理' },
   { key: 'in_progress', label: '处理中' },
   { key: 'resolved', label: '已解决' },
   { key: 'needs_chris', label: '需要 Chris' },
+  { key: 'whatsapp', label: 'WhatsApp Intake' },
 ];
 
 const PRIORITY_COLOR: Record<string, string> = { P1: RED, P2: AMBER, P3: MUTED };
@@ -67,6 +75,18 @@ export function SupportInbox() {
   const [draftBusy, setDraftBusy] = useState<SupportChannel | null>(null);
   const [draftErr, setDraftErr] = useState<string | null>(null);
 
+  // GIA WhatsApp Intake V1 — real messages from whatsapp_messages, separate
+  // list from the ticket views above (a WhatsApp message may have been
+  // routed to a followup/task instead of a ticket, so it wouldn't appear
+  // in the ticket list at all).
+  const [waMessages, setWaMessages] = useState<WhatsAppMessageRow[]>([]);
+  const [waLoading, setWaLoading] = useState(true);
+  const [waError, setWaError] = useState<string | null>(null);
+  const [waSelected, setWaSelected] = useState<WhatsAppMessageRow | null>(null);
+  const [waDraft, setWaDraft] = useState<TicketDraft | null>(null);
+  const [waDraftBusy, setWaDraftBusy] = useState(false);
+  const [waDraftErr, setWaDraftErr] = useState<string | null>(null);
+
   async function load() {
     setLoading(true);
     setError(null);
@@ -76,10 +96,36 @@ export function SupportInbox() {
     setLoading(false);
   }
 
+  async function loadWhatsApp() {
+    setWaLoading(true);
+    setWaError(null);
+    const res = await getWhatsAppMessages(100);
+    if (res.ok) setWaMessages(res.rows);
+    else setWaError(res.error);
+    setWaLoading(false);
+  }
+
   useEffect(() => {
-    load();
+    if (view === 'whatsapp') loadWhatsApp();
+    else load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
+
+  async function handleWhatsAppDraft() {
+    if (!waSelected) return;
+    setWaDraftBusy(true);
+    setWaDraftErr(null);
+    const res = await draftTicketReply({
+      channel: 'whatsapp',
+      rawContent: waSelected.text_content,
+      summaryZh: waSelected.summary_zh || undefined,
+      suggestedAction: waSelected.suggested_action || undefined,
+      customerName: waSelected.crm_customers?.customer_name || waSelected.contact_name || undefined,
+    });
+    setWaDraftBusy(false);
+    if (res.ok) setWaDraft(res.data);
+    else setWaDraftErr(res.error);
+  }
 
   function openTicket(t: SupportTicket) {
     setSelected(t);
@@ -209,6 +255,79 @@ export function SupportInbox() {
         ))}
       </div>
 
+      {view === 'whatsapp' ? (
+        <div style={{ display: 'flex', gap: 20 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {waLoading && <div style={{ fontSize: 13, color: MUTED }}>加载中…</div>}
+            {waError && <div style={{ fontSize: 13, color: RED }}>读取失败:{waError}</div>}
+            {!waLoading && !waError && waMessages.length === 0 && (
+              <div style={{ padding: '18px 20px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, fontSize: 13, color: MUTED }}>暂无 WhatsApp 消息。</div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {waMessages.map((m) => (
+                <div
+                  key={m.id}
+                  onClick={() => { setWaSelected(m); setWaDraft(null); setWaDraftErr(null); }}
+                  style={{ padding: '12px 16px', borderRadius: 10, cursor: 'pointer', background: waSelected?.id === m.id ? 'rgba(203,168,92,0.08)' : CARD, border: `1px solid ${waSelected?.id === m.id ? 'rgba(203,168,92,0.4)' : BORD}` }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 9.5, color: '#6FBF8E', background: 'rgba(111,191,142,0.14)', borderRadius: 4, padding: '2px 6px', fontWeight: 700 }}>WhatsApp</span>
+                    {m.priority && <span style={{ fontSize: 10, fontWeight: 700, color: PRIORITY_COLOR[m.priority], background: `${PRIORITY_COLOR[m.priority]}18`, borderRadius: 4, padding: '2px 6px' }}>{m.priority}</span>}
+                    <span style={{ fontSize: 12.5, fontWeight: 700, color: TEXT }}>{m.contact_name || `+${m.phone}`}</span>
+                    <span style={{ fontSize: 10.5, color: MUTED }}>{m.crm_customers?.customer_name ? `客户：${m.crm_customers.customer_name}` : '未识别联系人'}</span>
+                    <div style={{ flex: 1 }} />
+                    <span style={{ fontSize: 10.5, color: MUTED }}>{fmtTime(m.wa_timestamp)}</span>
+                  </div>
+                  <div style={{ fontSize: 12.5, color: TEXT, marginBottom: 4 }}>{m.summary_zh || m.text_content.slice(0, 60)}</div>
+                  {m.suggested_action && <div style={{ fontSize: 11, color: MUTED }}>建议: {m.suggested_action}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {waSelected && (
+            <div style={{ width: 420, flexShrink: 0, border: `1px solid ${BORD}`, borderRadius: 12, background: CARD, padding: '16px 18px', height: 'fit-content' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                {waSelected.priority && <span style={{ fontSize: 10, fontWeight: 700, color: PRIORITY_COLOR[waSelected.priority], background: `${PRIORITY_COLOR[waSelected.priority]}18`, borderRadius: 4, padding: '2px 6px' }}>{waSelected.priority}</span>}
+                <span style={{ fontSize: 14, fontWeight: 700, color: TEXT }}>{waSelected.contact_name || `+${waSelected.phone}`}</span>
+              </div>
+              <div style={{ fontSize: 11, color: MUTED, marginBottom: 12 }}>
+                {waSelected.crm_customers?.customer_name ? `客户：${waSelected.crm_customers.customer_name}` : '未识别联系人（不在 CRM 中）'}
+                {waSelected.classification && ` · ${CLASSIFICATION_LABEL[waSelected.classification]}`}
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 10.5, color: GOLD, fontWeight: 700, marginBottom: 4 }}>客户原始内容</div>
+                <div style={{ fontSize: 12, color: TEXT, lineHeight: 1.6, whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.15)', borderRadius: 6, padding: '8px 10px', maxHeight: 140, overflowY: 'auto' }}>{waSelected.text_content}</div>
+              </div>
+
+              {waSelected.summary_zh && <div style={{ marginBottom: 6 }}><span style={{ fontSize: 10.5, color: GOLD, fontWeight: 700 }}>GIA 摘要:</span> <span style={{ fontSize: 12, color: TEXT }}>{waSelected.summary_zh}</span></div>}
+              {waSelected.suggested_action && <div style={{ marginBottom: 14 }}><span style={{ fontSize: 10.5, color: GOLD, fontWeight: 700 }}>建议动作:</span> <span style={{ fontSize: 12, color: MUTED }}>{waSelected.suggested_action}</span></div>}
+
+              <div style={{ fontSize: 11, color: MUTED, marginBottom: 14 }}>
+                {waSelected.linked_ticket_id && '已建客服工单'}
+                {waSelected.linked_followup_id && '已建 CRM 跟进'}
+                {waSelected.linked_task_id && '已建待办事项'}
+                {!waSelected.linked_ticket_id && !waSelected.linked_followup_id && !waSelected.linked_task_id && '尚未关联记录'}
+              </div>
+
+              <div style={{ borderTop: `1px solid ${BORD}`, paddingTop: 12 }}>
+                <div style={{ fontSize: 10.5, color: GOLD, fontWeight: 700, marginBottom: 8 }}>起草回复（不自动发送）</div>
+                <button disabled={waDraftBusy} onClick={handleWhatsAppDraft} style={{ padding: '6px 14px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT, marginBottom: 10 }}>
+                  {waDraftBusy ? '生成中…' : 'WhatsApp Draft'}
+                </button>
+                {waDraftErr && <div style={{ fontSize: 11.5, color: RED, marginBottom: 8 }}>{waDraftErr}</div>}
+                {waDraft && (
+                  <div style={{ padding: '10px 12px', background: 'rgba(203,168,92,0.05)', border: '1px solid rgba(203,168,92,0.2)', borderRadius: 8 }}>
+                    <div style={{ fontSize: 12, color: TEXT, lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: 200, overflowY: 'auto' }}>{waDraft.body}</div>
+                    <div style={{ fontSize: 10.5, color: MUTED, marginTop: 8 }}>草稿仅保存在当前页面，未发送</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
       <div style={{ display: 'flex', gap: 20 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           {loading && <div style={{ fontSize: 13, color: MUTED }}>加载中…</div>}
@@ -280,6 +399,7 @@ export function SupportInbox() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

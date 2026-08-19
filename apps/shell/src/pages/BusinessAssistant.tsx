@@ -37,6 +37,7 @@ import {
   type GiaBusinessMemoryRow,
 } from '../lib/businessMemory';
 import { extractCompanyName } from '../lib/giaFiles';
+import { matchWhatsAppQuery, answerWhatsAppQuery } from '../lib/whatsapp';
 import type { ExecutiveTask } from '../lib/executiveTasks';
 import type { CrmCustomer } from '../lib/crmSupabase';
 
@@ -237,6 +238,15 @@ export function BusinessAssistant() {
         : `Business Memory 中未找到匹配的规则（未识别出具体公司/主体名称）。`;
     }
     return formatMemoryRows(rows);
+  }
+
+  // GIA WhatsApp Intake V1 — "今天 WhatsApp 有什么要处理？" / "SHADI 最近
+  // WhatsApp 说了什么？" / "有哪些 WhatsApp 客户还没回复？". Reads only real
+  // rows already captured by api/whatsapp/webhook.ts — never fabricates.
+  async function tryWhatsAppQuery(text: string): Promise<string | null> {
+    const m = matchWhatsAppQuery(text);
+    if (!m.kind) return null;
+    return answerWhatsAppQuery(m.kind, m.customerName);
   }
 
   // GIA Foundation §C — "帮我给这个客户准备劳工报价": combine the currently
@@ -528,6 +538,11 @@ export function BusinessAssistant() {
       setFileSearchReply(memoryReply);
       return;
     }
+    const whatsappReply = await tryWhatsAppQuery(t);
+    if (whatsappReply) {
+      setFileSearchReply(whatsappReply);
+      return;
+    }
     const quotePrepReply = await tryQuotePrepCommand(t, ctx?.customer ?? null);
     if (quotePrepReply) {
       setFileSearchReply(quotePrepReply);
@@ -594,6 +609,13 @@ export function BusinessAssistant() {
     const memoryReply = await tryBusinessMemoryQuery(question);
     if (memoryReply) {
       setChatHistory((prev) => [...prev, { role: 'user', content: question }, { role: 'assistant', content: memoryReply }]);
+      return;
+    }
+
+    // GIA WhatsApp Intake V1 — works mid-conversation too.
+    const whatsappReply = await tryWhatsAppQuery(question);
+    if (whatsappReply) {
+      setChatHistory((prev) => [...prev, { role: 'user', content: question }, { role: 'assistant', content: whatsappReply }]);
       return;
     }
 
