@@ -428,7 +428,10 @@ export function BusinessAssistant() {
     const t = text.trim();
     if (!t) return;
     setFileSearchReply(null);
-    if (BARE_NAME_RE.test(t)) {
+    // A bare-looking string ("SHADI这件事下周再提醒我") can still be a task
+    // lifecycle/reschedule command with no spaces or listed punctuation —
+    // check those first so they aren't swallowed as a customer-name switch.
+    if (BARE_NAME_RE.test(t) && !matchTaskLifecycleCommand(t) && !matchTaskRescheduleCommand(t)) {
       resolve(t);
       return;
     }
