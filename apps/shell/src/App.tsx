@@ -20,6 +20,8 @@ import { EmailAssistant } from './pages/EmailAssistant';
 import { BusinessAssistant } from './pages/BusinessAssistant';
 import { CrmCustomers } from './pages/CrmCustomers';
 import { SupportInbox } from './pages/SupportInbox';
+import { MiaLeads } from './pages/MiaLeads';
+import { MiaLeadDetail } from './pages/MiaLeadDetail';
 import TradeModule from '../../../modules/trade/TradeModule';
 import CrmModule from '../../../modules/crm/CrmModule';
 import QuotationModule from '../../../modules/quotation/QuotationModule';
@@ -158,6 +160,8 @@ function Shell() {
             }
           />
           <Route path="/support-inbox" element={<SupportInbox />} />
+          <Route path="/mia-leads" element={<MiaLeads />} />
+          <Route path="/mia-leads/:leadId" element={<MiaLeadDetail />} />
           <Route path="/access-denied" element={<AccessDenied />} />
 
           <Route

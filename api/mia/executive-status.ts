@@ -6,6 +6,30 @@
 // this function makes exactly one GET call and returns MIA's own bounded
 // summary as-is — no additional data is fetched, nothing is written
 // anywhere, on either side.
+//
+// Task 18.4 (MIA Detail Bridge) — audited live: MIA's response today only
+// has summary counts + an always-empty `top_leads` array with no stable id
+// (fields: company/contact/country/reason/current_stage/next_action/
+// source_ref — no lead_id, so GCI can't deep-link to a specific lead off
+// it). To power a GIA-side lead list + deep-linkable detail page without
+// building a second database, MIA's own /api/executive-status needs to
+// start additionally returning:
+//   "recent_leads": [{
+//     "lead_id": string, "company_name": string, "country": string|null,
+//     "industry": string|null, "contact_name": string|null,
+//     "email": string|null, "whatsapp": string|null, "score": number|null,
+//     "priority": string|null, "status": string|null,
+//     "why_relevant": string|null, "created_at": string
+//   }, ...]   // today's leads, most recent first, capped at 10
+//   "needs_chris_items": [{
+//     "id": string, "lead_id": string|null, "company_name": string,
+//     "reason": string, "suggested_action": string|null,
+//     "priority": string|null, "created_at": string
+//   }, ...]
+// This adapter needs NO code change to relay those once MIA sends them —
+// it already passes through `...data` as-is below. Until MIA's side adds
+// them, GCI's lead list/detail pages show an honest empty state rather
+// than fabricating data.
 export const config = { runtime: 'edge' };
 
 const MIA_BASE_URL = process.env.MIA_BASE_URL || 'https://gci-ai-sales-agent.vercel.app';

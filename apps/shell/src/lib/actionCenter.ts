@@ -387,7 +387,10 @@ export async function getBossActions(): Promise<
         related_customer: null,
         related_system: 'MIA',
         action_type: 'mia_needs_chris',
-        deep_link: '/',
+        // Task 18.4 fix: was '/' — clicking this bounced straight back to
+        // Home instead of showing the actual items. Now opens the real
+        // needs-Chris list in the MIA lead bridge.
+        deep_link: '/mia-leads?tab=needs_chris',
       });
     } else if (d.status === 'warning') {
       actions.push({

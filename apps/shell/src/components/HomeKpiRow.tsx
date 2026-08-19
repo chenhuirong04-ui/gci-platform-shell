@@ -76,7 +76,9 @@ export function HomeKpiRow() {
     { label: '等你决定', value: decisions, color: RED, onClick: () => navigate('/decisions') },
     { label: '待执行', value: pendingExec, color: AMBER, onClick: () => navigate('/decisions') },
     { label: '重要客户邮件', value: importantEmails, color: GREEN, onClick: () => navigate('/email-assistant') },
-    { label: '今日新开发潜客(MIA)', value: miaLeadsToday, color: GOLD, onClick: () => navigate('/actions?filter=mia') },
+    // Task 18.4 — was '/actions?filter=mia' (a generic Boss Action filter,
+    // not an actual lead list). Now opens the real MIA lead bridge.
+    { label: '今日新开发潜客(MIA)', value: miaLeadsToday, color: GOLD, onClick: () => navigate('/mia-leads') },
   ];
 
   return (
