@@ -1,3 +1,15 @@
+// ⚠️ LEGACY / INACTIVE — GCI Home Final Cleanup, GIA WhatsApp Intake V1
+// (2026-08-19). Confirmed by Chris: not registered with Meta, not
+// receiving real traffic — carried over from the old "DEAL" repo
+// (leads.globalcareinfo.com) during the Day 4-5 CRM migration
+// (commit 5c1eaba, moved from api/whatsapp-webhook.ts). This file is
+// intentionally left in place, unmodified, as history — it must NEVER be
+// registered as a live Meta webhook, its auto-reply must NEVER be enabled,
+// and it must NEVER be pointed at Notion again. The real, current WhatsApp
+// intake is api/whatsapp/webhook.ts (GIA WhatsApp Intake V1) — that is the
+// only endpoint that should ever be configured in Meta's WhatsApp Business
+// Callback URL setting.
+//
 // Vercel Edge Runtime — WhatsApp Cloud API Webhook (minimal stable v2)
 // Flow: receive message → write Notion WA Inbox → send fixed auto-reply
 // No AI · No Telegram · No Follow-up Log
