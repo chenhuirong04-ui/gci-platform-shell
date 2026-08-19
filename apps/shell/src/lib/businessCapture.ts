@@ -76,6 +76,12 @@ export interface ResolvedCaptureItem {
   resolvedNextFollowUpAt: string | null; // ISO date
   resolvedTodoDueAt: string | null;
   resolvedCommitmentDueAt: string | null;
+  // A CRM_FOLLOWUP naming someone who isn't in CRM yet (no exact match, no
+  // ambiguous candidates either) must never dead-end — it falls back to an
+  // executive_task instead of failing, per the routing-priority fix: a
+  // customer not existing yet is never a reason to drop what Chris asked
+  // to be tracked.
+  fallbackToTask: boolean;
 }
 
 async function resolveCustomer(name: string | null): Promise<{ matched: CrmCustomer | null; candidates: CrmCustomer[] | null; isNew: boolean }> {
@@ -125,6 +131,8 @@ export async function resolveCaptureItems(
       effectiveType = 'CRM_FOLLOWUP';
     }
 
+    const fallbackToTask = effectiveType === 'CRM_FOLLOWUP' && !matched && (!candidates || candidates.length === 0);
+
     const resolvedNextFollowUpAt = raw.next_follow_up_at ? parseRelativeDateZh(raw.next_follow_up_at) : null;
     const resolvedTodoDueAt = raw.todo_due_at ? parseRelativeDateZh(raw.todo_due_at) : null;
     const resolvedCommitmentDueAt = raw.commitment_due_at ? parseRelativeDateZh(raw.commitment_due_at) : null;
@@ -151,11 +159,15 @@ export async function resolveCaptureItems(
         if (resolvedNextFollowUpAt) summaryLines.push(`我方下一步：${resolvedNextFollowUpAt} 再次联系`);
         break;
       case 'CRM_FOLLOWUP':
-        summaryLines.push(
-          downgradedFromNewCustomer
-            ? `客户：${custName}（已存在，记为跟进，不会重复建档）`
-            : `客户：${custName ?? '(未指定)'}`
-        );
+        if (fallbackToTask) {
+          summaryLines.push(`${custName ?? '(未指定)'}暂未建立客户档案，已先建立商务待办进行跟踪`);
+        } else {
+          summaryLines.push(
+            downgradedFromNewCustomer
+              ? `客户：${custName}（已存在，记为跟进，不会重复建档）`
+              : `客户：${custName ?? '(未指定)'}`
+          );
+        }
         if (raw.followup_notes) summaryLines.push(`跟进内容：${raw.followup_notes}`);
         if (raw.needs_summary && !raw.followup_notes) summaryLines.push(`跟进内容：${raw.needs_summary}`);
         if (raw.next_action) summaryLines.push(`下一步：${raw.next_action}`);
@@ -190,6 +202,7 @@ export async function resolveCaptureItems(
       resolvedNextFollowUpAt,
       resolvedTodoDueAt,
       resolvedCommitmentDueAt,
+      fallbackToTask,
     });
   }
   return out;
@@ -234,7 +247,24 @@ export async function confirmCaptureItem(item: ResolvedCaptureItem): Promise<{ o
       return { ok: true };
     }
     case 'CRM_FOLLOWUP': {
-      if (!item.matchedCustomer) return { ok: false, error: '未找到匹配的客户' };
+      // Routing-priority fix: naming someone who isn't in CRM yet must
+      // never dead-end the capture — fall back to an executive_task so
+      // what Chris asked to be tracked is still recorded somewhere, rather
+      // than failing with "未找到匹配的客户" after he's already confirmed.
+      if (!item.matchedCustomer) {
+        if (!item.fallbackToTask) return { ok: false, error: '未找到匹配的客户' };
+        const { raw } = item;
+        const custName = raw.customer_name || '(未指定)';
+        const notesParts = [raw.followup_notes, raw.needs_summary].filter(Boolean);
+        const created = await createExecutiveTask({
+          title: `${custName} — ${notesParts[0] || raw.next_action || raw.raw_fragment}`.slice(0, 120),
+          description: notesParts.join(' · ') || raw.raw_fragment,
+          businessArea: 'OTHER',
+          dueAt: item.resolvedNextFollowUpAt || null,
+        });
+        if (!created.ok) return created;
+        return { ok: true };
+      }
       const res = await logFollowup({
         customerId: item.matchedCustomer.id,
         notes: item.raw.followup_notes || item.raw.needs_summary || item.raw.raw_fragment,

@@ -66,6 +66,7 @@ For each intent, extract only the fields that are actually stated. Never fabrica
 }
 
 Rules:
+- CRITICAL — explicit capture/reminder trigger phrases: if the text contains an explicit instruction to record/create/track something for Chris himself — patterns like "帮我记一下" / "新建" / "建一个提醒" / "提醒我" / "帮我跟进" / "做好跟踪" / "记录一下" / "加到待办" (or English equivalents: "remind me", "create a reminder", "track this", "add to my to-do", "make sure I follow up") — you MUST classify it as a capturable type, NEVER as LOOKUP or UNKNOWN, even though the sentence reads like an instruction to you rather than a plain factual statement. If a specific person or company is named as who this is about, classify as CRM_FOLLOWUP with customer_name set to that name (per the rule above: assume they're an existing customer unless the text clearly says they're new) and followup_notes describing what's being discussed; if no specific person/company is named, classify as BUSINESS_TODO. Only skip next_follow_up_at/todo_due_at if no date was actually stated — never invent one, but you must still emit the intent itself rather than dropping it as LOOKUP/UNKNOWN just because no date was given.
 - If Chris explicitly states where something should be recorded (e.g. "这个写进客户跟进" / "这个做成待办" / "这个做成承诺" / "这个记成决定" / "这个只记录不要提醒" / "下周三提醒我"), that explicit instruction OVERRIDES your own classification for that item — use the type Chris named.
 - Never output an intent with an empty/meaningless raw_fragment.
 - Respond with ONLY the JSON object, no other text.`;
