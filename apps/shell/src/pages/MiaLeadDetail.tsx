@@ -96,9 +96,12 @@ export function MiaLeadDetail() {
             <Field label="Email" value={lead.email ? <a href={`mailto:${lead.email}`} style={{ color: GOLD }}>{lead.email}</a> : '—'} />
             <Field label="WhatsApp" value={lead.whatsapp} />
             <Field label="当前状态" value={lead.status} />
-            <Field label="创建时间" value={fmtTime(lead.created_at)} />
+            <Field label="发现时间" value={fmtTime(lead.created_at)} />
           </div>
 
+          {lead.website_url && (
+            <Field label="网站" value={<a href={lead.website_url} target="_blank" rel="noreferrer" style={{ color: GOLD }}>{lead.website_url}</a>} />
+          )}
           <Field label="为什么相关 (why_relevant)" value={lead.why_relevant} />
 
           {relatedNeedsChris.length > 0 && (
@@ -107,7 +110,8 @@ export function MiaLeadDetail() {
               {relatedNeedsChris.map((it) => (
                 <div key={it.id} style={{ padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: `1px solid ${RED}30`, borderRadius: 8, marginBottom: 8 }}>
                   <div style={{ fontSize: 12.5, color: TEXT, marginBottom: 4 }}>{it.reason}</div>
-                  {it.suggested_action && <div style={{ fontSize: 11.5, color: MUTED }}>建议: {it.suggested_action}</div>}
+                  {it.suggested_action && <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 4 }}>建议: {it.suggested_action}</div>}
+                  {it.source_ref && <a href={it.source_ref} target="_blank" rel="noreferrer" style={{ fontSize: 10.5, color: GOLD }}>在 MIA 中查看 →</a>}
                 </div>
               ))}
             </div>

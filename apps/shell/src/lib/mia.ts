@@ -18,12 +18,16 @@ export interface MiaTopLead {
   source_ref: string | null;
 }
 
-// Task 18.4 — MIA Detail Bridge. Additive contract fields: MIA's
-// /api/executive-status does not populate these yet (confirmed live — see
-// api/mia/executive-status.ts's header comment for the exact contract MIA's
-// own side needs to implement). Optional here so the existing summary-only
-// response keeps working unchanged; the UI shows an honest empty state
-// until MIA starts sending real data through these fields.
+// Task 18.4 — MIA Detail Bridge. MIA's /api/executive-status now sends
+// real per-lead data, but with its own field names (no lead_id at all —
+// company name is the only stable identifier within a day's list) rather
+// than the contract originally proposed. Below, MiaLead/MiaNeedsChrisItem
+// are GCI's stable internal shape (unchanged, so MiaLeads.tsx/
+// MiaLeadDetail.tsx needed zero changes); mapRawLead/mapRawNeedsChrisItem
+// do the field-name translation from MIA's actual response. Every field
+// here traces to a real field MIA sent — nothing is invented. Fields MIA
+// doesn't provide (contact_name/email/whatsapp/status) stay null rather
+// than being guessed.
 export interface MiaLead {
   lead_id: string;
   company_name: string;
@@ -37,6 +41,7 @@ export interface MiaLead {
   status: string | null;
   why_relevant: string | null;
   created_at: string;
+  website_url?: string | null;
 }
 
 export interface MiaNeedsChrisItem {
@@ -47,6 +52,58 @@ export interface MiaNeedsChrisItem {
   suggested_action: string | null;
   priority: string | null;
   created_at: string;
+  source_ref?: string | null;
+}
+
+interface MiaRawLead {
+  company: string;
+  website_url?: string | null;
+  business_type?: string | null;
+  country?: string | null;
+  confidence?: number | null;
+  discovered_at: string;
+}
+
+interface MiaRawNeedsChrisItem {
+  company: string;
+  intent?: string | null;
+  risk_level?: string | null;
+  confidence?: number | null;
+  summary: string;
+  recommended_action?: string | null;
+  received_at: string;
+  source_ref?: string | null;
+}
+
+function mapRawLead(raw: MiaRawLead): MiaLead {
+  return {
+    lead_id: raw.company,
+    company_name: raw.company,
+    country: raw.country ?? null,
+    industry: raw.business_type ?? null,
+    contact_name: null,
+    email: null,
+    whatsapp: null,
+    score: typeof raw.confidence === 'number' ? Math.round(raw.confidence * 100) : null,
+    priority: null,
+    status: null,
+    why_relevant: null,
+    created_at: raw.discovered_at,
+    website_url: raw.website_url ?? null,
+  };
+}
+
+function mapRawNeedsChrisItem(raw: MiaRawNeedsChrisItem): MiaNeedsChrisItem {
+  return {
+    id: raw.source_ref || `${raw.company}-${raw.received_at}`,
+    lead_id: raw.company,
+    company_name: raw.company,
+    reason: raw.summary,
+    suggested_action: raw.recommended_action ?? null,
+    priority: raw.risk_level ?? null,
+    created_at: raw.received_at,
+    source_ref: raw.source_ref ?? null,
+  };
 }
 
 export interface MiaStatus {
@@ -69,8 +126,13 @@ export async function getMiaStatus(): Promise<{ ok: true; data: MiaStatus } | { 
   try {
     const res = await fetch(`${base()}/api/mia/executive-status`);
     const data = await res.json();
-    if (data?.ok) return { ok: true, data: data as MiaStatus };
-    return { ok: false, status: (data?.status as MiaAgentStatus) ?? 'no_data', error: data?.error ?? 'Unknown error' };
+    if (!data?.ok) return { ok: false, status: (data?.status as MiaAgentStatus) ?? 'no_data', error: data?.error ?? 'Unknown error' };
+    const mapped: MiaStatus = {
+      ...data,
+      recent_leads: Array.isArray(data.recent_leads) ? data.recent_leads.map(mapRawLead) : undefined,
+      needs_chris_items: Array.isArray(data.needs_chris_items) ? data.needs_chris_items.map(mapRawNeedsChrisItem) : undefined,
+    };
+    return { ok: true, data: mapped };
   } catch (e: any) {
     return { ok: false, status: 'no_data', error: String(e?.message ?? e) };
   }
