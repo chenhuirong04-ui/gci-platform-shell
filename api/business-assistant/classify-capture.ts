@@ -45,7 +45,7 @@ For each intent, extract only the fields that are actually stated. Never fabrica
   "intents": [
     {
       "type": "NEW_CUSTOMER" | "CRM_FOLLOWUP" | "BUSINESS_TODO" | "COMMITMENT" | "DECISION" | "BUSINESS_MEMORY" | "LOOKUP" | "DRAFT_EMAIL" | "DRAFT_WHATSAPP" | "UNKNOWN",
-      "customer_name": string | null, // populate whenever a specific customer/company is named anywhere in raw_fragment, even for a BUSINESS_TODO/DECISION/etc. intent where it isn't the "main" field — the caller may need it to link the item to that customer without changing which type you chose
+      "customer_name": string | null, // populate whenever a specific customer/company is named anywhere in raw_fragment, even for a BUSINESS_TODO/DECISION/LOOKUP/etc. intent where it isn't the "main" field — this includes a LOOKUP question that's asking about a named customer (e.g. "ABC最近一次跟进是什么时候？" — type stays LOOKUP, but customer_name is "ABC") — the caller may need it to link the item to that customer without changing which type you chose
       "contact_name": string | null,
       "contact_phone": string | null, // only for NEW_CUSTOMER — a phone/WhatsApp number stated for the contact, digits as given, never invented
       "country": string | null,
