@@ -95,15 +95,20 @@ function validateAction(a: any): Action | null {
   if (!a || typeof a !== 'object') return null;
   if (!ACTION_TYPES.includes(a.type)) return null;
   if (typeof a.entities !== 'object' || a.entities === null || Array.isArray(a.entities)) return null;
-  if (a.due_date_expression !== null && typeof a.due_date_expression !== 'string') return null;
+  const dueDate = a.due_date_expression === 'null' ? null : a.due_date_expression;
+  if (dueDate !== null && typeof dueDate !== 'string') return null;
   if (!Array.isArray(a.missing_fields) || a.missing_fields.some((f: any) => typeof f !== 'string')) return null;
-  return { type: a.type, entities: a.entities, due_date_expression: a.due_date_expression, missing_fields: a.missing_fields };
+  return { type: a.type, entities: a.entities, due_date_expression: dueDate, missing_fields: a.missing_fields };
 }
 
 function validatePlan(raw: any): Plan | null {
   if (!raw || typeof raw !== 'object') return null;
   if (!OPERATIONS.includes(raw.operation)) return null;
-  if (raw.object !== null && !OBJECTS.includes(raw.object)) return null;
+  // json_object mode occasionally emits the STRING "null" instead of the
+  // JSON literal null for an optional field — normalize before validating,
+  // otherwise a semantically-correct answer gets rejected as malformed.
+  const objectVal = raw.object === 'null' ? null : raw.object;
+  if (objectVal !== null && !OBJECTS.includes(objectVal)) return null;
   if (!Array.isArray(raw.actions)) return null;
   const actions: Action[] = [];
   for (const a of raw.actions) {
@@ -113,7 +118,7 @@ function validatePlan(raw: any): Plan | null {
   }
   if (typeof raw.requires_confirmation !== 'boolean') return null;
   if (typeof raw.confidence !== 'number' || raw.confidence < 0 || raw.confidence > 1) return null;
-  return { operation: raw.operation, object: raw.object, actions, requires_confirmation: raw.requires_confirmation, confidence: raw.confidence };
+  return { operation: raw.operation, object: objectVal, actions, requires_confirmation: raw.requires_confirmation, confidence: raw.confidence };
 }
 
 function dubaiToday(): string {
