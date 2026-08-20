@@ -304,7 +304,7 @@ export async function resolveExplicitDestinationCapture(
   if (!dest.content) {
     const askLine = dest.destination === 'MY_TASKS' ? '要加入什么待办？'
       : dest.destination === 'CRM' ? '可以，客户名称是什么？'
-      : '要记住的业务规则是什么？';
+      : '要记住什么？';
     return [{
       type: dest.destination === 'BUSINESS_MEMORY' ? 'BUSINESS_MEMORY' : dest.destination === 'MY_TASKS' ? 'BUSINESS_TODO' : 'NEW_CUSTOMER',
       summaryLines: [askLine],
@@ -476,7 +476,7 @@ export async function confirmCaptureItem(item: ResolvedCaptureItem): Promise<{ o
     }
     case 'BUSINESS_MEMORY': {
       const { raw } = item;
-      if (!raw.memory_content && !raw.raw_fragment) return { ok: false, error: '要记住的业务规则是什么？' };
+      if (!raw.memory_content && !raw.raw_fragment) return { ok: false, error: '要记住什么？' };
       const res = await createBusinessMemory({
         category: raw.memory_category ?? 'other',
         title: raw.memory_title ?? raw.raw_fragment,
