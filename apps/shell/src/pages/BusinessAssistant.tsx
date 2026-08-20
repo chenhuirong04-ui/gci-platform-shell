@@ -506,6 +506,10 @@ export function BusinessAssistant() {
   // mistake a short standalone name for a passing mention and swallow it
   // into a content-free CRM_FOLLOWUP instead of switching context.
   const BARE_NAME_RE = /^[^\s，。！？,.:：；;]{1,24}$/u;
+  // A bare, punctuation-free "建个客户" / "新建客户" / "登记客户" ask (no name
+  // stated) must reach the capture router so it can ask for the name,
+  // instead of being swallowed as a literal customer-name lookup.
+  const NEW_CUSTOMER_TRIGGER_RE = /(建|新建|登记|添加).{0,2}(一个|新)?.{0,2}客户/u;
 
   async function handleTopSubmit(text: string) {
     const t = text.trim();
@@ -519,7 +523,8 @@ export function BusinessAssistant() {
       BARE_NAME_RE.test(t) &&
       !matchTaskLifecycleCommand(t) &&
       !matchTaskRescheduleCommand(t) &&
-      !QUOTE_PREP_TRIGGER_RE.test(t)
+      !QUOTE_PREP_TRIGGER_RE.test(t) &&
+      !NEW_CUSTOMER_TRIGGER_RE.test(t)
     ) {
       resolve(t);
       return;
