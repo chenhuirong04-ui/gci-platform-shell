@@ -92,6 +92,10 @@ export interface ResolvedCaptureItem {
   // must never create a blank customer row — this stops the item at a
   // clarification question instead of a confirm button.
   needsCustomerName: boolean;
+  // An explicit-destination command with nothing after it (e.g. "进入我的
+  // 待办" alone) — stops at a clarification question instead of creating an
+  // empty task/memory row. Same UI gate as needsCustomerName.
+  needsContent: boolean;
 }
 
 async function resolveCustomer(name: string | null): Promise<{ matched: CrmCustomer | null; candidates: CrmCustomer[] | null; isNew: boolean }> {
@@ -126,6 +130,7 @@ export async function resolveCaptureItems(
         resolvedCommitmentDueAt: null,
         fallbackToTask: false,
         needsCustomerName: true,
+        needsContent: false,
       });
       continue;
     }
@@ -137,7 +142,12 @@ export async function resolveCaptureItems(
     let candidates: CrmCustomer[] | null = null;
     let isNew = false;
 
-    if (raw.type === 'NEW_CUSTOMER' || raw.type === 'CRM_FOLLOWUP' || (raw.type === 'COMMITMENT' && nameForCustomerLookup)) {
+    // BUSINESS_TODO is included here (name-only, no currentCustomer
+    // fallback via nameForCustomerLookup) so an explicit-destination task
+    // like "进入我的待办：周五追Ray的付款" can still link relatedCustomerId to
+    // Ray on confirm — linking a customer is never the same as changing the
+    // destination to CRM_FOLLOWUP.
+    if (raw.type === 'NEW_CUSTOMER' || raw.type === 'CRM_FOLLOWUP' || raw.type === 'BUSINESS_TODO' || (raw.type === 'COMMITMENT' && nameForCustomerLookup)) {
       const r = await resolveCustomer(nameForCustomerLookup);
       matched = r.matched;
       candidates = r.candidates;
@@ -217,6 +227,7 @@ export async function resolveCaptureItems(
         summaryLines.push(`待办：${raw.todo_title ?? raw.raw_fragment}`);
         summaryLines.push(`业务领域：${raw.todo_business_area ?? 'OTHER'}`);
         if (resolvedTodoDueAt) summaryLines.push(`到期：${resolvedTodoDueAt}`);
+        if (matched) summaryLines.push(`关联客户：${matched.customer_name}`);
         break;
       case 'BUSINESS_MEMORY':
         summaryLines.push(`长期业务规则：${raw.memory_title ?? raw.raw_fragment}`);
@@ -238,9 +249,107 @@ export async function resolveCaptureItems(
       resolvedCommitmentDueAt,
       fallbackToTask,
       needsCustomerName: false,
+      needsContent: false,
     });
   }
   return out;
+}
+
+// ─── V1 explicit-destination override — Chris naming the destination beats
+// whatever classify-capture would otherwise decide. Field extraction still
+// goes through the same classifier (it's already reliable at recognizing
+// these trigger phrases as capturable per its own rule 1); only the
+// resulting TYPE is forced afterward. Scoped to the exact trigger phrases
+// below — not a general keyword router, so it never fires on ordinary
+// mid-sentence mentions of "提醒我" etc. that the existing classifier
+// already handles on its own. ────────────────────────────────────────────
+export type ExplicitDestination = 'CRM' | 'MY_TASKS' | 'BUSINESS_MEMORY';
+
+const CRM_DEST_RE = /^(进入\s*CRM|记到\s*CRM|登记到\s*CRM)[：:，,]?\s*/iu;
+const MY_TASKS_DEST_RE = /^(进入我的待办|加到我的待办|记到我的待办|提醒我)[：:，,]?\s*/u;
+const MEMORY_DEST_RE = /^(记住这个|以后记住|作为业务规则记住)[：:，,]?\s*/u;
+
+export function detectExplicitDestination(text: string): { destination: ExplicitDestination; content: string } | null {
+  const t = text.trim();
+  let m = t.match(CRM_DEST_RE);
+  if (m) return { destination: 'CRM', content: t.slice(m[0].length).trim() };
+  m = t.match(MY_TASKS_DEST_RE);
+  if (m) return { destination: 'MY_TASKS', content: t.slice(m[0].length).trim() };
+  m = t.match(MEMORY_DEST_RE);
+  if (m) return { destination: 'BUSINESS_MEMORY', content: t.slice(m[0].length).trim() };
+  return null;
+}
+
+function emptyRawIntent(rawFragment: string): RawCaptureIntent {
+  return {
+    type: 'UNKNOWN', customer_name: null, contact_name: null, contact_phone: null, country: null,
+    business_type: null, needs_summary: null, followup_notes: null, next_action: null,
+    next_follow_up_at: null, commitment_direction: null, commitment_text: null, commitment_due_at: null,
+    decision_title: null, decision_note: null, todo_title: null, todo_business_area: null, todo_due_at: null,
+    memory_category: null, memory_title: null, memory_content: null, memory_company: null,
+    raw_fragment: rawFragment,
+  };
+}
+
+// Returns null when no explicit-destination trigger matched — the caller
+// falls through to the normal router. Returns exactly one resolved item
+// otherwise (a clarification item if the trigger had no content after it).
+export async function resolveExplicitDestinationCapture(
+  text: string,
+  currentCustomer: CrmCustomer | null,
+): Promise<ResolvedCaptureItem[] | null> {
+  const dest = detectExplicitDestination(text);
+  if (!dest) return null;
+
+  if (!dest.content) {
+    const askLine = dest.destination === 'MY_TASKS' ? '要加入什么待办？'
+      : dest.destination === 'CRM' ? '可以，客户名称是什么？'
+      : '要记住的业务规则是什么？';
+    return [{
+      type: dest.destination === 'BUSINESS_MEMORY' ? 'BUSINESS_MEMORY' : dest.destination === 'MY_TASKS' ? 'BUSINESS_TODO' : 'NEW_CUSTOMER',
+      summaryLines: [askLine],
+      raw: emptyRawIntent(text),
+      matchedCustomer: null,
+      candidateCustomers: null,
+      isNewCustomer: false,
+      resolvedNextFollowUpAt: null,
+      resolvedTodoDueAt: null,
+      resolvedCommitmentDueAt: null,
+      fallbackToTask: false,
+      needsCustomerName: dest.destination === 'CRM',
+      needsContent: dest.destination !== 'CRM',
+    }];
+  }
+
+  // Pass the ORIGINAL text (trigger phrase included) to the classifier —
+  // "提醒我"/"加到我的待办" are already-reliable capture triggers per its own
+  // rule 1, so field extraction (dates, customer name) stays accurate even
+  // though we override the type it assigns right after.
+  const cls = await classifyCapture(text, currentCustomer?.customer_name ?? null);
+  const first: RawCaptureIntent = (cls.ok && cls.intents[0]) || emptyRawIntent(dest.content);
+
+  let forced: RawCaptureIntent;
+  if (dest.destination === 'MY_TASKS') {
+    forced = {
+      ...first,
+      type: 'BUSINESS_TODO',
+      todo_title: dest.content,
+      todo_due_at: first.todo_due_at ?? first.next_follow_up_at ?? first.commitment_due_at,
+      todo_business_area: first.todo_business_area ?? 'OTHER',
+    };
+  } else if (dest.destination === 'BUSINESS_MEMORY') {
+    forced = {
+      ...first,
+      type: 'BUSINESS_MEMORY',
+      memory_title: first.memory_title ?? dest.content,
+      memory_content: first.memory_content ?? dest.content,
+      memory_category: first.memory_category ?? 'other',
+    };
+  } else {
+    forced = { ...first, type: 'NEW_CUSTOMER' };
+  }
+
+  return resolveCaptureItems([forced], currentCustomer);
 }
 
 // ─── Write path — only ever called after Chris's explicit confirm click ────
@@ -354,6 +463,7 @@ export async function confirmCaptureItem(item: ResolvedCaptureItem): Promise<{ o
     }
     case 'BUSINESS_TODO': {
       const { raw } = item;
+      if (!raw.todo_title && !raw.raw_fragment) return { ok: false, error: '要加入什么待办？' };
       const res = await createExecutiveTask({
         title: raw.todo_title ?? raw.raw_fragment,
         description: raw.raw_fragment,
@@ -366,6 +476,7 @@ export async function confirmCaptureItem(item: ResolvedCaptureItem): Promise<{ o
     }
     case 'BUSINESS_MEMORY': {
       const { raw } = item;
+      if (!raw.memory_content && !raw.raw_fragment) return { ok: false, error: '要记住的业务规则是什么？' };
       const res = await createBusinessMemory({
         category: raw.memory_category ?? 'other',
         title: raw.memory_title ?? raw.raw_fragment,

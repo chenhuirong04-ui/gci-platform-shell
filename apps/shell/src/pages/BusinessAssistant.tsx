@@ -21,6 +21,7 @@ import {
   classifyCapture, resolveCaptureItems, confirmCaptureItem,
   matchTaskLifecycleCommand, findOpenTasksByKeyword, completeOrCancelTask,
   matchTaskRescheduleCommand, rescheduleTask,
+  detectExplicitDestination, resolveExplicitDestinationCapture,
   type ResolvedCaptureItem,
 } from '../lib/businessCapture';
 import { parseRelativeDateZh } from '../ai/crmAskGciParsers';
@@ -389,6 +390,24 @@ export function BusinessAssistant() {
     }
   }
 
+  // GIA 显式目的地指令 V1 — Chris naming the destination ("进入我的待办" /
+  // "进入CRM" / "记住这个") outranks every other router below, including
+  // BARE_NAME_RE's customer-switch shortcut and the classifier's own type
+  // decision. Must run first, before anything else gets a chance to consume
+  // the input, in both entry points (top input + continuous chat).
+  async function tryExplicitDestination(text: string, currentCustomer: CrmCustomer | null): Promise<boolean> {
+    if (!detectExplicitDestination(text)) return false;
+    setFileSearchReply(null);
+    setCaptureLoading(true);
+    setCaptureError(null);
+    const resolved = await resolveExplicitDestinationCapture(text, currentCustomer);
+    setCaptureLoading(false);
+    if (!resolved) return false;
+    setCaptureDone(new Set());
+    setPendingCapture(resolved);
+    return true;
+  }
+
   // Task 16 §三/§十二 — the unified router. Runs on both the top input
   // (works with no customer loaded yet) and the chat box (works with a
   // customer already loaded, so "他"/"这个客户" resolves via ctx.customer).
@@ -439,6 +458,7 @@ export function BusinessAssistant() {
       if (newlyDone.has(i)) continue;
       if (pendingCapture[i].candidateCustomers) continue; // needs Chris to pick first
       if (pendingCapture[i].needsCustomerName) continue; // needs Chris to supply a name first
+      if (pendingCapture[i].needsContent) continue; // needs Chris to supply content first
       const res = await confirmCaptureItem(pendingCapture[i]);
       if (res.ok) newlyDone.add(i);
       else { setCaptureError(res.error); break; }
@@ -515,6 +535,9 @@ export function BusinessAssistant() {
     const t = text.trim();
     if (!t) return;
     setFileSearchReply(null);
+    // 显式目的地指令永远最先检查 — 在 BARE_NAME_RE 等一切其他判断之前，
+    // 确保不会被其他 Router 抢走。
+    if (await tryExplicitDestination(t, ctx?.customer ?? null)) return;
     // A bare-looking string ("SHADI这件事下周再提醒我" / "帮我给这个客户准备劳工报价")
     // can still be a task lifecycle/reschedule/quote-prep command with no
     // spaces or listed punctuation — check those first so they aren't
@@ -579,6 +602,14 @@ export function BusinessAssistant() {
   async function handleSendWithContext(context: BusinessContext, text: string) {
     const question = text.trim();
     if (!question) return;
+
+    // 显式目的地指令永远最先检查 — 确保聊天框里也不会被 CRM_FOLLOWUP 等
+    // 其他 Router 抢走 ("进入我的待办：周五追Ray的付款" 不得因为提到 Ray 就
+    // 变成 CRM Follow-up)。
+    if (await tryExplicitDestination(question, context.customer)) {
+      setChatHistory((prev) => [...prev, { role: 'user', content: question }]);
+      return;
+    }
 
     if (context.customer) {
       const followupDraft = parseFollowupDraftFromChat(context.customer.customer_name, question);
@@ -918,7 +949,7 @@ export function BusinessAssistant() {
                     </div>
                   )}
 
-                  {!item.candidateCustomers && !item.needsCustomerName && !done && (
+                  {!item.candidateCustomers && !item.needsCustomerName && !item.needsContent && !done && (
                     <button
                       disabled={captureBusy === i || captureBusy === 'all'}
                       onClick={() => handleConfirmCaptureItem(i)}
