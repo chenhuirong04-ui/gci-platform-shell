@@ -30,6 +30,7 @@ export interface RawCaptureIntent {
   type: CaptureType;
   customer_name: string | null;
   contact_name: string | null;
+  contact_phone: string | null;
   country: string | null;
   business_type: string | null;
   needs_summary: string | null;
@@ -170,6 +171,7 @@ export async function resolveCaptureItems(
       case 'NEW_CUSTOMER':
         summaryLines.push(`客户：${raw.customer_name}（新客户）`);
         if (raw.contact_name) summaryLines.push(`联系人：${raw.contact_name}`);
+        if (raw.contact_phone) summaryLines.push(`电话：${raw.contact_phone}`);
         if (raw.business_type) summaryLines.push(`业务：${raw.business_type}`);
         if (raw.needs_summary) summaryLines.push(`当前需求：${raw.needs_summary}`);
         if (raw.followup_notes) summaryLines.push(`本次沟通：${raw.followup_notes}`);
@@ -250,6 +252,7 @@ export async function confirmCaptureItem(item: ResolvedCaptureItem): Promise<{ o
       const created = await createCustomerWithContact({
         customerName: raw.customer_name,
         contactName: raw.contact_name || undefined,
+        phone: raw.contact_phone || undefined,
       });
       if (!created.ok) return created;
       const notesParts = [raw.needs_summary, raw.followup_notes].filter(Boolean);

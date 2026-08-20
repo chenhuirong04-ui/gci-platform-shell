@@ -47,6 +47,7 @@ For each intent, extract only the fields that are actually stated. Never fabrica
       "type": "NEW_CUSTOMER" | "CRM_FOLLOWUP" | "BUSINESS_TODO" | "COMMITMENT" | "DECISION" | "BUSINESS_MEMORY" | "LOOKUP" | "DRAFT_EMAIL" | "DRAFT_WHATSAPP" | "UNKNOWN",
       "customer_name": string | null,
       "contact_name": string | null,
+      "contact_phone": string | null, // only for NEW_CUSTOMER — a phone/WhatsApp number stated for the contact, digits as given, never invented
       "country": string | null,
       "business_type": string | null,
       "needs_summary": string | null,
