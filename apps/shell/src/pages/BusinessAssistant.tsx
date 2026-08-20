@@ -438,6 +438,7 @@ export function BusinessAssistant() {
     for (let i = 0; i < pendingCapture.length; i++) {
       if (newlyDone.has(i)) continue;
       if (pendingCapture[i].candidateCustomers) continue; // needs Chris to pick first
+      if (pendingCapture[i].needsCustomerName) continue; // needs Chris to supply a name first
       const res = await confirmCaptureItem(pendingCapture[i]);
       if (res.ok) newlyDone.add(i);
       else { setCaptureError(res.error); break; }
@@ -912,7 +913,7 @@ export function BusinessAssistant() {
                     </div>
                   )}
 
-                  {!item.candidateCustomers && !done && (
+                  {!item.candidateCustomers && !item.needsCustomerName && !done && (
                     <button
                       disabled={captureBusy === i || captureBusy === 'all'}
                       onClick={() => handleConfirmCaptureItem(i)}

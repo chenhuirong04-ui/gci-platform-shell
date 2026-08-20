@@ -87,6 +87,10 @@ export interface ResolvedCaptureItem {
   // customer not existing yet is never a reason to drop what Chris asked
   // to be tracked.
   fallbackToTask: boolean;
+  // A NEW_CUSTOMER intent with no customer_name at all (e.g. "帮我建个客户")
+  // must never create a blank customer row — this stops the item at a
+  // clarification question instead of a confirm button.
+  needsCustomerName: boolean;
 }
 
 async function resolveCustomer(name: string | null): Promise<{ matched: CrmCustomer | null; candidates: CrmCustomer[] | null; isNew: boolean }> {
@@ -106,6 +110,23 @@ export async function resolveCaptureItems(
   for (const raw of intents) {
     if (raw.type === 'LOOKUP' || raw.type === 'DRAFT_EMAIL' || raw.type === 'DRAFT_WHATSAPP' || raw.type === 'UNKNOWN') {
       continue; // these aren't capture writes — handled by the existing chat/draft flows
+    }
+
+    if (raw.type === 'NEW_CUSTOMER' && !raw.customer_name) {
+      out.push({
+        type: 'NEW_CUSTOMER',
+        summaryLines: ['可以，客户名称是什么？'],
+        raw,
+        matchedCustomer: null,
+        candidateCustomers: null,
+        isNewCustomer: true,
+        resolvedNextFollowUpAt: null,
+        resolvedTodoDueAt: null,
+        resolvedCommitmentDueAt: null,
+        fallbackToTask: false,
+        needsCustomerName: true,
+      });
+      continue;
     }
 
     const nameForCustomerLookup =
@@ -214,6 +235,7 @@ export async function resolveCaptureItems(
       resolvedTodoDueAt,
       resolvedCommitmentDueAt,
       fallbackToTask,
+      needsCustomerName: false,
     });
   }
   return out;
@@ -224,8 +246,9 @@ export async function confirmCaptureItem(item: ResolvedCaptureItem): Promise<{ o
   switch (item.type) {
     case 'NEW_CUSTOMER': {
       const { raw } = item;
+      if (!raw.customer_name) return { ok: false, error: '客户名称是什么？' };
       const created = await createCustomerWithContact({
-        customerName: raw.customer_name!,
+        customerName: raw.customer_name,
         contactName: raw.contact_name || undefined,
       });
       if (!created.ok) return created;
