@@ -366,12 +366,19 @@ function clarificationItem(type: CaptureType, message: string, rawFragment: stri
 // "进入CRM，新建客户：…" / "进入CRM，客户跟进：…" (explicit sub-action) and the
 // auto-judged equivalents share the same forced-type + resolveCaptureItems
 // path — only the safety option passed differs (see ResolveCaptureItemsOptions).
+// After stripping "进入CRM，新建客户：" the bare content ("ABC贸易，联系人李总，
+// 电话...") can read to the classifier as context-free noise with no
+// "real business context" cue, leaving customer_name unextracted — a
+// synthetic "新客户：" prefix restores that cue without changing what's
+// actually recorded (NEW_CUSTOMER's summary/write use raw.customer_name
+// directly, never raw_fragment).
 async function buildForcedCrmItems(
   forceType: 'NEW_CUSTOMER' | 'CRM_FOLLOWUP',
   content: string,
   currentCustomer: CrmCustomer | null,
 ): Promise<ResolvedCaptureItem[]> {
-  const cls = await classifyCapture(content, currentCustomer?.customer_name ?? null);
+  const classifyText = forceType === 'NEW_CUSTOMER' ? `新客户：${content}` : content;
+  const cls = await classifyCapture(classifyText, currentCustomer?.customer_name ?? null);
   const first: RawCaptureIntent = (cls.ok && cls.intents[0]) || emptyRawIntent(content);
   const forced: RawCaptureIntent = { ...first, type: forceType };
   return resolveCaptureItems([forced], currentCustomer,
