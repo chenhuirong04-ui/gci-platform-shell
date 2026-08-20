@@ -96,6 +96,11 @@ export interface ResolvedCaptureItem {
   // 待办" alone) — stops at a clarification question instead of creating an
   // empty task/memory row. Same UI gate as needsCustomerName.
   needsContent: boolean;
+  // "进入CRM，客户跟进：…" (explicit or auto-judged) named a customer that
+  // isn't in CRM at all (zero matches, not ambiguous) — must never silently
+  // fall back to an executive_task the way the ordinary CRM_FOLLOWUP path
+  // does; stops and asks whether to create the customer first instead.
+  crmNoMatchBlocked: boolean;
 }
 
 async function resolveCustomer(name: string | null): Promise<{ matched: CrmCustomer | null; candidates: CrmCustomer[] | null; isNew: boolean }> {
@@ -107,9 +112,22 @@ async function resolveCustomer(name: string | null): Promise<{ matched: CrmCusto
   return { matched: null, candidates: null, isNew: true };
 }
 
+export interface ResolveCaptureItemsOptions {
+  // "进入CRM，新建客户：…" — an exact-match customer must never silently
+  // downgrade this to CRM_FOLLOWUP the way the ordinary NEW_CUSTOMER path
+  // does; instead it's presented as a pick (use existing vs. create new
+  // anyway), reusing the same candidate-picker UI as an ambiguous match.
+  forceNewCustomerConfirm?: boolean;
+  // "进入CRM，客户跟进：…" — zero matches must never silently fall back to
+  // an executive_task; instead the item is blocked with a "create the
+  // customer first?" prompt (crmNoMatchBlocked on the resolved item).
+  suppressFollowupFallback?: boolean;
+}
+
 export async function resolveCaptureItems(
   intents: RawCaptureIntent[],
   currentCustomer: CrmCustomer | null,
+  opts?: ResolveCaptureItemsOptions,
 ): Promise<ResolvedCaptureItem[]> {
   const out: ResolvedCaptureItem[] = [];
   for (const raw of intents) {
@@ -131,6 +149,7 @@ export async function resolveCaptureItems(
         fallbackToTask: false,
         needsCustomerName: true,
         needsContent: false,
+        crmNoMatchBlocked: false,
       });
       continue;
     }
@@ -165,10 +184,21 @@ export async function resolveCaptureItems(
     // he chooses.
     let effectiveType: CaptureType = raw.type;
     if (raw.type === 'NEW_CUSTOMER' && matched) {
-      effectiveType = 'CRM_FOLLOWUP';
+      if (opts?.forceNewCustomerConfirm) {
+        // "进入CRM，新建客户" explicitly demanded NEW_CUSTOMER — an exact
+        // match doesn't get to silently steer this into CRM_FOLLOWUP the
+        // way the ordinary path does. Present it exactly like an ambiguous
+        // match instead: Chris picks "use existing" or "create new anyway".
+        candidates = [matched];
+        matched = null;
+      } else {
+        effectiveType = 'CRM_FOLLOWUP';
+      }
     }
 
-    const fallbackToTask = effectiveType === 'CRM_FOLLOWUP' && !matched && (!candidates || candidates.length === 0);
+    const noMatchNoCandidates = effectiveType === 'CRM_FOLLOWUP' && !matched && (!candidates || candidates.length === 0);
+    const fallbackToTask = noMatchNoCandidates && !opts?.suppressFollowupFallback;
+    const crmNoMatchBlocked = noMatchNoCandidates && !!opts?.suppressFollowupFallback;
 
     const resolvedNextFollowUpAt = raw.next_follow_up_at ? parseRelativeDateZh(raw.next_follow_up_at) : null;
     const resolvedTodoDueAt = raw.todo_due_at ? parseRelativeDateZh(raw.todo_due_at) : null;
@@ -197,7 +227,9 @@ export async function resolveCaptureItems(
         if (resolvedNextFollowUpAt) summaryLines.push(`我方下一步：${resolvedNextFollowUpAt} 再次联系`);
         break;
       case 'CRM_FOLLOWUP':
-        if (fallbackToTask) {
+        if (crmNoMatchBlocked) {
+          summaryLines.push('CRM里没有找到这个客户，要先创建客户吗？');
+        } else if (fallbackToTask) {
           summaryLines.push(`${custName ?? '(未指定)'}暂未建立客户档案，已先建立商务待办进行跟踪`);
         } else {
           summaryLines.push(
@@ -250,6 +282,7 @@ export async function resolveCaptureItems(
       fallbackToTask,
       needsCustomerName: false,
       needsContent: false,
+      crmNoMatchBlocked,
     });
   }
   return out;
@@ -264,19 +297,40 @@ export async function resolveCaptureItems(
 // mid-sentence mentions of "提醒我" etc. that the existing classifier
 // already handles on its own. ────────────────────────────────────────────
 export type ExplicitDestination = 'CRM' | 'MY_TASKS' | 'BUSINESS_MEMORY';
+// CRM 二级明确指令 — only meaningful when destination === 'CRM'.
+export type CrmSubAction = 'NEW_CUSTOMER' | 'CRM_FOLLOWUP' | 'CRM_QUERY';
 
 const CRM_DEST_RE = /^(进入\s*CRM|记到\s*CRM|登记到\s*CRM)[：:，,]?\s*/iu;
 const MY_TASKS_DEST_RE = /^(进入我的待办|加到我的待办|记到我的待办|提醒我)[：:，,]?\s*/u;
 const MEMORY_DEST_RE = /^(记住这个|以后记住|作为业务规则记住)[：:，,]?\s*/u;
 
-export function detectExplicitDestination(text: string): { destination: ExplicitDestination; content: string } | null {
+// Checked in this fixed order right after "进入CRM，" — each is its own
+// mutually-exclusive prefix so order among these three never matters.
+const CRM_SUB_NEW_CUSTOMER_RE = /^(新建客户|登记客户)[：:，,]?\s*/u;
+const CRM_SUB_FOLLOWUP_RE = /^(进入客户跟进|客户跟进|记录跟进)[：:，,]?\s*/u;
+const CRM_SUB_QUERY_RE = /^(查询客户|查客户)[：:，,]?\s*/u;
+
+export function detectExplicitDestination(text: string): {
+  destination: ExplicitDestination;
+  content: string;
+  crmSubAction: CrmSubAction | null;
+} | null {
   const t = text.trim();
   let m = t.match(CRM_DEST_RE);
-  if (m) return { destination: 'CRM', content: t.slice(m[0].length).trim() };
+  if (m) {
+    const rest = t.slice(m[0].length).trim();
+    let sm = rest.match(CRM_SUB_NEW_CUSTOMER_RE);
+    if (sm) return { destination: 'CRM', crmSubAction: 'NEW_CUSTOMER', content: rest.slice(sm[0].length).trim() };
+    sm = rest.match(CRM_SUB_FOLLOWUP_RE);
+    if (sm) return { destination: 'CRM', crmSubAction: 'CRM_FOLLOWUP', content: rest.slice(sm[0].length).trim() };
+    sm = rest.match(CRM_SUB_QUERY_RE);
+    if (sm) return { destination: 'CRM', crmSubAction: 'CRM_QUERY', content: rest.slice(sm[0].length).trim() };
+    return { destination: 'CRM', crmSubAction: null, content: rest };
+  }
   m = t.match(MY_TASKS_DEST_RE);
-  if (m) return { destination: 'MY_TASKS', content: t.slice(m[0].length).trim() };
+  if (m) return { destination: 'MY_TASKS', crmSubAction: null, content: t.slice(m[0].length).trim() };
   m = t.match(MEMORY_DEST_RE);
-  if (m) return { destination: 'BUSINESS_MEMORY', content: t.slice(m[0].length).trim() };
+  if (m) return { destination: 'BUSINESS_MEMORY', crmSubAction: null, content: t.slice(m[0].length).trim() };
   return null;
 }
 
@@ -291,34 +345,129 @@ function emptyRawIntent(rawFragment: string): RawCaptureIntent {
   };
 }
 
+function clarificationItem(type: CaptureType, message: string, rawFragment: string, isNameQuestion: boolean): ResolvedCaptureItem {
+  return {
+    type,
+    summaryLines: [message],
+    raw: emptyRawIntent(rawFragment),
+    matchedCustomer: null,
+    candidateCustomers: null,
+    isNewCustomer: false,
+    resolvedNextFollowUpAt: null,
+    resolvedTodoDueAt: null,
+    resolvedCommitmentDueAt: null,
+    fallbackToTask: false,
+    needsCustomerName: isNameQuestion,
+    needsContent: !isNameQuestion,
+    crmNoMatchBlocked: false,
+  };
+}
+
+// "进入CRM，新建客户：…" / "进入CRM，客户跟进：…" (explicit sub-action) and the
+// auto-judged equivalents share the same forced-type + resolveCaptureItems
+// path — only the safety option passed differs (see ResolveCaptureItemsOptions).
+async function buildForcedCrmItems(
+  forceType: 'NEW_CUSTOMER' | 'CRM_FOLLOWUP',
+  content: string,
+  currentCustomer: CrmCustomer | null,
+): Promise<ResolvedCaptureItem[]> {
+  const cls = await classifyCapture(content, currentCustomer?.customer_name ?? null);
+  const first: RawCaptureIntent = (cls.ok && cls.intents[0]) || emptyRawIntent(content);
+  const forced: RawCaptureIntent = { ...first, type: forceType };
+  return resolveCaptureItems([forced], currentCustomer,
+    forceType === 'NEW_CUSTOMER' ? { forceNewCustomerConfirm: true } : { suppressFollowupFallback: true });
+}
+
+// "进入CRM，查询客户：…" (explicit or auto-judged) — read-only: only ever
+// calls classifyCapture (server-side OpenAI extraction, no DB write) and
+// findCustomerByName (Supabase select). Never touches createCustomerWithContact
+// / logFollowup / createExecutiveTask — there is no path from here to a write.
+async function resolveCrmQueryReply(content: string, currentCustomer: CrmCustomer | null): Promise<string> {
+  const cls = await classifyCapture(content, currentCustomer?.customer_name ?? null);
+  const customerName = (cls.ok && cls.intents[0]?.customer_name) || null;
+  if (!customerName) return '要查询哪个客户？';
+
+  const res = await findCustomerByName(customerName);
+  if (!res.ok) return `查询失败：${res.error}`;
+  if (!res.found) {
+    if (res.multiple) return `CRM里找到多个与「${customerName}」相关的客户，请提供更明确的名称。`;
+    return `CRM里没有找到「${customerName}」这个客户。`;
+  }
+
+  const c = res.customer;
+  const lastFollowup = res.followups[0];
+  const lines = [
+    `${c.customer_name}：`,
+    `状态：${c.status ?? '未知'}`,
+    `最近跟进：${c.last_follow_up_at ?? lastFollowup?.follow_up_date ?? '暂无记录'}`,
+  ];
+  if (lastFollowup?.notes) lines.push(`跟进内容：${lastFollowup.notes}`);
+  if (c.next_follow_up_at) lines.push(`下次跟进：${c.next_follow_up_at}`);
+  return lines.join('\n');
+}
+
+// CRM 二级指令优先级：显式指令 > AI 自动判断 > 追问，绝不硬猜。
+async function resolveCrmDestination(
+  dest: { crmSubAction: CrmSubAction | null; content: string },
+  currentCustomer: CrmCustomer | null,
+): Promise<ExplicitDestinationResult> {
+  const { crmSubAction, content } = dest;
+
+  if (crmSubAction === 'CRM_QUERY') {
+    if (!content) return { kind: 'query', reply: '要查询哪个客户？' };
+    return { kind: 'query', reply: await resolveCrmQueryReply(content, currentCustomer) };
+  }
+
+  if (crmSubAction === 'NEW_CUSTOMER') {
+    if (!content) return { kind: 'capture', items: [clarificationItem('NEW_CUSTOMER', '客户名称是什么？', content, true)] };
+    return { kind: 'capture', items: await buildForcedCrmItems('NEW_CUSTOMER', content, currentCustomer) };
+  }
+
+  if (crmSubAction === 'CRM_FOLLOWUP') {
+    if (!content) return { kind: 'capture', items: [clarificationItem('CRM_FOLLOWUP', '是哪一个客户？要记录什么跟进内容？', content, false)] };
+    return { kind: 'capture', items: await buildForcedCrmItems('CRM_FOLLOWUP', content, currentCustomer) };
+  }
+
+  // No explicit sub-action ("进入CRM：…") — auto-judge from content, or ask
+  // if there's nothing to judge from.
+  if (!content) return { kind: 'capture', items: [clarificationItem('NEW_CUSTOMER', '可以，客户名称是什么？', content, true)] };
+
+  const cls = await classifyCapture(content, currentCustomer?.customer_name ?? null);
+  const judged = cls.ok ? cls.intents[0]?.type : null;
+  if (judged === 'NEW_CUSTOMER') return { kind: 'capture', items: await buildForcedCrmItems('NEW_CUSTOMER', content, currentCustomer) };
+  if (judged === 'CRM_FOLLOWUP') return { kind: 'capture', items: await buildForcedCrmItems('CRM_FOLLOWUP', content, currentCustomer) };
+  if (judged === 'LOOKUP') return { kind: 'query', reply: await resolveCrmQueryReply(content, currentCustomer) };
+
+  // Can't reliably tell — never guess (spec §二).
+  return {
+    kind: 'capture',
+    items: [clarificationItem('NEW_CUSTOMER', '不确定是要新建客户、记录跟进还是查询客户，能说清楚一点吗？', content, false)],
+  };
+}
+
+export type ExplicitDestinationResult =
+  | { kind: 'capture'; items: ResolvedCaptureItem[] }
+  | { kind: 'query'; reply: string };
+
 // Returns null when no explicit-destination trigger matched — the caller
-// falls through to the normal router. Returns exactly one resolved item
-// otherwise (a clarification item if the trigger had no content after it).
+// falls through to the normal router. Otherwise returns either a set of
+// resolved capture items to show a confirm card for, or a read-only query
+// reply string.
 export async function resolveExplicitDestinationCapture(
   text: string,
   currentCustomer: CrmCustomer | null,
-): Promise<ResolvedCaptureItem[] | null> {
+): Promise<ExplicitDestinationResult | null> {
   const dest = detectExplicitDestination(text);
   if (!dest) return null;
 
+  if (dest.destination === 'CRM') return resolveCrmDestination(dest, currentCustomer);
+
   if (!dest.content) {
-    const askLine = dest.destination === 'MY_TASKS' ? '要加入什么待办？'
-      : dest.destination === 'CRM' ? '可以，客户名称是什么？'
-      : '要记住什么？';
-    return [{
-      type: dest.destination === 'BUSINESS_MEMORY' ? 'BUSINESS_MEMORY' : dest.destination === 'MY_TASKS' ? 'BUSINESS_TODO' : 'NEW_CUSTOMER',
-      summaryLines: [askLine],
-      raw: emptyRawIntent(text),
-      matchedCustomer: null,
-      candidateCustomers: null,
-      isNewCustomer: false,
-      resolvedNextFollowUpAt: null,
-      resolvedTodoDueAt: null,
-      resolvedCommitmentDueAt: null,
-      fallbackToTask: false,
-      needsCustomerName: dest.destination === 'CRM',
-      needsContent: dest.destination !== 'CRM',
-    }];
+    const askLine = dest.destination === 'MY_TASKS' ? '要加入什么待办？' : '要记住什么？';
+    return {
+      kind: 'capture',
+      items: [clarificationItem(dest.destination === 'MY_TASKS' ? 'BUSINESS_TODO' : 'BUSINESS_MEMORY', askLine, text, false)],
+    };
   }
 
   // Pass the ORIGINAL text (trigger phrase included) to the classifier —
@@ -337,7 +486,7 @@ export async function resolveExplicitDestinationCapture(
       todo_due_at: first.todo_due_at ?? first.next_follow_up_at ?? first.commitment_due_at,
       todo_business_area: first.todo_business_area ?? 'OTHER',
     };
-  } else if (dest.destination === 'BUSINESS_MEMORY') {
+  } else {
     forced = {
       ...first,
       type: 'BUSINESS_MEMORY',
@@ -345,11 +494,9 @@ export async function resolveExplicitDestinationCapture(
       memory_content: first.memory_content ?? dest.content,
       memory_category: first.memory_category ?? 'other',
     };
-  } else {
-    forced = { ...first, type: 'NEW_CUSTOMER' };
   }
 
-  return resolveCaptureItems([forced], currentCustomer);
+  return { kind: 'capture', items: await resolveCaptureItems([forced], currentCustomer) };
 }
 
 // ─── Write path — only ever called after Chris's explicit confirm click ────

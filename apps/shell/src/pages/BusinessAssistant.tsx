@@ -390,12 +390,16 @@ export function BusinessAssistant() {
     }
   }
 
-  // GIA 显式目的地指令 V1 — Chris naming the destination ("进入我的待办" /
-  // "进入CRM" / "记住这个") outranks every other router below, including
-  // BARE_NAME_RE's customer-switch shortcut and the classifier's own type
-  // decision. Must run first, before anything else gets a chance to consume
-  // the input, in both entry points (top input + continuous chat).
-  async function tryExplicitDestination(text: string, currentCustomer: CrmCustomer | null): Promise<boolean> {
+  // GIA 显式目的地指令 V1/V2 — Chris naming the destination ("进入我的待办" /
+  // "进入CRM[，新建客户/客户跟进/查询客户]" / "记住这个") outranks every other
+  // router below, including BARE_NAME_RE's customer-switch shortcut and the
+  // classifier's own type decision. Must run first, before anything else
+  // gets a chance to consume the input, in both entry points (top input +
+  // continuous chat).
+  // Return value: false = not consumed (caller falls through); true = a
+  // capture confirm card was shown (pendingCapture already set); string =
+  // a read-only CRM_QUERY reply the caller must display itself.
+  async function tryExplicitDestination(text: string, currentCustomer: CrmCustomer | null): Promise<boolean | string> {
     if (!detectExplicitDestination(text)) return false;
     setFileSearchReply(null);
     setCaptureLoading(true);
@@ -403,8 +407,9 @@ export function BusinessAssistant() {
     const resolved = await resolveExplicitDestinationCapture(text, currentCustomer);
     setCaptureLoading(false);
     if (!resolved) return false;
+    if (resolved.kind === 'query') return resolved.reply;
     setCaptureDone(new Set());
-    setPendingCapture(resolved);
+    setPendingCapture(resolved.items);
     return true;
   }
 
@@ -459,6 +464,7 @@ export function BusinessAssistant() {
       if (pendingCapture[i].candidateCustomers) continue; // needs Chris to pick first
       if (pendingCapture[i].needsCustomerName) continue; // needs Chris to supply a name first
       if (pendingCapture[i].needsContent) continue; // needs Chris to supply content first
+      if (pendingCapture[i].crmNoMatchBlocked) continue; // needs Chris to decide whether to create the customer first
       const res = await confirmCaptureItem(pendingCapture[i]);
       if (res.ok) newlyDone.add(i);
       else { setCaptureError(res.error); break; }
@@ -537,7 +543,9 @@ export function BusinessAssistant() {
     setFileSearchReply(null);
     // 显式目的地指令永远最先检查 — 在 BARE_NAME_RE 等一切其他判断之前，
     // 确保不会被其他 Router 抢走。
-    if (await tryExplicitDestination(t, ctx?.customer ?? null)) return;
+    const explicitResult = await tryExplicitDestination(t, ctx?.customer ?? null);
+    if (explicitResult === true) return;
+    if (typeof explicitResult === 'string') { setFileSearchReply(explicitResult); return; }
     // A bare-looking string ("SHADI这件事下周再提醒我" / "帮我给这个客户准备劳工报价")
     // can still be a task lifecycle/reschedule/quote-prep command with no
     // spaces or listed punctuation — check those first so they aren't
@@ -606,8 +614,13 @@ export function BusinessAssistant() {
     // 显式目的地指令永远最先检查 — 确保聊天框里也不会被 CRM_FOLLOWUP 等
     // 其他 Router 抢走 ("进入我的待办：周五追Ray的付款" 不得因为提到 Ray 就
     // 变成 CRM Follow-up)。
-    if (await tryExplicitDestination(question, context.customer)) {
+    const explicitResult = await tryExplicitDestination(question, context.customer);
+    if (explicitResult === true) {
       setChatHistory((prev) => [...prev, { role: 'user', content: question }]);
+      return;
+    }
+    if (typeof explicitResult === 'string') {
+      setChatHistory((prev) => [...prev, { role: 'user', content: question }, { role: 'assistant', content: explicitResult }]);
       return;
     }
 
@@ -949,7 +962,7 @@ export function BusinessAssistant() {
                     </div>
                   )}
 
-                  {!item.candidateCustomers && !item.needsCustomerName && !item.needsContent && !done && (
+                  {!item.candidateCustomers && !item.needsCustomerName && !item.needsContent && !item.crmNoMatchBlocked && !done && (
                     <button
                       disabled={captureBusy === i || captureBusy === 'all'}
                       onClick={() => handleConfirmCaptureItem(i)}
