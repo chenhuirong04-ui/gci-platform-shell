@@ -166,7 +166,10 @@ export function Decisions() {
   const navigate = useNavigate();
   const [decisions, setDecisions] = useState<ExecutiveDecision[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>('all');
+  // GCI Home Final Structure — default view is Pending only; Decided/
+  // Dismissed history remains one click away via the existing tabs, it just
+  // no longer clutters the default list or the Home KPI count.
+  const [filter, setFilter] = useState<Filter>('pending');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pendingInputs, setPendingInputs] = useState<Record<string, RecordDecisionInput>>({});
 

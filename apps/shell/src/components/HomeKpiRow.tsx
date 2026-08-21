@@ -1,41 +1,52 @@
-// GCI Executive Desk — Home Dashboard: top KPI row.
-// Seven compact number tiles, each backed by an existing read function
-// (Tasks 4/7/8/9/5.2/14.1) — no new data source. Click drills into the
-// matching existing page. No long text here by design; detail lives one
-// click away.
+// GCI Executive Desk — Home Dashboard: top-level entry row.
+// GCI Home Final Structure — replaces the old 8-tile KPI row. Audit found
+// 6 of the 8 old tiles were re-slicing the same 2-3 underlying datasets
+// (今日待处理/逾期事项/客户跟进 all derived from getBossActions(); 等你决定/
+// 待执行 both from executive_decisions; 今日邮件/AI建议处理 both from the
+// same Gmail today-list) — confusing in daily use per Chris. Down to 4
+// entries, each backed by exactly ONE source, matching the approved final
+// structure:
+//   我的事项      -> executive_tasks only (getExecutiveTasks), -> /tasks
+//   需要我决定    -> executive_decisions, status=pending only, -> /decisions
+//   重要消息      -> today's Gmail, AI-flagged action-required subset, -> /email-assistant
+//   新业务机会    -> MIA leads_found_today; shows an honest "暂不可用"
+//                    state (not a stale "—") when MIA itself reports failure,
+//                    never a fabricated number.
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getBossActions } from '../lib/actionCenter';
-import { getTodaysFollowups } from '../lib/crmSupabase';
-import { refreshPendingDecisions, getFollowThroughData } from '../lib/decisionInbox';
+import { getExecutiveTasks } from '../lib/executiveTasks';
+import { refreshPendingDecisions } from '../lib/decisionInbox';
 import { getTodayEmails } from '../lib/googleSearch';
 import { triageEmails } from '../lib/emailAssistant';
 import { getMiaStatus } from '../lib/mia';
 
 const GOLD = '#CBA85C';
 const RED = '#E0846A';
-const AMBER = '#D4A843';
 const GREEN = '#6FBF8E';
 const BLUE = '#8FA6D4';
 const MUTED = '#7A8494';
 const CARD = 'rgba(255,255,255,0.025)';
 const BORD = 'rgba(255,255,255,0.07)';
 
+type KpiValue = number | null | 'unavailable';
+
 interface Kpi {
   label: string;
-  value: number | null;
+  value: KpiValue;
   color: string;
   onClick: () => void;
 }
 
 function KpiTile({ k }: { k: Kpi }) {
+  const display = k.value === null ? '—' : k.value === 'unavailable' ? '暂不可用' : String(k.value);
+  const isNumberWithValue = typeof k.value === 'number' && k.value > 0;
   return (
     <div
       onClick={k.onClick}
-      style={{ padding: '14px 14px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, cursor: 'pointer', textAlign: 'center' }}
+      style={{ padding: '16px 16px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, cursor: 'pointer', textAlign: 'center' }}
     >
-      <div style={{ fontSize: 24, fontWeight: 700, color: k.value !== null && k.value > 0 ? k.color : MUTED, fontFamily: "'Space Grotesk',sans-serif" }}>
-        {k.value === null ? '—' : k.value}
+      <div style={{ fontSize: k.value === 'unavailable' ? 14 : 24, fontWeight: 700, color: isNumberWithValue ? k.color : MUTED, fontFamily: "'Space Grotesk',sans-serif" }}>
+        {display}
       </div>
       <div style={{ fontSize: 10.5, color: MUTED, marginTop: 4 }}>{k.label}</div>
     </div>
@@ -44,66 +55,51 @@ function KpiTile({ k }: { k: Kpi }) {
 
 export function HomeKpiRow() {
   const navigate = useNavigate();
-  const [totalActions, setTotalActions] = useState<number | null>(null);
-  const [overdue, setOverdue] = useState<number | null>(null);
-  const [todaysFollowups, setTodaysFollowups] = useState<number | null>(null);
-  const [decisions, setDecisions] = useState<number | null>(null);
-  const [pendingExec, setPendingExec] = useState<number | null>(null);
-  // 今日邮件/AI建议处理 — both read getTodayEmails() (real Gmail, Dubai-day-
-  // scoped, paginated), the exact same function Email Assistant's default
-  // view uses. No maxResults=15 cap, no fake fallback number: if Gmail is
-  // unreachable both stay null ("—"), never a stale/hardcoded "15".
-  const [todayEmailCount, setTodayEmailCount] = useState<number | null>(null);
-  const [actionRequiredCount, setActionRequiredCount] = useState<number | null>(null);
-  const [miaLeadsToday, setMiaLeadsToday] = useState<number | null>(null);
+  const [myItems, setMyItems] = useState<KpiValue>(null);
+  const [decisions, setDecisions] = useState<KpiValue>(null);
+  const [importantMessages, setImportantMessages] = useState<KpiValue>(null);
+  const [miaLeadsToday, setMiaLeadsToday] = useState<KpiValue>(null);
 
   useEffect(() => {
-    getBossActions().then((res) => {
-      if (res.ok) {
-        setTotalActions(res.actions.length);
-        const now = Date.now();
-        setOverdue(res.actions.filter((a) => a.due_at && new Date(a.due_at).getTime() < now).length);
-      }
+    // 我的事项 — executive_tasks ONLY, never mixed with email/decisions/MIA.
+    // Open + in-progress (not completed/cancelled) is the same "still on my
+    // plate" definition /tasks itself uses to exclude Completed by default.
+    getExecutiveTasks().then((res) => {
+      if (res.ok) setMyItems(res.rows.filter((t) => t.status === 'open' || t.status === 'in_progress').length);
     });
-    getTodaysFollowups().then((res) => { if (res.ok) setTodaysFollowups(res.rows.length); });
+
+    // 需要我决定 — same refreshPendingDecisions() Decisions.tsx's own default
+    // view now uses (status=pending only) — Home's number and the page's
+    // default list are guaranteed to agree.
     refreshPendingDecisions().then((res) => { if (res.ok) setDecisions(res.rows.length); });
-    getFollowThroughData().then((res) => { if (res.ok) setPendingExec(res.counts.pending + res.counts.inProgress + res.counts.blocked); });
+
+    // 重要消息 — today's real Gmail, AI-flagged action-required subset
+    // (same triageEmails() call Email Assistant uses internally). This
+    // replaces the old separate 今日邮件/AI建议处理 tiles with one number:
+    // what actually needs Chris's attention, not raw email volume.
     getTodayEmails().then((res) => {
-      if (!res.ok) { setTodayEmailCount(null); setActionRequiredCount(null); return; }
-      setTodayEmailCount(res.results.length);
-      if (res.results.length === 0) { setActionRequiredCount(0); return; }
+      if (!res.ok) { setImportantMessages(null); return; }
+      if (res.results.length === 0) { setImportantMessages(0); return; }
       triageEmails(res.results.map((m) => ({ id: m.id, sender: m.sender, subject: m.subject, snippet: m.snippet, date: m.date }))).then((tres) => {
-        if (tres.ok) setActionRequiredCount(tres.results.filter((r) => r.tier === 'must').length);
-        // AI classification failing doesn't touch todayEmailCount (already real)
-        // — actionRequiredCount just stays null ("—") rather than a guess.
+        setImportantMessages(tres.ok ? tres.results.filter((r) => r.tier === 'must').length : null);
       });
     });
-    // Task 14.1: this number comes from MIA only — never from CRM new-customer
-    // counts. If MIA isn't reachable/configured, this stays null ("—"), it
-    // never falls back to a CRM-derived number.
-    getMiaStatus().then((res) => { if (res.ok) setMiaLeadsToday(res.data.leads_found_today); });
+
+    // 新业务机会 (MIA) — never a fabricated number, never a permanent "—".
+    // A real MIA failure (timeout/error) now shows "暂不可用" so it reads as
+    // "MIA is down" rather than "loading forever" or "zero leads".
+    getMiaStatus().then((res) => setMiaLeadsToday(res.ok ? res.data.leads_found_today : 'unavailable'));
   }, []);
 
   const kpis: Kpi[] = [
-    { label: '今日待处理', value: totalActions, color: GOLD, onClick: () => navigate('/actions') },
-    { label: '今日客户跟进', value: todaysFollowups, color: BLUE, onClick: () => navigate('/crm?tab=dashboard') },
-    { label: '逾期事项', value: overdue, color: RED, onClick: () => navigate('/actions?filter=overdue') },
-    { label: '等你决定', value: decisions, color: RED, onClick: () => navigate('/decisions') },
-    { label: '待执行', value: pendingExec, color: AMBER, onClick: () => navigate('/decisions') },
-    // Real Gmail count, same getTodayEmails() Email Assistant's default
-    // "今天" view reads — clicking shows exactly this many emails.
-    { label: '今日邮件', value: todayEmailCount, color: BLUE, onClick: () => navigate('/email-assistant') },
-    // Same today-email list, filtered to AI tier="must" via the same
-    // triageEmails() call Email Assistant uses — deep-links to that page's
-    // AI建议处理 filter (still just a filter over "全部", switchable back).
-    { label: 'AI建议处理', value: actionRequiredCount, color: GREEN, onClick: () => navigate('/email-assistant?filter=action-required') },
-    // Task 18.4 — was '/actions?filter=mia' (a generic Boss Action filter,
-    // not an actual lead list). Now opens the real MIA lead bridge.
-    { label: '今日新开发潜客(MIA)', value: miaLeadsToday, color: GOLD, onClick: () => navigate('/mia-leads') },
+    { label: '我的事项', value: myItems, color: GOLD, onClick: () => navigate('/tasks') },
+    { label: '需要我决定', value: decisions, color: RED, onClick: () => navigate('/decisions') },
+    { label: '重要消息', value: importantMessages, color: BLUE, onClick: () => navigate('/email-assistant') },
+    { label: '新业务机会', value: miaLeadsToday, color: GREEN, onClick: () => navigate('/mia-leads') },
   ];
 
   return (
-    <div className="grid" style={{ gridTemplateColumns: 'repeat(8,1fr)', gap: 10, marginBottom: 20 }}>
+    <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
       {kpis.map((k) => <KpiTile key={k.label} k={k} />)}
     </div>
   );

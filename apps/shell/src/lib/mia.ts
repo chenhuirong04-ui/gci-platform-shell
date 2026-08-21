@@ -129,8 +129,15 @@ export interface MiaStatus {
 // every caller is bounded, not just the ones that happened to wrap it.
 export async function getMiaStatus(): Promise<{ ok: true; data: MiaStatus } | { ok: false; status: MiaAgentStatus; error: string }> {
   try {
+    // GCI Home Final Structure §5 — 7s here, longer than the server
+    // adapter's own 4s upstream timeout, so the adapter is always the one
+    // to fail first and return a real error message; this client-side
+    // timeout is now just a backstop for the adapter itself hanging, not
+    // the primary failure path. abort() is given an explicit reason so a
+    // genuine client-side timeout never again surfaces as the opaque
+    // "signal is aborted without reason".
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
+    const timer = setTimeout(() => controller.abort(new Error('GCI 请求 MIA 状态接口超时（7秒）')), 7000);
     const res = await fetch(`${base()}/api/mia/executive-status`, { signal: controller.signal });
     clearTimeout(timer);
     const data = await res.json();

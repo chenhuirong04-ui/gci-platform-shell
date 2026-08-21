@@ -48,8 +48,16 @@ export default async function handler(): Promise<Response> {
   }
 
   try {
+    // GCI Home Final Structure §5 — this upstream call previously had NO
+    // timeout at all, so a hung/slow MIA left the client's own 5s
+    // AbortController (mia.ts) as the only thing that ever fired, surfacing
+    // as an opaque "signal is aborted without reason" with no indication of
+    // WHERE it failed. A server-side timeout, shorter than the client's,
+    // means this adapter is always the one to time out first and can say so
+    // plainly.
     const res = await fetch(`${MIA_BASE_URL}/api/executive-status`, {
       headers: { Authorization: `Bearer ${secret}` },
+      signal: AbortSignal.timeout(4000),
     });
     const text = await res.text();
     let data: any;
@@ -63,6 +71,11 @@ export default async function handler(): Promise<Response> {
     }
     return json({ ok: true, ...data });
   } catch (e: any) {
-    return json({ ok: false, status: 'no_data', error: String(e?.message ?? e) });
+    const timedOut = e?.name === 'TimeoutError' || e?.name === 'AbortError';
+    return json({
+      ok: false,
+      status: 'no_data',
+      error: timedOut ? 'MIA 服务响应超时（4秒），可能未启动或正在冷启动' : String(e?.message ?? e),
+    });
   }
 }
