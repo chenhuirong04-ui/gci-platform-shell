@@ -676,7 +676,17 @@ export function BusinessAssistant() {
     if (didAutoResolve.current) return;
     const customerParam = searchParams.get('customer');
     const qParam = searchParams.get('q');
-    if (customerParam) {
+    const askParam = searchParams.get('ask');
+    if (askParam) {
+      // Home dashboard's GIA entry (BusinessAssistantEntry.tsx) — a real
+      // free-text message, routed through the exact same chat-first router
+      // (explicit destination / V3 / classify-capture / lookup fallback)
+      // as this page's own input box, not the plain customer-lookup path
+      // `customer=` triggers below.
+      didAutoResolve.current = true;
+      setInputValue('');
+      handleTopSubmit(askParam);
+    } else if (customerParam) {
       didAutoResolve.current = true;
       setInputValue(customerParam);
       resolve(customerParam, qParam || undefined);

@@ -1,8 +1,12 @@
-// GCI Executive Desk — Task 12 / Home Layout Cleanup: Business Assistant
-// entry point. A real input (not just a decorative card) so Chris can type
-// a customer/company name and land directly on /business-assistant?customer=.
-// The actual Customer 360 aggregation logic lives entirely on that page —
-// nothing here talks to CRM/Gmail/Drive/etc.
+// GCI Executive Desk — Home dashboard's GIA entry point. A real input (not
+// just a decorative card) that hands the typed message to the SAME
+// chat-first router /business-assistant's own input box uses (explicit
+// destination -> Planner V3 -> classify-capture -> lookup fallback) via the
+// ?ask= param, instead of a plain customer-name lookup — this used to only
+// ever navigate to ?customer= (name-lookup only), which silently swallowed
+// any real instruction typed here (e.g. "新建客户 X" landed on a "customer
+// not found" screen instead of the capture confirm card). All actual
+// routing/aggregation logic still lives entirely on that page.
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
@@ -21,7 +25,7 @@ export function BusinessAssistantEntry() {
 
   function go() {
     const v = value.trim();
-    navigate(v ? `/business-assistant?customer=${encodeURIComponent(v)}` : '/business-assistant');
+    navigate(v ? `/business-assistant?ask=${encodeURIComponent(v)}` : '/business-assistant');
   }
 
   return (
