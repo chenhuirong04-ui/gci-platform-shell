@@ -17,6 +17,12 @@ export interface BriefItem {
   suggestion: string;
   deepLink: string;
   source: ActionSource;
+  // Kept alongside `source` specifically so todaysThreeActions' verb choice
+  // can tell apart the different action_types the 'business' source bucket
+  // bundles together (quotation_followup/invoice_review/inventory_alert) —
+  // 'source' alone was the bug: it collapsed all three into one "Contact"
+  // verb, which made no sense for an inventory alert.
+  actionType: string;
   dueAt: string | null;
   // Home Daily Brief §六 — when `fact` is a translated/rewritten version of
   // raw technical text (currently: Systems Registry notes, often in
@@ -323,6 +329,7 @@ export async function getDailyBrief(lang: BriefLang = 'zh'): Promise<{ ok: true;
       suggestion: suggestion(rep, lang),
       deepLink: deepLinkFor(rep, key),
       source: rep.source,
+      actionType: rep.action_type,
       dueAt: rep.due_at,
     });
   }
@@ -347,12 +354,35 @@ export async function getDailyBrief(lang: BriefLang = 'zh'): Promise<{ ok: true;
   // reply" there).
   const items = deduped.filter((it) => it.source !== 'email').slice(0, 5);
 
+  // Bug fix: verb choice was keyed purely on `source`, and 'business' bundles
+  // three unrelated action_types (quotation_followup/invoice_review/
+  // inventory_alert) under one bucket — every one of them got "联系"/"Contact"
+  // regardless, which made no sense for e.g. an inventory alert ("联系8项库存
+  // 异常"/"Contact 8 inventory alerts"). action_type is checked FIRST for the
+  // 3 business sub-types; everything else falls through to the original
+  // source-based mapping, unchanged.
   const todaysThreeActions = items.slice(0, 3).map((it) => {
     if (lang === 'en') {
-      const verb = it.source === 'crm' || it.source === 'business' ? 'Contact' : it.source === 'email' ? 'Reply to' : it.source === 'decisions' ? 'Progress' : it.source === 'commitments' ? 'Deliver on' : 'Handle';
+      let verb: string;
+      if (it.actionType === 'inventory_alert') verb = 'Review';
+      else if (it.actionType === 'invoice_review') verb = 'Review';
+      else if (it.actionType === 'quotation_followup') verb = 'Follow up on';
+      else if (it.source === 'crm' || it.source === 'business') verb = 'Contact';
+      else if (it.source === 'email') verb = 'Reply to';
+      else if (it.source === 'decisions') verb = 'Progress';
+      else if (it.source === 'commitments') verb = 'Deliver on';
+      else verb = 'Handle';
       return `${verb} ${it.subject}`;
     }
-    const verb = it.source === 'crm' || it.source === 'business' ? '联系' : it.source === 'email' ? '回复' : it.source === 'decisions' ? '推进' : it.source === 'commitments' ? '兑现' : '处理';
+    let verb: string;
+    if (it.actionType === 'inventory_alert') verb = '核查';
+    else if (it.actionType === 'invoice_review') verb = '审核';
+    else if (it.actionType === 'quotation_followup') verb = '跟进';
+    else if (it.source === 'crm' || it.source === 'business') verb = '联系';
+    else if (it.source === 'email') verb = '回复';
+    else if (it.source === 'decisions') verb = '推进';
+    else if (it.source === 'commitments') verb = '兑现';
+    else verb = '处理';
     return `${verb}${it.subject}`;
   });
 
