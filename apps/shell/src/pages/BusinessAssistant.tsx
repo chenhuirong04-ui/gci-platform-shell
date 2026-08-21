@@ -1,6 +1,6 @@
 // GCI Executive Desk — Task 12: Business Assistant / 商务助理.
 // Customer-centric orchestration: resolve a customer/company name once,
-// aggregate CRM/Gmail/Drive/Quotation/Commitments/Decisions/Boss Actions/
+// aggregate CRM/Drive/Quotation/Commitments/Decisions/Boss Actions/
 // Calendar, show a fact-based summary + chat. Every write (CRM follow-up,
 // reminder, new customer) requires an explicit confirm click. WhatsApp is
 // draft-only — never sent. Switching customers always resets chat/drafts.
@@ -525,10 +525,8 @@ export function BusinessAssistant() {
     if (!ctx) return;
     setCreateBusy(true);
     setCreateErr(null);
-    const firstEmail = ctx.emails[0];
     const res = await createCustomerWithContact({
       customerName: ctx.queryName,
-      email: firstEmail ? firstEmail.sender.match(/<([^>]+)>/)?.[1] || undefined : undefined,
     });
     setCreateBusy(false);
     if (res.ok) {
@@ -775,7 +773,7 @@ export function BusinessAssistant() {
 
       {ctx && !ctx.found && !ctx.potentialCustomer && (
         <div style={{ padding: '18px 20px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, fontSize: 13, color: MUTED }}>
-          未找到与「{ctx.queryName}」相关的 CRM 记录、邮件或文件。
+          未找到与「{ctx.queryName}」相关的 CRM 记录或文件。
         </div>
       )}
 
@@ -783,7 +781,7 @@ export function BusinessAssistant() {
         <div style={{ padding: '16px 20px', background: 'rgba(203,168,92,0.05)', border: '1px solid rgba(203,168,92,0.25)', borderRadius: 12, marginBottom: 20 }}>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: GOLD, marginBottom: 6 }}>未建档客户 / Potential Customer</div>
           <div style={{ fontSize: 12, color: MUTED, marginBottom: 10 }}>
-            「{ctx.queryName}」尚未在 CRM 建档,但在 Gmail/Drive 中找到 {ctx.emails.length} 封邮件、{ctx.driveFiles.length} 个文件。
+            「{ctx.queryName}」尚未在 CRM 建档,但在 Drive 中找到 {ctx.driveFiles.length} 个文件。
           </div>
           {!showCreateForm ? (
             <button onClick={() => setShowCreateForm(true)} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: 'rgba(203,168,92,0.14)', border: '1px solid rgba(203,168,92,0.4)', color: GOLD }}>
@@ -791,7 +789,7 @@ export function BusinessAssistant() {
             </button>
           ) : (
             <div>
-              <div style={{ fontSize: 12, color: TEXT, marginBottom: 8 }}>将以「{ctx.queryName}」创建新 CRM 客户{ctx.emails[0] ? `,联系邮箱取自最近邮件` : ''}。</div>
+              <div style={{ fontSize: 12, color: TEXT, marginBottom: 8 }}>将以「{ctx.queryName}」创建新 CRM 客户。</div>
               {createErr && <div style={{ fontSize: 12, color: RED, marginBottom: 8 }}>{createErr}</div>}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button disabled={createBusy} onClick={handleCreateCustomer} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: 'rgba(111,191,142,0.14)', border: '1px solid rgba(111,191,142,0.4)', color: GREEN }}>
@@ -814,7 +812,6 @@ export function BusinessAssistant() {
                 <div>当前阶段:<span style={{ color: TEXT }}> {facts.stage || '未知'}</span></div>
                 <div>业务类别:<span style={{ color: TEXT }}> {facts.businessCategory || '未分类'}</span></div>
                 <div>最近联系:<span style={{ color: TEXT }}> {formatDate(facts.lastContact)}</span></div>
-                <div>最近邮件:<span style={{ color: TEXT }}> {formatDate(facts.lastEmail)}</span></div>
                 <div>最近报价:<span style={{ color: TEXT }}> {facts.lastQuoteAmount != null ? `${facts.lastQuoteCurrency || 'AED'} ${facts.lastQuoteAmount}` : '无'}</span></div>
                 <div>未完成承诺:<span style={{ color: TEXT }}> {facts.openCommitments}</span></div>
                 <div>下次跟进:<span style={{ color: TEXT }}> {formatDate(facts.nextFollowUp)}</span></div>
@@ -875,17 +872,6 @@ export function BusinessAssistant() {
                     )}
                   </div>
                 )}
-              </div>
-            )}
-
-            {ctx.emails.length > 0 && (
-              <div style={{ padding: '14px 16px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, marginBottom: 14 }}>
-                <SectionLabel>最近邮件 · {ctx.emails.length}</SectionLabel>
-                {ctx.emails.slice(0, 5).map((m) => (
-                  <a key={m.id} href={`/email-assistant?threadId=${encodeURIComponent(m.threadId)}`} style={{ display: 'block', fontSize: 12, color: TEXT, textDecoration: 'none', padding: '6px 0', borderBottom: `1px solid ${BORD}` }}>
-                    <span style={{ color: GOLD }}>{m.subject || '(无主题)'}</span> <span style={{ color: SUBTLE }}>· {m.sender} · {m.date}</span>
-                  </a>
-                ))}
               </div>
             )}
 

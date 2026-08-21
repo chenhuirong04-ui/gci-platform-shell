@@ -4,7 +4,7 @@
 // never writes to any of those systems and never fabricates an item that
 // isn't backed by real underlying data.
 import { getTodaysFollowups, getOverdueFollowups, getBossDecisions } from './crmSupabase';
-import { getImportantEmails, getCalendarEvents } from './googleSearch';
+import { getCalendarEvents } from './googleSearch';
 import { getSystemRegistry } from './systemRegistry';
 import { AGENTS } from '../components/AgentsStatus';
 import { getDecisionFollowThroughActions } from './decisionInbox';
@@ -94,7 +94,6 @@ async function fetchBossActions(): Promise<
     todaysFollowups,
     overdue,
     bossDecisions,
-    importantEmails,
     calendarToday,
     systemRegistry,
     quotationFollowups,
@@ -110,7 +109,6 @@ async function fetchBossActions(): Promise<
     getTodaysFollowups(),
     getOverdueFollowups(),
     getBossDecisions(),
-    withTimeout(getImportantEmails(), SLOW_SOURCE_TIMEOUT_MS, { ok: false, error: 'timeout' } as any),
     withTimeout(getCalendarEvents('today'), SLOW_SOURCE_TIMEOUT_MS, { ok: false, error: 'timeout' } as any),
     getSystemRegistry(),
     safeFetchJson<any>(`${base()}/api/trade/check-quotation-followups`),
@@ -194,31 +192,9 @@ async function fetchBossActions(): Promise<
     }
   }
 
-  // ── 2. Gmail — reuses Task 5.2's explainable rule (unread, last 7 days,
-  // excl. promotions/social). This rule has no signal for whether a message
-  // is actually customer-related (it also matches notifications/newsletters
-  // like Vercel/Zoom/bank alerts) — per §3 "if uncertain, downgrade — never
-  // inflate to P1", every result here is P2, never P1. Escalating requires
-  // a real customer-relevance signal, which is out of this round's scope. ──
-  if (importantEmails.ok) {
-    for (const m of importantEmails.results) {
-      const dateMs = new Date(m.date).getTime();
-      const priority: ActionPriority = 'P2';
-      actions.push({
-        id: `email-${m.id}`,
-        source: 'email',
-        category: 'Email',
-        title: `${m.sender} — ${m.subject}`,
-        summary: m.snippet,
-        priority,
-        due_at: Number.isFinite(dateMs) ? new Date(dateMs).toISOString() : null,
-        related_customer: null,
-        related_system: null,
-        action_type: 'email_review',
-        deep_link: m.link,
-      });
-    }
-  }
+  // ── 2. Gmail — removed (GCI/GIA final product decision: no email
+  // capability anywhere). Was: Task 5.2's important-emails rule (unread,
+  // last 7 days, excl. promotions/social), always P2. ──
 
   // ── 3. Calendar (today) — starting within 2h → P1, later today → P2.
   // Meetings more than 1h in the past are dropped (nothing left to do). ──

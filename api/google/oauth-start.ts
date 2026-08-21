@@ -1,16 +1,18 @@
 // /api/google/oauth-start
-// Redirects to Google's OAuth consent screen. Gmail/Calendar stay
-// read-only. Drive now has two scopes: drive.readonly (unchanged — powers
-// existing whole-Drive search in drive-search.ts/drive-list-folder.ts) PLUS
+// Redirects to Google's OAuth consent screen. Calendar stays read-only.
+// Drive has two scopes: drive.readonly (unchanged — powers existing
+// whole-Drive search in drive-search.ts/drive-list-folder.ts) PLUS
 // drive.file (Task 17 GIA write permission — additive, NOT a replacement).
 // drive.file only ever grants access to files GIA itself creates, or files
 // the user explicitly hands over via Google Picker (future step) — it does
 // not expand what GIA can read/write beyond that. No full `drive` scope.
+// gmail.readonly removed (final product decision: no email capability
+// anywhere in GCI/GIA) — Gmail-only scope, dropping it does not affect
+// the Drive/Calendar token above.
 // Server-side only: GOOGLE_CLIENT_ID / GOOGLE_REDIRECT_URI never reach the browser.
 export const config = { runtime: 'edge' };
 
 const SCOPES = [
-  'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/drive.readonly',
   'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/calendar.readonly',

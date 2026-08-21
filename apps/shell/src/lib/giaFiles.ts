@@ -165,11 +165,11 @@ function base64ToBlob(base64: string, mimeType: string): Blob {
   return new Blob([bytes], { type: mimeType });
 }
 
-// GIA Multi-Source File Intake — deterministic, no AI call. Only resolves
-// the two sources that are unambiguous from raw chat text alone (a literal
-// URL, a literal Drive link) — never guesses "which email" a vague phrase
-// like "刚才那封邮件" refers to (that path is an explicit button click in
-// Email Assistant instead, see fetchAndStoreGmailAttachment below).
+// GIA Multi-Source File Intake — deterministic, no AI call. Resolves the
+// two sources that are unambiguous from raw chat text alone (a literal
+// URL, a literal Drive link). Gmail-attachment intake was removed with the
+// rest of GCI/GIA's email capability (final product decision) — file
+// intake now covers upload/URL/existing-Drive-file only.
 const URL_RE = /https?:\/\/[^\s，,。]+/i;
 const DRIVE_FILE_RE = /drive\.google\.com\/(?:file\/d\/|open\?id=)([\w-]{10,})/i;
 
@@ -243,47 +243,6 @@ export async function fetchAndStoreFromUrl(
       tags: classification.tags,
       sourceType: 'url',
       sourceRef: url,
-    });
-  } catch (e: any) {
-    return { ok: false, error: String(e?.message ?? e) };
-  }
-}
-
-// Fetches one specific Gmail attachment the user already has visible on
-// screen (Email Assistant's own attachment chip supplies messageId+
-// attachmentId directly — never guessed from free text), then reuses the
-// existing upload+register pipeline unchanged.
-export async function fetchAndStoreGmailAttachment(
-  messageId: string,
-  attachmentId: string,
-  filename: string,
-  mimeType: string,
-  classification: FileClassification,
-  customerId: string | null,
-): Promise<{ ok: true; row: GiaFileRegistryRow } | { ok: false; error: string }> {
-  try {
-    const res = await fetch(`/api/google/gmail-attachment?messageId=${encodeURIComponent(messageId)}&attachmentId=${encodeURIComponent(attachmentId)}`);
-    const data = await res.json();
-    if (!data.ok) return { ok: false, error: data.error || '附件下载失败' };
-    const blob = base64ToBlob(data.data, mimeType);
-    const displayName = classification.displayName || filename;
-    const file = new File([blob], filename, { type: mimeType });
-    const uploaded = await uploadFileToDrive(file, DEFAULT_TARGET_FOLDER_ID, filename);
-    if (!uploaded.ok) return uploaded;
-    return registerFile({
-      fileName: filename,
-      displayName,
-      documentType: classification.documentType,
-      businessArea: classification.businessArea,
-      companyName: classification.companyName,
-      customerId,
-      driveFileId: uploaded.fileId,
-      driveUrl: uploaded.webViewLink,
-      driveFolder: DEFAULT_TARGET_FOLDER_NAME,
-      isCurrent: true,
-      tags: classification.tags,
-      sourceType: 'gmail_attachment',
-      sourceRef: `${messageId}:${attachmentId}`,
     });
   } catch (e: any) {
     return { ok: false, error: String(e?.message ?? e) };

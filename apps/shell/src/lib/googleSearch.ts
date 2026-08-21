@@ -1,19 +1,11 @@
 // GCI Executive Desk — Task 5.2 client-side wrappers for the Google read
 // routes. No Google credentials ever live here — every call just hits our
 // own /api/google/* server routes.
+// Gmail wrappers (searchGmail/getImportantEmails/getTodayEmails/
+// getGmailThread + GmailResult/GmailThreadMessage) removed — final product
+// decision: GCI/GIA no longer reads email at all. Drive/Calendar untouched.
 function base(): string {
   return typeof window !== 'undefined' ? window.location.origin : '';
-}
-
-export interface GmailResult {
-  id: string;
-  threadId: string;
-  sender: string;
-  subject: string;
-  date: string;
-  snippet: string;
-  link: string;
-  unread?: boolean;
 }
 
 export interface DriveResult {
@@ -52,11 +44,6 @@ async function safeFetchJson<T>(url: string): Promise<T | { ok: false; error: st
   }
 }
 
-export async function searchGmail(q: string, max?: number): Promise<{ ok: true; query: string; results: GmailResult[] } | { ok: false; error: string }> {
-  const qs = new URLSearchParams({ q, ...(max ? { max: String(max) } : {}) });
-  return safeFetchJson(`${base()}/api/google/gmail-search?${qs.toString()}`);
-}
-
 export async function searchDrive(q: string): Promise<{ ok: true; query: string; results: DriveResult[] } | { ok: false; error: string }> {
   return safeFetchJson(`${base()}/api/google/drive-search?q=${encodeURIComponent(q)}`);
 }
@@ -67,35 +54,4 @@ export async function getCalendarEvents(
 ): Promise<{ ok: true; range: string; startDate: string; endDate: string; results: CalendarResult[] } | { ok: false; error: string }> {
   const qs = new URLSearchParams({ range, ...(date ? { date } : {}) });
   return safeFetchJson(`${base()}/api/google/calendar-events?${qs.toString()}`);
-}
-
-export async function getImportantEmails(): Promise<{ ok: true; rule: string; results: GmailResult[] } | { ok: false; error: string }> {
-  return safeFetchJson(`${base()}/api/google/important-emails`);
-}
-
-// The ONE unified "today's real Gmail inbox" source — Home's KPIs and
-// Email Assistant's default view both call this exact function, so the
-// count they show and the list they show are always the same query.
-export async function getTodayEmails(): Promise<{ ok: true; date: string; results: GmailResult[] } | { ok: false; error: string }> {
-  return safeFetchJson(`${base()}/api/google/today-emails`);
-}
-
-// Task 11.1 — Email Chat Assistant: full thread content (subject/from/to/date
-// + plain-text body, HTML safely converted server-side, attachments listed
-// by name/type only — never fetched/decoded). gmail.readonly only.
-export interface GmailThreadMessage {
-  id: string;
-  from: string;
-  to: string;
-  subject: string;
-  date: string;
-  snippet: string;
-  body: string;
-  attachments: { filename: string; mimeType: string; size: number; attachmentId: string }[];
-}
-
-export async function getGmailThread(
-  threadId: string,
-): Promise<{ ok: true; threadId: string; messages: GmailThreadMessage[] } | { ok: false; error: string }> {
-  return safeFetchJson(`${base()}/api/google/gmail-thread?threadId=${encodeURIComponent(threadId)}`);
 }

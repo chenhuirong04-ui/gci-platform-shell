@@ -115,7 +115,7 @@ export interface ResolvedCaptureItem {
   // classifyPlanV3Actions). fileSource/fileRef together tell
   // confirmCaptureItem() which giaFiles.ts fetch+store+register function to
   // call; nothing is fetched or written until Chris's explicit confirm.
-  fileSource?: 'drive_file' | 'url' | 'gmail_attachment';
+  fileSource?: 'drive_file' | 'url';
   fileRef?: string;
   fileName?: string;
   fileMimeType?: string;

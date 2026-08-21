@@ -50,10 +50,9 @@ const STATUS_COLOR: Record<AgentStatus, string> = {
 // Identification confirmed via direct Vercel/GitHub/Supabase inspection this
 // round (Task 4.1) — never guessed. See conversation record for the audit trail.
 // Task 13: fixed naming going into the MIA/E-commerce/Growth integration
-// rounds (14.1/14.2). Email Assistant is intentionally NOT listed here —
-// it's a built-in GCI feature (Task 11.1), not an external agent, and its
-// signal already appears as the Home "重要客户邮件" KPI + /email-assistant
-// — listing it again here was a duplicate entry point.
+// rounds (14.1/14.2). Email Assistant is not listed here — the email
+// capability it was part of was removed entirely (final product decision:
+// no email capability anywhere in GCI/GIA).
 export const AGENTS: AgentCard[] = [
   {
     name: 'MIA｜客户开发 AI',

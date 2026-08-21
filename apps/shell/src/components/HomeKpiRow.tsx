@@ -3,15 +3,20 @@
 // 6 of the 8 old tiles were re-slicing the same 2-3 underlying datasets
 // (今日待处理/逾期事项/客户跟进 all derived from getBossActions(); 等你决定/
 // 待执行 both from executive_decisions) — confusing in daily use per Chris.
-// 今日邮件 restored afterward (Chris confirmed the email entry point itself
-// was still needed, not just its "AI建议处理" derivative) — pulled straight
-// back from the pre-simplification implementation (commit bee3bfd), same
-// getTodayEmails() call 重要消息 already made, just also reading the raw
-// result count instead of only the AI must-tier subset. Current structure:
+//
+// Email removal (final product decision — GCI/GIA no longer reads Gmail at
+// all): 今日邮件 and the email-derived 重要消息 are both gone. 重要消息 is
+// kept as a KPI slot (per Chris's required 4-entry structure) but is a
+// static 0 for now — no email source, and explicitly no new AI/API call was
+// added just to fill it. It becomes real once a non-email "important
+// messages" data source (Support/WhatsApp per Chris's own roadmap note) is
+// actually wired in — not before.
+//
+// Current structure:
 //   我的事项      -> executive_tasks only (getExecutiveTasks), -> /tasks
 //   需要我决定    -> executive_decisions, status=pending only, -> /decisions
-//   今日邮件      -> today's real Gmail count (getTodayEmails()), -> /email-assistant
-//   重要消息      -> same Gmail list, AI-flagged action-required subset, -> /email-assistant
+//   重要消息      -> static 0 (no data source yet — email removed, no
+//                    replacement wired in this round)
 //   新业务机会    -> MIA leads_found_today; shows an honest "暂不可用"
 //                    state (not a stale "—") when MIA itself reports failure,
 //                    never a fabricated number.
@@ -20,8 +25,6 @@ import { useNavigate } from 'react-router-dom';
 import { useI18n } from '@gci/i18n';
 import { getExecutiveTasks } from '../lib/executiveTasks';
 import { refreshPendingDecisions } from '../lib/decisionInbox';
-import { getTodayEmails } from '../lib/googleSearch';
-import { triageEmails } from '../lib/emailAssistant';
 import { getMiaStatus } from '../lib/mia';
 
 const GOLD = '#CBA85C';
@@ -62,8 +65,6 @@ export function HomeKpiRow() {
   const { lang } = useI18n();
   const [myItems, setMyItems] = useState<KpiValue>(null);
   const [decisions, setDecisions] = useState<KpiValue>(null);
-  const [todayEmailCount, setTodayEmailCount] = useState<KpiValue>(null);
-  const [importantMessages, setImportantMessages] = useState<KpiValue>(null);
   const [miaLeadsToday, setMiaLeadsToday] = useState<KpiValue>(null);
 
   useEffect(() => {
@@ -79,20 +80,6 @@ export function HomeKpiRow() {
     // default list are guaranteed to agree.
     refreshPendingDecisions().then((res) => { if (res.ok) setDecisions(res.rows.length); });
 
-    // 今日邮件 / 重要消息 — one getTodayEmails() call (real Gmail, same
-    // function Email Assistant's default view uses) backs both: raw count
-    // for 今日邮件 (restored, was removed by mistake — Chris confirmed the
-    // email entry itself was still needed), and the AI must-tier subset for
-    // 重要消息 (same triageEmails() call Email Assistant uses internally).
-    getTodayEmails().then((res) => {
-      if (!res.ok) { setTodayEmailCount(null); setImportantMessages(null); return; }
-      setTodayEmailCount(res.results.length);
-      if (res.results.length === 0) { setImportantMessages(0); return; }
-      triageEmails(res.results.map((m) => ({ id: m.id, sender: m.sender, subject: m.subject, snippet: m.snippet, date: m.date }))).then((tres) => {
-        setImportantMessages(tres.ok ? tres.results.filter((r) => r.tier === 'must').length : null);
-      });
-    });
-
     // 新业务机会 (MIA) — never a fabricated number, never a permanent "—".
     // A real MIA failure (timeout/error) now shows "暂不可用" so it reads as
     // "MIA is down" rather than "loading forever" or "zero leads".
@@ -102,13 +89,12 @@ export function HomeKpiRow() {
   const kpis: Kpi[] = [
     { label: lang === 'zh' ? '我的事项' : 'My Tasks', value: myItems, color: GOLD, onClick: () => navigate('/tasks') },
     { label: lang === 'zh' ? '需要我决定' : 'Needs My Decision', value: decisions, color: RED, onClick: () => navigate('/decisions') },
-    { label: lang === 'zh' ? '今日邮件' : "Today's Emails", value: todayEmailCount, color: BLUE, onClick: () => navigate('/email-assistant') },
-    { label: lang === 'zh' ? '重要消息' : 'Important Messages', value: importantMessages, color: BLUE, onClick: () => navigate('/email-assistant') },
+    { label: lang === 'zh' ? '重要消息' : 'Important Messages', value: 0, color: BLUE, onClick: () => {} },
     { label: lang === 'zh' ? '新业务机会' : 'New Business Opportunities', value: miaLeadsToday, color: GREEN, onClick: () => navigate('/mia-leads') },
   ];
 
   return (
-    <div className="grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 20 }}>
+    <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
       {kpis.map((k) => <KpiTile key={k.label} k={k} lang={lang} />)}
     </div>
   );

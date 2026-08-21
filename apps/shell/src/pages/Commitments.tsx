@@ -8,7 +8,6 @@ import {
   refreshCommitments,
   getCommitments,
   getCrmCommitmentCandidates,
-  getGmailCommitmentCandidates,
   confirmCommitmentCandidate,
   updateCommitmentStatus,
   commitmentDisplayStatus,
@@ -71,11 +70,12 @@ export function Commitments() {
       if (res.ok) setCommitments(res.rows);
       else setError(res.error);
     });
-    Promise.all([getCrmCommitmentCandidates(), getGmailCommitmentCandidates()]).then(([crmRes, gmailRes]) => {
-      const list: CommitmentCandidate[] = [];
-      if (crmRes.ok) list.push(...crmRes.candidates);
-      if (gmailRes.ok) list.push(...gmailRes.candidates);
-      setCandidates(list);
+    // Gmail candidate generation removed (final product decision: no email
+    // capability in GCI/GIA) — CRM-sourced candidates only from here on.
+    // Historical commitments with source='gmail' are untouched and still
+    // filterable below.
+    getCrmCommitmentCandidates().then((crmRes) => {
+      setCandidates(crmRes.ok ? crmRes.candidates : []);
     });
   }
 

@@ -4,7 +4,7 @@
 // aggregated, bounded context — never a full dump of any one source, and
 // never a new copy of CRM/Gmail/Drive/Quotation data in a new table.
 import { findCustomerByName, type CrmCustomer, type CrmContact, type CrmFollowup } from './crmSupabase';
-import { searchGmail, searchDrive, getCalendarEvents, type GmailResult, type DriveResult, type CalendarResult } from './googleSearch';
+import { searchDrive, getCalendarEvents, type DriveResult, type CalendarResult } from './googleSearch';
 import { getCommitments, type ExecutiveCommitment } from './commitments';
 import { getDecisions, type ExecutiveDecision } from './decisionInbox';
 import { getBossActions, type BossAction } from './actionCenter';
@@ -37,11 +37,10 @@ export interface QuotationSummary {
 export interface BusinessContext {
   queryName: string;
   found: boolean;
-  potentialCustomer: boolean; // not in CRM, but Gmail/Drive has real hits
+  potentialCustomer: boolean; // not in CRM, but Drive has real hits
   customer: CrmCustomer | null;
   contacts: CrmContact[];
   followups: CrmFollowup[];
-  emails: GmailResult[];
   driveFiles: DriveResult[];
   quotations: QuotationSummary | null;
   commitments: ExecutiveCommitment[];
@@ -57,9 +56,8 @@ function textMatches(haystack: string | null | undefined, name: string): boolean
 export async function resolveBusinessContext(rawName: string): Promise<BusinessContext> {
   const name = rawName.trim();
 
-  const [custRes, emailRes, driveRes, quoteRes, commitRes, decisionRes, actionsRes, calendarRes] = await Promise.all([
+  const [custRes, driveRes, quoteRes, commitRes, decisionRes, actionsRes, calendarRes] = await Promise.all([
     findCustomerByName(name),
-    searchGmail(name),
     searchDrive(name),
     safeFetchJson<any>(`${base()}/api/ai/quotation-history?customer=${encodeURIComponent(name)}`),
     getCommitments(),
@@ -73,7 +71,6 @@ export async function resolveBusinessContext(rawName: string): Promise<BusinessC
   const contacts = found ? (custRes as any).contacts : [];
   const followups = found ? (custRes as any).followups : [];
 
-  const emails = emailRes.ok ? emailRes.results.slice(0, 8) : [];
   const driveFiles = driveRes.ok ? driveRes.results.slice(0, 8) : [];
 
   const quotations: QuotationSummary | null =
@@ -101,7 +98,7 @@ export async function resolveBusinessContext(rawName: string): Promise<BusinessC
       ) || null;
   }
 
-  const potentialCustomer = !found && (emails.length > 0 || driveFiles.length > 0);
+  const potentialCustomer = !found && driveFiles.length > 0;
 
   return {
     queryName: name,
@@ -110,7 +107,6 @@ export async function resolveBusinessContext(rawName: string): Promise<BusinessC
     customer,
     contacts,
     followups,
-    emails,
     driveFiles,
     quotations,
     commitments,
@@ -126,7 +122,6 @@ export async function resolveBusinessContext(rawName: string): Promise<BusinessC
 export interface BusinessSummaryFacts {
   stage: string | null;
   lastContact: string | null;
-  lastEmail: string | null;
   lastQuoteAmount: number | null;
   lastQuoteCurrency: string | null;
   openCommitments: number;
@@ -138,7 +133,6 @@ export interface BusinessSummaryFacts {
 export function buildBusinessSummaryFacts(ctx: BusinessContext): BusinessSummaryFacts {
   const stage = ctx.customer?.status || null;
   const lastContact = ctx.customer?.last_follow_up_at || null;
-  const lastEmail = ctx.emails[0]?.date || null;
   const latestQuote = ctx.quotations?.quotes?.[0] || null;
   const lastQuoteAmount = latestQuote ? latestQuote.grandTotal ?? latestQuote.sellingTotal ?? null : null;
   const lastQuoteCurrency = latestQuote?.currency || null;
@@ -157,7 +151,6 @@ export function buildBusinessSummaryFacts(ctx: BusinessContext): BusinessSummary
   return {
     stage,
     lastContact,
-    lastEmail,
     lastQuoteAmount,
     lastQuoteCurrency,
     openCommitments,
@@ -183,11 +176,6 @@ export function buildContextSummaryForAI(ctx: BusinessContext): string {
   if (ctx.followups.length > 0) {
     lines.push(`\n最近跟进记录:`);
     ctx.followups.slice(0, 3).forEach((f) => lines.push(`- ${f.follow_up_date}: ${f.notes || f.next_action || ''}`));
-  }
-
-  if (ctx.emails.length > 0) {
-    lines.push(`\n最近邮件 (共 ${ctx.emails.length} 条):`);
-    ctx.emails.slice(0, 5).forEach((m) => lines.push(`- ${m.date} | ${m.sender} | ${m.subject}: ${m.snippet}`));
   }
 
   if (ctx.driveFiles.length > 0) {

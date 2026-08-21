@@ -201,39 +201,11 @@ export async function getCrmCommitmentCandidates(): Promise<
   return { ok: true, candidates };
 }
 
-const GMAIL_COMMITMENT_RE =
-  /\bI will\b|\bWe will\b|\bI'll\b|\bWe'll\b|will send|will provide|will confirm|will get back to you|by tomorrow|by (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)|我会|我们会|明天发|下周给|稍后确认|会回复|会提供/i;
-
-export async function getGmailCommitmentCandidates(): Promise<
-  { ok: true; candidates: CommitmentCandidate[] } | { ok: false; error: string }
-> {
-  const important = await safeFetchJson<any>(`${base()}/api/google/important-emails`);
-  if (!important || !important.ok) return { ok: true, candidates: [] };
-  const existing = await existingCommitmentKeySet();
-
-  const candidates: CommitmentCandidate[] = [];
-  for (const m of important.results ?? []) {
-    const text = `${m.subject || ''} ${m.snippet || ''}`.trim();
-    if (!text || !GMAIL_COMMITMENT_RE.test(text)) continue;
-    const sourceRef = `email-${m.id}`;
-    const key = `gmail|${sourceRef}|${text}`;
-    if (existing.has(key)) continue;
-    const dateStr = parseRelativeDateZh(text); // English weekday phrases aren't parsed by this helper — due_at stays null rather than guessed
-    candidates.push({
-      id: key,
-      source: 'gmail',
-      source_ref: sourceRef,
-      title: `${m.sender} — ${m.subject || '(无主题)'}`,
-      commitment_text: text,
-      due_at: dateStr ? toDubaiMidnightIso(dateStr) : null,
-      counterparty: m.sender,
-      commitment_type: 'inbound', // the sender is the one promising, in an email addressed to Chris
-      source_link: m.link,
-      priority: 'P2',
-    });
-  }
-  return { ok: true, candidates };
-}
+// Gmail-derived commitment candidates removed (final product decision: no
+// email capability anywhere in GCI/GIA). Historical commitments with
+// source='gmail' are untouched — only new candidate generation from email
+// is gone. Was: getGmailCommitmentCandidates(), scanning
+// /api/google/important-emails for promise-like phrasing.
 
 // Chris explicitly confirms a candidate — this is the ONLY way free-text
 // candidates ever get written.

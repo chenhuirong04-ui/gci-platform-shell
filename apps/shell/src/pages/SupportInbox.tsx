@@ -1,7 +1,8 @@
 // GCI Executive Desk — Task 18.2: GIA Support Inbox.
-// Email support reuses existing Gmail read capability via "转为客服工单"
-// on the Email Assistant detail page (feeds a thread in here). WhatsApp
-// intake (GIA WhatsApp Intake V1) reads real messages captured by
+// Email-sourced ticket intake (was: "转为客服工单" on the now-removed Email
+// Assistant detail page) is gone along with GCI/GIA's email capability
+// (final product decision) — manual ticket entry below still covers that
+// case. WhatsApp intake (GIA WhatsApp Intake V1) reads real messages captured by
 // api/whatsapp/webhook.ts — this page never sends anything itself; a
 // "WhatsApp Draft" is generated for review only, always shown as 未发送.
 // Manual ticket entry (below) still exists for anything outside the

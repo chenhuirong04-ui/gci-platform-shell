@@ -16,7 +16,6 @@ import { Actions } from './pages/Actions';
 import { Decisions } from './pages/Decisions';
 import { Commitments } from './pages/Commitments';
 import { Tasks } from './pages/Tasks';
-import { EmailAssistant } from './pages/EmailAssistant';
 import { BusinessAssistant } from './pages/BusinessAssistant';
 import { CrmCustomers } from './pages/CrmCustomers';
 import { SupportInbox } from './pages/SupportInbox';
@@ -149,7 +148,10 @@ function Shell() {
           <Route path="/decisions" element={<Decisions />} />
           <Route path="/commitments" element={<Commitments />} />
           <Route path="/tasks" element={<Tasks />} />
-          <Route path="/email-assistant" element={<EmailAssistant />} />
+          {/* Email Assistant retired (final product decision: no email
+              capability in GCI/GIA) — old bookmarks/links redirect Home
+              instead of a broken page. */}
+          <Route path="/email-assistant" element={<Navigate to="/" replace />} />
           <Route path="/business-assistant" element={<BusinessAssistant />} />
           <Route
             path="/crm-customers"

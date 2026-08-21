@@ -75,13 +75,6 @@ const AGENT_OPTIONS: DecisionOption[] = [
   LATER,
 ];
 
-const EMAIL_OPTIONS: DecisionOption[] = [
-  { key: 'approve', label: '同意/确认' },
-  { key: 'reject', label: '拒绝/不同意' },
-  { key: 'need_more_info', label: '需要更多信息' },
-  LATER,
-];
-
 interface DecisionCandidate {
   source: DecisionSource;
   source_ref: string;
@@ -140,37 +133,6 @@ function parseDueDateInput(text: string | undefined | null): string | null {
   const dateStr = parseRelativeDateZh(text.trim());
   if (!dateStr) return null;
   return `${dateStr}T00:00:00+04:00`;
-}
-
-// ── §1: Very conservative rule + CRM-name correlation for Gmail candidates ──
-const DECISION_KEYWORDS = /报价|价格|条款|合同|付款|合作条件|批准|确认|approve|contract|quote|confirm|decide|payment terms/i;
-
-async function collectEmailCandidates(customerNames: string[]): Promise<DecisionCandidate[]> {
-  if (customerNames.length === 0) return [];
-  const importantEmails = await safeFetchJson<any>(`${base()}/api/google/important-emails`);
-  if (!importantEmails || !importantEmails.ok) return [];
-
-  const candidates: DecisionCandidate[] = [];
-  for (const m of importantEmails.results ?? []) {
-    const text = `${m.subject || ''} ${m.snippet || ''}`;
-    if (!DECISION_KEYWORDS.test(text)) continue;
-    const matchedCustomer = customerNames.find((name) => name.length >= 2 && text.toLowerCase().includes(name.toLowerCase()));
-    if (!matchedCustomer) continue;
-    candidates.push({
-      source: 'email',
-      source_ref: `email-${m.id}`,
-      category: 'Email',
-      title: `${matchedCustomer} — ${m.subject || '(无主题)'}`,
-      summary: m.snippet,
-      reason: `邮件提及客户「${matchedCustomer}」且包含明确的决定性用语(价格/条款/合同/付款/批准等),需要老板确认`,
-      priority: 'P2',
-      decision_options: EMAIL_OPTIONS,
-      related_customer_id: null,
-      related_system_id: null,
-      due_at: null,
-    });
-  }
-  return candidates;
 }
 
 async function collectCandidates(): Promise<DecisionCandidate[]> {
@@ -259,8 +221,12 @@ async function collectCandidates(): Promise<DecisionCandidate[]> {
     }
   }
 
-  const emailCandidates = await collectEmailCandidates(stagnantCustomerNames);
-  candidates.push(...emailCandidates);
+  // Gmail-derived decision candidates removed (final product decision: no
+  // email capability anywhere in GCI/GIA) — was collectEmailCandidates(),
+  // scanning /api/google/important-emails for decision-worthy customer
+  // mentions. stagnantCustomerNames is still collected above for the CRM
+  // stagnant-customer candidates themselves, just no longer cross-
+  // referenced against email.
 
   return candidates;
 }

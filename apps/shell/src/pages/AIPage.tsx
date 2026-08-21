@@ -15,10 +15,10 @@ import { getTodaysFollowups, findCustomerByName, logFollowup, createCustomerWith
 import { parseQueryCustomerCommand, parseLogFollowupCommand, parseCreateCrmCustomerCommand } from '../ai/crmAskGciParsers';
 import { getSystemRegistry } from '../lib/systemRegistry';
 import { answerRegistryQuery, REGISTRY_QUERY_RE } from '../ai/registryAskGciParsers';
-import { searchGmail, searchDrive, getCalendarEvents, getImportantEmails } from '../lib/googleSearch';
+import { searchDrive, getCalendarEvents } from '../lib/googleSearch';
 import {
-  parseGmailSearchCommand, parseDriveSearchCommand, parseCustomerContextCommand,
-  CALENDAR_TODAY_RE, CALENDAR_TOMORROW_RE, CALENDAR_WEEK_RE, IMPORTANT_EMAILS_RE, CUSTOMER_CONTEXT_RE,
+  parseDriveSearchCommand, parseCustomerContextCommand,
+  CALENDAR_TODAY_RE, CALENDAR_TOMORROW_RE, CALENDAR_WEEK_RE, CUSTOMER_CONTEXT_RE,
 } from '../ai/googleAskGciParsers';
 import { matchBossActionQueryMode } from '../ai/actionCenterAskGciParsers';
 import { getBossActions, type BossAction } from '../lib/actionCenter';
@@ -34,7 +34,6 @@ import {
   COMMITMENT_SOURCE_LABEL, COMMITMENT_TYPE_LABEL,
   type ExecutiveCommitment,
 } from '../lib/commitments';
-import { OPEN_EMAIL_ASSISTANT_RE } from '../ai/emailAssistantAskGciParsers';
 import { matchBusinessAssistantQuery } from '../ai/businessAssistantAskGciParsers';
 import { matchMiaStatusQuery } from '../ai/miaAskGciParsers';
 import { getMiaStatus, type MiaStatus } from '../lib/mia';
@@ -1965,35 +1964,6 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
             </div>
           )}
 
-          {/* ── Google (Gmail): search results ── */}
-          {intent.intentId === 'gmail_search' && !state.resultData && (
-            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在搜索 Gmail…</div>
-          )}
-          {intent.intentId === 'gmail_search' && state.resultData && !state.resultData.ok && (
-            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
-              Gmail 搜索失败:{state.resultData.error}
-            </div>
-          )}
-          {intent.intentId === 'gmail_search' && state.resultData?.ok && (() => {
-            const results = state.resultData.results || [];
-            return results.length === 0 ? (
-              <div style={{ fontSize: 13, color: MUTED }}>暂无相关邮件。</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {results.map((m: any) => (
-                  <div key={m.id} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    <a href={m.link} target="_blank" rel="noreferrer" style={{ display: 'block', textDecoration: 'none' }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{m.subject || '(无主题)'}</div>
-                      <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{m.sender} · {m.date}</div>
-                      <div style={{ fontSize: 12, color: SUBTLE, marginTop: 4 }}>{m.snippet}</div>
-                    </a>
-                    <a href={`/email-assistant?threadId=${encodeURIComponent(m.threadId)}`} style={{ fontSize: 10.5, color: GOLD, textDecoration: 'none' }}>在邮件助理中打开 →</a>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-
           {/* ── Google (Drive): search results ── */}
           {intent.intentId === 'drive_search' && !state.resultData && (
             <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在搜索 Google Drive…</div>
@@ -2048,43 +2018,9 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
             );
           })()}
 
-          {/* ── Google (Gmail): important emails ── */}
-          {intent.intentId === 'important_emails' && !state.resultData && (
-            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在按规则筛选重要邮件…</div>
-          )}
-          {intent.intentId === 'important_emails' && state.resultData && !state.resultData.ok && (
-            <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
-              查询失败:{state.resultData.error}
-            </div>
-          )}
-          {intent.intentId === 'important_emails' && state.resultData?.ok && (() => {
-            const results = state.resultData.results || [];
-            return (
-              <div>
-                <div style={{ fontSize: 11, color: SUBTLE, marginBottom: 8 }}>规则:未读 · 最近7天 · 排除推广/社交邮件</div>
-                {results.length === 0 ? (
-                  <div style={{ fontSize: 13, color: '#6FBF8E' }}>✓ 没有符合规则的重要邮件。</div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {results.map((m: any) => (
-                      <div key={m.id} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <a href={m.link} target="_blank" rel="noreferrer" style={{ display: 'block', textDecoration: 'none' }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{m.subject || '(无主题)'}</div>
-                          <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{m.sender} · {m.date}</div>
-                          <div style={{ fontSize: 12, color: SUBTLE, marginTop: 4 }}>{m.snippet}</div>
-                        </a>
-                        <a href={`/email-assistant?threadId=${encodeURIComponent(m.threadId)}`} style={{ fontSize: 10.5, color: GOLD, textDecoration: 'none' }}>在邮件助理中打开 →</a>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-
-          {/* ── Customer context: CRM + Gmail + Drive combined ── */}
+          {/* ── Customer context: CRM + Drive combined ── */}
           {intent.intentId === 'customer_context_query' && !state.resultData && (
-            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查询 CRM / Gmail / Drive…</div>
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在查询 CRM / Drive…</div>
           )}
           {intent.intentId === 'customer_context_query' && state.resultData && state.resultData.ok === false && (
             <div style={{ fontSize: 13, color: '#E0846A', padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
@@ -2097,7 +2033,7 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
             </div>
           )}
           {intent.intentId === 'customer_context_query' && state.resultData?.ok && !state.resultData.noName && (() => {
-            const { custName, crm, gmail, drive } = state.resultData;
+            const { custName, crm, drive } = state.resultData;
             return (
               <div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: TEXT, marginBottom: 10 }}>{custName}</div>
@@ -2109,19 +2045,6 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
                   </div>
                 ) : (
                   <div style={{ fontSize: 12, color: MUTED, marginBottom: 12 }}>暂无(CRM 中未找到该客户)</div>
-                )}
-
-                <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 4 }}>最近邮件</div>
-                {gmail?.ok && gmail.results?.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
-                    {gmail.results.slice(0, 3).map((m: any) => (
-                      <a key={m.id} href={m.link} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: TEXT, textDecoration: 'none' }}>
-                        · {m.subject || '(无主题)'} — {m.date}
-                      </a>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 12, color: MUTED, marginBottom: 12 }}>暂无</div>
                 )}
 
                 <div style={{ fontSize: 11, color: GOLD, fontWeight: 700, marginBottom: 4 }}>相关文件</div>
@@ -3778,14 +3701,6 @@ export function AIPage() {
       return;
     }
 
-    // Email Chat Assistant — Task 11.1 quick entry. "打开邮件助理" /
-    // "和我讨论这封邮件" / "帮我回复这封邮件" just navigate to /email-assistant;
-    // Task 5.2's own Gmail search/important-emails queries below are untouched.
-    if (OPEN_EMAIL_ASSISTANT_RE.test(raw.trim())) {
-      window.location.assign('/email-assistant');
-      return;
-    }
-
     // Business Assistant — Task 12 quick entry. "帮我看看 X" / "X现在什么情况" /
     // "X最近有什么进展" / "X上次报价多少" / "X的文件在哪里" / "记录一下跟X沟通…" /
     // "下周二提醒我跟X" / "帮我写whatsapp给X" all deep-link into
@@ -4040,34 +3955,6 @@ export function AIPage() {
       return;
     }
 
-    // Google (Gmail) — "找一下 X 最近的邮件" — Task 5.2, read-only.
-    const gmailQuery = parseGmailSearchCommand(raw.trim());
-    if (gmailQuery) {
-      const gmailMatch: AIIntentMatch = {
-        intent: {
-          intentId: 'gmail_search', intentNameZh: '邮件搜索', intentNameEn: 'Gmail Search', category: 'query',
-          triggerKeywordsZh: [], triggerKeywordsEn: [], targetTab: 'chat', targetModule: 'Google',
-          targetRoute: '', readSources: ['Gmail (gmail.readonly)'], writeTargets: [], requiredFields: [],
-          approvalRequired: false, resultPanel: null, implementationStatus: 'real', notConnectedMessage: '', fallbackBehavior: '',
-        },
-        confidence: 1, raw: raw.trim(), detectedMissingFields: [],
-      };
-      setTab('chat');
-      setCmdState({ raw: raw.trim(), match: gmailMatch, phase: 'processing', step: 0 });
-      runner.run(
-        ['正在识别指令…', '正在连接 Gmail…', '正在搜索邮件…'],
-        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
-        () => {
-          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
-          searchGmail(gmailQuery)
-            .then(res => setCmdState(prev => prev ? { ...prev, resultData: res } : prev))
-            .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: String(e?.message ?? e) } } : prev));
-        },
-      );
-      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
-      return;
-    }
-
     // Google (Drive) — "找一下 X 的文件" / "找一下我以前做过的 X 方案" — Task 5.2, read-only.
     const driveQuery = parseDriveSearchCommand(raw.trim());
     if (driveQuery) {
@@ -4124,41 +4011,15 @@ export function AIPage() {
       return;
     }
 
-    // Google (Gmail) — "有哪些重要邮件需要我处理？" — Task 5.2, read-only, rule-based.
-    if (IMPORTANT_EMAILS_RE.test(raw.trim())) {
-      const impMatch: AIIntentMatch = {
-        intent: {
-          intentId: 'important_emails', intentNameZh: '重要邮件', intentNameEn: 'Important Emails', category: 'query',
-          triggerKeywordsZh: [], triggerKeywordsEn: [], targetTab: 'chat', targetModule: 'Google',
-          targetRoute: '', readSources: ['Gmail (gmail.readonly)'], writeTargets: [], requiredFields: [],
-          approvalRequired: false, resultPanel: null, implementationStatus: 'real', notConnectedMessage: '', fallbackBehavior: '',
-        },
-        confidence: 1, raw: raw.trim(), detectedMissingFields: [],
-      };
-      setTab('chat');
-      setCmdState({ raw: raw.trim(), match: impMatch, phase: 'processing', step: 0 });
-      runner.run(
-        ['正在识别指令…', '正在连接 Gmail…', '正在按规则筛选重要邮件…'],
-        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
-        () => {
-          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
-          getImportantEmails()
-            .then(res => setCmdState(prev => prev ? { ...prev, resultData: res } : prev))
-            .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: String(e?.message ?? e) } } : prev));
-        },
-      );
-      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
-      return;
-    }
-
-    // Customer context — "X 最近沟通到哪里了？" — combines CRM + Gmail + Drive. Task 5.2, read-only.
+    // Customer context — "X 最近沟通到哪里了？" — combines CRM + Drive. Task 5.2, read-only.
+    // (Gmail dropped from this combo — GCI/GIA no longer reads email at all.)
     if (CUSTOMER_CONTEXT_RE.test(raw.trim())) {
       const custName = parseCustomerContextCommand(raw.trim());
       const ctxMatch: AIIntentMatch = {
         intent: {
           intentId: 'customer_context_query', intentNameZh: '客户上下文', intentNameEn: 'Customer Context', category: 'query',
           triggerKeywordsZh: [], triggerKeywordsEn: [], targetTab: 'chat', targetModule: 'Google',
-          targetRoute: '', readSources: ['crm_customers (Supabase)', 'Gmail (gmail.readonly)', 'Google Drive (drive.readonly)'],
+          targetRoute: '', readSources: ['crm_customers (Supabase)', 'Google Drive (drive.readonly)'],
           writeTargets: [], requiredFields: [],
           approvalRequired: false, resultPanel: null, implementationStatus: 'real', notConnectedMessage: '', fallbackBehavior: '',
         },
@@ -4167,7 +4028,7 @@ export function AIPage() {
       setTab('chat');
       setCmdState({ raw: raw.trim(), match: ctxMatch, phase: 'processing', step: 0 });
       runner.run(
-        ['正在识别指令…', '正在查询 CRM / Gmail / Drive…', '正在整合客户上下文…'],
+        ['正在识别指令…', '正在查询 CRM / Drive…', '正在整合客户上下文…'],
         (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
         () => {
           setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
@@ -4175,9 +4036,9 @@ export function AIPage() {
             setCmdState(prev => prev ? { ...prev, resultData: { ok: true, noName: true } } : prev);
             return;
           }
-          Promise.all([findCustomerByName(custName), searchGmail(custName), searchDrive(custName)])
-            .then(([crm, gmail, drive]) => {
-              setCmdState(prev => prev ? { ...prev, resultData: { ok: true, custName, crm, gmail, drive } } : prev);
+          Promise.all([findCustomerByName(custName), searchDrive(custName)])
+            .then(([crm, drive]) => {
+              setCmdState(prev => prev ? { ...prev, resultData: { ok: true, custName, crm, drive } } : prev);
             })
             .catch(e => setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: String(e?.message ?? e) } } : prev));
         },
@@ -4455,7 +4316,7 @@ export function AIPage() {
           intentId: 'boss_action_query', intentNameZh: '老板待办', intentNameEn: 'Boss Action Center', category: 'query',
           triggerKeywordsZh: [], triggerKeywordsEn: [], targetTab: 'chat', targetModule: 'Actions',
           targetRoute: '/actions',
-          readSources: ['crm_customers/crm_followups (Supabase)', 'Gmail (gmail.readonly)', 'Google Calendar (calendar.readonly)', 'quotation_records', 'invoice_drafts', 'consignment_stock', 'executive_system_registry (Supabase)', 'AI Agents Status'],
+          readSources: ['crm_customers/crm_followups (Supabase)', 'Google Calendar (calendar.readonly)', 'quotation_records', 'invoice_drafts', 'consignment_stock', 'executive_system_registry (Supabase)', 'AI Agents Status'],
           writeTargets: [], requiredFields: [],
           approvalRequired: false, resultPanel: null, implementationStatus: 'real', notConnectedMessage: '', fallbackBehavior: '',
         },
@@ -4464,7 +4325,7 @@ export function AIPage() {
       setTab('chat');
       setCmdState({ raw: raw.trim(), match: bossMatch, phase: 'processing', step: 0 });
       runner.run(
-        ['正在识别指令…', '正在汇总 CRM / 邮件 / 日程 / 业务数据…', '正在按 P1/P2/P3 排序…'],
+        ['正在识别指令…', '正在汇总 CRM / 日程 / 业务数据…', '正在按 P1/P2/P3 排序…'],
         (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
         () => {
           setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
