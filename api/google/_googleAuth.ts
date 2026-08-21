@@ -53,3 +53,35 @@ export function extractHeader(headers: any[] | undefined, name: string): string 
   const h = headers?.find((x: any) => x.name?.toLowerCase() === name.toLowerCase());
   return h?.value || '';
 }
+
+// Fetches per-message metadata for a list of Gmail message ids with bounded
+// concurrency (chunks, not one giant Promise.all over everything) — an
+// unbounded Promise.all over ~60 ids was confirmed to cause a Vercel Edge
+// 504 (FUNCTION_INVOCATION_TIMEOUT). One message failing to fetch is
+// dropped (null, filtered out), never fails the whole batch.
+export async function fetchMessagesMetadataChunked(
+  ids: string[],
+  accessToken: string,
+  chunkSize = 8,
+): Promise<any[]> {
+  const out: any[] = [];
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize);
+    const results = await Promise.all(
+      chunk.map(async (id) => {
+        try {
+          const r = await fetch(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+            { headers: { Authorization: `Bearer ${accessToken}` } },
+          );
+          if (!r.ok) return null;
+          return await r.json();
+        } catch {
+          return null;
+        }
+      }),
+    );
+    out.push(...results.filter(Boolean));
+  }
+  return out;
+}

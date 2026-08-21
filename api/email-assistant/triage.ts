@@ -49,12 +49,14 @@ Only escalate to "must" when there is a genuine, specific action requirement poi
 
 NEVER classify as "ignored" — always "must" or "important" — anything resembling a security exception: suspicious login, unknown device, password changed, security alert, payment failure, account suspension, or similar account-security/financial-risk signals, PROVIDED it is category A above (about Chris/GCI's own account, from the real institution) and not a vendor's cold pitch merely referencing security topics. When genuinely uncertain whether something is a security exception, err toward "important" rather than "ignored".
 
-For every email tiered "must", also produce: a short Chinese title (chineseTitle), a one-sentence Chinese summary (summary), a one-sentence Chinese reason it matters (why), and a one-sentence Chinese suggested next step (nextStep).
-For every email tiered "important", also produce a one-sentence Chinese reason (importantReason).
-For "ignored" emails, only the tier is needed — leave the other fields as empty strings.
+For EVERY email regardless of tier, also produce chineseSubject: a short, direct Chinese translation/localization of the subject line — not a summary, not a judgment, just what the subject says in Chinese. Never leave this empty; if the subject is already Chinese or has no real content to translate, echo it back plainly.
+
+For every email tiered "must", additionally produce: a short Chinese title (chineseTitle), a one-sentence Chinese summary (summary), a one-sentence Chinese reason it matters (why), and a one-sentence Chinese suggested next step (nextStep).
+For every email tiered "important", additionally produce a one-sentence Chinese reason (importantReason).
+For "ignored" emails, only tier and chineseSubject are needed — leave the other fields as empty strings.
 
 Respond with ONLY a JSON object of this exact shape, no other text:
-{"results": [{"id": "<same id as input>", "tier": "must"|"important"|"ignored", "chineseTitle": "", "summary": "", "why": "", "nextStep": "", "importantReason": ""}, ...]}
+{"results": [{"id": "<same id as input>", "tier": "must"|"important"|"ignored", "chineseSubject": "", "chineseTitle": "", "summary": "", "why": "", "nextStep": "", "importantReason": ""}, ...]}
 Include exactly one result object per input email, in any order, matching by id.`;
 
 function buildContextBlock(emails: EmailMeta[]): string {
@@ -77,7 +79,7 @@ export default async function handler(request: Request): Promise<Response> {
     return json({ ok: false, error: 'Invalid JSON body' }, 400);
   }
 
-  const emails = Array.isArray(body.emails) ? body.emails.slice(0, 40) : []; // bounded — a single day's inbox
+  const emails = Array.isArray(body.emails) ? body.emails.slice(0, 60) : []; // bounded — a single day's inbox
   if (emails.length === 0) return json({ ok: true, results: [] });
 
   const messages = [
@@ -92,7 +94,7 @@ export default async function handler(request: Request): Promise<Response> {
       body: JSON.stringify({
         model: 'gpt-4o',
         messages,
-        max_tokens: 3000,
+        max_tokens: 4500, // every email now gets a chineseSubject too, not just "must" tier
         temperature: 0.2,
         response_format: { type: 'json_object' },
       }),

@@ -73,6 +73,13 @@ export async function getImportantEmails(): Promise<{ ok: true; rule: string; re
   return safeFetchJson(`${base()}/api/google/important-emails`);
 }
 
+// The ONE unified "today's real Gmail inbox" source — Home's KPIs and
+// Email Assistant's default view both call this exact function, so the
+// count they show and the list they show are always the same query.
+export async function getTodayEmails(): Promise<{ ok: true; date: string; results: GmailResult[] } | { ok: false; error: string }> {
+  return safeFetchJson(`${base()}/api/google/today-emails`);
+}
+
 // Task 11.1 — Email Chat Assistant: full thread content (subject/from/to/date
 // + plain-text body, HTML safely converted server-side, attachments listed
 // by name/type only — never fetched/decoded). gmail.readonly only.

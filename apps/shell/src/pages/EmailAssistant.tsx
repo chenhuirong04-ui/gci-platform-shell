@@ -6,19 +6,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { colors } from '@gci/design-system';
-import { searchGmail, getGmailThread, getImportantEmails, type GmailResult, type GmailThreadMessage } from '../lib/googleSearch';
+import { searchGmail, getGmailThread, getTodayEmails, type GmailResult, type GmailThreadMessage } from '../lib/googleSearch';
 import { getAllCustomerNames } from '../lib/crmSupabase';
 import {
   sendEmailAssistantChat, resolveCustomerContext, threadMessagesForChat, extractSenderName,
   summarizeEmailThread, categorizeEmail, EMAIL_CATEGORIES,
-  triageEmails, dubaiDateStr, todayDubaiStr, yesterdayDubaiStr,
-  type ChatTurn, type DraftShape, type EmailSummary, type EmailCategory, type TriageResult,
+  triageEmails, dubaiDateStr, todayDubaiStr, yesterdayDubaiStr, TIER_LABELS,
+  type ChatTurn, type DraftShape, type EmailSummary, type EmailCategory, type TriageResult, type EmailTier,
 } from '../lib/emailAssistant';
 import { classifySupportMessage, createTicket, type TicketClassification } from '../lib/supportTickets';
 
 const GOLD = '#CBA85C';
 const RED = '#E0846A';
 const GREEN = '#6FBF8E';
+const BLUE_TAG = '#8FA6D4';
 const MUTED = '#7A8494';
 const SUBTLE = '#5A6A84';
 const TEXT = colors.textPrimary;
@@ -54,27 +55,31 @@ export function EmailAssistant() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Home's "重要客户邮件" KPI card links here with ?view=important — this
-  // mode shows exactly the same getImportantEmails() list the KPI counted
-  // (same query, same rule: is:unread newer_than:7d, real Gmail), instead
-  // of the unrelated 30-day/today-bucketed/AI-triaged view below. Reuses
-  // the existing function — no second copy of the query.
-  const importantView = searchParams.get('view') === 'important';
-  const [importantEmails, setImportantEmails] = useState<GmailResult[] | null>(null);
-  const [importantError, setImportantError] = useState<string | null>(null);
+  // 统一真实邮件数据源 — Home's KPIs and this page's default "今天" view
+  // both read getTodayEmails() (real Gmail, Dubai-calendar-day-scoped,
+  // paginated so the count is never silently truncated). AI classification
+  // is a separate, purely additive pass over this same list — it never
+  // changes which emails are in it.
+  const [todayEmails, setTodayEmails] = useState<GmailResult[] | null>(null);
+  const [todayError, setTodayError] = useState<string | null>(null);
+  const [triageMap, setTriageMap] = useState<Record<string, TriageResult> | null>(null);
+  const [triageLoading, setTriageLoading] = useState(false);
+  const [triageError, setTriageError] = useState<string | null>(null);
+  // 全部/AI建议处理/重要/未读 — filters the SAME todayEmails array client-side,
+  // never a different Gmail query per filter. Home's "AI建议处理" KPI deep-
+  // links with ?filter=action-required.
+  const [todayFilter, setTodayFilter] = useState<'all' | 'action' | 'important' | 'unread'>(
+    searchParams.get('filter') === 'action-required' ? 'action' : 'all',
+  );
 
   const [category, setCategory] = useState<EmailCategory | 'all'>('all');
   const [emails, setEmails] = useState<GmailResult[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [customerNames, setCustomerNames] = useState<string[]>([]);
 
-  // "今天只看今天" — default landing tab is today's 3-tier triage; 昨天/更早
-  // are a deliberate opt-in via this switcher, never crowding the homepage.
+  // "今天只看今天" — default landing tab; 昨天/更早 are a deliberate opt-in
+  // via this switcher, never crowding the default view.
   const [dayTab, setDayTab] = useState<'today' | 'yesterday' | 'earlier'>('today');
-  const [triageMap, setTriageMap] = useState<Record<string, TriageResult> | null>(null);
-  const [triageLoading, setTriageLoading] = useState(false);
-  const [triageError, setTriageError] = useState<string | null>(null);
-  const [showIgnored, setShowIgnored] = useState(false);
 
   const [selected, setSelected] = useState<GmailResult | null>(null);
   const [threadMessages, setThreadMessages] = useState<GmailThreadMessage[] | null>(null);
@@ -105,52 +110,32 @@ export function EmailAssistant() {
     });
   }, []);
 
+  // The real, unified "今天" list — loads immediately regardless of which
+  // dayTab is active, since it's also what Home's KPIs read. Fast: metadata
+  // only, Dubai-day-scoped (~2 days of inbox, not 30), bounded concurrency
+  // server-side — see api/google/today-emails.ts.
   useEffect(() => {
-    if (importantView) return; // that mode loads its own list below
-    setEmails(null);
-    setListError(null);
-    searchGmail(GMAIL_SCOPE_QUERY, GMAIL_SCOPE_MAX).then((res) => {
-      if (res.ok) setEmails(res.results);
-      else setListError(res.error);
+    setTodayEmails(null);
+    setTodayError(null);
+    getTodayEmails().then((res) => {
+      if (res.ok) setTodayEmails(res.results);
+      else setTodayError(res.error);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [importantView]);
+  }, []);
 
+  // AI classification is a separate pass over the SAME list, after it's
+  // already visible — one bulk call, additive only (chineseSubject + tier),
+  // never removes or hides an email. If this call fails entirely, every
+  // email just falls back to its real subject with no tier badge — the
+  // list itself is unaffected.
   useEffect(() => {
-    if (!importantView) return;
-    setImportantEmails(null);
-    setImportantError(null);
-    getImportantEmails().then((res) => {
-      if (res.ok) setImportantEmails(res.results);
-      else setImportantError(res.error);
-    });
-  }, [importantView]);
-
-  // Bucket by Asia/Dubai calendar day — today's triage is the default
-  // landing view; 昨天/更早 stay one click away instead of crowding it.
-  const buckets = useMemo(() => {
-    const today = todayDubaiStr();
-    const yesterday = yesterdayDubaiStr();
-    const t: GmailResult[] = [], y: GmailResult[] = [], e: GmailResult[] = [];
-    for (const m of emails || []) {
-      const d = dubaiDateStr(m.date);
-      if (d === today) t.push(m);
-      else if (d === yesterday) y.push(m);
-      else e.push(m);
-    }
-    return { today: t, yesterday: y, earlier: e };
-  }, [emails]);
-
-  // One bulk triage call over TODAY's emails only, once, when the list
-  // first loads — never per row, never for yesterday/earlier.
-  useEffect(() => {
-    if (!emails || triageMap || triageLoading) return;
-    if (buckets.today.length === 0) {
+    if (!todayEmails || triageMap || triageLoading) return;
+    if (todayEmails.length === 0) {
       setTriageMap({});
       return;
     }
     setTriageLoading(true);
-    triageEmails(buckets.today.map((m) => ({ id: m.id, sender: m.sender, subject: m.subject, snippet: m.snippet, date: m.date }))).then((res) => {
+    triageEmails(todayEmails.map((m) => ({ id: m.id, sender: m.sender, subject: m.subject, snippet: m.snippet, date: m.date }))).then((res) => {
       setTriageLoading(false);
       if (res.ok) {
         const map: Record<string, TriageResult> = {};
@@ -160,12 +145,44 @@ export function EmailAssistant() {
         setTriageError(res.error);
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emails]);
+  }, [todayEmails, triageMap, triageLoading]);
 
-  const mustList = buckets.today.filter((m) => triageMap?.[m.id]?.tier === 'must').slice(0, 5);
-  const importantList = buckets.today.filter((m) => triageMap?.[m.id]?.tier === 'important');
-  const ignoredList = buckets.today.filter((m) => triageMap?.[m.id]?.tier === 'ignored');
+  const actionRequiredCount = todayEmails?.filter((m) => triageMap?.[m.id]?.tier === 'must').length ?? 0;
+  const importantCount = todayEmails?.filter((m) => triageMap?.[m.id]?.tier === 'important').length ?? 0;
+  const unreadCount = todayEmails?.filter((m) => m.unread).length ?? 0;
+
+  // 全部/AI建议处理/重要/未读 — same array, filtered client-side, never a
+  // second Gmail query. "全部" always shows every email regardless of tier.
+  const filteredTodayEmails = useMemo(() => {
+    const list = todayEmails || [];
+    if (todayFilter === 'action') return list.filter((m) => triageMap?.[m.id]?.tier === 'must');
+    if (todayFilter === 'important') return list.filter((m) => triageMap?.[m.id]?.tier === 'important');
+    if (todayFilter === 'unread') return list.filter((m) => m.unread);
+    return list;
+  }, [todayEmails, todayFilter, triageMap]);
+
+  useEffect(() => {
+    if (dayTab === 'today') return; // lazy — the 30-day list is only needed for 昨天/更早
+    if (emails || listError) return; // already fetched/attempted once
+    searchGmail(GMAIL_SCOPE_QUERY, GMAIL_SCOPE_MAX).then((res) => {
+      if (res.ok) setEmails(res.results);
+      else setListError(res.error);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dayTab]);
+
+  // Bucket the (lazily-loaded) 30-day list by Asia/Dubai calendar day for
+  // 昨天/更早 only — "今天" no longer reads from this, see todayEmails above.
+  const buckets = useMemo(() => {
+    const yesterday = yesterdayDubaiStr();
+    const y: GmailResult[] = [], e: GmailResult[] = [];
+    for (const m of emails || []) {
+      const d = dubaiDateStr(m.date);
+      if (d === yesterday) y.push(m);
+      else if (d !== todayDubaiStr()) e.push(m);
+    }
+    return { yesterday: y, earlier: e };
+  }, [emails]);
 
   // Default sort for the 昨天/更早 flat list views: needs-Chris-first
   // (unread as the cheap, explainable proxy), then most recent first.
@@ -341,43 +358,8 @@ export function EmailAssistant() {
       </div>
 
       <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
-        {/* ── Left: today's triage, or a date-scoped flat list, or the
-            重要客户邮件 deep-link list from Home ── */}
-        <div style={{ width: dayTab === 'today' || importantView ? 460 : 300, flexShrink: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          {importantView ? (
-            <div style={{ flex: 1, overflowY: 'auto', border: `1px solid ${BORD}`, borderRadius: 12, background: CARD }}>
-              <div style={{ padding: '10px 14px', fontSize: 11, fontWeight: 700, color: GOLD, borderBottom: `1px solid ${BORD}`, letterSpacing: '0.04em' }}>
-                重要客户邮件 · 未读 · 近7天{importantEmails ? ` · ${importantEmails.length}` : ''}
-              </div>
-              {importantError ? (
-                <div style={{ padding: 16, fontSize: 12.5, color: RED }}>读取失败:{importantError}</div>
-              ) : !importantEmails ? (
-                <div style={{ padding: 16, fontSize: 12.5, color: MUTED }}>加载中…</div>
-              ) : importantEmails.length === 0 ? (
-                <div style={{ padding: 16, fontSize: 12.5, color: MUTED }}>过去7天没有符合条件的未读邮件。</div>
-              ) : (
-                importantEmails.map((m) => {
-                  const active = selected?.threadId === m.threadId;
-                  return (
-                    <div
-                      key={m.id}
-                      onClick={() => openThread(m)}
-                      style={{ padding: '11px 14px', borderBottom: `1px solid ${BORD}`, cursor: 'pointer', background: active ? 'rgba(203,168,92,0.08)' : 'transparent' }}
-                    >
-                      <div style={{ fontSize: 12, fontWeight: 700, color: TEXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {extractSenderName(m.sender)}
-                      </div>
-                      <div style={{ fontSize: 12, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
-                        {m.subject || '(无主题)'}
-                      </div>
-                      <div style={{ fontSize: 10.5, color: SUBTLE, marginTop: 4 }}>{formatEmailDate(m.date)}</div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          ) : (
-          <>
+        {/* ── Left: today's full real inbox (default), or a date-scoped flat list ── */}
+        <div style={{ width: dayTab === 'today' ? 460 : 300, flexShrink: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
             {([['today', '今天'], ['yesterday', '昨天'], ['earlier', '更早']] as const).map(([key, label]) => (
               <button
@@ -395,89 +377,93 @@ export function EmailAssistant() {
             ))}
           </div>
 
-          {listError && <div style={{ padding: 16, fontSize: 12.5, color: RED }}>读取失败:{listError}</div>}
+          {dayTab === 'today' && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: TEXT, marginBottom: 8 }}>
+                今日邮件 · {todayEmails ? todayEmails.length : todayError ? '—' : '…'}
+              </div>
 
-          {!listError && dayTab === 'today' && (
-            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {!emails ? (
+              {todayError ? (
+                <div style={{ padding: 16, fontSize: 12.5, color: RED }}>邮件读取失败 / 未连接:{todayError}</div>
+              ) : !todayEmails ? (
                 <div style={{ padding: 16, fontSize: 12.5, color: MUTED }}>加载中…</div>
               ) : (
                 <>
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: GOLD, marginBottom: 8, letterSpacing: '0.04em' }}>
-                      今日必须处理{mustList.length > 0 ? ` · ${mustList.length}` : ''}
-                    </div>
-                    {triageLoading ? (
-                      <div style={{ fontSize: 12, color: MUTED, padding: '10px 0' }}>正在分析今天的邮件…</div>
-                    ) : triageError ? (
-                      <div style={{ fontSize: 12, color: RED, padding: '10px 0' }}>分析失败:{triageError}</div>
-                    ) : mustList.length === 0 ? (
-                      <div style={{ fontSize: 12, color: MUTED, padding: '10px 0' }}>今天没有必须处理的邮件。</div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {mustList.map((m) => {
-                          const t = triageMap?.[m.id];
-                          const active = selected?.threadId === m.threadId;
-                          return (
-                            <div
-                              key={m.id}
-                              onClick={() => openThread(m)}
-                              style={{ padding: '12px 14px', borderRadius: 10, cursor: 'pointer', background: active ? 'rgba(203,168,92,0.1)' : CARD, border: `1px solid ${active ? 'rgba(203,168,92,0.4)' : BORD}` }}
-                            >
-                              <div style={{ fontSize: 13, fontWeight: 700, color: TEXT, marginBottom: 5 }}>{t?.chineseTitle || m.subject || '(无主题)'}</div>
-                              <div style={{ fontSize: 12, color: TEXT, lineHeight: 1.6, marginBottom: 3 }}>{t?.summary}</div>
-                              <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.6, marginBottom: 3 }}><span style={{ color: SUBTLE }}>为什么重要:</span>{t?.why}</div>
-                              <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.6, marginBottom: 6 }}><span style={{ color: SUBTLE }}>建议下一步:</span>{t?.nextStep}</div>
-                              <div style={{ fontSize: 10.5, color: SUBTLE }}>{extractSenderName(m.sender)} · {formatEmailDate(m.date)}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+                    {([
+                      ['all', `全部 · ${todayEmails.length}`],
+                      ['action', `AI建议处理 · ${actionRequiredCount}`],
+                      ['important', `重要 · ${importantCount}`],
+                      ['unread', `未读 · ${unreadCount}`],
+                    ] as const).map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => setTodayFilter(key)}
+                        style={{
+                          padding: '5px 11px', borderRadius: 16, fontSize: 11.5, cursor: 'pointer',
+                          background: todayFilter === key ? 'rgba(203,168,92,0.16)' : 'rgba(255,255,255,0.04)',
+                          border: `1px solid ${todayFilter === key ? 'rgba(203,168,92,0.5)' : BORD}`,
+                          color: todayFilter === key ? GOLD : MUTED,
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
                   </div>
+                  {triageLoading && <div style={{ fontSize: 11, color: MUTED, marginBottom: 8 }}>AI 正在分析今天的邮件…</div>}
+                  {triageError && <div style={{ fontSize: 11, color: RED, marginBottom: 8 }}>AI 分析失败（邮件仍可查看）:{triageError}</div>}
 
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, marginBottom: 8, letterSpacing: '0.04em' }}>
-                      今日重要{importantList.length > 0 ? ` · ${importantList.length}` : ''}
-                    </div>
-                    {importantList.length === 0 && !triageLoading ? (
-                      <div style={{ fontSize: 12, color: MUTED, padding: '4px 0' }}>暂无。</div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {importantList.map((m) => {
-                          const t = triageMap?.[m.id];
-                          const active = selected?.threadId === m.threadId;
-                          return (
-                            <div
-                              key={m.id}
-                              onClick={() => openThread(m)}
-                              style={{ padding: '9px 12px', borderRadius: 9, cursor: 'pointer', background: active ? 'rgba(203,168,92,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${BORD}` }}
-                            >
-                              <div style={{ fontSize: 12, fontWeight: 600, color: TEXT }}>{extractSenderName(m.sender)} · {m.subject || '(无主题)'}</div>
-                              {t?.importantReason && <div style={{ fontSize: 11, color: MUTED, marginTop: 3 }}>{t.importantReason}</div>}
-                              <div style={{ fontSize: 10, color: SUBTLE, marginTop: 3 }}>{formatEmailDate(m.date)}</div>
-                            </div>
-                          );
-                        })}
+                  <div style={{ flex: 1, overflowY: 'auto', border: `1px solid ${BORD}`, borderRadius: 12, background: CARD }}>
+                    {filteredTodayEmails.length === 0 ? (
+                      <div style={{ padding: 16, fontSize: 12.5, color: MUTED }}>
+                        {todayEmails.length === 0 ? '今天还没有新邮件。' : '这个筛选下没有邮件。'}
                       </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <div
-                      onClick={() => setShowIgnored((v) => !v)}
-                      style={{ fontSize: 11.5, color: SUBTLE, cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      已自动忽略 · {ignoredList.length} 封 {ignoredList.length > 0 ? (showIgnored ? '（收起）' : '（展开查看）') : ''}
-                    </div>
-                    {showIgnored && ignoredList.length > 0 && (
-                      <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        {ignoredList.map((m) => (
-                          <div key={m.id} onClick={() => openThread(m)} style={{ fontSize: 11, color: SUBTLE, cursor: 'pointer', padding: '4px 0' }}>
-                            {extractSenderName(m.sender)} · {m.subject || '(无主题)'} · {formatEmailDate(m.date)}
+                    ) : (
+                      filteredTodayEmails.map((m) => {
+                        const t = triageMap?.[m.id];
+                        const match = isCustomerMatch(m.sender);
+                        const active = selected?.threadId === m.threadId;
+                        const cn = t?.chineseSubject && t.chineseSubject.trim() && t.chineseSubject !== m.subject ? t.chineseSubject : null;
+                        return (
+                          <div
+                            key={m.id}
+                            onClick={() => openThread(m)}
+                            style={{
+                              padding: '11px 14px', borderBottom: `1px solid ${BORD}`, cursor: 'pointer',
+                              background: active ? 'rgba(203,168,92,0.08)' : 'transparent',
+                              display: 'flex', alignItems: 'flex-start', gap: 8,
+                            }}
+                          >
+                            {m.unread && <span style={{ width: 6, height: 6, borderRadius: '50%', background: GOLD, marginTop: 6, flexShrink: 0 }} />}
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ fontSize: 12.5, fontWeight: m.unread ? 700 : 500, color: TEXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {cn || m.subject || '(无主题)'}
+                              </div>
+                              {cn && (
+                                <div style={{ fontSize: 10.5, color: SUBTLE, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
+                                  {m.subject || '(no subject)'}
+                                </div>
+                              )}
+                              <div style={{ fontSize: 11, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 3 }}>
+                                {extractSenderName(m.sender)}
+                              </div>
+                              <div style={{ fontSize: 10.5, color: SUBTLE, marginTop: 4, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                                <span>{formatEmailDate(m.date)}</span>
+                                {t?.tier && (
+                                  <span style={{
+                                    color: t.tier === 'must' ? GOLD : t.tier === 'important' ? BLUE_TAG : MUTED,
+                                    background: t.tier === 'must' ? 'rgba(203,168,92,0.12)' : t.tier === 'important' ? 'rgba(143,166,212,0.12)' : 'rgba(255,255,255,0.05)',
+                                    borderRadius: 3, padding: '1px 5px',
+                                  }}>
+                                    {TIER_LABELS[t.tier as EmailTier]}
+                                  </span>
+                                )}
+                                {match && <span style={{ color: GOLD, background: 'rgba(203,168,92,0.12)', borderRadius: 3, padding: '1px 5px' }}>{match}</span>}
+                              </div>
+                            </div>
                           </div>
-                        ))}
-                      </div>
+                        );
+                      })
                     )}
                   </div>
                 </>
@@ -552,8 +538,6 @@ export function EmailAssistant() {
                 )}
               </div>
             </>
-          )}
-          </>
           )}
         </div>
 

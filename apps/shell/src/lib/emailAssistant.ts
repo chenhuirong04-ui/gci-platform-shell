@@ -172,12 +172,22 @@ export type EmailTier = 'must' | 'important' | 'ignored';
 export interface TriageResult {
   id: string;
   tier: EmailTier;
+  chineseSubject: string; // populated for every email, every tier — a plain subject translation, not a summary
   chineseTitle: string;
   summary: string;
   why: string;
   nextStep: string;
   importantReason: string;
 }
+
+// UI-facing labels for EmailTier — 建议处理/重要/普通 per the GCI Email
+// Assistant spec. The internal tier values (must/important/ignored) are
+// unchanged so the triage prompt/classification logic didn't need touching.
+export const TIER_LABELS: Record<EmailTier, string> = {
+  must: '建议处理',
+  important: '重要',
+  ignored: '普通',
+};
 
 export interface TriageInputEmail {
   id: string;
