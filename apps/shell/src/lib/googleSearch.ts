@@ -91,7 +91,7 @@ export interface GmailThreadMessage {
   date: string;
   snippet: string;
   body: string;
-  attachments: { filename: string; mimeType: string; size: number }[];
+  attachments: { filename: string; mimeType: string; size: number; attachmentId: string }[];
 }
 
 export async function getGmailThread(

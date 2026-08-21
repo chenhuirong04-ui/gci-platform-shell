@@ -10,6 +10,7 @@ interface Attachment {
   filename: string;
   mimeType: string;
   size: number;
+  attachmentId: string;
 }
 
 function decodeBase64Url(data: string): string {
@@ -53,7 +54,7 @@ function walkParts(
   if (!payload) return;
   const { mimeType, filename, body, parts } = payload;
   if (filename && body?.attachmentId) {
-    acc.attachments.push({ filename, mimeType: mimeType || 'application/octet-stream', size: body.size ?? 0 });
+    acc.attachments.push({ filename, mimeType: mimeType || 'application/octet-stream', size: body.size ?? 0, attachmentId: body.attachmentId });
   } else if (mimeType === 'text/plain' && body?.data) {
     try { acc.textPlain += decodeBase64Url(body.data); } catch { /* skip unparseable part */ }
   } else if (mimeType === 'text/html' && body?.data) {

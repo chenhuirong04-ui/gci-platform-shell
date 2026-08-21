@@ -13,6 +13,7 @@ import { confirmCommitmentCandidate, type CommitmentCandidate, type CommitmentTy
 import { createManualDecision } from './decisionInbox';
 import { createExecutiveTask, getExecutiveTasks, updateExecutiveTaskStatus, updateExecutiveTaskDueDate, type TaskBusinessArea, type ExecutiveTask } from './executiveTasks';
 import { createBusinessMemory, type MemoryCategory } from './businessMemory';
+import { registerExistingDriveFile, fetchAndStoreFromUrl, classifyFileDescription } from './giaFiles';
 
 function base(): string {
   return typeof window !== 'undefined' ? window.location.origin : '';
@@ -24,6 +25,7 @@ function dubaiToday(): string {
 
 export type CaptureType =
   | 'NEW_CUSTOMER' | 'CRM_FOLLOWUP' | 'BUSINESS_TODO' | 'COMMITMENT' | 'DECISION' | 'BUSINESS_MEMORY'
+  | 'STORE_DOCUMENT'
   | 'LOOKUP' | 'DRAFT_EMAIL' | 'DRAFT_WHATSAPP' | 'UNKNOWN';
 
 export interface RawCaptureIntent {
@@ -50,6 +52,13 @@ export interface RawCaptureIntent {
   memory_content: string | null;
   memory_company: string | null;
   raw_fragment: string;
+  // GIA Multi-Source File Intake — only populated for type === 'STORE_DOCUMENT'
+  // when plannerV3.ts's detectFileSource() resolved an explicit source
+  // (a literal URL or Drive link in the message). Undefined for every other
+  // intent type and for the existing classify-capture.ts path.
+  file_source?: 'drive_file' | 'url';
+  file_ref?: string;
+  file_name?: string;
 }
 
 export async function classifyCapture(
@@ -101,6 +110,15 @@ export interface ResolvedCaptureItem {
   // fall back to an executive_task the way the ordinary CRM_FOLLOWUP path
   // does; stops and asks whether to create the customer first instead.
   crmNoMatchBlocked: boolean;
+  // GIA Multi-Source File Intake — only set for type === 'STORE_DOCUMENT'
+  // when a source was actually resolved (see plannerV3.ts's
+  // classifyPlanV3Actions). fileSource/fileRef together tell
+  // confirmCaptureItem() which giaFiles.ts fetch+store+register function to
+  // call; nothing is fetched or written until Chris's explicit confirm.
+  fileSource?: 'drive_file' | 'url' | 'gmail_attachment';
+  fileRef?: string;
+  fileName?: string;
+  fileMimeType?: string;
 }
 
 async function resolveCustomer(name: string | null): Promise<{ matched: CrmCustomer | null; candidates: CrmCustomer[] | null; isNew: boolean }> {
@@ -267,6 +285,10 @@ export async function resolveCaptureItems(
         if (raw.memory_company) summaryLines.push(`适用主体：${raw.memory_company}`);
         summaryLines.push(`规则内容：${raw.memory_content ?? raw.raw_fragment}`);
         break;
+      case 'STORE_DOCUMENT':
+        summaryLines.push(`文件：${raw.file_name ?? raw.raw_fragment}`);
+        summaryLines.push(`来源：${raw.file_source === 'drive_file' ? 'Google Drive（已存在文件，登记不重复上传）' : 'URL 链接（下载后存入 Drive）'}`);
+        break;
     }
 
     out.push({
@@ -283,6 +305,9 @@ export async function resolveCaptureItems(
       needsCustomerName: false,
       needsContent: false,
       crmNoMatchBlocked,
+      fileSource: raw.file_source,
+      fileRef: raw.file_ref,
+      fileName: raw.file_name,
     });
   }
   return out;
@@ -641,6 +666,17 @@ export async function confirmCaptureItem(item: ResolvedCaptureItem): Promise<{ o
       });
       if (!res.ok) return res;
       return { ok: true };
+    }
+    case 'STORE_DOCUMENT': {
+      if (!item.fileSource || !item.fileRef) return { ok: false, error: '缺少文件来源信息' };
+      const classification = classifyFileDescription(item.fileName ?? item.raw.raw_fragment, item.fileName ?? '');
+      if (item.fileSource === 'drive_file') {
+        return registerExistingDriveFile(item.fileRef, classification, item.matchedCustomer?.id ?? null);
+      }
+      if (item.fileSource === 'url') {
+        return fetchAndStoreFromUrl(item.fileRef, classification, item.matchedCustomer?.id ?? null);
+      }
+      return { ok: false, error: '该文件来源暂不支持自动收好' };
     }
     default:
       return { ok: false, error: `不支持的类型: ${item.type}` };

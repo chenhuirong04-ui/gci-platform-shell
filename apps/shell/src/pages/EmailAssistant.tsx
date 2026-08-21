@@ -15,6 +15,7 @@ import {
   type ChatTurn, type DraftShape, type EmailSummary, type EmailCategory, type TriageResult, type EmailTier,
 } from '../lib/emailAssistant';
 import { classifySupportMessage, createTicket, type TicketClassification } from '../lib/supportTickets';
+import { fetchAndStoreGmailAttachment, classifyFileDescription } from '../lib/giaFiles';
 
 const GOLD = '#CBA85C';
 const RED = '#E0846A';
@@ -89,6 +90,28 @@ export function EmailAssistant() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [showOriginal, setShowOriginal] = useState(false);
+
+  // GIA Multi-Source File Intake — "收好" next to an attachment chip.
+  // Explicit, single-attachment action (messageId+attachmentId already
+  // known from this exact chip, never guessed) — a lightweight two-click
+  // confirm inline instead of the full multi-item capture card, since
+  // there's only ever one thing to confirm here.
+  const [confirmingAttachmentKey, setConfirmingAttachmentKey] = useState<string | null>(null);
+  const [savingAttachmentKey, setSavingAttachmentKey] = useState<string | null>(null);
+  const [savedAttachmentKeys, setSavedAttachmentKeys] = useState<Set<string>>(new Set());
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+
+  async function handleSaveAttachment(messageId: string, a: { filename: string; mimeType: string; attachmentId: string }) {
+    const key = `${messageId}:${a.attachmentId}`;
+    setSavingAttachmentKey(key);
+    setAttachmentError(null);
+    const classification = classifyFileDescription(a.filename, a.filename);
+    const res = await fetchAndStoreGmailAttachment(messageId, a.attachmentId, a.filename, a.mimeType, classification, null);
+    setSavingAttachmentKey(null);
+    setConfirmingAttachmentKey(null);
+    if (res.ok) setSavedAttachmentKeys((prev) => new Set(prev).add(key));
+    else setAttachmentError(res.error);
+  }
 
   // Task 18.2 — "转为客服工单": reuses this thread's content, runs the same
   // classify() used by the Support Inbox's manual entry, then a single
@@ -607,14 +630,36 @@ export function EmailAssistant() {
                         </div>
                         <div style={{ fontSize: 12.5, color: TEXT, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{m.body}</div>
                         {m.attachments.length > 0 && (
-                          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                            {m.attachments.map((a, ai) => (
-                              <span key={ai} style={{ fontSize: 10.5, color: MUTED, background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, borderRadius: 5, padding: '3px 8px' }}>
-                                📎 {a.filename}
-                              </span>
-                            ))}
+                          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                            {m.attachments.map((a, ai) => {
+                              const key = `${m.id}:${a.attachmentId}`;
+                              const saved = savedAttachmentKeys.has(key);
+                              const saving = savingAttachmentKey === key;
+                              const confirming = confirmingAttachmentKey === key;
+                              return (
+                                <span key={ai} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: MUTED, background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, borderRadius: 5, padding: '3px 8px' }}>
+                                  📎 {a.filename}
+                                  {saved ? (
+                                    <span style={{ color: GOLD }}>✓ 已收好</span>
+                                  ) : confirming ? (
+                                    <>
+                                      <span>确认收好到 Drive？</span>
+                                      <button onClick={() => handleSaveAttachment(m.id, a)} disabled={saving} style={{ fontSize: 10, color: GOLD, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                                        {saving ? '收好中…' : '是'}
+                                      </button>
+                                      <button onClick={() => setConfirmingAttachmentKey(null)} disabled={saving} style={{ fontSize: 10, color: MUTED, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>否</button>
+                                    </>
+                                  ) : (
+                                    <button onClick={() => setConfirmingAttachmentKey(key)} style={{ fontSize: 10, color: GOLD, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+                                      收好
+                                    </button>
+                                  )}
+                                </span>
+                              );
+                            })}
                           </div>
                         )}
+                        {attachmentError && <div style={{ marginTop: 6, fontSize: 10.5, color: '#E0846A' }}>{attachmentError}</div>}
                       </div>
                     ))}
                   </>

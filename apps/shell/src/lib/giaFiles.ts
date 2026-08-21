@@ -17,6 +17,8 @@ export interface GiaFileRegistryRow {
   drive_folder: string | null;
   is_current: boolean;
   tags: string[] | null;
+  source_type: 'upload' | 'gmail_attachment' | 'drive_file' | 'url';
+  source_ref: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -129,6 +131,7 @@ export async function registerFile(row: {
   fileName: string; displayName: string; documentType: string; businessArea: string | null;
   companyName: string | null; customerId: string | null; driveFileId: string; driveUrl: string;
   driveFolder: string | null; isCurrent: boolean; tags: string[];
+  sourceType?: 'upload' | 'gmail_attachment' | 'drive_file' | 'url'; sourceRef?: string | null;
 }): Promise<{ ok: true; row: GiaFileRegistryRow } | { ok: false; error: string }> {
   if (row.isCurrent) {
     const existing = await findCurrentRegistryEntry(row.documentType, row.companyName);
@@ -148,9 +151,143 @@ export async function registerFile(row: {
     drive_folder: row.driveFolder,
     is_current: row.isCurrent,
     tags: row.tags,
+    source_type: row.sourceType ?? 'upload',
+    source_ref: row.sourceRef ?? null,
   }).select().single();
   if (error) return { ok: false, error: error.message };
   return { ok: true, row: data as GiaFileRegistryRow };
+}
+
+function base64ToBlob(base64: string, mimeType: string): Blob {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mimeType });
+}
+
+// GIA Multi-Source File Intake — deterministic, no AI call. Only resolves
+// the two sources that are unambiguous from raw chat text alone (a literal
+// URL, a literal Drive link) — never guesses "which email" a vague phrase
+// like "刚才那封邮件" refers to (that path is an explicit button click in
+// Email Assistant instead, see fetchAndStoreGmailAttachment below).
+const URL_RE = /https?:\/\/[^\s，,。]+/i;
+const DRIVE_FILE_RE = /drive\.google\.com\/(?:file\/d\/|open\?id=)([\w-]{10,})/i;
+
+export function detectFileSource(text: string): { type: 'drive_file'; ref: string } | { type: 'url'; ref: string } | null {
+  const driveMatch = text.match(DRIVE_FILE_RE);
+  if (driveMatch) return { type: 'drive_file', ref: driveMatch[1] };
+  const urlMatch = text.match(URL_RE);
+  if (urlMatch) return { type: 'url', ref: urlMatch[0].replace(/[)\]}>,.;]+$/, '') };
+  return null;
+}
+
+// Registers an already-in-Drive file in place — no download, no re-upload,
+// no duplicate. Uses the drive-list-folder.ts fileId= metadata mode.
+export async function registerExistingDriveFile(
+  fileId: string,
+  classification: FileClassification,
+  customerId: string | null,
+): Promise<{ ok: true; row: GiaFileRegistryRow } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(`/api/google/drive-list-folder?fileId=${encodeURIComponent(fileId)}`);
+    const data = await res.json();
+    if (!data.ok || !data.results?.[0]) return { ok: false, error: data.error || '未找到该 Drive 文件' };
+    const file = data.results[0];
+    return registerFile({
+      fileName: file.name,
+      displayName: classification.displayName || file.name,
+      documentType: classification.documentType,
+      businessArea: classification.businessArea,
+      companyName: classification.companyName,
+      customerId,
+      driveFileId: file.id,
+      driveUrl: file.webViewLink,
+      driveFolder: null, // already lives wherever it already lived in Drive
+      isCurrent: true,
+      tags: classification.tags,
+      sourceType: 'drive_file',
+      sourceRef: fileId,
+    });
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message ?? e) };
+  }
+}
+
+// Fetches an explicitly-given URL server-side, then reuses the existing
+// upload+register pipeline unchanged.
+export async function fetchAndStoreFromUrl(
+  url: string,
+  classification: FileClassification,
+  customerId: string | null,
+): Promise<{ ok: true; row: GiaFileRegistryRow } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(`/api/files/fetch-url?url=${encodeURIComponent(url)}`);
+    const data = await res.json();
+    if (!data.ok) return { ok: false, error: data.error || 'URL 下载失败' };
+    const blob = base64ToBlob(data.data, data.mimeType);
+    const fileName = classification.displayName || data.suggestedName || 'downloaded-file';
+    const file = new File([blob], fileName, { type: data.mimeType });
+    const uploaded = await uploadFileToDrive(file, DEFAULT_TARGET_FOLDER_ID, fileName);
+    if (!uploaded.ok) return uploaded;
+    return registerFile({
+      fileName,
+      displayName: classification.displayName || fileName,
+      documentType: classification.documentType,
+      businessArea: classification.businessArea,
+      companyName: classification.companyName,
+      customerId,
+      driveFileId: uploaded.fileId,
+      driveUrl: uploaded.webViewLink,
+      driveFolder: DEFAULT_TARGET_FOLDER_NAME,
+      isCurrent: true,
+      tags: classification.tags,
+      sourceType: 'url',
+      sourceRef: url,
+    });
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message ?? e) };
+  }
+}
+
+// Fetches one specific Gmail attachment the user already has visible on
+// screen (Email Assistant's own attachment chip supplies messageId+
+// attachmentId directly — never guessed from free text), then reuses the
+// existing upload+register pipeline unchanged.
+export async function fetchAndStoreGmailAttachment(
+  messageId: string,
+  attachmentId: string,
+  filename: string,
+  mimeType: string,
+  classification: FileClassification,
+  customerId: string | null,
+): Promise<{ ok: true; row: GiaFileRegistryRow } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(`/api/google/gmail-attachment?messageId=${encodeURIComponent(messageId)}&attachmentId=${encodeURIComponent(attachmentId)}`);
+    const data = await res.json();
+    if (!data.ok) return { ok: false, error: data.error || '附件下载失败' };
+    const blob = base64ToBlob(data.data, mimeType);
+    const displayName = classification.displayName || filename;
+    const file = new File([blob], filename, { type: mimeType });
+    const uploaded = await uploadFileToDrive(file, DEFAULT_TARGET_FOLDER_ID, filename);
+    if (!uploaded.ok) return uploaded;
+    return registerFile({
+      fileName: filename,
+      displayName,
+      documentType: classification.documentType,
+      businessArea: classification.businessArea,
+      companyName: classification.companyName,
+      customerId,
+      driveFileId: uploaded.fileId,
+      driveUrl: uploaded.webViewLink,
+      driveFolder: DEFAULT_TARGET_FOLDER_NAME,
+      isCurrent: true,
+      tags: classification.tags,
+      sourceType: 'gmail_attachment',
+      sourceRef: `${messageId}:${attachmentId}`,
+    });
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message ?? e) };
+  }
 }
 
 // Rule-based search — matches a recognized document type and/or a known

@@ -8,6 +8,7 @@
 // old classify-capture router untouched.
 import type { CaptureType, RawCaptureIntent } from './businessCapture';
 import type { TaskBusinessArea } from './executiveTasks';
+import { detectFileSource } from './giaFiles';
 
 function base(): string {
   return typeof window !== 'undefined' ? window.location.origin : '';
@@ -82,10 +83,11 @@ const MAPPABLE: Record<string, CaptureType> = {
 // mirrors how tryFileSearch/tryBusinessMemoryQuery already behave.
 export const READ_ONLY_ACTIONS = new Set(['QUERY_DOCUMENT', 'BUSINESS_MEMORY_QUERY']);
 
-// Known-but-not-executable-from-text-alone — STORE_DOCUMENT from a plain
-// chat message never has a real attachment; plan-v3.ts already flags this
-// (executable:false) and we surface it as an honest note rather than a
-// silent drop or a fake success.
+// STORE_DOCUMENT from a plain chat message has no real attachment UNLESS the
+// message contains a literal URL or Drive link (detectFileSource() in
+// giaFiles.ts, deterministic, no AI call, no guessing) — everything else
+// (e.g. "帮我把刚才那封邮件里的合同收好", no link) stays an honest gap exactly
+// like before: plan-v3.ts's own missing_context note is surfaced as-is.
 const HONEST_GAP_ACTIONS = new Set(['STORE_DOCUMENT']);
 
 function emptyRawIntent(rawFragment: string): RawCaptureIntent {
@@ -108,6 +110,16 @@ function entityStr(e: Record<string, unknown>, key: string): string | null {
 // resolveCaptureItems()/confirmCaptureItem() already know how to resolve
 // and write — this is the entire "deterministic mapping to existing write
 // paths" step; no new write function is introduced.
+// STORE_DOCUMENT is handled separately from MAPPABLE (see
+// classifyPlanV3Actions) because it needs a resolved file source, not just
+// a 1:1 action->type lookup — kept as its own function for clarity.
+function toStoreDocumentIntent(rawFragment: string): RawCaptureIntent | null {
+  const source = detectFileSource(rawFragment);
+  if (!source) return null;
+  const fileName = source.type === 'url' ? source.ref.split('/').pop() || source.ref : source.ref;
+  return { ...emptyRawIntent(rawFragment), type: 'STORE_DOCUMENT', file_source: source.type, file_ref: source.ref, file_name: fileName };
+}
+
 function toRawIntent(a: PlanV3Action, rawFragment: string): RawCaptureIntent | null {
   const type = MAPPABLE[a.action];
   if (!type) return null;
@@ -154,7 +166,12 @@ export function classifyPlanV3Actions(actions: PlanV3Action[], rawFragment: stri
   const outcome: PlanV3Outcome = { intents: [], readOnlyActions: [], honestGapNotes: [], unhandled: [] };
   for (const a of actions) {
     if (READ_ONLY_ACTIONS.has(a.action)) { outcome.readOnlyActions.push(a); continue; }
-    if (HONEST_GAP_ACTIONS.has(a.action)) { outcome.honestGapNotes.push(a.missing_context || `${a.action} 暂无法自动执行`); continue; }
+    if (HONEST_GAP_ACTIONS.has(a.action)) {
+      const storeIntent = a.action === 'STORE_DOCUMENT' ? toStoreDocumentIntent(rawFragment) : null;
+      if (storeIntent) { outcome.intents.push(storeIntent); continue; }
+      outcome.honestGapNotes.push(a.missing_context || `${a.action} 暂无法自动执行`);
+      continue;
+    }
     const intent = toRawIntent(a, rawFragment);
     if (intent) { outcome.intents.push(intent); continue; }
     outcome.unhandled.push(a.action);
