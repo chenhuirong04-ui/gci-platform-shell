@@ -610,7 +610,16 @@ export function BusinessAssistant() {
   async function handleTopSubmit(text: string) {
     const t = text.trim();
     if (!t) return;
+    // Pre-existing gap, surfaced during V3 acceptance testing: a still-
+    // unconfirmed capture card from a PREVIOUS message was never cleared
+    // when a new, unrelated message came in (fileSearchReply and
+    // pendingCapture render independently) — visually stacking a stale
+    // card under the new answer. Every fresh top-input submission now
+    // starts clean, same as it already did for fileSearchReply.
     setFileSearchReply(null);
+    setPendingCapture(null);
+    setCaptureDone(new Set());
+    setCaptureError(null);
     // 显式目的地指令永远最先检查 — 在 BARE_NAME_RE 等一切其他判断之前，
     // 确保不会被其他 Router 抢走。
     const explicitResult = await tryExplicitDestination(t, ctx?.customer ?? null);
@@ -886,12 +895,12 @@ export function BusinessAssistant() {
         <input
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && inputValue.trim() && !captureLoading) handleTopSubmit(inputValue); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' && inputValue.trim() && !captureLoading) { const v = inputValue; setInputValue(''); handleTopSubmit(v); } }}
           placeholder="输入客户/公司，或直接告诉我发生了什么…例如 MAG / 今天认识了新客户MAG，需要80个工人 / 肯尼亚保姆这周再跟一下"
           style={{ flex: 1, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: TEXT, fontSize: 14 }}
         />
         <button
-          onClick={() => handleTopSubmit(inputValue)}
+          onClick={() => { const v = inputValue; setInputValue(''); handleTopSubmit(v); }}
           disabled={!inputValue.trim() || loading || captureLoading}
           style={{ padding: '12px 22px', borderRadius: 10, background: `linear-gradient(135deg,${GOLD},#E2C988)`, border: 'none', color: '#080D1E', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
         >
