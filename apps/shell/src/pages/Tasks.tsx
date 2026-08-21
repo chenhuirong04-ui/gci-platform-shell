@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
+import { useI18n } from '@gci/i18n';
 import {
   getExecutiveTasks, updateExecutiveTaskStatus, updateExecutiveTaskDueDate, taskUrgency, BUSINESS_AREA_LABEL,
   type ExecutiveTask, type TaskBusinessArea, type TaskStatus,
@@ -23,7 +24,17 @@ const BORD = 'rgba(255,255,255,0.07)';
 type ViewFilter = 'today' | 'overdue' | 'week' | 'nodate' | 'completed';
 type AreaFilter = 'all' | TaskBusinessArea;
 
-const VIEWS: { key: ViewFilter; label: string }[] = [
+// Display-only i18n (Chris request): labels switch with the app's existing
+// EN/中文 toggle, no change to ViewFilter/AreaFilter keys, filtering logic,
+// data, or route.
+const VIEWS_ZH: { key: ViewFilter; label: string }[] = [
+  { key: 'today', label: '今天' },
+  { key: 'overdue', label: '逾期' },
+  { key: 'week', label: '本周' },
+  { key: 'nodate', label: '未设日期' },
+  { key: 'completed', label: '已完成' },
+];
+const VIEWS_EN: { key: ViewFilter; label: string }[] = [
   { key: 'today', label: 'Today' },
   { key: 'overdue', label: 'Overdue' },
   { key: 'week', label: 'This Week' },
@@ -31,8 +42,17 @@ const VIEWS: { key: ViewFilter; label: string }[] = [
   { key: 'completed', label: 'Completed' },
 ];
 
-const AREAS: { key: AreaFilter; label: string }[] = [
+const AREAS_ZH: { key: AreaFilter; label: string }[] = [
   { key: 'all', label: '全部' },
+  { key: '25H_AI', label: '25H / AI' },
+  { key: 'TRADE', label: '贸易' },
+  { key: 'WORKFORCE', label: '劳务' },
+  { key: 'ECOMMERCE', label: '电商' },
+  { key: 'COMPANY_ADMIN', label: '公司事务' },
+  { key: 'OTHER', label: '其他' },
+];
+const AREAS_EN: { key: AreaFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
   { key: '25H_AI', label: '25H / AI' },
   { key: 'TRADE', label: 'Trade' },
   { key: 'WORKFORCE', label: 'Workforce' },
@@ -57,6 +77,9 @@ function dubaiDateStr(ms: number): string {
 
 export function Tasks() {
   const navigate = useNavigate();
+  const { lang } = useI18n();
+  const VIEWS = lang === 'zh' ? VIEWS_ZH : VIEWS_EN;
+  const AREAS = lang === 'zh' ? AREAS_ZH : AREAS_EN;
   const [tasks, setTasks] = useState<ExecutiveTask[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<ViewFilter>('today');
@@ -127,7 +150,7 @@ export function Tasks() {
           ← 返回
         </button>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: colors.textPrimary, margin: 0, fontFamily: "'Space Grotesk',sans-serif" }}>
-          我的待办 / Business To-Do
+          {lang === 'zh' ? '我的待办' : 'Business To-Do'}
         </h1>
       </div>
 
