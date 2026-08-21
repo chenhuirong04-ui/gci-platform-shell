@@ -14,6 +14,7 @@
 //                    never a fabricated number.
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useI18n } from '@gci/i18n';
 import { getExecutiveTasks } from '../lib/executiveTasks';
 import { refreshPendingDecisions } from '../lib/decisionInbox';
 import { getTodayEmails } from '../lib/googleSearch';
@@ -37,8 +38,8 @@ interface Kpi {
   onClick: () => void;
 }
 
-function KpiTile({ k }: { k: Kpi }) {
-  const display = k.value === null ? '—' : k.value === 'unavailable' ? '暂不可用' : String(k.value);
+function KpiTile({ k, lang }: { k: Kpi; lang: 'zh' | 'en' }) {
+  const display = k.value === null ? '—' : k.value === 'unavailable' ? (lang === 'zh' ? '暂不可用' : 'Unavailable') : String(k.value);
   const isNumberWithValue = typeof k.value === 'number' && k.value > 0;
   return (
     <div
@@ -55,6 +56,7 @@ function KpiTile({ k }: { k: Kpi }) {
 
 export function HomeKpiRow() {
   const navigate = useNavigate();
+  const { lang } = useI18n();
   const [myItems, setMyItems] = useState<KpiValue>(null);
   const [decisions, setDecisions] = useState<KpiValue>(null);
   const [importantMessages, setImportantMessages] = useState<KpiValue>(null);
@@ -92,15 +94,15 @@ export function HomeKpiRow() {
   }, []);
 
   const kpis: Kpi[] = [
-    { label: '我的事项', value: myItems, color: GOLD, onClick: () => navigate('/tasks') },
-    { label: '需要我决定', value: decisions, color: RED, onClick: () => navigate('/decisions') },
-    { label: '重要消息', value: importantMessages, color: BLUE, onClick: () => navigate('/email-assistant') },
-    { label: '新业务机会', value: miaLeadsToday, color: GREEN, onClick: () => navigate('/mia-leads') },
+    { label: lang === 'zh' ? '我的事项' : 'My Tasks', value: myItems, color: GOLD, onClick: () => navigate('/tasks') },
+    { label: lang === 'zh' ? '需要我决定' : 'Needs My Decision', value: decisions, color: RED, onClick: () => navigate('/decisions') },
+    { label: lang === 'zh' ? '重要消息' : 'Important Messages', value: importantMessages, color: BLUE, onClick: () => navigate('/email-assistant') },
+    { label: lang === 'zh' ? '新业务机会' : 'New Business Opportunities', value: miaLeadsToday, color: GREEN, onClick: () => navigate('/mia-leads') },
   ];
 
   return (
     <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
-      {kpis.map((k) => <KpiTile key={k.label} k={k} />)}
+      {kpis.map((k) => <KpiTile key={k.label} k={k} lang={lang} />)}
     </div>
   );
 }

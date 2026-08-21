@@ -45,13 +45,13 @@ const MUTED = '#7A8494';
 const CARD = 'rgba(255,255,255,0.025)';
 const BORD = 'rgba(255,255,255,0.07)';
 
-function ChartCard({ title, onOpen, children }: { title: string; onOpen?: () => void; children: React.ReactNode }) {
+function ChartCard({ title, onOpen, lang, children }: { title: string; onOpen?: () => void; lang: 'zh' | 'en'; children: React.ReactNode }) {
   return (
     <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, padding: '14px 16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
         <span style={{ fontSize: 11.5, fontWeight: 700, color: colors.textPrimary, flex: 1 }}>{title}</span>
         {onOpen && (
-          <span onClick={onOpen} style={{ fontSize: 11, color: GOLD, cursor: 'pointer' }}>查看全部 →</span>
+          <span onClick={onOpen} style={{ fontSize: 11, color: GOLD, cursor: 'pointer' }}>{lang === 'zh' ? '查看全部 →' : 'View all →'}</span>
         )}
       </div>
       {children}
@@ -60,6 +60,7 @@ function ChartCard({ title, onOpen, children }: { title: string; onOpen?: () => 
 }
 
 function TrendChart() {
+  const { lang } = useI18n();
   const [days, setDays] = useState<TrendDay[] | null>(null);
   const [hasSignal, setHasSignal] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -72,13 +73,13 @@ function TrendChart() {
   }, []);
 
   return (
-    <ChartCard title="近7天商务工作趋势 · CRM跟进 / 新客户">
+    <ChartCard title={lang === 'zh' ? '近7天商务工作趋势 · CRM跟进 / 新客户' : '7-Day Business Activity · CRM Follow-ups / New Clients'} lang={lang}>
       {error ? (
-        <div style={{ fontSize: 12, color: RED, padding: '20px 0', textAlign: 'center' }}>读取失败:{error}</div>
+        <div style={{ fontSize: 12, color: RED, padding: '20px 0', textAlign: 'center' }}>{lang === 'zh' ? `读取失败:${error}` : `Failed to load: ${error}`}</div>
       ) : !days ? (
-        <div style={{ fontSize: 12, color: MUTED, padding: '20px 0', textAlign: 'center' }}>加载中…</div>
+        <div style={{ fontSize: 12, color: MUTED, padding: '20px 0', textAlign: 'center' }}>{lang === 'zh' ? '加载中…' : 'Loading…'}</div>
       ) : !hasSignal ? (
-        <div style={{ fontSize: 12, color: MUTED, padding: '30px 0', textAlign: 'center' }}>历史数据不足，暂无可展示的趋势</div>
+        <div style={{ fontSize: 12, color: MUTED, padding: '30px 0', textAlign: 'center' }}>{lang === 'zh' ? '历史数据不足，暂无可展示的趋势' : 'Not enough history yet to show a trend.'}</div>
       ) : (
         <div style={{ width: '100%', height: 180 }}>
           <ResponsiveContainer>
@@ -121,7 +122,7 @@ function BusinessStructureChart() {
   const maxCount = byCategory ? Math.max(1, ...BUSINESS_STRUCTURE_CATEGORIES.map((c) => byCategory[c].length)) : 1;
 
   return (
-    <ChartCard title={lang === 'zh' ? '当前业务事项结构' : 'Current Business Structure'} onOpen={() => navigate('/actions')}>
+    <ChartCard title={lang === 'zh' ? '当前业务事项结构' : 'Current Business Structure'} onOpen={() => navigate('/actions')} lang={lang}>
       {error ? (
         <div style={{ fontSize: 12, color: RED, padding: '20px 0', textAlign: 'center' }}>{lang === 'zh' ? `读取失败:${error}` : `Failed to load: ${error}`}</div>
       ) : !byCategory ? (

@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
+import { useI18n } from '@gci/i18n';
 import { runGiaTopRouter, type GiaRouterState } from '../lib/giaRouter';
 import { confirmCaptureItem, completeOrCancelTask, rescheduleTask, type ResolvedCaptureItem } from '../lib/businessCapture';
 import type { ExecutiveTask } from '../lib/executiveTasks';
@@ -22,10 +23,13 @@ const CARD = 'rgba(255,255,255,0.025)';
 const BORD = 'rgba(203,168,92,0.18)';
 const TEXT = colors.textPrimary;
 
-const SHORTCUTS = ['查客户', '查报价', '找文件', '记录沟通', '写邮件'];
+const SHORTCUTS_ZH = ['查客户', '查报价', '找文件', '记录沟通', '写邮件'];
+const SHORTCUTS_EN = ['Search clients', 'Search quotes', 'Find file', 'Log communication', 'Write email'];
 
 export function BusinessAssistantEntry() {
   const navigate = useNavigate();
+  const { lang } = useI18n();
+  const SHORTCUTS = lang === 'zh' ? SHORTCUTS_ZH : SHORTCUTS_EN;
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
   const [fileSearchReply, setFileSearchReply] = useState<string | null>(null);
