@@ -102,6 +102,14 @@ const CASES = [
     expectActions: ['PREPARE_QUOTE'],
     context: { currentCustomerName: 'SHADI' },
   },
+  {
+    n: 10, text: '把这个链接存到公司资料 https://example.com/x.pdf',
+    expectActions: ['STORE_DOCUMENT'],
+  },
+  {
+    n: 11, text: '把这个Google Drive文件登记一下 https://drive.google.com/file/d/1oGZS6oxfh_8de9WPukiEAY594O6XLb_f/view',
+    expectActions: ['STORE_DOCUMENT'],
+  },
 ];
 
 async function callOnce(text, context = {}) {

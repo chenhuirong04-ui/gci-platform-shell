@@ -130,6 +130,8 @@ context_reference: an object with exactly three keys — points_to_current_custo
 
 is_completion: true only when a TASK-related requested_operation is reporting something as already done/finished ("完成了"/"办完了"/"搞定了"/"done").
 
+STORE+DOCUMENT when a link is present — if the message contains an actual http(s):// link AND asks to store/save/register/收好/登记/存 it, this is ALWAYS operation STORE, object DOCUMENT (put the literal URL in entities.url) — never CREATE+TASK, even though it also sounds like "something to do." Do not turn a link-storage request into a to-do reminder.
+
 CREATE+CUSTOMER vs CREATE+FOLLOWUP — this is the most common mistake, read carefully: only use CREATE+CUSTOMER when the text explicitly asks to add/register a brand-new customer ("新建客户"/"新增客户"/"帮我建个客户"/"add a new customer"). A message that says someone TALKED/MET/COMMUNICATED with a person or company ("跟X聊了"/"跟X沟通了"/"见了X"/"talked to X") is reporting on an ONGOING relationship, not creating one — that is always CREATE+FOLLOWUP, never CREATE+CUSTOMER, even if X has never been mentioned before in this conversation and even if the sentence also happens to describe X's business. Do not default to CREATE+CUSTOMER just because a name and a business topic are both present.
 
 Examples (Chinese business messages):
@@ -145,6 +147,12 @@ Examples (Chinese business messages):
 
 "这几个合同我这周要处理，帮我收好" ->
 {"user_goal":"收好这几个合同并在本周处理","subjects":[],"facts":[],"time_expressions":["这周"],"context_reference":{"points_to_current_customer":false,"points_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"STORE","object":"DOCUMENT","entities":{"document_topic":"合同"},"time_expression":null,"is_completion":false,"confidence":0.8},{"operation":"CREATE","object":"TASK","entities":{"business_topic":"处理合同"},"time_expression":"这周","is_completion":false,"confidence":0.8}]}
+
+"把这个链接里的PDF存到公司资料 https://example.com/x.pdf" ->
+{"user_goal":"把链接里的文件存到公司资料","subjects":[],"facts":[],"time_expressions":[],"context_reference":{"points_to_current_customer":false,"points_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"STORE","object":"DOCUMENT","entities":{"document_topic":"公司资料","url":"https://example.com/x.pdf"},"time_expression":null,"is_completion":false,"confidence":0.9}]}
+
+"把这个Google Drive文件登记一下 https://drive.google.com/file/d/abc123/view" ->
+{"user_goal":"登记这个已有的Drive文件","subjects":[],"facts":[],"time_expressions":[],"context_reference":{"points_to_current_customer":false,"points_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"STORE","object":"DOCUMENT","entities":{"document_topic":"文件登记","url":"https://drive.google.com/file/d/abc123/view"},"time_expression":null,"is_completion":false,"confidence":0.9}]}
 
 "记住，以后 Highway 劳务按26天每天10小时算" ->
 {"user_goal":"记住Highway劳务的计算规则","subjects":["Highway"],"facts":["Highway劳务按26天每天10小时算"],"time_expressions":[],"context_reference":{"points_to_current_customer":false,"points_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"REMEMBER","object":"BUSINESS_MEMORY","entities":{"company":"Highway","rule":"劳务按26天每天10小时算"},"time_expression":null,"is_completion":false,"confidence":0.9}]}
