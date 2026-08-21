@@ -2,13 +2,16 @@
 // GCI Home Final Structure — replaces the old 8-tile KPI row. Audit found
 // 6 of the 8 old tiles were re-slicing the same 2-3 underlying datasets
 // (今日待处理/逾期事项/客户跟进 all derived from getBossActions(); 等你决定/
-// 待执行 both from executive_decisions; 今日邮件/AI建议处理 both from the
-// same Gmail today-list) — confusing in daily use per Chris. Down to 4
-// entries, each backed by exactly ONE source, matching the approved final
-// structure:
+// 待执行 both from executive_decisions) — confusing in daily use per Chris.
+// 今日邮件 restored afterward (Chris confirmed the email entry point itself
+// was still needed, not just its "AI建议处理" derivative) — pulled straight
+// back from the pre-simplification implementation (commit bee3bfd), same
+// getTodayEmails() call 重要消息 already made, just also reading the raw
+// result count instead of only the AI must-tier subset. Current structure:
 //   我的事项      -> executive_tasks only (getExecutiveTasks), -> /tasks
 //   需要我决定    -> executive_decisions, status=pending only, -> /decisions
-//   重要消息      -> today's Gmail, AI-flagged action-required subset, -> /email-assistant
+//   今日邮件      -> today's real Gmail count (getTodayEmails()), -> /email-assistant
+//   重要消息      -> same Gmail list, AI-flagged action-required subset, -> /email-assistant
 //   新业务机会    -> MIA leads_found_today; shows an honest "暂不可用"
 //                    state (not a stale "—") when MIA itself reports failure,
 //                    never a fabricated number.
@@ -59,6 +62,7 @@ export function HomeKpiRow() {
   const { lang } = useI18n();
   const [myItems, setMyItems] = useState<KpiValue>(null);
   const [decisions, setDecisions] = useState<KpiValue>(null);
+  const [todayEmailCount, setTodayEmailCount] = useState<KpiValue>(null);
   const [importantMessages, setImportantMessages] = useState<KpiValue>(null);
   const [miaLeadsToday, setMiaLeadsToday] = useState<KpiValue>(null);
 
@@ -75,12 +79,14 @@ export function HomeKpiRow() {
     // default list are guaranteed to agree.
     refreshPendingDecisions().then((res) => { if (res.ok) setDecisions(res.rows.length); });
 
-    // 重要消息 — today's real Gmail, AI-flagged action-required subset
-    // (same triageEmails() call Email Assistant uses internally). This
-    // replaces the old separate 今日邮件/AI建议处理 tiles with one number:
-    // what actually needs Chris's attention, not raw email volume.
+    // 今日邮件 / 重要消息 — one getTodayEmails() call (real Gmail, same
+    // function Email Assistant's default view uses) backs both: raw count
+    // for 今日邮件 (restored, was removed by mistake — Chris confirmed the
+    // email entry itself was still needed), and the AI must-tier subset for
+    // 重要消息 (same triageEmails() call Email Assistant uses internally).
     getTodayEmails().then((res) => {
-      if (!res.ok) { setImportantMessages(null); return; }
+      if (!res.ok) { setTodayEmailCount(null); setImportantMessages(null); return; }
+      setTodayEmailCount(res.results.length);
       if (res.results.length === 0) { setImportantMessages(0); return; }
       triageEmails(res.results.map((m) => ({ id: m.id, sender: m.sender, subject: m.subject, snippet: m.snippet, date: m.date }))).then((tres) => {
         setImportantMessages(tres.ok ? tres.results.filter((r) => r.tier === 'must').length : null);
@@ -96,12 +102,13 @@ export function HomeKpiRow() {
   const kpis: Kpi[] = [
     { label: lang === 'zh' ? '我的事项' : 'My Tasks', value: myItems, color: GOLD, onClick: () => navigate('/tasks') },
     { label: lang === 'zh' ? '需要我决定' : 'Needs My Decision', value: decisions, color: RED, onClick: () => navigate('/decisions') },
+    { label: lang === 'zh' ? '今日邮件' : "Today's Emails", value: todayEmailCount, color: BLUE, onClick: () => navigate('/email-assistant') },
     { label: lang === 'zh' ? '重要消息' : 'Important Messages', value: importantMessages, color: BLUE, onClick: () => navigate('/email-assistant') },
     { label: lang === 'zh' ? '新业务机会' : 'New Business Opportunities', value: miaLeadsToday, color: GREEN, onClick: () => navigate('/mia-leads') },
   ];
 
   return (
-    <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+    <div className="grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 20 }}>
       {kpis.map((k) => <KpiTile key={k.label} k={k} lang={lang} />)}
     </div>
   );
