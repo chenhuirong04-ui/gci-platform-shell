@@ -13,12 +13,29 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
+import { useI18n } from '@gci/i18n';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { getSevenDayTrend, type TrendDay } from '../lib/homeTrends';
 import {
   getBossActions, summarizeBusinessStructure, BUSINESS_STRUCTURE_CATEGORIES,
   type BossAction, type BusinessStructureCategory,
 } from '../lib/actionCenter';
+
+// Display-only i18n (Chris request) — BUSINESS_STRUCTURE_CATEGORIES itself
+// lives in actionCenter.ts (out of scope for this fix) and stays unchanged
+// as the grouping key; this is purely an alternate English label for the
+// same fixed category value, shown only in EN mode instead of the
+// zh/en-mixed string ("劳务 / Workforce") the raw category constant uses.
+const CATEGORY_LABEL_EN: Record<BusinessStructureCategory, string> = {
+  '执照 / 公司服务': 'License / Company Services',
+  '系统开发 / AI项目': 'Systems / AI Projects',
+  '客户跟进': 'Customer Follow-up',
+  '报价 / 合同': 'Quotation / Contracts',
+  '劳务 / Workforce': 'Workforce',
+  '供应商 / 采购': 'Suppliers / Procurement',
+  '客服 / 售后': 'Support / After-sales',
+  '内部事项 / 其他': 'Internal / Other',
+};
 
 const GOLD = '#CBA85C';
 const RED = '#E0846A';
@@ -87,6 +104,7 @@ const PRIORITY_COLOR: Record<string, string> = { P1: RED, P2: AMBER, P3: MUTED }
 
 function BusinessStructureChart() {
   const navigate = useNavigate();
+  const { lang } = useI18n();
   const [actions, setActions] = useState<BossAction[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<BusinessStructureCategory | null>(null);
@@ -103,25 +121,26 @@ function BusinessStructureChart() {
   const maxCount = byCategory ? Math.max(1, ...BUSINESS_STRUCTURE_CATEGORIES.map((c) => byCategory[c].length)) : 1;
 
   return (
-    <ChartCard title="当前业务事项结构" onOpen={() => navigate('/actions')}>
+    <ChartCard title={lang === 'zh' ? '当前业务事项结构' : 'Current Business Structure'} onOpen={() => navigate('/actions')}>
       {error ? (
-        <div style={{ fontSize: 12, color: RED, padding: '20px 0', textAlign: 'center' }}>读取失败:{error}</div>
+        <div style={{ fontSize: 12, color: RED, padding: '20px 0', textAlign: 'center' }}>{lang === 'zh' ? `读取失败:${error}` : `Failed to load: ${error}`}</div>
       ) : !byCategory ? (
-        <div style={{ fontSize: 12, color: MUTED, padding: '20px 0', textAlign: 'center' }}>加载中…</div>
+        <div style={{ fontSize: 12, color: MUTED, padding: '20px 0', textAlign: 'center' }}>{lang === 'zh' ? '加载中…' : 'Loading…'}</div>
       ) : total === 0 ? (
-        <div style={{ fontSize: 12, color: MUTED, padding: '30px 0', textAlign: 'center' }}>暂无待办事项</div>
+        <div style={{ fontSize: 12, color: MUTED, padding: '30px 0', textAlign: 'center' }}>{lang === 'zh' ? '暂无待办事项' : 'No open items'}</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {BUSINESS_STRUCTURE_CATEGORIES.map((cat) => {
             const items = byCategory[cat];
             const isOpen = expanded === cat;
+            const catLabel = lang === 'zh' ? cat : CATEGORY_LABEL_EN[cat];
             return (
               <div key={cat}>
                 <div
                   onClick={() => items.length > 0 && setExpanded(isOpen ? null : cat)}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 2px', cursor: items.length > 0 ? 'pointer' : 'default', opacity: items.length > 0 ? 1 : 0.4 }}
                 >
-                  <span style={{ fontSize: 11.5, color: colors.textPrimary, width: 112, flexShrink: 0 }}>{cat}</span>
+                  <span style={{ fontSize: 11.5, color: colors.textPrimary, width: 112, flexShrink: 0 }}>{catLabel}</span>
                   <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' }}>
                     <div style={{ width: `${(items.length / maxCount) * 100}%`, height: '100%', background: GOLD, borderRadius: 3 }} />
                   </div>
@@ -136,7 +155,7 @@ function BusinessStructureChart() {
                           <span style={{ color: colors.textPrimary, fontWeight: 600 }}>{a.related_customer || a.related_system || '—'}</span>
                           <span style={{ color: MUTED }}>· {a.title}</span>
                         </div>
-                        {a.summary && <div style={{ color: MUTED, marginLeft: 12 }}>下一步：{a.summary}</div>}
+                        {a.summary && <div style={{ color: MUTED, marginLeft: 12 }}>{lang === 'zh' ? `下一步：${a.summary}` : `Next: ${a.summary}`}</div>}
                       </div>
                     ))}
                   </div>

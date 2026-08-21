@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
+import { useI18n } from '@gci/i18n';
 import { getDailyBrief, SOURCE_LABEL, type BriefItem } from '../lib/dailyBrief';
 import type { ActionPriority } from '../lib/actionCenter';
 
@@ -19,11 +20,15 @@ const BORD = 'rgba(255,255,255,0.07)';
 const PRIORITY_COLOR: Record<ActionPriority, string> = { P1: RED, P2: AMBER, P3: MUTED };
 // Home Daily Brief §一 — P1/P2/P3 stay as the internal sort key (unchanged
 // everywhere else in the app) but are never shown as raw codes on Home;
-// Chris sees the plain-language meaning instead.
-const PRIORITY_LABEL: Record<ActionPriority, string> = { P1: '立即处理', P2: '需要关注', P3: '一般事项' };
+// Chris sees the plain-language meaning instead, in whichever language the
+// app toggle is set to.
+const PRIORITY_LABEL_ZH: Record<ActionPriority, string> = { P1: '立即处理', P2: '需要关注', P3: '一般事项' };
+const PRIORITY_LABEL_EN: Record<ActionPriority, string> = { P1: 'Urgent', P2: 'Needs attention', P3: 'General' };
 
 export function HomeDailyBrief() {
   const navigate = useNavigate();
+  const { lang } = useI18n();
+  const PRIORITY_LABEL = lang === 'zh' ? PRIORITY_LABEL_ZH : PRIORITY_LABEL_EN;
   const [items, setItems] = useState<BriefItem[] | null>(null);
   const [todaysActions, setTodaysActions] = useState<string[]>([]);
   const [totalDeduped, setTotalDeduped] = useState<number>(0);
@@ -31,7 +36,7 @@ export function HomeDailyBrief() {
   const [showRaw, setShowRaw] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    getDailyBrief().then((res) => {
+    getDailyBrief(lang).then((res) => {
       if (res.ok) {
         setItems(res.brief.items);
         setTodaysActions(res.brief.todaysThreeActions);
@@ -40,7 +45,7 @@ export function HomeDailyBrief() {
         setError(res.error);
       }
     });
-  }, []);
+  }, [lang]);
 
   function go(link: string) {
     if (link.startsWith('http')) window.open(link, '_blank', 'noopener,noreferrer');
@@ -56,18 +61,18 @@ export function HomeDailyBrief() {
         <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,rgba(203,168,92,0.36),transparent)' }} />
         {totalDeduped > 0 && (
           <span onClick={() => navigate('/actions')} style={{ fontSize: 11, color: GOLD, cursor: 'pointer' }}>
-            查看全部 ({totalDeduped}) →
+            {lang === 'zh' ? `查看全部 (${totalDeduped}) →` : `View all (${totalDeduped}) →`}
           </span>
         )}
       </div>
 
       {error ? (
-        <div style={{ padding: '18px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, fontSize: 12.5, color: RED }}>读取失败:{error}</div>
+        <div style={{ padding: '18px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, fontSize: 12.5, color: RED }}>{lang === 'zh' ? `读取失败:${error}` : `Failed to load: ${error}`}</div>
       ) : !items ? (
-        <div style={{ padding: '18px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, fontSize: 12.5, color: MUTED }}>加载中…</div>
+        <div style={{ padding: '18px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, fontSize: 12.5, color: MUTED }}>{lang === 'zh' ? '加载中…' : 'Loading…'}</div>
       ) : items.length === 0 ? (
         <div style={{ padding: '30px 18px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, textAlign: 'center', fontSize: 12.5, color: MUTED }}>
-          今天暂无重点事项
+          {lang === 'zh' ? '今天暂无重点事项' : 'No priority items today'}
         </div>
       ) : (
         <>
@@ -85,16 +90,16 @@ export function HomeDailyBrief() {
                     </span>
                     <span style={{ fontSize: 13.5, fontWeight: 700, color: colors.textPrimary }}>{it.subject}</span>
                   </div>
-                  <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.4 }}><strong style={{ color: colors.textPrimary }}>发生了什么：</strong>{it.fact}</div>
-                  <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.4 }}><strong style={{ color: colors.textPrimary }}>为什么重要：</strong>{it.whyItMatters}</div>
-                  <div style={{ fontSize: 11.5, color: GOLD }}><strong>建议你做什么：</strong>{it.suggestion}</div>
+                  <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.4 }}><strong style={{ color: colors.textPrimary }}>{lang === 'zh' ? '发生了什么：' : 'What happened: '}</strong>{it.fact}</div>
+                  <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.4 }}><strong style={{ color: colors.textPrimary }}>{lang === 'zh' ? '为什么重要：' : 'Why it matters: '}</strong>{it.whyItMatters}</div>
+                  <div style={{ fontSize: 11.5, color: GOLD }}><strong>{lang === 'zh' ? '建议你做什么：' : 'Recommended action: '}</strong>{it.suggestion}</div>
                   {it.rawFact && (
                     <div>
                       <span
                         onClick={() => setShowRaw((prev) => { const next = new Set(prev); next.has(i) ? next.delete(i) : next.add(i); return next; })}
                         style={{ fontSize: 10.5, color: MUTED, cursor: 'pointer', textDecoration: 'underline' }}
                       >
-                        {showRaw.has(i) ? '收起原始信息' : '查看原始信息'}
+                        {lang === 'zh' ? (showRaw.has(i) ? '收起原始信息' : '查看原始信息') : (showRaw.has(i) ? 'Hide original' : 'View original')}
                       </span>
                       {showRaw.has(i) && (
                         <div style={{ fontSize: 10.5, color: MUTED, marginTop: 4, padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, fontFamily: 'IBM Plex Mono,monospace' }}>
@@ -107,7 +112,7 @@ export function HomeDailyBrief() {
                     onClick={() => go(it.deepLink)}
                     style={{ marginTop: 2, alignSelf: 'flex-start', fontSize: 11, color: colors.textPrimary, background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, borderRadius: 7, padding: '5px 12px', cursor: 'pointer' }}
                   >
-                    查看 →
+                    {lang === 'zh' ? '查看 →' : 'View →'}
                   </div>
                 </div>
               );
@@ -116,7 +121,7 @@ export function HomeDailyBrief() {
 
           {todaysActions.length > 0 && (
             <div style={{ padding: '12px 16px', background: 'rgba(203,168,92,0.05)', border: '1px solid rgba(203,168,92,0.18)', borderRadius: 12 }}>
-              <div style={{ fontSize: 10.5, color: GOLD, fontWeight: 700, marginBottom: 6 }}>建议今天先做</div>
+              <div style={{ fontSize: 10.5, color: GOLD, fontWeight: 700, marginBottom: 6 }}>{lang === 'zh' ? '建议今天先做' : 'Suggested priorities today'}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {todaysActions.map((a, i) => (
                   <div key={i} style={{ fontSize: 12.5, color: colors.textPrimary }}>{i + 1}. {a}</div>

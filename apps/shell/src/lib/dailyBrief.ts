@@ -111,6 +111,8 @@ function businessKey(a: BossAction): string {
 // translation; anything else gets an honest generic Chinese line instead of
 // its raw notes — the raw notes are never dropped, just moved to rawFact
 // for a "查看原始信息" toggle instead of the headline.
+export type BriefLang = 'zh' | 'en';
+
 const SYSTEM_REVIEW_TEXT: Record<string, { fact: string; why: string; suggestion: string }> = {
   'Chanya Growth Agent': {
     fact: 'Growth Agent 当前仍在使用 Chanya 共用数据库中的 growth_* 表。',
@@ -124,18 +126,66 @@ const SYSTEM_REVIEW_TEXT: Record<string, { fact: string; why: string; suggestion
   },
 };
 
-function systemReviewText(a: BossAction): { fact: string; why: string; suggestion: string } {
-  const known = a.related_system ? SYSTEM_REVIEW_TEXT[a.related_system] : undefined;
+const SYSTEM_REVIEW_TEXT_EN: Record<string, { fact: string; why: string; suggestion: string }> = {
+  'Chanya Growth Agent': {
+    fact: 'Growth Agent still uses the growth_* tables in Chanya\'s shared database.',
+    why: 'The system boundary isn\'t fully settled yet, so maintenance and access could get tangled.',
+    suggestion: 'Decide whether to keep sharing the database or plan a separation.',
+  },
+  'MIA / GCI AI Sales Agent': {
+    fact: 'MIA\'s production environment still needs a username/password login, and its Supabase project ownership is unconfirmed.',
+    why: 'MIA\'s real operating status can\'t be verified directly, which may affect future integration and data checks.',
+    suggestion: 'Confirm the login method and verify which Supabase project it belongs to.',
+  },
+};
+
+// Display-only i18n (Chris request): dynamic Daily Brief text now has a
+// zh AND an en variant, built from the same structured BossAction fields
+// (action_type/priority/related_system) as the zh version already used —
+// no change to actionCenter.ts, its data, priority, or sort logic; this
+// only adds an alternate rendering of the same facts.
+function systemReviewText(a: BossAction, lang: BriefLang): { fact: string; why: string; suggestion: string } {
+  const table = lang === 'zh' ? SYSTEM_REVIEW_TEXT : SYSTEM_REVIEW_TEXT_EN;
+  const known = a.related_system ? table[a.related_system] : undefined;
   if (known) return known;
-  const name = a.related_system || '该系统';
-  return {
-    fact: `「${name}」的资产状态仍待确认。`,
-    why: '系统资产状态尚未确认，可能存在维护或权限风险。',
-    suggestion: '核实该系统是否仍在使用，并决定保留或归档。',
-  };
+  const name = a.related_system || (lang === 'zh' ? '该系统' : 'this system');
+  return lang === 'zh'
+    ? {
+        fact: `「${name}」的资产状态仍待确认。`,
+        why: '系统资产状态尚未确认，可能存在维护或权限风险。',
+        suggestion: '核实该系统是否仍在使用，并决定保留或归档。',
+      }
+    : {
+        fact: `The asset status of "${name}" is still unconfirmed.`,
+        why: 'An unconfirmed system asset status may carry maintenance or access risk.',
+        suggestion: 'Verify whether this system is still in use, then decide to keep or archive it.',
+      };
 }
 
-function whyItMatters(a: BossAction): string {
+function whyItMatters(a: BossAction, lang: BriefLang): string {
+  if (lang === 'en') {
+    switch (a.action_type) {
+      case 'quotation_followup': return 'The project has stalled for a long time and may be lost.';
+      case 'crm_followup': return 'Customer follow-up is overdue, affecting the relationship.';
+      case 'crm_decision': return 'Needs your judgment before it can move forward.';
+      case 'decision_execution': return 'A decision was made but not yet executed.';
+      case 'decision_follow_up': return 'The agreed review date has arrived.';
+      case 'commitment': return 'A commitment you or the other side made — being overdue hurts trust.';
+      case 'mia_error': return 'MIA may have stopped developing new customers normally.';
+      case 'mia_needs_chris': return 'A real reply came in — only you can judge how to respond.';
+      case 'mia_warning': return 'MIA shows an anomaly — watch whether it affects tomorrow\'s output.';
+      case 'chanya_error': return 'Chanya is in an abnormal state, which may affect customer use.';
+      case 'chanya_payment_failure': return 'A payment failure could interrupt the customer\'s subscription.';
+      case 'chanya_needs_chris': return 'An account/subscription issue only you can decide how to handle.';
+      case 'calendar_meeting': return 'The meeting is about to start.';
+      case 'inventory_alert': return 'May affect delivery or cash flow.';
+      case 'invoice_review': return 'An invoice is stuck in approval, slowing down collections.';
+      case 'agent_decision': return 'Needs your decision on whether to keep this asset.';
+      case 'agent_warning': return 'Watch whether this affects normal operation.';
+      case 'systems_review': case 'systems_audit': return systemReviewText(a, lang).why;
+      default: return a.priority === 'P1' ? 'Highest priority — needs handling today.' : 'Needs attention.';
+    }
+  }
   switch (a.action_type) {
     case 'quotation_followup': return '项目长期停滞，可能流失';
     case 'crm_followup': return '客户跟进逾期，影响关系';
@@ -154,12 +204,33 @@ function whyItMatters(a: BossAction): string {
     case 'invoice_review': return '发票卡在审批，影响回款节奏';
     case 'agent_decision': return '需要你决定资产去留';
     case 'agent_warning': return '需要留意是否影响正常运行';
-    case 'systems_review': case 'systems_audit': return systemReviewText(a).why;
+    case 'systems_review': case 'systems_audit': return systemReviewText(a, lang).why;
     default: return a.priority === 'P1' ? '优先级最高，今天需要处理' : '需要关注';
   }
 }
 
-function suggestion(a: BossAction): string {
+function suggestion(a: BossAction, lang: BriefLang): string {
+  if (lang === 'en') {
+    switch (a.action_type) {
+      case 'quotation_followup': return 'Confirm today whether the project continues.';
+      case 'crm_followup': return 'Contact them today to confirm next steps.';
+      case 'crm_decision': return 'Make the decision today.';
+      case 'decision_execution': return 'Push execution forward or update progress.';
+      case 'decision_follow_up': return 'Review the current status.';
+      case 'commitment': return 'Deliver on it today or update progress.';
+      case 'mia_error': return 'Check MIA\'s running status.';
+      case 'mia_needs_chris': return 'Reply to or judge this lead today.';
+      case 'mia_warning': return 'Keep an eye on MIA\'s subsequent runs.';
+      case 'chanya_error': return 'Check Chanya\'s running status.';
+      case 'chanya_payment_failure': return 'Verify the payment failure reason today.';
+      case 'chanya_needs_chris': return 'Review and handle this issue today.';
+      case 'calendar_meeting': return 'Confirm materials/prep ahead of time.';
+      case 'inventory_alert': return 'Arrange restocking or verify today.';
+      case 'invoice_review': return 'Approve or return it today.';
+      case 'systems_review': case 'systems_audit': return systemReviewText(a, lang).suggestion;
+      default: return a.priority === 'P1' ? 'Handle this first today.' : 'Proceed as planned.';
+    }
+  }
   switch (a.action_type) {
     case 'quotation_followup': return '今天确认项目是否继续';
     case 'crm_followup': return '今天联系确认下一步';
@@ -176,20 +247,25 @@ function suggestion(a: BossAction): string {
     case 'calendar_meeting': return '提前确认材料/是否需要准备';
     case 'inventory_alert': return '今天安排补货或核实';
     case 'invoice_review': return '今天审批或退回';
-    case 'systems_review': case 'systems_audit': return systemReviewText(a).suggestion;
+    case 'systems_review': case 'systems_audit': return systemReviewText(a, lang).suggestion;
     default: return a.priority === 'P1' ? '今天优先处理' : '按计划推进';
   }
 }
 
-// Home Daily Brief §二 — "发生了什么": for systems_review/systems_audit this
-// overrides the raw Systems Registry notes with a real Chinese business
-// description; every other action_type's summary is already a Chinese,
-// business-worded sentence built in actionCenter.ts, so it's used as-is.
-function factFor(a: BossAction): { fact: string; rawFact: string | null } {
+// Home Daily Brief §二 — "发生了什么"/"What happened": for systems_review/
+// systems_audit this overrides the raw Systems Registry notes with a real
+// business description in the requested language; every other action_type's
+// `summary` is built in actionCenter.ts and is Chinese-only there (that file
+// is out of scope for this fix), so in English mode this falls back to the
+// raw `a.title` rather than mixing a Chinese sentence into an English card —
+// titles are typically "{Customer} — {short tag}" and read acceptably in
+// either language.
+function factFor(a: BossAction, lang: BriefLang): { fact: string; rawFact: string | null } {
   if (a.action_type === 'systems_review' || a.action_type === 'systems_audit') {
     const raw = a.summary || a.title;
-    return { fact: systemReviewText(a).fact, rawFact: raw };
+    return { fact: systemReviewText(a, lang).fact, rawFact: raw };
   }
+  if (lang === 'en') return { fact: a.title, rawFact: null };
   return { fact: a.summary || a.title, rawFact: null };
 }
 
@@ -212,7 +288,7 @@ const CONTACT_ACTION_TYPES = new Set([
   'crm_followup', 'quotation_followup', 'email_review', 'commitment', 'mia_needs_chris',
 ]);
 
-export async function getDailyBrief(): Promise<{ ok: true; brief: DailyBrief } | { ok: false; error: string }> {
+export async function getDailyBrief(lang: BriefLang = 'zh'): Promise<{ ok: true; brief: DailyBrief } | { ok: false; error: string }> {
   const res = await getBossActions();
   if (!res.ok) return res;
 
@@ -237,14 +313,14 @@ export async function getDailyBrief(): Promise<{ ok: true; brief: DailyBrief } |
       return 0;
     })[0];
 
-    const { fact, rawFact } = factFor(rep);
+    const { fact, rawFact } = factFor(rep, lang);
     deduped.push({
       priority: rep.priority,
       subject: rep.related_customer || rep.title.split(' — ')[0] || rep.title,
       fact,
       rawFact,
-      whyItMatters: whyItMatters(rep),
-      suggestion: suggestion(rep),
+      whyItMatters: whyItMatters(rep, lang),
+      suggestion: suggestion(rep, lang),
       deepLink: deepLinkFor(rep, key),
       source: rep.source,
       dueAt: rep.due_at,
@@ -272,6 +348,10 @@ export async function getDailyBrief(): Promise<{ ok: true; brief: DailyBrief } |
   const items = deduped.filter((it) => it.source !== 'email').slice(0, 5);
 
   const todaysThreeActions = items.slice(0, 3).map((it) => {
+    if (lang === 'en') {
+      const verb = it.source === 'crm' || it.source === 'business' ? 'Contact' : it.source === 'email' ? 'Reply to' : it.source === 'decisions' ? 'Progress' : it.source === 'commitments' ? 'Deliver on' : 'Handle';
+      return `${verb} ${it.subject}`;
+    }
     const verb = it.source === 'crm' || it.source === 'business' ? '联系' : it.source === 'email' ? '回复' : it.source === 'decisions' ? '推进' : it.source === 'commitments' ? '兑现' : '处理';
     return `${verb}${it.subject}`;
   });
