@@ -126,41 +126,43 @@ Your ONLY job is UNDERSTANDING. You never decide the final action type yourself 
 operation (per requested_operation): ${OPERATIONS.join(' | ')}
 object (per requested_operation): ${OBJECTS.join(' | ')}
 
-referenced_context: set refers_to_current_customer=true when the text uses a pronoun/reference like "这个客户"/"他"/"该客户" instead of naming someone explicitly, and refers_to_current_task=true when it uses "这件事"/"这个事"/"那件事" instead of naming a task explicitly. reference_phrase is the exact phrase that triggered it, or null.
+context_reference: an object with exactly three keys — points_to_current_customer (boolean, true when the text uses a pronoun/reference like "这个客户"/"他"/"该客户" instead of naming someone explicitly), points_to_current_task (boolean, true when it uses "这件事"/"这个事"/"那件事" instead of naming a task explicitly), and reference_phrase (the exact phrase that triggered it, or null). Do not rename these three keys and do not add others.
 
 is_completion: true only when a TASK-related requested_operation is reporting something as already done/finished ("完成了"/"办完了"/"搞定了"/"done").
+
+CREATE+CUSTOMER vs CREATE+FOLLOWUP — this is the most common mistake, read carefully: only use CREATE+CUSTOMER when the text explicitly asks to add/register a brand-new customer ("新建客户"/"新增客户"/"帮我建个客户"/"add a new customer"). A message that says someone TALKED/MET/COMMUNICATED with a person or company ("跟X聊了"/"跟X沟通了"/"见了X"/"talked to X") is reporting on an ONGOING relationship, not creating one — that is always CREATE+FOLLOWUP, never CREATE+CUSTOMER, even if X has never been mentioned before in this conversation and even if the sentence also happens to describe X's business. Do not default to CREATE+CUSTOMER just because a name and a business topic are both present.
 
 Examples (Chinese business messages):
 
 "新建客户 SHADI，做咖啡机器人" ->
-{"user_goal":"新建客户SHADI并记录其业务","subjects":["SHADI"],"facts":[],"time_expressions":[],"referenced_context":{"refers_to_current_customer":false,"refers_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"CREATE","object":"CUSTOMER","entities":{"customer_name":"SHADI","business_topic":"咖啡机器人"},"time_expression":null,"is_completion":false,"confidence":0.9}]}
+{"user_goal":"新建客户SHADI并记录其业务","subjects":["SHADI"],"facts":[],"time_expressions":[],"context_reference":{"points_to_current_customer":false,"points_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"CREATE","object":"CUSTOMER","entities":{"customer_name":"SHADI","business_topic":"咖啡机器人"},"time_expression":null,"is_completion":false,"confidence":0.9}]}
 
 "今天跟SHADI聊了咖啡机器人，下周一提醒我" ->
-{"user_goal":"记录跟SHADI的沟通并设置下周一的提醒","subjects":["SHADI"],"facts":[],"time_expressions":["今天","下周一"],"referenced_context":{"refers_to_current_customer":false,"refers_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"CREATE","object":"FOLLOWUP","entities":{"customer_name":"SHADI","business_topic":"咖啡机器人"},"time_expression":null,"is_completion":false,"confidence":0.85},{"operation":"CREATE","object":"TASK","entities":{"customer_name":"SHADI","business_topic":"咖啡机器人"},"time_expression":"下周一","is_completion":false,"confidence":0.85}]}
+{"user_goal":"记录跟SHADI的沟通并设置下周一的提醒","subjects":["SHADI"],"facts":[],"time_expressions":["今天","下周一"],"context_reference":{"points_to_current_customer":false,"points_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"CREATE","object":"FOLLOWUP","entities":{"customer_name":"SHADI","business_topic":"咖啡机器人"},"time_expression":null,"is_completion":false,"confidence":0.85},{"operation":"CREATE","object":"TASK","entities":{"customer_name":"SHADI","business_topic":"咖啡机器人"},"time_expression":"下周一","is_completion":false,"confidence":0.85}]}
 
 "帮我建一个中国港湾的项目承包/劳工需求项目" ->
-{"user_goal":"新建中国港湾的项目承包/劳工需求项目","subjects":["中国港湾"],"facts":[],"time_expressions":[],"referenced_context":{"refers_to_current_customer":false,"refers_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"CREATE","object":"PROJECT","entities":{"company":"中国港湾","business_lines":"项目承包/劳工需求"},"time_expression":null,"is_completion":false,"confidence":0.9}]}
+{"user_goal":"新建中国港湾的项目承包/劳工需求项目","subjects":["中国港湾"],"facts":[],"time_expressions":[],"context_reference":{"points_to_current_customer":false,"points_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"CREATE","object":"PROJECT","entities":{"company":"中国港湾","business_lines":"项目承包/劳工需求"},"time_expression":null,"is_completion":false,"confidence":0.9}]}
 
 "这几个合同我这周要处理，帮我收好" ->
-{"user_goal":"收好这几个合同并在本周处理","subjects":[],"facts":[],"time_expressions":["这周"],"referenced_context":{"refers_to_current_customer":false,"refers_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"STORE","object":"DOCUMENT","entities":{"document_topic":"合同"},"time_expression":null,"is_completion":false,"confidence":0.8},{"operation":"CREATE","object":"TASK","entities":{"business_topic":"处理合同"},"time_expression":"这周","is_completion":false,"confidence":0.8}]}
+{"user_goal":"收好这几个合同并在本周处理","subjects":[],"facts":[],"time_expressions":["这周"],"context_reference":{"points_to_current_customer":false,"points_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"STORE","object":"DOCUMENT","entities":{"document_topic":"合同"},"time_expression":null,"is_completion":false,"confidence":0.8},{"operation":"CREATE","object":"TASK","entities":{"business_topic":"处理合同"},"time_expression":"这周","is_completion":false,"confidence":0.8}]}
 
 "记住，以后 Highway 劳务按26天每天10小时算" ->
-{"user_goal":"记住Highway劳务的计算规则","subjects":["Highway"],"facts":["Highway劳务按26天每天10小时算"],"time_expressions":[],"referenced_context":{"refers_to_current_customer":false,"refers_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"REMEMBER","object":"BUSINESS_MEMORY","entities":{"company":"Highway","rule":"劳务按26天每天10小时算"},"time_expression":null,"is_completion":false,"confidence":0.9}]}
+{"user_goal":"记住Highway劳务的计算规则","subjects":["Highway"],"facts":["Highway劳务按26天每天10小时算"],"time_expressions":[],"context_reference":{"points_to_current_customer":false,"points_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"REMEMBER","object":"BUSINESS_MEMORY","entities":{"company":"Highway","rule":"劳务按26天每天10小时算"},"time_expression":null,"is_completion":false,"confidence":0.9}]}
 
 "Highway 劳务怎么算？" ->
-{"user_goal":"查询Highway劳务的计算规则","subjects":["Highway"],"facts":[],"time_expressions":[],"referenced_context":{"refers_to_current_customer":false,"refers_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"QUERY","object":"BUSINESS_MEMORY","entities":{"company":"Highway","topic":"劳务"},"time_expression":null,"is_completion":false,"confidence":0.9}]}
+{"user_goal":"查询Highway劳务的计算规则","subjects":["Highway"],"facts":[],"time_expressions":[],"context_reference":{"points_to_current_customer":false,"points_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"QUERY","object":"BUSINESS_MEMORY","entities":{"company":"Highway","topic":"劳务"},"time_expression":null,"is_completion":false,"confidence":0.9}]}
 
 "找 GCI 最新营业执照" ->
-{"user_goal":"查找GCI最新的营业执照文件","subjects":["GCI"],"facts":[],"time_expressions":[],"referenced_context":{"refers_to_current_customer":false,"refers_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"QUERY","object":"DOCUMENT","entities":{"company":"GCI","document_type":"营业执照"},"time_expression":null,"is_completion":false,"confidence":0.9}]}
+{"user_goal":"查找GCI最新的营业执照文件","subjects":["GCI"],"facts":[],"time_expressions":[],"context_reference":{"points_to_current_customer":false,"points_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"QUERY","object":"DOCUMENT","entities":{"company":"GCI","document_type":"营业执照"},"time_expression":null,"is_completion":false,"confidence":0.9}]}
 
 "这件事完成了" ->
-{"user_goal":"把这件事标记为已完成","subjects":[],"facts":[],"time_expressions":[],"referenced_context":{"refers_to_current_customer":false,"refers_to_current_task":true,"reference_phrase":"这件事"},"requested_operations":[{"operation":"UPDATE","object":"TASK","entities":{},"time_expression":null,"is_completion":true,"confidence":0.85}]}
+{"user_goal":"把这件事标记为已完成","subjects":[],"facts":[],"time_expressions":[],"context_reference":{"points_to_current_customer":false,"points_to_current_task":true,"reference_phrase":"这件事"},"requested_operations":[{"operation":"UPDATE","object":"TASK","entities":{},"time_expression":null,"is_completion":true,"confidence":0.85}]}
 
 "帮我给这个客户准备劳工报价" ->
-{"user_goal":"给当前客户准备劳工报价","subjects":[],"facts":[],"time_expressions":[],"referenced_context":{"refers_to_current_customer":true,"refers_to_current_task":false,"reference_phrase":"这个客户"},"requested_operations":[{"operation":"PREPARE","object":"QUOTE","entities":{"quote_type":"劳工报价"},"time_expression":null,"is_completion":false,"confidence":0.85}]}
+{"user_goal":"给当前客户准备劳工报价","subjects":[],"facts":[],"time_expressions":[],"context_reference":{"points_to_current_customer":true,"points_to_current_task":false,"reference_phrase":"这个客户"},"requested_operations":[{"operation":"PREPARE","object":"QUOTE","entities":{"quote_type":"劳工报价"},"time_expression":null,"is_completion":false,"confidence":0.85}]}
 
 Output ONLY this JSON shape, nothing else:
-{"user_goal":"...","subjects":[],"facts":[],"time_expressions":[],"referenced_context":{"refers_to_current_customer":false,"refers_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"...","object":"...","entities":{},"time_expression":null,"is_completion":false,"confidence":0.0}]}`;
+{"user_goal":"...","subjects":[],"facts":[],"time_expressions":[],"context_reference":{"points_to_current_customer":false,"points_to_current_task":false,"reference_phrase":null},"requested_operations":[{"operation":"...","object":"...","entities":{},"time_expression":null,"is_completion":false,"confidence":0.0}]}`;
 
 interface RequestedOperation {
   operation: Operation;
@@ -176,9 +178,9 @@ interface Understanding {
   subjects: string[];
   facts: string[];
   time_expressions: string[];
-  referenced_context: {
-    refers_to_current_customer: boolean;
-    refers_to_current_task: boolean;
+  context_reference: {
+    points_to_current_customer: boolean;
+    points_to_current_task: boolean;
     reference_phrase: string | null;
   };
   requested_operations: RequestedOperation[];
@@ -209,10 +211,10 @@ function validateUnderstanding(raw: any): Understanding | null {
   if (!Array.isArray(raw.subjects) || raw.subjects.some((s: any) => typeof s !== 'string')) return null;
   if (!Array.isArray(raw.facts) || raw.facts.some((s: any) => typeof s !== 'string')) return null;
   if (!Array.isArray(raw.time_expressions) || raw.time_expressions.some((s: any) => typeof s !== 'string')) return null;
-  const rc = raw.referenced_context;
+  const rc = raw.context_reference;
   if (!rc || typeof rc !== 'object') return null;
-  if (typeof rc.refers_to_current_customer !== 'boolean') return null;
-  if (typeof rc.refers_to_current_task !== 'boolean') return null;
+  if (typeof rc.points_to_current_customer !== 'boolean') return null;
+  if (typeof rc.points_to_current_task !== 'boolean') return null;
   const referencePhrase = nullifyStringLiteral(rc.reference_phrase);
   if (referencePhrase !== null && typeof referencePhrase !== 'string') return null;
   if (!Array.isArray(raw.requested_operations)) return null;
@@ -227,7 +229,7 @@ function validateUnderstanding(raw: any): Understanding | null {
     subjects: raw.subjects,
     facts: raw.facts,
     time_expressions: raw.time_expressions,
-    referenced_context: { refers_to_current_customer: rc.refers_to_current_customer, refers_to_current_task: rc.refers_to_current_task, reference_phrase: referencePhrase },
+    context_reference: { points_to_current_customer: rc.points_to_current_customer, points_to_current_task: rc.points_to_current_task, reference_phrase: referencePhrase },
     requested_operations: ops,
   };
 }
@@ -283,13 +285,13 @@ function mapUnderstandingToActions(
       missingContext = '无法从纯文本消息读取文件附件，需要用户在UI中实际上传文件';
     }
 
-    // Honesty rule: referenced_context points at something the caller didn't
+    // Honesty rule: context_reference points at something the caller didn't
     // supply — never guess which customer/task it means.
-    if (u.referenced_context.refers_to_current_customer && !ctx.hasCurrentCustomer && (action === 'PREPARE_QUOTE' || op.object === 'CUSTOMER')) {
+    if (u.context_reference.points_to_current_customer && !ctx.hasCurrentCustomer && (action === 'PREPARE_QUOTE' || op.object === 'CUSTOMER')) {
       executable = false;
       missingContext = missingContext || '消息引用了"这个客户"但未提供当前客户上下文';
     }
-    if (u.referenced_context.refers_to_current_task && !ctx.hasOpenTask && action === 'UPDATE_TASK') {
+    if (u.context_reference.points_to_current_task && !ctx.hasOpenTask && action === 'UPDATE_TASK') {
       executable = false;
       missingContext = missingContext || '消息引用了"这件事"但未提供当前任务上下文';
     }
