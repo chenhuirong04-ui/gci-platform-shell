@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { colors } from '@gci/design-system';
-import { searchGmail, getGmailThread, type GmailResult, type GmailThreadMessage } from '../lib/googleSearch';
+import { searchGmail, getGmailThread, getImportantEmails, type GmailResult, type GmailThreadMessage } from '../lib/googleSearch';
 import { getAllCustomerNames } from '../lib/crmSupabase';
 import {
   sendEmailAssistantChat, resolveCustomerContext, threadMessagesForChat, extractSenderName,
@@ -54,6 +54,15 @@ export function EmailAssistant() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  // Home's "重要客户邮件" KPI card links here with ?view=important — this
+  // mode shows exactly the same getImportantEmails() list the KPI counted
+  // (same query, same rule: is:unread newer_than:7d, real Gmail), instead
+  // of the unrelated 30-day/today-bucketed/AI-triaged view below. Reuses
+  // the existing function — no second copy of the query.
+  const importantView = searchParams.get('view') === 'important';
+  const [importantEmails, setImportantEmails] = useState<GmailResult[] | null>(null);
+  const [importantError, setImportantError] = useState<string | null>(null);
+
   const [category, setCategory] = useState<EmailCategory | 'all'>('all');
   const [emails, setEmails] = useState<GmailResult[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
@@ -97,13 +106,25 @@ export function EmailAssistant() {
   }, []);
 
   useEffect(() => {
+    if (importantView) return; // that mode loads its own list below
     setEmails(null);
     setListError(null);
     searchGmail(GMAIL_SCOPE_QUERY, GMAIL_SCOPE_MAX).then((res) => {
       if (res.ok) setEmails(res.results);
       else setListError(res.error);
     });
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [importantView]);
+
+  useEffect(() => {
+    if (!importantView) return;
+    setImportantEmails(null);
+    setImportantError(null);
+    getImportantEmails().then((res) => {
+      if (res.ok) setImportantEmails(res.results);
+      else setImportantError(res.error);
+    });
+  }, [importantView]);
 
   // Bucket by Asia/Dubai calendar day — today's triage is the default
   // landing view; 昨天/更早 stay one click away instead of crowding it.
@@ -320,8 +341,43 @@ export function EmailAssistant() {
       </div>
 
       <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
-        {/* ── Left: today's triage, or a date-scoped flat list ── */}
-        <div style={{ width: dayTab === 'today' ? 460 : 300, flexShrink: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {/* ── Left: today's triage, or a date-scoped flat list, or the
+            重要客户邮件 deep-link list from Home ── */}
+        <div style={{ width: dayTab === 'today' || importantView ? 460 : 300, flexShrink: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          {importantView ? (
+            <div style={{ flex: 1, overflowY: 'auto', border: `1px solid ${BORD}`, borderRadius: 12, background: CARD }}>
+              <div style={{ padding: '10px 14px', fontSize: 11, fontWeight: 700, color: GOLD, borderBottom: `1px solid ${BORD}`, letterSpacing: '0.04em' }}>
+                重要客户邮件 · 未读 · 近7天{importantEmails ? ` · ${importantEmails.length}` : ''}
+              </div>
+              {importantError ? (
+                <div style={{ padding: 16, fontSize: 12.5, color: RED }}>读取失败:{importantError}</div>
+              ) : !importantEmails ? (
+                <div style={{ padding: 16, fontSize: 12.5, color: MUTED }}>加载中…</div>
+              ) : importantEmails.length === 0 ? (
+                <div style={{ padding: 16, fontSize: 12.5, color: MUTED }}>过去7天没有符合条件的未读邮件。</div>
+              ) : (
+                importantEmails.map((m) => {
+                  const active = selected?.threadId === m.threadId;
+                  return (
+                    <div
+                      key={m.id}
+                      onClick={() => openThread(m)}
+                      style={{ padding: '11px 14px', borderBottom: `1px solid ${BORD}`, cursor: 'pointer', background: active ? 'rgba(203,168,92,0.08)' : 'transparent' }}
+                    >
+                      <div style={{ fontSize: 12, fontWeight: 700, color: TEXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {extractSenderName(m.sender)}
+                      </div>
+                      <div style={{ fontSize: 12, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
+                        {m.subject || '(无主题)'}
+                      </div>
+                      <div style={{ fontSize: 10.5, color: SUBTLE, marginTop: 4 }}>{formatEmailDate(m.date)}</div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          ) : (
+          <>
           <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
             {([['today', '今天'], ['yesterday', '昨天'], ['earlier', '更早']] as const).map(([key, label]) => (
               <button
@@ -496,6 +552,8 @@ export function EmailAssistant() {
                 )}
               </div>
             </>
+          )}
+          </>
           )}
         </div>
 

@@ -75,7 +75,11 @@ export function HomeKpiRow() {
     { label: '逾期事项', value: overdue, color: RED, onClick: () => navigate('/actions?filter=overdue') },
     { label: '等你决定', value: decisions, color: RED, onClick: () => navigate('/decisions') },
     { label: '待执行', value: pendingExec, color: AMBER, onClick: () => navigate('/decisions') },
-    { label: '重要客户邮件', value: importantEmails, color: GREEN, onClick: () => navigate('/email-assistant') },
+    // Deep-links to the same getImportantEmails() list this count comes
+    // from (?view=important) — was the bare Email Assistant page, which
+    // shows an unrelated 30-day/today-only/AI-triaged view, so this number
+    // and what appeared after clicking never matched.
+    { label: '重要客户邮件', value: importantEmails, color: GREEN, onClick: () => navigate('/email-assistant?view=important') },
     // Task 18.4 — was '/actions?filter=mia' (a generic Boss Action filter,
     // not an actual lead list). Now opens the real MIA lead bridge.
     { label: '今日新开发潜客(MIA)', value: miaLeadsToday, color: GOLD, onClick: () => navigate('/mia-leads') },
