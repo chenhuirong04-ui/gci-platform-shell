@@ -39,6 +39,7 @@ import {
 } from '../lib/businessMemory';
 import { extractCompanyName } from '../lib/giaFiles';
 import { matchWhatsAppQuery, answerWhatsAppQuery } from '../lib/whatsapp';
+import { isPlannerV3Enabled, callPlannerV3, classifyPlanV3Actions } from '../lib/plannerV3';
 import type { ExecutiveTask } from '../lib/executiveTasks';
 import type { CrmCustomer } from '../lib/crmSupabase';
 
@@ -413,6 +414,75 @@ export function BusinessAssistant() {
     return true;
   }
 
+  // GIA Action Planner V3 — STEP 2 minimal integration (feature-flagged,
+  // default OFF via VITE_GIA_PLANNER_V3_ENABLED / ?v3=1 override). Runs
+  // BEFORE the old classify-capture router below; the old router is left
+  // completely untouched as the fallback whenever the flag is off, the V3
+  // call fails, or V3's own action set can't be mapped. Writes still only
+  // happen via the existing confirmCaptureItem() after an explicit confirm
+  // click — V3 never writes directly.
+  async function tryBusinessCaptureV3(text: string, currentCustomer: CrmCustomer | null): Promise<boolean> {
+    if (!isPlannerV3Enabled()) return false;
+    const t = text.trim();
+    if (!t) return false;
+
+    const planned = await callPlannerV3(t, currentCustomer?.customer_name ?? null, null);
+    if (!planned.ok || planned.actions.length === 0) return false; // fall back to old router
+
+    const outcome = classifyPlanV3Actions(planned.actions, t);
+
+    // Any action type V3 identified but this integration doesn't yet know
+    // how to execute (CREATE_PROJECT / PREPARE_QUOTE / SUPPORT_ACTION) —
+    // never partially execute; fall back to the old router for the whole
+    // message rather than guessing which half to honor.
+    if (outcome.unhandled.length > 0) return false;
+
+    // Read-only answers (QUERY_DOCUMENT / BUSINESS_MEMORY_QUERY) — V3 has
+    // already confirmed the intent, so call the real search functions
+    // directly (bypassing the regex gates tryFileSearch/tryBusinessMemoryQuery
+    // use for the old router) rather than fabricating a reply from entities.
+    if (outcome.readOnlyActions.length > 0 && outcome.intents.length === 0) {
+      const replies: string[] = [];
+      for (const a of outcome.readOnlyActions) {
+        if (a.action === 'QUERY_DOCUMENT') {
+          const registryHits = await searchFileRegistryByQuery(t);
+          if (registryHits.length > 0) {
+            replies.push(`在 GIA 文件库中找到：\n${registryHits.slice(0, 5).map((h) => `${h.is_current ? '✓ 当前版本' : '（旧版本）'} ${h.display_name} — ${h.drive_url}`).join('\n')}`);
+            continue;
+          }
+          const driveHits = await searchDriveFallback(t);
+          if (driveHits.length > 0) {
+            replies.push(`GIA 文件库中暂未登记，但在 Drive 中找到：\n${driveHits.slice(0, 5).map((h) => `${h.name} — ${h.webViewLink}`).join('\n')}`);
+            continue;
+          }
+          replies.push('未在 GIA 文件库或 Drive 中找到匹配的文件。');
+        } else if (a.action === 'BUSINESS_MEMORY_QUERY') {
+          const rows = await queryBusinessMemoryByText(t);
+          replies.push(rows.length > 0 ? formatMemoryRows(rows) : 'Business Memory 中未找到匹配的规则。');
+        }
+      }
+      setFileSearchReply(replies.join('\n\n'));
+      return true;
+    }
+
+    if (outcome.intents.length === 0) return false;
+
+    setCaptureLoading(true);
+    const resolved = await resolveCaptureItems(outcome.intents, currentCustomer);
+    setCaptureLoading(false);
+    if (resolved.length === 0) return false;
+
+    // Honest-gap note (e.g. STORE_DOCUMENT with no real attachment) — shown
+    // on the confirm card instead of a silent drop or a fake success.
+    if (outcome.honestGapNotes.length > 0) {
+      resolved[0] = { ...resolved[0], summaryLines: [...outcome.honestGapNotes.map((n) => `⚠ ${n}`), ...resolved[0].summaryLines] };
+    }
+
+    setCaptureDone(new Set());
+    setPendingCapture(resolved);
+    return true;
+  }
+
   // Task 16 §三/§十二 — the unified router. Runs on both the top input
   // (works with no customer loaded yet) and the chat box (works with a
   // customer already loaded, so "他"/"这个客户" resolves via ctx.customer).
@@ -585,6 +655,8 @@ export function BusinessAssistant() {
       setFileSearchReply(quotePrepReply);
       return;
     }
+    const v3Consumed = await tryBusinessCaptureV3(t, ctx?.customer ?? null);
+    if (v3Consumed) return;
     const consumed = await tryBusinessCapture(t, ctx?.customer ?? null);
     if (consumed) return;
     const stripped = t.replace(LOOKUP_PREFIX_RE, '').trim() || t;
@@ -674,6 +746,13 @@ export function BusinessAssistant() {
     const quotePrepReply = await tryQuotePrepCommand(question, context.customer);
     if (quotePrepReply) {
       setChatHistory((prev) => [...prev, { role: 'user', content: question }, { role: 'assistant', content: quotePrepReply }]);
+      return;
+    }
+
+    // GIA Action Planner V3 — same feature-flagged pre-check as the top input.
+    const v3Captured = await tryBusinessCaptureV3(question, context.customer);
+    if (v3Captured) {
+      setChatHistory((prev) => [...prev, { role: 'user', content: question }]);
       return;
     }
 
