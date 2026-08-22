@@ -25,6 +25,7 @@ import {
   type GiaBusinessMemoryRow,
 } from './businessMemory';
 import { matchWhatsAppQuery, answerWhatsAppQuery } from './whatsapp';
+import { looksLikeServiceKnowledgeQuery, answerServiceKnowledgeQuery } from './serviceKnowledge';
 import { isPlannerV3Enabled, callPlannerV3, classifyPlanV3Actions } from './plannerV3';
 import type { ExecutiveTask } from './executiveTasks';
 import type { CrmCustomer } from './crmSupabase';
@@ -51,6 +52,11 @@ export interface GiaRouterState {
   // router) for any caller that doesn't provide it, so this is additive —
   // it can't break /business-assistant's existing behavior.
   setPendingDriveFolderCreate?: (v: PendingDriveFolderCreate | null) => void;
+  // Optional, defaults to 'zh' when absent — only used by
+  // tryServiceKnowledgeQuery to pick which language to answer a service/
+  // price question in. Every other function in this file is unaffected
+  // and stays Chinese-only by its existing convention.
+  lang?: 'zh' | 'en';
 }
 
 // Task 16 §18 — "肯尼亚保姆这个事情完成了。" Checked before capture
@@ -209,6 +215,23 @@ export async function tryWhatsAppQuery(text: string): Promise<string | null> {
   const m = matchWhatsAppQuery(text);
   if (!m.kind) return null;
   return answerWhatsAppQuery(m.kind, m.customerName);
+}
+
+// GIA Service Knowledge Read V1 — "VAT注册多少钱？" / "钢筋工一小时多少钱？" were
+// falling through to tryBusinessMemoryQuery below (Planner V3 misclassifying
+// them as a BUSINESS_MEMORY_QUERY action, since GIA had no better category
+// to route pricing questions to) and returning "Business Memory 中未找到匹配
+// 的规则" — real, structured pricing data existed the whole time in
+// service_catalog_items/workforce_rate_card, just never queried. Checked
+// BEFORE Chanya/Business Memory/WhatsApp/QuotePrep/Planner V3 below so a
+// real service/price question always wins the race against that AI guess.
+// Returns null (falls through unchanged) for anything that doesn't
+// actually match real catalog/workforce data — e.g. "我们规定报价最低毛利是
+// 多少？" still reaches tryBusinessMemoryQuery exactly as before, since no
+// catalog/workforce row matches "报价最低毛利".
+export async function tryServiceKnowledgeQuery(text: string, state: GiaRouterState): Promise<string | null> {
+  if (!looksLikeServiceKnowledgeQuery(text)) return null;
+  return answerServiceKnowledgeQuery(text, state.lang ?? 'zh');
 }
 
 // GIA Foundation §C — "帮我给这个客户准备劳工报价": combine the currently
@@ -403,6 +426,13 @@ export async function runGiaCaptureChain(text: string, state: GiaRouterState): P
   // an explicit "create a Drive folder" instruction must never fall through
   // to generic AI capture classification (see comment on the function).
   if (await tryDriveCreateFolderCommand(t, state)) return true;
+
+  // Checked before Chanya/Business Memory/WhatsApp/QuotePrep/V3 — a real
+  // service/price question must always be answered from the real catalog,
+  // never fall through to Business Memory or an AI guess (see comment on
+  // the function).
+  const serviceKnowledgeReply = await tryServiceKnowledgeQuery(t, state);
+  if (serviceKnowledgeReply) { state.setFileSearchReply(serviceKnowledgeReply); return true; }
 
   const chanyaReply = await tryChanyaStatusQuery(t);
   if (chanyaReply) { state.setFileSearchReply(chanyaReply); return true; }

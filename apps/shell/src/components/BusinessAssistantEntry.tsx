@@ -213,7 +213,7 @@ export function BusinessAssistantEntry() {
       currentCustomer: null, // Home has no loaded customer context
       setFileSearchReply, setPendingCapture, setCaptureLoading: setBusy, setCaptureError,
       setCaptureDone, setPendingTaskLifecycle, setPendingTaskReschedule,
-      setPendingDriveFolderCreate,
+      setPendingDriveFolderCreate, lang,
     };
     const consumed = await runGiaTopRouter(v, state);
     setBusy(false);
