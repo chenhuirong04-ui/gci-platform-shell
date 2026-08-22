@@ -11,7 +11,7 @@ import { colors } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
 import { runGiaTopRouter, type GiaRouterState } from '../lib/giaRouter';
 import { confirmCaptureItem, completeOrCancelTask, rescheduleTask, type ResolvedCaptureItem } from '../lib/businessCapture';
-import type { ExecutiveTask } from '../lib/executiveTasks';
+import { BUSINESS_AREA_LABEL, BUSINESS_AREA_LABEL_ZH, ALL_BUSINESS_AREAS, type ExecutiveTask, type TaskBusinessArea } from '../lib/executiveTasks';
 import type { CrmCustomer } from '../lib/crmSupabase';
 
 const GOLD = '#CBA85C';
@@ -99,6 +99,19 @@ export function BusinessAssistantEntry() {
       candidateCustomers: null,
       isNewCustomer: false,
     };
+    setPendingCapture(next);
+  }
+
+  // GIA Planner confirm-card business-area editor — pure local state edit,
+  // no re-classification/model call. Mutates item.raw.todo_business_area
+  // directly, the exact field confirmCaptureItem()'s BUSINESS_TODO branch
+  // already reads to build the executive_tasks write — so a manual pick
+  // here is what actually gets saved, not Planner's original guess.
+  function changeBusinessArea(index: number, area: TaskBusinessArea) {
+    if (!pendingCapture) return;
+    const next = [...pendingCapture];
+    const item = next[index];
+    next[index] = { ...item, raw: { ...item.raw, todo_business_area: area } };
     setPendingCapture(next);
   }
 
@@ -214,9 +227,32 @@ export function BusinessAssistantEntry() {
                 return (
                   <div key={i} style={{ padding: '8px 12px', background: done ? 'rgba(111,191,142,0.06)' : 'rgba(255,255,255,0.03)', border: `1px solid ${done ? 'rgba(111,191,142,0.3)' : BORD}`, borderRadius: 8 }}>
                     <div style={{ fontSize: 10, color: '#8FA6D4', marginBottom: 3 }}>[{i + 1}] {item.type}</div>
-                    {item.summaryLines.map((l, li) => (
-                      <div key={li} style={{ fontSize: 12, color: TEXT, lineHeight: 1.5 }}>{l}</div>
-                    ))}
+                    {item.summaryLines
+                      .filter((l) => !(item.type === 'BUSINESS_TODO' && l.startsWith('业务领域：')))
+                      .map((l, li) => (
+                        <div key={li} style={{ fontSize: 12, color: TEXT, lineHeight: 1.5 }}>{l}</div>
+                      ))}
+                    {item.type === 'BUSINESS_TODO' && (
+                      done ? (
+                        <div style={{ fontSize: 12, color: TEXT, lineHeight: 1.5 }}>
+                          {lang === 'zh' ? '业务领域：' : 'Business area: '}
+                          {lang === 'zh' ? BUSINESS_AREA_LABEL_ZH[item.raw.todo_business_area ?? 'OTHER'] : BUSINESS_AREA_LABEL[item.raw.todo_business_area ?? 'OTHER']}
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                          <span style={{ fontSize: 12, color: TEXT }}>{lang === 'zh' ? '业务领域：' : 'Business area:'}</span>
+                          <select
+                            value={item.raw.todo_business_area ?? 'OTHER'}
+                            onChange={(e) => changeBusinessArea(i, e.target.value as TaskBusinessArea)}
+                            style={{ fontSize: 12, padding: '2px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORD}`, color: TEXT }}
+                          >
+                            {ALL_BUSINESS_AREAS.map((a) => (
+                              <option key={a} value={a}>{lang === 'zh' ? BUSINESS_AREA_LABEL_ZH[a] : BUSINESS_AREA_LABEL[a]}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )
+                    )}
 
                     {item.candidateCustomers && (
                       <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>

@@ -32,6 +32,21 @@ export const BUSINESS_AREA_LABEL: Record<TaskBusinessArea, string> = {
   OTHER: 'Other',
 };
 
+// GIA Planner confirm-card business-area editor (Home) — same enum as
+// BUSINESS_AREA_LABEL above, Chinese labels. Mirrors the exact ZH strings
+// Tasks.tsx's own area filter already uses (贸易/劳务/电商/公司事务/其他), so
+// this editor and /tasks never disagree on what a value is called.
+export const BUSINESS_AREA_LABEL_ZH: Record<TaskBusinessArea, string> = {
+  '25H_AI': '25H / AI',
+  TRADE: '贸易',
+  WORKFORCE: '劳务',
+  ECOMMERCE: '电商',
+  COMPANY_ADMIN: '公司事务',
+  OTHER: '其他',
+};
+
+export const ALL_BUSINESS_AREAS: TaskBusinessArea[] = ['25H_AI', 'TRADE', 'WORKFORCE', 'ECOMMERCE', 'COMPANY_ADMIN', 'OTHER'];
+
 export async function getExecutiveTasks(): Promise<{ ok: true; rows: ExecutiveTask[] } | { ok: false; error: string }> {
   const { data, error } = await supabase.from('executive_tasks').select('*').order('due_at', { ascending: true, nullsFirst: false }).order('created_at', { ascending: false });
   if (error) return { ok: false, error: error.message };
