@@ -249,12 +249,42 @@ export async function fetchAndStoreFromUrl(
   }
 }
 
+export interface DriveFolderOption {
+  id: string;
+  name: string;
+  webViewLink: string;
+}
+
+// Real Drive folder search — reuses drive-search.ts (the same tiered
+// name/fullText relevance query every other Ask GCI file lookup already
+// uses), filtered client-side to folders only. No new Drive endpoint, no
+// AI: this is the same "找文件" search capability, just scoped to folders,
+// used both by the upload preview card's folder picker and by parsing a
+// chat sentence like "这个传到劳务文件夹" while a file is pending.
+export async function searchDriveFolders(query: string): Promise<DriveFolderOption[]> {
+  const q = query.trim();
+  if (!q) return [];
+  try {
+    const res = await fetch(`/api/google/drive-search?q=${encodeURIComponent(q)}&max=10`);
+    const data = await res.json();
+    if (!data.ok) return [];
+    return (data.results || [])
+      .filter((r: any) => r.mimeType === 'application/vnd.google-apps.folder')
+      .map((r: any) => ({ id: r.id, name: r.name, webViewLink: r.webViewLink }));
+  } catch {
+    return [];
+  }
+}
+
 // GIA Home local file upload entry point — a browser File the user picked
-// via a native file-select dialog (not chat text, not a URL/Drive link).
-// Deliberately skips classifyFileDescription(): no AI, no rule-based
-// classification, no business-area/company guess, no folder routing beyond
-// the existing default intake folder — this is a direct tool action the
-// user explicitly triggered, not something for Planner/GIA to interpret.
+// via a native file-select dialog or drag & drop (not chat text, not a
+// URL/Drive link). Deliberately skips classifyFileDescription(): no AI, no
+// rule-based classification, no business-area/company guess — this is a
+// direct tool action the user explicitly triggered, not something for
+// Planner/GIA to interpret. targetFolder defaults to the existing GIA
+// intake folder; the caller may pass a real Drive folder the user picked
+// or named in chat (see searchDriveFolders above) — this file never
+// guesses a Customers/Suppliers/Contracts-style destination on its own.
 // isCurrent is always false here (unlike fetchAndStoreFromUrl) because
 // there's no real (documentType, companyName) pair to group by — both are
 // unclassified — so this must never demote an unrelated file's "current"
@@ -262,8 +292,9 @@ export async function fetchAndStoreFromUrl(
 // intake source; no second upload service.
 export async function uploadAndRegisterLocalFile(
   file: File,
+  targetFolder: { id: string; name: string } = { id: DEFAULT_TARGET_FOLDER_ID, name: DEFAULT_TARGET_FOLDER_NAME },
 ): Promise<{ ok: true; row: GiaFileRegistryRow } | { ok: false; error: string }> {
-  const uploaded = await uploadFileToDrive(file, DEFAULT_TARGET_FOLDER_ID, file.name);
+  const uploaded = await uploadFileToDrive(file, targetFolder.id, file.name);
   if (!uploaded.ok) return uploaded;
   return registerFile({
     fileName: file.name,
@@ -274,7 +305,7 @@ export async function uploadAndRegisterLocalFile(
     customerId: null,
     driveFileId: uploaded.fileId,
     driveUrl: uploaded.webViewLink,
-    driveFolder: DEFAULT_TARGET_FOLDER_NAME,
+    driveFolder: targetFolder.name,
     isCurrent: false,
     tags: [],
     sourceType: 'upload',

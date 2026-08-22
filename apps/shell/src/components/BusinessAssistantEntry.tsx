@@ -12,7 +12,7 @@ import { useI18n } from '@gci/i18n';
 import { runGiaTopRouter, type GiaRouterState } from '../lib/giaRouter';
 import { confirmCaptureItem, completeOrCancelTask, rescheduleTask, type ResolvedCaptureItem } from '../lib/businessCapture';
 import { BUSINESS_AREA_LABEL, BUSINESS_AREA_LABEL_ZH, ALL_BUSINESS_AREAS, type ExecutiveTask, type TaskBusinessArea } from '../lib/executiveTasks';
-import { uploadAndRegisterLocalFile } from '../lib/giaFiles';
+import { uploadAndRegisterLocalFile, searchDriveFolders, DEFAULT_TARGET_FOLDER_ID, DEFAULT_TARGET_FOLDER_NAME, type DriveFolderOption } from '../lib/giaFiles';
 import type { CrmCustomer } from '../lib/crmSupabase';
 
 const GOLD = '#CBA85C';
@@ -41,6 +41,18 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// Non-AI, deterministic — mirrors the plain-regex chat command parsers
+// already used elsewhere in GIA (e.g. googleAskGciParsers.ts). Only ever
+// consulted while a file is pending, to pull a folder keyword out of a
+// sentence like "这个传到劳务文件夹" / "传到 Contracts" — never sent to any
+// model, never used to invent a destination that wasn't typed.
+function extractFolderKeyword(text: string): string {
+  const t = text.trim();
+  const m = t.match(/(?:传到|放到|上传到|存到|收纳到|归到)\s*(.+?)\s*(?:文件夹|目录|项目)?$/);
+  if (m && m[1].trim()) return m[1].trim();
+  return t.replace(/(文件夹|目录)$/g, '').trim();
+}
+
 export function BusinessAssistantEntry() {
   const navigate = useNavigate();
   const { lang } = useI18n();
@@ -61,7 +73,16 @@ export function BusinessAssistantEntry() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadedFile, setUploadedFile] = useState<{ name: string; driveUrl: string } | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<{ name: string; driveUrl: string; folderName: string } | null>(null);
+  // Target Drive folder for the pending upload — defaults to the existing
+  // GIA intake folder. Only ever set to a real folder returned by
+  // searchDriveFolders() (button search or a chat-typed instruction), never
+  // guessed/invented (no Customers/Suppliers/Contracts-style routing).
+  const [selectedFolder, setSelectedFolder] = useState<{ id: string; name: string }>({ id: DEFAULT_TARGET_FOLDER_ID, name: DEFAULT_TARGET_FOLDER_NAME });
+  const [folderQuery, setFolderQuery] = useState('');
+  const [folderCandidates, setFolderCandidates] = useState<DriveFolderOption[] | null>(null);
+  const [folderSearchBusy, setFolderSearchBusy] = useState(false);
+  const [folderNotice, setFolderNotice] = useState<string | null>(null);
   // Drag & drop — same pending-file preview as the "上传文件" button, just a
   // second on-ramp into it. dragCounter survives dragenter/dragleave firing
   // on child elements as the pointer moves within the box (a plain boolean
@@ -73,6 +94,17 @@ export function BusinessAssistantEntry() {
   async function go() {
     const v = value.trim();
     if (!v) { navigate('/business-assistant'); return; }
+    // A file preview is showing — this text is a folder instruction for the
+    // pending upload, never a Planner/capture command. This is the actual
+    // root-cause fix for the "上传文件" BUSINESS_TODO bug: text typed while a
+    // file is pending must never reach classify-capture/runGiaTopRouter —
+    // it was falling through to normal chat capture classification before,
+    // which is exactly how a to-do titled after the upload text got created.
+    if (selectedFile) {
+      await runFolderSearch(v);
+      setValue('');
+      return;
+    }
     setBusy(true);
     const state: GiaRouterState = {
       currentCustomer: null, // Home has no loaded customer context
@@ -169,6 +201,51 @@ export function BusinessAssistantEntry() {
     setUploadError(null);
     setUploadedFile(null);
     setSelectedFile(f);
+    // Reset folder state to the default intake folder for each new file —
+    // never carry a previous file's picked folder over to this one.
+    setSelectedFolder({ id: DEFAULT_TARGET_FOLDER_ID, name: DEFAULT_TARGET_FOLDER_NAME });
+    setFolderCandidates(null);
+    setFolderNotice(null);
+    setFolderQuery('');
+    // Clear any leftover Planner/capture confirm card — a stale pendingCapture
+    // from an earlier, unrelated chat message rendering below the new upload
+    // card is exactly what made an old classification (e.g. a BUSINESS_TODO
+    // titled after some earlier text) look like it was produced BY the
+    // upload. Starting a file upload always starts with a clean slate.
+    setPendingCapture(null);
+    setCaptureDone(new Set());
+    setCaptureError(null);
+    setFileSearchReply(null);
+  }
+
+  async function runFolderSearch(rawText: string) {
+    const keyword = extractFolderKeyword(rawText);
+    if (!keyword) return;
+    setFolderSearchBusy(true);
+    setFolderNotice(null);
+    const results = await searchDriveFolders(keyword);
+    setFolderSearchBusy(false);
+    if (results.length === 0) {
+      setFolderCandidates(null);
+      setFolderNotice(
+        lang === 'zh'
+          ? `未找到匹配"${keyword}"的文件夹，已保持默认 ${DEFAULT_TARGET_FOLDER_NAME}`
+          : `No folder matched "${keyword}" — kept the default ${DEFAULT_TARGET_FOLDER_NAME}`,
+      );
+    } else if (results.length === 1) {
+      setSelectedFolder({ id: results[0].id, name: results[0].name });
+      setFolderCandidates(null);
+      setFolderNotice(null);
+    } else {
+      setFolderCandidates(results);
+      setFolderNotice(null);
+    }
+  }
+
+  function pickFolderCandidate(f: DriveFolderOption) {
+    setSelectedFolder({ id: f.id, name: f.name });
+    setFolderCandidates(null);
+    setFolderNotice(null);
   }
 
   function handleFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
@@ -216,17 +293,19 @@ export function BusinessAssistantEntry() {
     setSelectedFile(null);
     setUploadError(null);
     setMultiDropNotice(false);
+    setFolderCandidates(null);
+    setFolderNotice(null);
   }
 
   async function confirmFileUpload() {
     if (!selectedFile) return;
     setUploadBusy(true);
     setUploadError(null);
-    const res = await uploadAndRegisterLocalFile(selectedFile);
+    const res = await uploadAndRegisterLocalFile(selectedFile, selectedFolder);
     setUploadBusy(false);
     setMultiDropNotice(false);
     if (res.ok) {
-      setUploadedFile({ name: selectedFile.name, driveUrl: res.row.drive_url });
+      setUploadedFile({ name: selectedFile.name, driveUrl: res.row.drive_url, folderName: selectedFolder.name });
       setSelectedFile(null);
     } else {
       setUploadError(res.error);
@@ -269,7 +348,7 @@ export function BusinessAssistantEntry() {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !busy) go(); }}
-            placeholder="问我：MAG现在什么情况？上次报价多少？今天先跟谁？"
+            placeholder={selectedFile ? (lang === 'zh' ? '这个传到哪个文件夹？例如：传到劳务文件夹' : 'Which folder? e.g. "send to Contracts"') : '问我：MAG现在什么情况？上次报价多少？今天先跟谁？'}
             style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, padding: '13px 48px 13px 16px', fontSize: 14.5, color: colors.textPrimary, outline: 'none', boxSizing: 'border-box', fontFamily: "'Space Grotesk',sans-serif" }}
             onFocus={(e) => (e.target.style.borderColor = 'rgba(203,168,92,0.45)')}
             onBlur={(e) => (e.target.style.borderColor = 'rgba(255,255,255,0.09)')}
@@ -315,8 +394,40 @@ export function BusinessAssistantEntry() {
             <div style={{ fontSize: 12.5, color: TEXT, lineHeight: 1.7 }}>
               <div>{lang === 'zh' ? '文件：' : 'File: '}{selectedFile.name}</div>
               <div>{lang === 'zh' ? '大小：' : 'Size: '}{formatFileSize(selectedFile.size)}</div>
-              <div>{lang === 'zh' ? '目标：Google Drive' : 'Destination: Google Drive'}</div>
+              <div>{lang === 'zh' ? '目标文件夹：' : 'Destination folder: '}<strong style={{ color: GOLD }}>{selectedFolder.name}</strong></div>
             </div>
+
+            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              <input
+                value={folderQuery}
+                onChange={(e) => setFolderQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); runFolderSearch(folderQuery); } }}
+                placeholder={lang === 'zh' ? '搜索文件夹' : 'Search folders'}
+                style={{ flex: 1, fontSize: 12, padding: '5px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: TEXT, outline: 'none' }}
+              />
+              <button
+                disabled={folderSearchBusy || !folderQuery.trim()}
+                onClick={() => runFolderSearch(folderQuery)}
+                style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}
+              >
+                {folderSearchBusy ? (lang === 'zh' ? '搜索中…' : 'Searching…') : (lang === 'zh' ? '选择文件夹' : 'Select folder')}
+              </button>
+            </div>
+
+            {folderCandidates && (
+              <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {folderCandidates.map((f) => (
+                  <button key={f.id} onClick={() => pickFolderCandidate(f)} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
+                    {f.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {folderNotice && (
+              <div style={{ marginTop: 6, fontSize: 11.5, color: MUTED }}>{folderNotice}</div>
+            )}
+
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <button
                 disabled={uploadBusy}
@@ -349,6 +460,7 @@ export function BusinessAssistantEntry() {
               {lang === 'zh' ? '✓ 已保存' : '✓ Saved'}
             </div>
             <div style={{ fontSize: 12.5, color: TEXT }}>{lang === 'zh' ? '已上传到 Google Drive' : 'Uploaded to Google Drive'}：{uploadedFile.name}</div>
+            <div style={{ fontSize: 12.5, color: TEXT, marginBottom: 4 }}>{lang === 'zh' ? '位置：' : 'Location: '}{uploadedFile.folderName}</div>
             <a href={uploadedFile.driveUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11.5, color: GOLD }}>
               {lang === 'zh' ? '查看文件 →' : 'View file →'}
             </a>
@@ -425,7 +537,13 @@ export function BusinessAssistantEntry() {
                             style={{ fontSize: 12, padding: '2px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORD}`, color: TEXT }}
                           >
                             {ALL_BUSINESS_AREAS.map((a) => (
-                              <option key={a} value={a}>{lang === 'zh' ? BUSINESS_AREA_LABEL_ZH[a] : BUSINESS_AREA_LABEL[a]}</option>
+                              // Explicit per-option background+color — the native options
+                              // popup does not reliably inherit the <select>'s own dark
+                              // background in Chrome/Edge (it defaults to a light system
+                              // popup), which left light gold text on a light background
+                              // almost unreadable. Each <option> setting its own colors is
+                              // the standard cross-browser fix, not a full dropdown rebuild.
+                              <option key={a} value={a} style={{ background: '#0B1220', color: '#F2F2F2' }}>{lang === 'zh' ? BUSINESS_AREA_LABEL_ZH[a] : BUSINESS_AREA_LABEL[a]}</option>
                             ))}
                           </select>
                         </div>
