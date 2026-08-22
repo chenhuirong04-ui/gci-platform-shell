@@ -31,6 +31,12 @@ import type { CrmCustomer } from './crmSupabase';
 
 const CAPTURABLE = new Set(['NEW_CUSTOMER', 'CRM_FOLLOWUP', 'BUSINESS_TODO', 'COMMITMENT', 'DECISION', 'BUSINESS_MEMORY']);
 
+export interface PendingDriveFolderCreate {
+  folderName: string | null; // null = GIA still needs to ask for a name
+  parentName: string; // display only, e.g. "My Drive"
+  parentId: string; // real Drive folder id ('root' for My Drive)
+}
+
 export interface GiaRouterState {
   currentCustomer: CrmCustomer | null;
   setFileSearchReply: (v: string | null) => void;
@@ -40,6 +46,11 @@ export interface GiaRouterState {
   setCaptureDone: (v: Set<number>) => void;
   setPendingTaskLifecycle: (v: { action: 'completed' | 'cancelled'; matches: ExecutiveTask[] } | null) => void;
   setPendingTaskReschedule: (v: { whenPhrase: string; resolvedDate: string | null; matches: ExecutiveTask[] } | null) => void;
+  // Optional: only Home (BusinessAssistantEntry.tsx) wires this up this
+  // round. tryDriveCreateFolderCommand no-ops (falls through to the old
+  // router) for any caller that doesn't provide it, so this is additive —
+  // it can't break /business-assistant's existing behavior.
+  setPendingDriveFolderCreate?: (v: PendingDriveFolderCreate | null) => void;
 }
 
 // Task 16 §18 — "肯尼亚保姆这个事情完成了。" Checked before capture
@@ -86,6 +97,60 @@ export async function tryFileSearch(text: string): Promise<string | null> {
     return `GIA 文件库中暂未登记，但在 Drive 中找到：\n${lines.join('\n')}`;
   }
   return null;
+}
+
+// GIA Drive folder creation regression fix — "在谷歌云新建一个文件夹" /
+// "新建 HIGHWAYGLOBAL 文件夹" / "Create HIGHWAYGLOBAL folder" were falling
+// through to classify-capture (no intent existed for this at all — this is
+// the missing piece, not a broken one) and being misclassified as
+// BUSINESS_TODO, "saving" the sentence as a to-do while Drive itself never
+// received a create-folder call. Checked BEFORE Planner V3/classify-capture
+// below so an explicit "create a folder" instruction always wins the race
+// against generic AI classification. Rule-based only, no AI call.
+//
+// Future/reminder phrasing ("下周提醒我...建一个文件夹") is deliberately
+// excluded here — that IS a real to-do (do it later), not an instruction to
+// create a folder right now, so it's left to fall through to the normal
+// BUSINESS_TODO capture router unchanged.
+const DRIVE_FOLDER_REMINDER_RE = /提醒我|记得|到时候|以后再|改天|下周|下个月|明天|后天/u;
+const DRIVE_FOLDER_ZH_TRIGGER_RE = /(?:新建|创建|建立|建).{0,10}?(?:文件夹|目录)/u;
+const DRIVE_FOLDER_EN_TRIGGER_RE = /(?:create|make)\s+(?:a\s+)?(?:new\s+)?.{0,30}?(?:folder|directory)\b/iu;
+
+export function looksLikeDriveCreateFolderCommand(text: string): boolean {
+  if (DRIVE_FOLDER_REMINDER_RE.test(text)) return false;
+  return DRIVE_FOLDER_ZH_TRIGGER_RE.test(text) || DRIVE_FOLDER_EN_TRIGGER_RE.test(text);
+}
+
+function isNoisyFolderName(name: string): boolean {
+  const n = name.trim().toLowerCase();
+  if (!n) return true;
+  if (/\b(folder|directory|drive|google|in|on|at|the)\b/.test(n)) return true;
+  if (n.split(/\s+/).length > 4) return true;
+  return false;
+}
+
+export function extractFolderNameFromCreateCommand(text: string): string | null {
+  const calledMatch = text.match(/(?:folder|directory)\s+(?:called|named)\s+([^\s，,。]+(?:\s+[^\s，,。]+){0,2})/iu);
+  if (calledMatch && !isNoisyFolderName(calledMatch[1])) return calledMatch[1].trim();
+
+  const zhMatch = text.match(/(?:新建|创建|建立|建)\s*(?:一个|个)?\s*([^\s，,。]+?)\s*(?:文件夹|目录)/u);
+  if (zhMatch && zhMatch[1] && !/^(?:一个|个)?$/.test(zhMatch[1])) return zhMatch[1].trim();
+
+  const enMatch = text.match(/(?:create|make)\s+(?:a\s+)?(?:new\s+)?([A-Za-z0-9][A-Za-z0-9_-]*)\s+(?:folder|directory)\b/iu);
+  if (enMatch && !isNoisyFolderName(enMatch[1])) return enMatch[1].trim();
+
+  return null;
+}
+
+// folderName is left null when the sentence had no extractable name (e.g.
+// "在谷歌云新建一个文件夹" alone) — the caller must ask before allowing
+// create-folder to run; this function itself never calls the Drive API.
+export async function tryDriveCreateFolderCommand(text: string, state: GiaRouterState): Promise<boolean> {
+  if (!state.setPendingDriveFolderCreate) return false;
+  if (!looksLikeDriveCreateFolderCommand(text)) return false;
+  const folderName = extractFolderNameFromCreateCommand(text);
+  state.setPendingDriveFolderCreate({ folderName, parentName: 'My Drive', parentId: 'root' });
+  return true;
 }
 
 // Task 18.1 — "Chanya今天有多少新用户？" / "今天有人付款吗？" / "Chanya今天
@@ -318,6 +383,11 @@ export async function runGiaCaptureChain(text: string, state: GiaRouterState): P
 
   const searchReply = await tryFileSearch(t);
   if (searchReply) { state.setFileSearchReply(searchReply); return true; }
+
+  // Checked before Chanya/Memory/WhatsApp/QuotePrep/V3/classify-capture —
+  // an explicit "create a Drive folder" instruction must never fall through
+  // to generic AI capture classification (see comment on the function).
+  if (await tryDriveCreateFolderCommand(t, state)) return true;
 
   const chanyaReply = await tryChanyaStatusQuery(t);
   if (chanyaReply) { state.setFileSearchReply(chanyaReply); return true; }

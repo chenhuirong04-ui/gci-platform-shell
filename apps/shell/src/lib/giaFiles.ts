@@ -86,7 +86,7 @@ export function extractCompanyName(text: string): string | null {
 export async function createFolderIfMissing(
   name: string,
   parentId: string,
-): Promise<{ ok: true; folderId: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; folderId: string; webViewLink: string; created: boolean } | { ok: false; error: string }> {
   try {
     const res = await fetch('/api/google/drive-create-folder', {
       method: 'POST',
@@ -95,7 +95,11 @@ export async function createFolderIfMissing(
     });
     const data = await res.json();
     if (!data.ok) return { ok: false, error: data.error || 'Create folder failed' };
-    return { ok: true, folderId: data.folder.id };
+    // api/google/drive-create-folder.ts already returns webViewLink and
+    // `created` (false when an existing folder of the same name/parent was
+    // found instead of making a duplicate) — both were previously discarded
+    // here even though the API already provides them.
+    return { ok: true, folderId: data.folder.id, webViewLink: data.folder.webViewLink, created: !!data.created };
   } catch (e: any) {
     return { ok: false, error: String(e?.message ?? e) };
   }

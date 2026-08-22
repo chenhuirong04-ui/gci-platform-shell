@@ -9,10 +9,10 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
-import { runGiaTopRouter, type GiaRouterState } from '../lib/giaRouter';
+import { runGiaTopRouter, type GiaRouterState, type PendingDriveFolderCreate } from '../lib/giaRouter';
 import { confirmCaptureItem, completeOrCancelTask, rescheduleTask, type ResolvedCaptureItem } from '../lib/businessCapture';
 import { BUSINESS_AREA_LABEL, BUSINESS_AREA_LABEL_ZH, ALL_BUSINESS_AREAS, type ExecutiveTask, type TaskBusinessArea } from '../lib/executiveTasks';
-import { uploadAndRegisterLocalFile, searchDriveFolders, extractCompanyName, DEFAULT_TARGET_FOLDER_ID, DEFAULT_TARGET_FOLDER_NAME, type DriveFolderOption } from '../lib/giaFiles';
+import { uploadAndRegisterLocalFile, searchDriveFolders, extractCompanyName, createFolderIfMissing, DEFAULT_TARGET_FOLDER_ID, DEFAULT_TARGET_FOLDER_NAME, type DriveFolderOption } from '../lib/giaFiles';
 import type { CrmCustomer } from '../lib/crmSupabase';
 
 const GOLD = '#CBA85C';
@@ -102,6 +102,14 @@ export function BusinessAssistantEntry() {
   const [manualCandidates, setManualCandidates] = useState<DriveFolderOption[] | null>(null);
   const [manualSearchBusy, setManualSearchBusy] = useState(false);
   const [manualNotice, setManualNotice] = useState<string | null>(null);
+  // Drive folder creation — a direct tool action, kept fully separate from
+  // pendingCapture/Planner state, same discipline as the file upload flow
+  // above. folderName===null means GIA is still waiting for a name; the
+  // Drive API is never called before an explicit "确认创建" click.
+  const [pendingDriveFolderCreate, setPendingDriveFolderCreate] = useState<PendingDriveFolderCreate | null>(null);
+  const [folderCreateBusy, setFolderCreateBusy] = useState(false);
+  const [folderCreateError, setFolderCreateError] = useState<string | null>(null);
+  const [folderCreated, setFolderCreated] = useState<{ name: string; webViewLink: string; alreadyExisted: boolean } | null>(null);
   // Drag & drop — same pending-file preview as the "上传文件" button, just a
   // second on-ramp into it. dragCounter survives dragenter/dragleave firing
   // on child elements as the pointer moves within the box (a plain boolean
@@ -125,11 +133,19 @@ export function BusinessAssistantEntry() {
       await describeAndRouteFile(v);
       return;
     }
+    // GIA is waiting for a folder name ("在谷歌云新建一个文件夹" with no name
+    // given) — this text answers that, never a Planner/capture command.
+    if (pendingDriveFolderCreate && !pendingDriveFolderCreate.folderName) {
+      setPendingDriveFolderCreate({ ...pendingDriveFolderCreate, folderName: v });
+      setValue('');
+      return;
+    }
     setBusy(true);
     const state: GiaRouterState = {
       currentCustomer: null, // Home has no loaded customer context
       setFileSearchReply, setPendingCapture, setCaptureLoading: setBusy, setCaptureError,
       setCaptureDone, setPendingTaskLifecycle, setPendingTaskReschedule,
+      setPendingDriveFolderCreate,
     };
     const consumed = await runGiaTopRouter(v, state);
     setBusy(false);
@@ -202,6 +218,29 @@ export function BusinessAssistantEntry() {
     const next = [...pendingCapture];
     next[index] = { ...next[index], matchedCustomer: null, candidateCustomers: null, isNewCustomer: true, type: 'NEW_CUSTOMER' };
     setPendingCapture(next);
+  }
+
+  function cancelFolderCreate() {
+    setPendingDriveFolderCreate(null);
+    setFolderCreateError(null);
+  }
+
+  // Real Drive API call — only ever invoked by an explicit "确认创建" click,
+  // never automatically after the name is known. Reuses createFolderIfMissing()
+  // (already existed, already wired to /api/google/drive-create-folder) —
+  // no second create-folder implementation.
+  async function confirmFolderCreate() {
+    if (!pendingDriveFolderCreate?.folderName) return;
+    setFolderCreateBusy(true);
+    setFolderCreateError(null);
+    const res = await createFolderIfMissing(pendingDriveFolderCreate.folderName, pendingDriveFolderCreate.parentId);
+    setFolderCreateBusy(false);
+    if (res.ok) {
+      setFolderCreated({ name: pendingDriveFolderCreate.folderName, webViewLink: res.webViewLink, alreadyExisted: !res.created });
+      setPendingDriveFolderCreate(null);
+    } else {
+      setFolderCreateError(res.error);
+    }
   }
 
   async function handleConfirmTaskLifecycle(taskId: string) {
@@ -425,7 +464,13 @@ export function BusinessAssistantEntry() {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !busy) go(); }}
-            placeholder={selectedFile ? (lang === 'zh' ? '例如：这是 SHADI 的劳务合同' : "Example: This is SHADI's manpower contract") : '问我：MAG现在什么情况？上次报价多少？今天先跟谁？'}
+            placeholder={
+              selectedFile
+                ? (lang === 'zh' ? '例如：这是 SHADI 的劳务合同' : "Example: This is SHADI's manpower contract")
+                : pendingDriveFolderCreate && !pendingDriveFolderCreate.folderName
+                  ? (lang === 'zh' ? '文件夹叫什么名字？例如：HIGHWAYGLOBAL' : 'What should the folder be named? e.g. HIGHWAYGLOBAL')
+                  : '问我：MAG现在什么情况？上次报价多少？今天先跟谁？'
+            }
             style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, padding: '13px 48px 13px 16px', fontSize: 14.5, color: colors.textPrimary, outline: 'none', boxSizing: 'border-box', fontFamily: "'Space Grotesk',sans-serif" }}
             onFocus={(e) => (e.target.style.borderColor = 'rgba(203,168,92,0.45)')}
             onBlur={(e) => (e.target.style.borderColor = 'rgba(255,255,255,0.09)')}
@@ -600,6 +645,67 @@ export function BusinessAssistantEntry() {
             <div style={{ fontSize: 12.5, color: TEXT, marginBottom: 4 }}>{lang === 'zh' ? '位置：' : 'Location: '}{uploadedFile.folderName}</div>
             <a href={uploadedFile.driveUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11.5, color: GOLD }}>
               {lang === 'zh' ? '查看文件 →' : 'View file →'}
+            </a>
+          </div>
+        )}
+
+        {pendingDriveFolderCreate && (
+          <div style={{ marginTop: 14, padding: '14px 16px', background: 'rgba(203,168,92,0.05)', border: `1px solid ${BORD}`, borderRadius: 10 }}>
+            {pendingDriveFolderCreate.folderName === null ? (
+              <>
+                <div style={{ fontSize: 12.5, color: TEXT, marginBottom: 6 }}>
+                  {lang === 'zh' ? '文件夹叫什么名字？' : 'What should the folder be named?'}
+                </div>
+                <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 8 }}>
+                  {lang === 'zh' ? '（在下方输入框回复即可）' : '(reply in the box above)'}
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 12, fontWeight: 700, color: GOLD, marginBottom: 8 }}>
+                  {lang === 'zh' ? '准备创建 Google Drive 文件夹' : 'Ready to create a Google Drive folder'}
+                </div>
+                <div style={{ fontSize: 12.5, color: TEXT, lineHeight: 1.7, marginBottom: 8 }}>
+                  <div>{lang === 'zh' ? '名称：' : 'Name: '}<strong style={{ color: GOLD }}>{pendingDriveFolderCreate.folderName}</strong></div>
+                  <div>{lang === 'zh' ? '位置：' : 'Location: '}{pendingDriveFolderCreate.parentName}</div>
+                </div>
+                {folderCreateError && (
+                  <div style={{ fontSize: 11.5, color: RED, marginBottom: 8 }}>
+                    {lang === 'zh' ? '创建失败，请重试' : 'Failed to create, please try again'}（{folderCreateError}）
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    disabled={folderCreateBusy}
+                    onClick={confirmFolderCreate}
+                    style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#E2C988)`, border: 'none', color: '#080D1E', fontWeight: 700 }}
+                  >
+                    {folderCreateBusy ? (lang === 'zh' ? '创建中…' : 'Creating…') : (lang === 'zh' ? '确认创建' : 'Create')}
+                  </button>
+                  <button
+                    disabled={folderCreateBusy}
+                    onClick={cancelFolderCreate}
+                    style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}
+                  >
+                    {lang === 'zh' ? '取消' : 'Cancel'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {folderCreated && (
+          <div style={{ marginTop: 14, padding: '14px 16px', background: 'rgba(111,191,142,0.06)', border: '1px solid rgba(111,191,142,0.3)', borderRadius: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: GREEN, marginBottom: 4 }}>
+              {lang === 'zh' ? '✓ 文件夹已创建' : '✓ Folder created'}
+            </div>
+            <div style={{ fontSize: 12.5, color: TEXT, marginBottom: 4 }}>
+              {folderCreated.name}
+              {folderCreated.alreadyExisted ? (lang === 'zh' ? '（该文件夹已存在，未重复创建）' : ' (already existed — not duplicated)') : ''}
+            </div>
+            <a href={folderCreated.webViewLink} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11.5, color: GOLD }}>
+              {lang === 'zh' ? '查看文件夹 →' : 'View folder →'}
             </a>
           </div>
         )}
