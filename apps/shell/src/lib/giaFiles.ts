@@ -249,6 +249,39 @@ export async function fetchAndStoreFromUrl(
   }
 }
 
+// GIA Home local file upload entry point — a browser File the user picked
+// via a native file-select dialog (not chat text, not a URL/Drive link).
+// Deliberately skips classifyFileDescription(): no AI, no rule-based
+// classification, no business-area/company guess, no folder routing beyond
+// the existing default intake folder — this is a direct tool action the
+// user explicitly triggered, not something for Planner/GIA to interpret.
+// isCurrent is always false here (unlike fetchAndStoreFromUrl) because
+// there's no real (documentType, companyName) pair to group by — both are
+// unclassified — so this must never demote an unrelated file's "current"
+// flag. Same uploadFileToDrive()/registerFile() pipeline as every other
+// intake source; no second upload service.
+export async function uploadAndRegisterLocalFile(
+  file: File,
+): Promise<{ ok: true; row: GiaFileRegistryRow } | { ok: false; error: string }> {
+  const uploaded = await uploadFileToDrive(file, DEFAULT_TARGET_FOLDER_ID, file.name);
+  if (!uploaded.ok) return uploaded;
+  return registerFile({
+    fileName: file.name,
+    displayName: file.name,
+    documentType: 'other',
+    businessArea: null,
+    companyName: null,
+    customerId: null,
+    driveFileId: uploaded.fileId,
+    driveUrl: uploaded.webViewLink,
+    driveFolder: DEFAULT_TARGET_FOLDER_NAME,
+    isCurrent: false,
+    tags: [],
+    sourceType: 'upload',
+    sourceRef: null,
+  });
+}
+
 // Rule-based search — matches a recognized document type and/or a known
 // company name in the query text, never a raw fuzzy substring search over
 // the whole sentence (keeps false-positive noise out, keeps this a no-op
