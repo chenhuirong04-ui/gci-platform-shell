@@ -313,7 +313,14 @@ export async function getDailyBrief(lang: BriefLang = 'zh'): Promise<{ ok: true;
   const res = await getBossActions();
   if (!res.ok) return res;
 
-  const filtered = res.actions.filter((a) => !looksLikeGenericNotification(a));
+  // Business Brief = boss's business radar, not a second to-do list.
+  // source === 'tasks' (executive_tasks, e.g. "8/24 跟进 SHADI") already has
+  // a name/what/date/status and lives on /tasks + the Home "我的事项" KPI
+  // (both read executive_tasks directly, untouched by this filter) — showing
+  // it again here as a full Brief card was the actual duplication. Excluded
+  // at the source, not swapped for a "3 tasks today" count card: Home's
+  // "我的事项" KPI already owns that reminder job.
+  const filtered = res.actions.filter((a) => !looksLikeGenericNotification(a) && a.source !== 'tasks');
 
   const groups = new Map<string, BossAction[]>();
   for (const a of filtered) {
