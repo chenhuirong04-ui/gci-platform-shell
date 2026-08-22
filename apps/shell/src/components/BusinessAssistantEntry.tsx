@@ -12,7 +12,7 @@ import { useI18n } from '@gci/i18n';
 import { runGiaTopRouter, type GiaRouterState } from '../lib/giaRouter';
 import { confirmCaptureItem, completeOrCancelTask, rescheduleTask, type ResolvedCaptureItem } from '../lib/businessCapture';
 import { BUSINESS_AREA_LABEL, BUSINESS_AREA_LABEL_ZH, ALL_BUSINESS_AREAS, type ExecutiveTask, type TaskBusinessArea } from '../lib/executiveTasks';
-import { uploadAndRegisterLocalFile, searchDriveFolders, DEFAULT_TARGET_FOLDER_ID, DEFAULT_TARGET_FOLDER_NAME, type DriveFolderOption } from '../lib/giaFiles';
+import { uploadAndRegisterLocalFile, searchDriveFolders, extractCompanyName, DEFAULT_TARGET_FOLDER_ID, DEFAULT_TARGET_FOLDER_NAME, type DriveFolderOption } from '../lib/giaFiles';
 import type { CrmCustomer } from '../lib/crmSupabase';
 
 const GOLD = '#CBA85C';
@@ -41,16 +41,22 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// Non-AI, deterministic — mirrors the plain-regex chat command parsers
-// already used elsewhere in GIA (e.g. googleAskGciParsers.ts). Only ever
-// consulted while a file is pending, to pull a folder keyword out of a
-// sentence like "这个传到劳务文件夹" / "传到 Contracts" — never sent to any
-// model, never used to invent a destination that wasn't typed.
-function extractFolderKeyword(text: string): string {
-  const t = text.trim();
-  const m = t.match(/(?:传到|放到|上传到|存到|收纳到|归到)\s*(.+?)\s*(?:文件夹|目录|项目)?$/);
-  if (m && m[1].trim()) return m[1].trim();
-  return t.replace(/(文件夹|目录)$/g, '').trim();
+// Non-AI, deterministic keyword extraction for file routing — V1 per spec:
+// "用户自然语言 + 文件名 → 真实 Drive 搜索", no LLM classification. Prioritizes
+// an entity name (customer/supplier/project, via giaFiles.ts's existing
+// extractCompanyName — same fallback capitalized-word pattern its rule-based
+// file classifier already uses) plus a recognized document-category word.
+// Falls back to the raw description text if neither is found, so a folder
+// search still runs on whatever the user actually typed.
+const ENTITY_HINT_WORDS = ['quotation', 'quote', '报价', 'manpower', 'workforce', '劳务', 'supplier', '供应商', 'contract', '合同', 'project', '项目'];
+
+function extractFileRoutingKeywords(description: string, fileName: string): string {
+  const combined = `${description} ${fileName}`.toLowerCase();
+  const entityName = extractCompanyName(description) || extractCompanyName(fileName);
+  const hint = ENTITY_HINT_WORDS.find((w) => combined.includes(w.toLowerCase()));
+  const parts = [entityName, hint].filter((v): v is string => Boolean(v));
+  if (parts.length > 0) return parts.join(' ');
+  return description.trim() || fileName;
 }
 
 export function BusinessAssistantEntry() {
@@ -74,15 +80,28 @@ export function BusinessAssistantEntry() {
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadedFile, setUploadedFile] = useState<{ name: string; driveUrl: string; folderName: string } | null>(null);
-  // Target Drive folder for the pending upload — defaults to the existing
-  // GIA intake folder. Only ever set to a real folder returned by
-  // searchDriveFolders() (button search or a chat-typed instruction), never
-  // guessed/invented (no Customers/Suppliers/Contracts-style routing).
+  // File routing — "用户负责告诉 GIA 文件是什么；GIA 负责记/找目录":
+  //   describe  -> user types what the file is / who it belongs to
+  //   suggested -> a single real Drive folder was found (or manually picked)
+  //   candidates-> 2-5 real Drive folders matched, user must pick one
+  //   no_match  -> nothing reliable matched; defaults to the Inbox
+  // selectedFolder is the one real target that will actually be used on
+  // upload — always has a value (defaults to the existing GIA intake
+  // folder), only ever set to a real folder searchDriveFolders() returned.
+  type UploadPhase = 'describe' | 'suggested' | 'candidates' | 'no_match';
+  const [uploadPhase, setUploadPhase] = useState<UploadPhase>('describe');
+  const [fileDescription, setFileDescription] = useState('');
+  const [describeBusy, setDescribeBusy] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState<{ id: string; name: string }>({ id: DEFAULT_TARGET_FOLDER_ID, name: DEFAULT_TARGET_FOLDER_NAME });
-  const [folderQuery, setFolderQuery] = useState('');
-  const [folderCandidates, setFolderCandidates] = useState<DriveFolderOption[] | null>(null);
-  const [folderSearchBusy, setFolderSearchBusy] = useState(false);
-  const [folderNotice, setFolderNotice] = useState<string | null>(null);
+  const [describeCandidates, setDescribeCandidates] = useState<DriveFolderOption[] | null>(null);
+  // Manual Folder Picker — fallback only, per spec: "只有用户不接受 GIA 推荐
+  // 时才打开真实 Folder Picker". Reads the same real Drive search as the
+  // automatic routing above; just a second, explicit entry point into it.
+  const [manualPickerOpen, setManualPickerOpen] = useState(false);
+  const [manualQuery, setManualQuery] = useState('');
+  const [manualCandidates, setManualCandidates] = useState<DriveFolderOption[] | null>(null);
+  const [manualSearchBusy, setManualSearchBusy] = useState(false);
+  const [manualNotice, setManualNotice] = useState<string | null>(null);
   // Drag & drop — same pending-file preview as the "上传文件" button, just a
   // second on-ramp into it. dragCounter survives dragenter/dragleave firing
   // on child elements as the pointer moves within the box (a plain boolean
@@ -94,15 +113,16 @@ export function BusinessAssistantEntry() {
   async function go() {
     const v = value.trim();
     if (!v) { navigate('/business-assistant'); return; }
-    // A file preview is showing — this text is a folder instruction for the
-    // pending upload, never a Planner/capture command. This is the actual
-    // root-cause fix for the "上传文件" BUSINESS_TODO bug: text typed while a
-    // file is pending must never reach classify-capture/runGiaTopRouter —
-    // it was falling through to normal chat capture classification before,
-    // which is exactly how a to-do titled after the upload text got created.
+    // A file is pending — ANY submitted text here means "what/whose file is
+    // this", never a Planner/capture command. This guard is what forecloses
+    // the "上传文件" BUSINESS_TODO bug: text typed while a file preview is
+    // showing must never reach classify-capture/runGiaTopRouter, regardless
+    // of whether the user typed into this top box or the preview card's own
+    // description field below — both feed the exact same non-AI routing.
     if (selectedFile) {
-      await runFolderSearch(v);
+      setFileDescription(v);
       setValue('');
+      await describeAndRouteFile(v);
       return;
     }
     setBusy(true);
@@ -201,12 +221,16 @@ export function BusinessAssistantEntry() {
     setUploadError(null);
     setUploadedFile(null);
     setSelectedFile(f);
-    // Reset folder state to the default intake folder for each new file —
-    // never carry a previous file's picked folder over to this one.
+    // Reset the whole routing flow to its starting phase for each new file —
+    // never carry a previous file's description/suggestion over to this one.
+    setUploadPhase('describe');
+    setFileDescription('');
     setSelectedFolder({ id: DEFAULT_TARGET_FOLDER_ID, name: DEFAULT_TARGET_FOLDER_NAME });
-    setFolderCandidates(null);
-    setFolderNotice(null);
-    setFolderQuery('');
+    setDescribeCandidates(null);
+    setManualPickerOpen(false);
+    setManualQuery('');
+    setManualCandidates(null);
+    setManualNotice(null);
     // Clear any leftover Planner/capture confirm card — a stale pendingCapture
     // from an earlier, unrelated chat message rendering below the new upload
     // card is exactly what made an old classification (e.g. a BUSINESS_TODO
@@ -218,34 +242,67 @@ export function BusinessAssistantEntry() {
     setFileSearchReply(null);
   }
 
-  async function runFolderSearch(rawText: string) {
-    const keyword = extractFolderKeyword(rawText);
-    if (!keyword) return;
-    setFolderSearchBusy(true);
-    setFolderNotice(null);
+  // The core routing step: "用户自然语言 + 文件名 → 真实 Drive 搜索 → 推荐".
+  // No AI call — extractFileRoutingKeywords() is pure regex/keyword matching,
+  // searchDriveFolders() is the same real Drive search the manual picker
+  // below also uses. Never generates a task/BUSINESS_TODO — this text is
+  // only ever used to pick a folder.
+  async function describeAndRouteFile(description: string) {
+    if (!selectedFile || !description.trim()) return;
+    setDescribeBusy(true);
+    setDescribeCandidates(null);
+    const keyword = extractFileRoutingKeywords(description, selectedFile.name);
     const results = await searchDriveFolders(keyword);
-    setFolderSearchBusy(false);
+    setDescribeBusy(false);
     if (results.length === 0) {
-      setFolderCandidates(null);
-      setFolderNotice(
-        lang === 'zh'
-          ? `未找到匹配"${keyword}"的文件夹，已保持默认 ${DEFAULT_TARGET_FOLDER_NAME}`
-          : `No folder matched "${keyword}" — kept the default ${DEFAULT_TARGET_FOLDER_NAME}`,
-      );
+      setSelectedFolder({ id: DEFAULT_TARGET_FOLDER_ID, name: DEFAULT_TARGET_FOLDER_NAME });
+      setUploadPhase('no_match');
     } else if (results.length === 1) {
       setSelectedFolder({ id: results[0].id, name: results[0].name });
-      setFolderCandidates(null);
-      setFolderNotice(null);
+      setUploadPhase('suggested');
     } else {
-      setFolderCandidates(results);
-      setFolderNotice(null);
+      setDescribeCandidates(results.slice(0, 5));
+      setUploadPhase('candidates');
     }
   }
 
-  function pickFolderCandidate(f: DriveFolderOption) {
+  function pickDescribeCandidate(f: DriveFolderOption) {
     setSelectedFolder({ id: f.id, name: f.name });
-    setFolderCandidates(null);
-    setFolderNotice(null);
+    setDescribeCandidates(null);
+    setUploadPhase('suggested');
+  }
+
+  // Fallback only — opened by "修改位置"/"Change location" when the user
+  // doesn't accept GIA's suggestion. Same real Drive search, just a manual,
+  // explicit second entry point into it.
+  function openManualPicker() {
+    setManualPickerOpen(true);
+    setManualQuery('');
+    setManualCandidates(null);
+    setManualNotice(null);
+  }
+
+  async function runManualFolderSearch() {
+    const q = manualQuery.trim();
+    if (!q) return;
+    setManualSearchBusy(true);
+    setManualNotice(null);
+    const results = await searchDriveFolders(q);
+    setManualSearchBusy(false);
+    if (results.length === 0) {
+      setManualCandidates(null);
+      setManualNotice(lang === 'zh' ? `未找到匹配"${q}"的文件夹` : `No folder matched "${q}"`);
+    } else {
+      setManualCandidates(results.slice(0, 5));
+    }
+  }
+
+  function pickManualFolderCandidate(f: DriveFolderOption) {
+    setSelectedFolder({ id: f.id, name: f.name });
+    setUploadPhase('suggested');
+    setManualPickerOpen(false);
+    setManualCandidates(null);
+    setManualNotice(null);
   }
 
   function handleFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
@@ -293,8 +350,12 @@ export function BusinessAssistantEntry() {
     setSelectedFile(null);
     setUploadError(null);
     setMultiDropNotice(false);
-    setFolderCandidates(null);
-    setFolderNotice(null);
+    setUploadPhase('describe');
+    setFileDescription('');
+    setDescribeCandidates(null);
+    setManualPickerOpen(false);
+    setManualCandidates(null);
+    setManualNotice(null);
   }
 
   async function confirmFileUpload() {
@@ -307,6 +368,10 @@ export function BusinessAssistantEntry() {
     if (res.ok) {
       setUploadedFile({ name: selectedFile.name, driveUrl: res.row.drive_url, folderName: selectedFolder.name });
       setSelectedFile(null);
+      setUploadPhase('describe');
+      setFileDescription('');
+      setDescribeCandidates(null);
+      setManualPickerOpen(false);
     } else {
       setUploadError(res.error);
     }
@@ -348,7 +413,7 @@ export function BusinessAssistantEntry() {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !busy) go(); }}
-            placeholder={selectedFile ? (lang === 'zh' ? '这个传到哪个文件夹？例如：传到劳务文件夹' : 'Which folder? e.g. "send to Contracts"') : '问我：MAG现在什么情况？上次报价多少？今天先跟谁？'}
+            placeholder={selectedFile ? (lang === 'zh' ? '例如：这是 SHADI 的劳务合同' : "Example: This is SHADI's manpower contract") : '问我：MAG现在什么情况？上次报价多少？今天先跟谁？'}
             style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, padding: '13px 48px 13px 16px', fontSize: 14.5, color: colors.textPrimary, outline: 'none', boxSizing: 'border-box', fontFamily: "'Space Grotesk',sans-serif" }}
             onFocus={(e) => (e.target.style.borderColor = 'rgba(203,168,92,0.45)')}
             onBlur={(e) => (e.target.style.borderColor = 'rgba(255,255,255,0.09)')}
@@ -391,56 +456,116 @@ export function BusinessAssistantEntry() {
                 {lang === 'zh' ? '一次请上传一个文件，已选择第一个文件' : 'Please upload one file at a time — the first file was selected'}
               </div>
             )}
-            <div style={{ fontSize: 12.5, color: TEXT, lineHeight: 1.7 }}>
+            <div style={{ fontSize: 12.5, color: TEXT, lineHeight: 1.7, marginBottom: 8 }}>
               <div>{lang === 'zh' ? '文件：' : 'File: '}{selectedFile.name}</div>
               <div>{lang === 'zh' ? '大小：' : 'Size: '}{formatFileSize(selectedFile.size)}</div>
-              <div>{lang === 'zh' ? '目标文件夹：' : 'Destination folder: '}<strong style={{ color: GOLD }}>{selectedFolder.name}</strong></div>
             </div>
 
-            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-              <input
-                value={folderQuery}
-                onChange={(e) => setFolderQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); runFolderSearch(folderQuery); } }}
-                placeholder={lang === 'zh' ? '搜索文件夹' : 'Search folders'}
-                style={{ flex: 1, fontSize: 12, padding: '5px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: TEXT, outline: 'none' }}
-              />
-              <button
-                disabled={folderSearchBusy || !folderQuery.trim()}
-                onClick={() => runFolderSearch(folderQuery)}
-                style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}
-              >
-                {folderSearchBusy ? (lang === 'zh' ? '搜索中…' : 'Searching…') : (lang === 'zh' ? '选择文件夹' : 'Select folder')}
-              </button>
-            </div>
-
-            {folderCandidates && (
-              <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {folderCandidates.map((f) => (
-                  <button key={f.id} onClick={() => pickFolderCandidate(f)} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
-                    {f.name}
+            {uploadPhase === 'describe' && (
+              <>
+                <div style={{ fontSize: 12.5, color: TEXT, marginBottom: 6 }}>
+                  {lang === 'zh' ? '告诉 GIA 这份文件属于谁 / 是什么资料：' : 'Tell GIA what this file is or who it belongs to:'}
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    value={fileDescription}
+                    onChange={(e) => setFileDescription(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); describeAndRouteFile(fileDescription); } }}
+                    placeholder={lang === 'zh' ? '例如：这是 SHADI 的劳务合同' : "Example: This is SHADI's manpower contract"}
+                    style={{ flex: 1, fontSize: 12.5, padding: '7px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: TEXT, outline: 'none' }}
+                  />
+                  <button
+                    disabled={describeBusy || !fileDescription.trim()}
+                    onClick={() => describeAndRouteFile(fileDescription)}
+                    style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#E2C988)`, border: 'none', color: '#080D1E', fontWeight: 700 }}
+                  >
+                    {describeBusy ? (lang === 'zh' ? '搜索中…' : 'Searching…') : (lang === 'zh' ? '继续' : 'Continue')}
                   </button>
-                ))}
+                </div>
+              </>
+            )}
+
+            {uploadPhase === 'candidates' && describeCandidates && (
+              <>
+                <div style={{ fontSize: 12.5, color: TEXT, marginBottom: 6 }}>
+                  {lang === 'zh' ? '我找到几个可能的位置：' : 'I found a few possible locations:'}
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {describeCandidates.map((f) => (
+                    <button key={f.id} onClick={() => pickDescribeCandidate(f)} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
+                      {f.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {(uploadPhase === 'suggested' || uploadPhase === 'no_match') && (
+              <>
+                <div style={{ fontSize: 12.5, color: TEXT, marginBottom: 8 }}>
+                  {uploadPhase === 'no_match'
+                    ? (lang === 'zh' ? '未找到明确对应目录。建议：' : 'No clear matching folder found. Suggested: ')
+                    : (lang === 'zh' ? '建议位置：' : 'Suggested location: ')}
+                  <strong style={{ color: GOLD }}>{selectedFolder.name}</strong>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    disabled={uploadBusy}
+                    onClick={confirmFileUpload}
+                    style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#E2C988)`, border: 'none', color: '#080D1E', fontWeight: 700 }}
+                  >
+                    {uploadBusy
+                      ? (lang === 'zh' ? '上传中…' : 'Uploading…')
+                      : uploadPhase === 'no_match'
+                        ? (lang === 'zh' ? '先存 Inbox' : 'Store in Inbox')
+                        : (lang === 'zh' ? '确认上传' : 'Upload')}
+                  </button>
+                  <button
+                    disabled={uploadBusy}
+                    onClick={openManualPicker}
+                    style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}
+                  >
+                    {uploadPhase === 'no_match'
+                      ? (lang === 'zh' ? '选择其他位置' : 'Choose other location')
+                      : (lang === 'zh' ? '修改位置' : 'Change location')}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {manualPickerOpen && (
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${BORD}` }}>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    value={manualQuery}
+                    onChange={(e) => setManualQuery(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); runManualFolderSearch(); } }}
+                    placeholder={lang === 'zh' ? '搜索文件夹' : 'Search folders'}
+                    style={{ flex: 1, fontSize: 12, padding: '5px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: TEXT, outline: 'none' }}
+                  />
+                  <button
+                    disabled={manualSearchBusy || !manualQuery.trim()}
+                    onClick={runManualFolderSearch}
+                    style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}
+                  >
+                    {manualSearchBusy ? (lang === 'zh' ? '搜索中…' : 'Searching…') : (lang === 'zh' ? '选择文件夹' : 'Select folder')}
+                  </button>
+                </div>
+                {manualCandidates && (
+                  <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {manualCandidates.map((f) => (
+                      <button key={f.id} onClick={() => pickManualFolderCandidate(f)} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
+                        {f.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {manualNotice && <div style={{ marginTop: 6, fontSize: 11.5, color: MUTED }}>{manualNotice}</div>}
               </div>
             )}
 
-            {folderNotice && (
-              <div style={{ marginTop: 6, fontSize: 11.5, color: MUTED }}>{folderNotice}</div>
-            )}
-
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button
-                disabled={uploadBusy}
-                onClick={confirmFileUpload}
-                style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#E2C988)`, border: 'none', color: '#080D1E', fontWeight: 700 }}
-              >
-                {uploadBusy ? (lang === 'zh' ? '上传中…' : 'Uploading…') : (lang === 'zh' ? '确认上传' : 'Upload')}
-              </button>
-              <button
-                disabled={uploadBusy}
-                onClick={cancelFileUpload}
-                style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}
-              >
+            <div style={{ marginTop: 10 }}>
+              <button onClick={cancelFileUpload} style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
                 {lang === 'zh' ? '取消' : 'Cancel'}
               </button>
             </div>
