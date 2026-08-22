@@ -5,14 +5,18 @@
 // A plain name/company lookup (nothing else matched) is the one case Home
 // hands off to /business-assistant?customer=, since Home has no Customer-360
 // view of its own to show the result in.
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
 import { runGiaTopRouter, type GiaRouterState, type PendingDriveFolderCreate } from '../lib/giaRouter';
 import { confirmCaptureItem, completeOrCancelTask, rescheduleTask, type ResolvedCaptureItem } from '../lib/businessCapture';
 import { BUSINESS_AREA_LABEL, BUSINESS_AREA_LABEL_ZH, ALL_BUSINESS_AREAS, type ExecutiveTask, type TaskBusinessArea } from '../lib/executiveTasks';
-import { uploadAndRegisterLocalFile, searchDriveFolders, extractCompanyName, createFolderIfMissing, DEFAULT_TARGET_FOLDER_ID, DEFAULT_TARGET_FOLDER_NAME, type DriveFolderOption } from '../lib/giaFiles';
+import { uploadAndRegisterLocalFile, searchDriveFolders, extractCompanyName, createFolderIfMissing, getDriveFolderName, DEFAULT_TARGET_FOLDER_ID, DEFAULT_TARGET_FOLDER_NAME, type DriveFolderOption } from '../lib/giaFiles';
+import {
+  findDriveFolderMemory, rememberDriveFolder, findBusinessAreaMemory, rememberBusinessArea, touchMemory, markMemoryStale,
+  type DriveFolderMemoryValue, type BusinessAreaMemoryValue,
+} from '../lib/giaMemory';
 import type { CrmCustomer } from '../lib/crmSupabase';
 
 const GOLD = '#CBA85C';
@@ -110,6 +114,40 @@ export function BusinessAssistantEntry() {
   const [folderCreateBusy, setFolderCreateBusy] = useState(false);
   const [folderCreateError, setFolderCreateError] = useState<string | null>(null);
   const [folderCreated, setFolderCreated] = useState<{ name: string; webViewLink: string; alreadyExisted: boolean } | null>(null);
+  // GIA Memory V1 — pre-fills each fresh BUSINESS_TODO's business area from
+  // a remembered mapping (outranking Planner's own guess for this session,
+  // per the read-only design's lookup priority), while leaving the
+  // dropdown fully editable — this is a suggestion, never a locked value.
+  // memoryAppliedRef dedupes by array identity so this never loops: our own
+  // setPendingCapture(next) call below is marked "already processed" before
+  // it re-triggers the effect.
+  const memoryAppliedRef = useRef<ResolvedCaptureItem[] | null>(null);
+  useEffect(() => {
+    if (!pendingCapture || pendingCapture === memoryAppliedRef.current) return;
+    memoryAppliedRef.current = pendingCapture;
+    (async () => {
+      let changed = false;
+      const next = [...pendingCapture];
+      for (let i = 0; i < next.length; i++) {
+        const item = next[i];
+        if (item.type !== 'BUSINESS_TODO') continue;
+        const entityKey = extractCompanyName(item.raw.todo_title || item.raw.raw_fragment);
+        if (!entityKey) continue;
+        const memory = await findBusinessAreaMemory(entityKey);
+        if (!memory) continue;
+        const value = memory.value_json as BusinessAreaMemoryValue;
+        if (value.businessArea && value.businessArea !== item.raw.todo_business_area) {
+          next[i] = { ...item, raw: { ...item.raw, todo_business_area: value.businessArea as TaskBusinessArea } };
+          changed = true;
+          touchMemory(memory.id);
+        }
+      }
+      if (changed) {
+        memoryAppliedRef.current = next;
+        setPendingCapture(next);
+      }
+    })();
+  }, [pendingCapture]);
   // Drag & drop — same pending-file preview as the "上传文件" button, just a
   // second on-ramp into it. dragCounter survives dragenter/dragleave firing
   // on child elements as the pointer moves within the box (a plain boolean
@@ -158,14 +196,39 @@ export function BusinessAssistantEntry() {
     setValue('');
   }
 
+  // GIA Memory V1 — the confirm click is the only trigger that writes
+  // business_area memory (never the Planner guess, never the pre-fill
+  // suggestion alone). Compared against whatever's currently remembered:
+  // matches an existing memory -> 'user_confirmation' (endorsing it as
+  // still correct); differs from (or there was no) existing memory ->
+  // 'user_correction'/first-time confirmation. Silently no-ops for items
+  // with no extractable entity name — never guesses a key.
+  async function learnBusinessAreaFromConfirmedItem(item: ResolvedCaptureItem) {
+    if (item.type !== 'BUSINESS_TODO') return;
+    const entityKey = extractCompanyName(item.raw.todo_title || item.raw.raw_fragment);
+    if (!entityKey) return;
+    const confirmedArea = item.raw.todo_business_area ?? 'OTHER';
+    const existing = await findBusinessAreaMemory(entityKey);
+    const existingArea = existing ? (existing.value_json as BusinessAreaMemoryValue).businessArea : null;
+    if (existingArea === confirmedArea) {
+      if (existing) touchMemory(existing.id);
+      return;
+    }
+    await rememberBusinessArea(entityKey, { businessArea: confirmedArea }, existingArea ? 'user_correction' : 'user_confirmation');
+  }
+
   async function handleConfirmItem(index: number) {
     if (!pendingCapture) return;
     const item = pendingCapture[index];
     setCaptureBusy(index);
     const res = await confirmCaptureItem(item);
     setCaptureBusy(null);
-    if (res.ok) setCaptureDone((prev) => new Set(prev).add(index));
-    else setCaptureError(res.error);
+    if (res.ok) {
+      setCaptureDone((prev) => new Set(prev).add(index));
+      await learnBusinessAreaFromConfirmedItem(item);
+    } else {
+      setCaptureError(res.error);
+    }
   }
 
   async function handleConfirmAll() {
@@ -179,7 +242,7 @@ export function BusinessAssistantEntry() {
       if (pendingCapture[i].needsContent) continue;
       if (pendingCapture[i].crmNoMatchBlocked) continue;
       const res = await confirmCaptureItem(pendingCapture[i]);
-      if (res.ok) newlyDone.add(i);
+      if (res.ok) { newlyDone.add(i); await learnBusinessAreaFromConfirmedItem(pendingCapture[i]); }
       else { setCaptureError(res.error); break; }
     }
     setCaptureDone(newlyDone);
@@ -290,6 +353,29 @@ export function BusinessAssistantEntry() {
     if (!selectedFile || !description.trim()) return;
     setDescribeBusy(true);
     setDescribeCandidates(null);
+
+    // GIA Memory V1 — a real entity the user has confirmed a Drive folder
+    // for before outranks a fresh search (priority: this-turn instruction >
+    // memory > real search). Never trusted blindly: the remembered folder
+    // is re-verified against Drive itself before being recommended, and a
+    // folder that's gone is retired instead of recommended forever.
+    const entityKey = extractCompanyName(description) || extractCompanyName(selectedFile.name);
+    if (entityKey) {
+      const memory = await findDriveFolderMemory(entityKey);
+      if (memory) {
+        const value = memory.value_json as DriveFolderMemoryValue;
+        const realName = await getDriveFolderName(value.folderId);
+        if (realName) {
+          touchMemory(memory.id);
+          setSelectedFolder({ id: value.folderId, name: realName });
+          setUploadPhase('suggested');
+          setDescribeBusy(false);
+          return;
+        }
+        await markMemoryStale(memory.id);
+      }
+    }
+
     const keyword = extractFileRoutingKeywords(description, selectedFile.name);
     const results = await searchDriveFolders(keyword);
     setDescribeBusy(false);
@@ -418,6 +504,14 @@ export function BusinessAssistantEntry() {
       // (verified real parent), not the pre-upload selectedFolder guess —
       // this is what the success card must show.
       setUploadedFile({ name: selectedFile.name, driveUrl: res.row.drive_url, folderName: res.actualFolderName });
+      // GIA Memory V1 — this explicit "确认上传" click is exactly the
+      // trigger the design calls for: only a real, user-confirmed
+      // destination is ever remembered, never a guess or a search result
+      // alone. Keyed off the same entity extraction used for routing above.
+      const entityKey = extractCompanyName(fileDescription) || extractCompanyName(selectedFile.name);
+      if (entityKey) {
+        await rememberDriveFolder(entityKey, { folderId: selectedFolder.id, folderName: res.actualFolderName }, 'user_confirmation');
+      }
       setSelectedFile(null);
       setUploadPhase('describe');
       setFileDescription('');
