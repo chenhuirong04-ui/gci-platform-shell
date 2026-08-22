@@ -33,6 +33,16 @@ export interface BossAction {
   // executive_tasks.business_area); used to bucket Business To-Do items
   // into the Home "当前业务事项结构" categories (e.g. WORKFORCE → 劳务).
   business_area?: string | null;
+  // title/summary above are Chinese-only by this file's own convention
+  // (see dailyBrief.ts's factFor comment) — dailyBrief.ts's English mode
+  // normally just falls back to the raw (Chinese) title/summary text for
+  // every action_type, which is fine for CRM/quotation items where
+  // related_customer is a real customer name (language-neutral), but would
+  // leak Chinese for an aggregate item with no related_customer. Only
+  // action_type 'receivables_overdue'/'receivables_due_soon' set these —
+  // every other action_type is untouched and keeps its existing behavior.
+  enTitle?: string;
+  enSummary?: string;
 }
 
 async function safeFetchJson<T = any>(url: string): Promise<T | { ok: false; error: string }> {
@@ -99,6 +109,7 @@ async function fetchBossActions(): Promise<
     quotationFollowups,
     invoiceSummary,
     inventoryAlerts,
+    receivablesSummary,
     decisionFollowThrough,
     commitmentActions,
     miaStatus,
@@ -114,6 +125,7 @@ async function fetchBossActions(): Promise<
     safeFetchJson<any>(`${base()}/api/trade/check-quotation-followups`),
     safeFetchJson<any>(`${base()}/api/invoice/pending-summary`),
     safeFetchJson<any>(`${base()}/api/trade/check-inventory`),
+    safeFetchJson<any>(`${base()}/api/bs/receivables-brief-summary`),
     getDecisionFollowThroughActions(),
     getOpenCommitmentActions(),
     withTimeout(getMiaStatus(), SLOW_SOURCE_TIMEOUT_MS, { ok: false, status: 'no_data', error: 'timeout' } as any),
@@ -274,6 +286,69 @@ async function fetchBossActions(): Promise<
       action_type: 'inventory_alert',
       deep_link: '/trade?tab=inventory',
     });
+  }
+
+  // ── 4.6 Company Services Receivables (AR) — only service_receivables/
+  // service_payments (Business Solutions module). Trade invoicing
+  // (invoice_drafts) has no due_date/paid/overdue fields and is out of
+  // scope here — see api/bs/receivables-brief-summary.ts. At most one
+  // overdue card + one due-soon card (never one row per receivable), so
+  // this never turns the Brief into a financial statement. ──────────────
+  if (receivablesSummary && receivablesSummary.ok) {
+    const fmtCurrencyTotals = (byCurrency: { currency: string; totalOutstanding: number }[]) =>
+      byCurrency.map((c) => `${c.currency} ${c.totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`).join(' + ');
+
+    const fmt2 = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const ov = receivablesSummary.overdue;
+    if (ov && ov.count > 0) {
+      const worstLine = ov.worst
+        ? `，逾期最长：${ov.worst.customer_name}（${ov.worst.daysOverdue}天，${ov.worst.currency} ${fmt2(ov.worst.outstanding_amount)}）`
+        : '';
+      const worstLineEn = ov.worst
+        ? ` Longest overdue: ${ov.worst.customer_name} (${ov.worst.daysOverdue} days, ${ov.worst.currency} ${fmt2(ov.worst.outstanding_amount)}).`
+        : '';
+      actions.push({
+        id: 'receivables-overdue',
+        source: 'business',
+        category: 'Receivables',
+        title: `${ov.count} 笔企业服务应收已逾期`,
+        summary: `合计 ${fmtCurrencyTotals(ov.byCurrency)} 已逾期${worstLine}`,
+        enTitle: `${ov.count} Company Services receivable${ov.count > 1 ? 's' : ''} overdue`,
+        enSummary: `${ov.count} Company Services receivable${ov.count > 1 ? 's' : ''} totaling ${fmtCurrencyTotals(ov.byCurrency)} ${ov.count > 1 ? 'are' : 'is'} overdue.${worstLineEn}`,
+        priority: 'P1',
+        due_at: null,
+        related_customer: null,
+        related_system: null,
+        action_type: 'receivables_overdue',
+        deep_link: '/business-solutions',
+      });
+    }
+
+    const ds = receivablesSummary.dueSoon;
+    if (ds && ds.count > 0) {
+      const soonestLine = ds.soonest
+        ? `，最近一笔：${ds.soonest.customer_name}（${ds.soonest.daysUntilDue === 0 ? '今日到期' : `${ds.soonest.daysUntilDue}天内到期`}，${ds.soonest.currency} ${fmt2(ds.soonest.outstanding_amount)}）`
+        : '';
+      const soonestLineEn = ds.soonest
+        ? ` Soonest: ${ds.soonest.customer_name} (${ds.soonest.daysUntilDue === 0 ? 'due today' : `due in ${ds.soonest.daysUntilDue} days`}, ${ds.soonest.currency} ${fmt2(ds.soonest.outstanding_amount)}).`
+        : '';
+      actions.push({
+        id: 'receivables-due-soon',
+        source: 'business',
+        category: 'Receivables',
+        title: `${ds.count} 笔企业服务应收将在 ${ds.dueSoonDays} 天内到期`,
+        summary: `合计 ${fmtCurrencyTotals(ds.byCurrency)}${soonestLine}`,
+        enTitle: `${ds.count} Company Services receivable${ds.count > 1 ? 's' : ''} due within ${ds.dueSoonDays} days`,
+        enSummary: `${ds.count} Company Services receivable${ds.count > 1 ? 's' : ''} totaling ${fmtCurrencyTotals(ds.byCurrency)} due within ${ds.dueSoonDays} days.${soonestLineEn}`,
+        priority: 'P2',
+        due_at: ds.soonest ? ds.soonest.due_date : null,
+        related_customer: null,
+        related_system: null,
+        action_type: 'receivables_due_soon',
+        deep_link: '/business-solutions',
+      });
+    }
   }
 
   // ── 5. Systems Registry ──────────────────────────────────────────────

@@ -186,6 +186,8 @@ function whyItMatters(a: BossAction, lang: BriefLang): string {
       case 'calendar_meeting': return 'The meeting is about to start.';
       case 'inventory_alert': return 'May affect delivery or cash flow.';
       case 'invoice_review': return 'An invoice is stuck in approval, slowing down collections.';
+      case 'receivables_overdue': return 'Overdue receivables may affect cash flow — worth confirming payment status.';
+      case 'receivables_due_soon': return 'A reminder before it becomes overdue.';
       case 'agent_decision': return 'Needs your decision on whether to keep this asset.';
       case 'agent_warning': return 'Watch whether this affects normal operation.';
       case 'systems_review': case 'systems_audit': return systemReviewText(a, lang).why;
@@ -208,6 +210,8 @@ function whyItMatters(a: BossAction, lang: BriefLang): string {
     case 'calendar_meeting': return '会议即将开始';
     case 'inventory_alert': return '可能影响交付或现金流';
     case 'invoice_review': return '发票卡在审批，影响回款节奏';
+    case 'receivables_overdue': return '逾期应收可能影响现金流，应优先确认客户付款状态';
+    case 'receivables_due_soon': return '提前提醒，避免变成逾期';
     case 'agent_decision': return '需要你决定资产去留';
     case 'agent_warning': return '需要留意是否影响正常运行';
     case 'systems_review': case 'systems_audit': return systemReviewText(a, lang).why;
@@ -233,6 +237,8 @@ function suggestion(a: BossAction, lang: BriefLang): string {
       case 'calendar_meeting': return 'Confirm materials/prep ahead of time.';
       case 'inventory_alert': return 'Arrange restocking or verify today.';
       case 'invoice_review': return 'Approve or return it today.';
+      case 'receivables_overdue': return 'Follow up first with the customer overdue longest or owing the most.';
+      case 'receivables_due_soon': return 'Confirm payment status before it becomes overdue.';
       case 'systems_review': case 'systems_audit': return systemReviewText(a, lang).suggestion;
       default: return a.priority === 'P1' ? 'Handle this first today.' : 'Proceed as planned.';
     }
@@ -253,6 +259,8 @@ function suggestion(a: BossAction, lang: BriefLang): string {
     case 'calendar_meeting': return '提前确认材料/是否需要准备';
     case 'inventory_alert': return '今天安排补货或核实';
     case 'invoice_review': return '今天审批或退回';
+    case 'receivables_overdue': return '优先跟进逾期时间最长或未收金额最高的客户';
+    case 'receivables_due_soon': return '提前确认客户付款状态';
     case 'systems_review': case 'systems_audit': return systemReviewText(a, lang).suggestion;
     default: return a.priority === 'P1' ? '今天优先处理' : '按计划推进';
   }
@@ -270,6 +278,13 @@ function factFor(a: BossAction, lang: BriefLang): { fact: string; rawFact: strin
   if (a.action_type === 'systems_review' || a.action_type === 'systems_audit') {
     const raw = a.summary || a.title;
     return { fact: systemReviewText(a, lang).fact, rawFact: raw };
+  }
+  // receivables_overdue/receivables_due_soon carry real, per-request numbers
+  // (count/amount/customer) baked into title/summary — a.title alone (the
+  // Chinese default every other action_type falls back to in English mode)
+  // would leak Chinese here, so these two use their own English fields.
+  if (lang === 'en' && (a.action_type === 'receivables_overdue' || a.action_type === 'receivables_due_soon')) {
+    return { fact: a.enSummary || a.enTitle || a.title, rawFact: null };
   }
   if (lang === 'en') return { fact: a.title, rawFact: null };
   return { fact: a.summary || a.title, rawFact: null };
@@ -320,9 +335,14 @@ export async function getDailyBrief(lang: BriefLang = 'zh'): Promise<{ ok: true;
     })[0];
 
     const { fact, rawFact } = factFor(rep, lang);
+    // Same reasoning as factFor above: an aggregate item (no related_customer)
+    // would otherwise show its raw Chinese title as the subject/headline even
+    // in English mode. Only receivables_overdue/receivables_due_soon set
+    // enTitle, so every other action_type's subject is unaffected.
+    const subjectTitle = lang === 'en' && rep.enTitle ? rep.enTitle : rep.title;
     deduped.push({
       priority: rep.priority,
-      subject: rep.related_customer || rep.title.split(' — ')[0] || rep.title,
+      subject: rep.related_customer || subjectTitle.split(' — ')[0] || subjectTitle,
       fact,
       rawFact,
       whyItMatters: whyItMatters(rep, lang),
