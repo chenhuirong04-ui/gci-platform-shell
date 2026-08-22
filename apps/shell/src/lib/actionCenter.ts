@@ -9,7 +9,6 @@ import { getSystemRegistry } from './systemRegistry';
 import { AGENTS } from '../components/AgentsStatus';
 import { getDecisionFollowThroughActions } from './decisionInbox';
 import { getOpenCommitmentActions } from './commitments';
-import { getMiaStatus } from './mia';
 import { getChanyaStatus } from './chanya';
 import { getExecutiveTasks, taskUrgency } from './executiveTasks';
 import { getUrgentTicketCounts } from './supportTickets';
@@ -113,7 +112,6 @@ async function fetchBossActions(): Promise<
     contractStatusSummary,
     decisionFollowThrough,
     commitmentActions,
-    miaStatus,
     executiveTasks,
     chanyaStatus,
     ticketCounts,
@@ -130,7 +128,6 @@ async function fetchBossActions(): Promise<
     safeFetchJson<any>(`${base()}/api/bs/contract-status-brief-summary`),
     getDecisionFollowThroughActions(),
     getOpenCommitmentActions(),
-    withTimeout(getMiaStatus(), SLOW_SOURCE_TIMEOUT_MS, { ok: false, status: 'no_data', error: 'timeout' } as any),
     getExecutiveTasks(),
     withTimeout(getChanyaStatus(), SLOW_SOURCE_TIMEOUT_MS, { ok: false, status: 'no_data', error: 'timeout' } as any),
     getUrgentTicketCounts(),
@@ -517,61 +514,14 @@ async function fetchBossActions(): Promise<
     }
   }
 
-  // ── 6.5 MIA (Task 14.1) — only real blocking errors or a genuine "needs
-  // Chris" backlog generate an action. Plain leads_found_today never does —
-  // discovering leads is MIA's normal, expected daily output, not a
-  // boss-level event. Deliberately at most one P1 + one P2 so a bad day
-  // doesn't spam the Action Center with one row per lead. ─────────────────
-  if (miaStatus.ok) {
-    const d = miaStatus.data;
-    if (d.status === 'error') {
-      actions.push({
-        id: 'mia-error',
-        source: 'mia',
-        category: 'MIA',
-        title: 'MIA｜客户开发 AI — 运行异常',
-        summary: `今日异常 ${d.errors} 次，可能阻塞正常运行`,
-        priority: 'P1',
-        due_at: null,
-        related_customer: null,
-        related_system: 'MIA',
-        action_type: 'mia_error',
-        deep_link: '/',
-      });
-    }
-    if (d.needs_chris > 0) {
-      actions.push({
-        id: 'mia-needs-chris',
-        source: 'mia',
-        category: 'MIA',
-        title: `MIA｜客户开发 AI — ${d.needs_chris} 件需要你处理`,
-        summary: `今日回复 ${d.replies_today} 条，其中 ${d.needs_chris} 件等待人工判断`,
-        priority: 'P2',
-        due_at: null,
-        related_customer: null,
-        related_system: 'MIA',
-        action_type: 'mia_needs_chris',
-        // Task 18.4 fix: was '/' — clicking this bounced straight back to
-        // Home instead of showing the actual items. Now opens the real
-        // needs-Chris list in the MIA lead bridge.
-        deep_link: '/mia-leads?tab=needs_chris',
-      });
-    } else if (d.status === 'warning') {
-      actions.push({
-        id: 'mia-warning',
-        source: 'mia',
-        category: 'MIA',
-        title: 'MIA｜客户开发 AI — 状态异常',
-        summary: `今日异常 ${d.errors} 次，未阻塞运行但需留意`,
-        priority: 'P2',
-        due_at: null,
-        related_customer: null,
-        related_system: 'MIA',
-        action_type: 'mia_warning',
-        deep_link: '/',
-      });
-    }
-  }
+  // ── 6.5 MIA — GCI/GIA's automatic real-time read of MIA is temporarily
+  // switched off (product decision: MIA is non-core, production reads are
+  // unreliable/no_data, and it was stably adding ~5s to every
+  // getBossActions() call by sitting in the Promise.all above). This is
+  // NOT a removal of MIA — mia.ts, /api/mia/executive-status, and MIA's own
+  // backend are all untouched and ready to reconnect once MIA itself is
+  // reworked. Was: getMiaStatus() in the Promise.all + an action block for
+  // d.status==='error'/'warning' or d.needs_chris>0. ──────────────────────
 
   // ── 6.6 Chanya (Task 18.1) — same discipline as MIA: normal operation
   // (new signups, routine paid conversions) never generates an action, only

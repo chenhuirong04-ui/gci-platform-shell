@@ -17,15 +17,18 @@
 //   需要我决定    -> executive_decisions, status=pending only, -> /decisions
 //   重要消息      -> static 0 (no data source yet — email removed, no
 //                    replacement wired in this round)
-//   新业务机会    -> MIA leads_found_today; shows an honest "暂不可用"
-//                    state (not a stale "—") when MIA itself reports failure,
-//                    never a fabricated number.
+//   新业务机会    -> static 0 (product decision: GCI/GIA's automatic
+//                    real-time read of MIA is temporarily switched off —
+//                    MIA is non-core and was adding a real ~6s network wait
+//                    to this tile. Not a removal of MIA: /mia-leads still
+//                    works as a deliberate, user-initiated visit. No
+//                    replacement AI/API call was added just to fill this
+//                    slot, and no opportunity count is invented.)
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useI18n } from '@gci/i18n';
 import { getExecutiveTasks } from '../lib/executiveTasks';
 import { refreshPendingDecisions } from '../lib/decisionInbox';
-import { getMiaStatus } from '../lib/mia';
 
 const GOLD = '#CBA85C';
 const RED = '#E0846A';
@@ -65,7 +68,6 @@ export function HomeKpiRow() {
   const { lang } = useI18n();
   const [myItems, setMyItems] = useState<KpiValue>(null);
   const [decisions, setDecisions] = useState<KpiValue>(null);
-  const [miaLeadsToday, setMiaLeadsToday] = useState<KpiValue>(null);
 
   useEffect(() => {
     // 我的事项 — executive_tasks ONLY, never mixed with email/decisions/MIA.
@@ -79,18 +81,16 @@ export function HomeKpiRow() {
     // view now uses (status=pending only) — Home's number and the page's
     // default list are guaranteed to agree.
     refreshPendingDecisions().then((res) => { if (res.ok) setDecisions(res.rows.length); });
-
-    // 新业务机会 (MIA) — never a fabricated number, never a permanent "—".
-    // A real MIA failure (timeout/error) now shows "暂不可用" so it reads as
-    // "MIA is down" rather than "loading forever" or "zero leads".
-    getMiaStatus().then((res) => setMiaLeadsToday(res.ok ? res.data.leads_found_today : 'unavailable'));
   }, []);
 
   const kpis: Kpi[] = [
     { label: lang === 'zh' ? '我的事项' : 'My Tasks', value: myItems, color: GOLD, onClick: () => navigate('/tasks') },
     { label: lang === 'zh' ? '需要我决定' : 'Needs My Decision', value: decisions, color: RED, onClick: () => navigate('/decisions') },
     { label: lang === 'zh' ? '重要消息' : 'Important Messages', value: 0, color: BLUE, onClick: () => {} },
-    { label: lang === 'zh' ? '新业务机会' : 'New Business Opportunities', value: miaLeadsToday, color: GREEN, onClick: () => navigate('/mia-leads') },
+    // Static 0 — MIA's automatic read is switched off (see header comment).
+    // Clicking still opens /mia-leads, a deliberate user-initiated visit
+    // that does its own live fetch, unrelated to Home's automatic loads.
+    { label: lang === 'zh' ? '新业务机会' : 'New Business Opportunities', value: 0, color: GREEN, onClick: () => navigate('/mia-leads') },
   ];
 
   return (
