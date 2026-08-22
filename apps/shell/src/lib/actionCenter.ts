@@ -110,6 +110,7 @@ async function fetchBossActions(): Promise<
     invoiceSummary,
     inventoryAlerts,
     receivablesSummary,
+    contractStatusSummary,
     decisionFollowThrough,
     commitmentActions,
     miaStatus,
@@ -126,6 +127,7 @@ async function fetchBossActions(): Promise<
     safeFetchJson<any>(`${base()}/api/invoice/pending-summary`),
     safeFetchJson<any>(`${base()}/api/trade/check-inventory`),
     safeFetchJson<any>(`${base()}/api/bs/receivables-brief-summary`),
+    safeFetchJson<any>(`${base()}/api/bs/contract-status-brief-summary`),
     getDecisionFollowThroughActions(),
     getOpenCommitmentActions(),
     withTimeout(getMiaStatus(), SLOW_SOURCE_TIMEOUT_MS, { ok: false, status: 'no_data', error: 'timeout' } as any),
@@ -346,6 +348,78 @@ async function fetchBossActions(): Promise<
         related_customer: null,
         related_system: null,
         action_type: 'receivables_due_soon',
+        deep_link: '/business-solutions',
+      });
+    }
+  }
+
+  // ── 4.7 Company Services contract/commercial status — literal status-
+  // field matches only, no AI inference and no invented "stuck for N days"
+  // (neither service_quotes nor service_customers has a reliable per-status
+  // timestamp — see api/bs/contract-status-brief-summary.ts). Each of the
+  // 3 categories is its own aggregate card (never one row per quote/
+  // customer), and only fires when that category actually has ≥1 row. ────
+  if (contractStatusSummary && contractStatusSummary.ok) {
+    const fmtTotals = (byCurrency: { currency: string; totalAmount: number }[]) =>
+      byCurrency.map((c) => `${c.currency} ${c.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`).join(' + ');
+
+    const rr = contractStatusSummary.revisionRequested;
+    if (rr && rr.count > 0) {
+      const amountLine = rr.byCurrency.length > 0 ? `，合计 ${fmtTotals(rr.byCurrency)}` : '';
+      const amountLineEn = rr.byCurrency.length > 0 ? ` totaling ${fmtTotals(rr.byCurrency)}` : '';
+      actions.push({
+        id: 'contract-revision-requested',
+        source: 'business',
+        category: 'Contract Status',
+        title: `${rr.count} 个企业服务报价仍在修改阶段`,
+        summary: `客户：${rr.customerPreview.join('、')}${amountLine}`,
+        enTitle: `${rr.count} Company Services quote${rr.count > 1 ? 's' : ''} still under revision`,
+        enSummary: `${rr.count} Company Services quote${rr.count > 1 ? 's' : ''} still under revision${amountLineEn}. Customers: ${rr.customerPreview.join(', ')}.`,
+        priority: 'P2',
+        due_at: null,
+        related_customer: null,
+        related_system: null,
+        action_type: 'contract_revision_requested',
+        deep_link: '/business-solutions',
+      });
+    }
+
+    const cp = contractStatusSummary.contractPending;
+    if (cp && cp.count > 0) {
+      actions.push({
+        id: 'contract-pending-signature',
+        source: 'business',
+        category: 'Contract Status',
+        title: `${cp.count} 个企业服务项目仍处于合同待签状态`,
+        summary: `客户：${cp.customerPreview.join('、')}`,
+        enTitle: `${cp.count} Company Services project${cp.count > 1 ? 's' : ''} still pending contract signature`,
+        enSummary: `${cp.count} Company Services project${cp.count > 1 ? 's' : ''} still pending contract signature. Customers: ${cp.customerPreview.join(', ')}.`,
+        priority: 'P2',
+        due_at: null,
+        related_customer: null,
+        related_system: null,
+        action_type: 'contract_pending_signature',
+        deep_link: '/business-solutions',
+      });
+    }
+
+    const ex = contractStatusSummary.expired;
+    if (ex && ex.count > 0) {
+      const amountLine = ex.byCurrency.length > 0 ? `，合计 ${fmtTotals(ex.byCurrency)}` : '';
+      const amountLineEn = ex.byCurrency.length > 0 ? ` totaling ${fmtTotals(ex.byCurrency)}` : '';
+      actions.push({
+        id: 'contract-quote-expired',
+        source: 'business',
+        category: 'Contract Status',
+        title: `${ex.count} 个企业服务报价已过期`,
+        summary: `客户：${ex.customerPreview.join('、')}${amountLine}`,
+        enTitle: `${ex.count} Company Services quote${ex.count > 1 ? 's' : ''} expired`,
+        enSummary: `${ex.count} Company Services quote${ex.count > 1 ? 's' : ''} expired${amountLineEn}. Customers: ${ex.customerPreview.join(', ')}.`,
+        priority: 'P2',
+        due_at: null,
+        related_customer: null,
+        related_system: null,
+        action_type: 'contract_quote_expired',
         deep_link: '/business-solutions',
       });
     }

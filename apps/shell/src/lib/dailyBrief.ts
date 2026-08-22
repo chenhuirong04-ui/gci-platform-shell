@@ -188,6 +188,9 @@ function whyItMatters(a: BossAction, lang: BriefLang): string {
       case 'invoice_review': return 'An invoice is stuck in approval, slowing down collections.';
       case 'receivables_overdue': return 'Overdue receivables may affect cash flow — worth confirming payment status.';
       case 'receivables_due_soon': return 'A reminder before it becomes overdue.';
+      case 'contract_revision_requested': return 'The commercial terms are still unresolved — the deal hasn\'t closed yet.';
+      case 'contract_pending_signature': return 'An unsigned contract for too long may delay revenue recognition and service start.';
+      case 'contract_quote_expired': return 'An expired quote with the business still open needs a decision on how to proceed.';
       case 'agent_decision': return 'Needs your decision on whether to keep this asset.';
       case 'agent_warning': return 'Watch whether this affects normal operation.';
       case 'systems_review': case 'systems_audit': return systemReviewText(a, lang).why;
@@ -212,6 +215,9 @@ function whyItMatters(a: BossAction, lang: BriefLang): string {
     case 'invoice_review': return '发票卡在审批，影响回款节奏';
     case 'receivables_overdue': return '逾期应收可能影响现金流，应优先确认客户付款状态';
     case 'receivables_due_soon': return '提前提醒，避免变成逾期';
+    case 'contract_revision_requested': return '商务条件仍未闭环，业务尚未成交';
+    case 'contract_pending_signature': return '合同长期未闭环可能影响收入确认和后续服务启动';
+    case 'contract_quote_expired': return '报价已过期但业务仍未关闭，需要决定如何处理';
     case 'agent_decision': return '需要你决定资产去留';
     case 'agent_warning': return '需要留意是否影响正常运行';
     case 'systems_review': case 'systems_audit': return systemReviewText(a, lang).why;
@@ -239,6 +245,9 @@ function suggestion(a: BossAction, lang: BriefLang): string {
       case 'invoice_review': return 'Approve or return it today.';
       case 'receivables_overdue': return 'Follow up first with the customer overdue longest or owing the most.';
       case 'receivables_due_soon': return 'Confirm payment status before it becomes overdue.';
+      case 'contract_revision_requested': return 'Follow up on the requested revisions to move the deal forward.';
+      case 'contract_pending_signature': return 'Contact these customers today to confirm signing progress.';
+      case 'contract_quote_expired': return 'Decide today whether to renew the quote or close it out.';
       case 'systems_review': case 'systems_audit': return systemReviewText(a, lang).suggestion;
       default: return a.priority === 'P1' ? 'Handle this first today.' : 'Proceed as planned.';
     }
@@ -261,6 +270,9 @@ function suggestion(a: BossAction, lang: BriefLang): string {
     case 'invoice_review': return '今天审批或退回';
     case 'receivables_overdue': return '优先跟进逾期时间最长或未收金额最高的客户';
     case 'receivables_due_soon': return '提前确认客户付款状态';
+    case 'contract_revision_requested': return '跟进对方要求的修改，推进成交';
+    case 'contract_pending_signature': return '今天联系这些客户，确认签署进度';
+    case 'contract_quote_expired': return '今天决定是否重新报价或结束跟进';
     case 'systems_review': case 'systems_audit': return systemReviewText(a, lang).suggestion;
     default: return a.priority === 'P1' ? '今天优先处理' : '按计划推进';
   }
@@ -279,11 +291,17 @@ function factFor(a: BossAction, lang: BriefLang): { fact: string; rawFact: strin
     const raw = a.summary || a.title;
     return { fact: systemReviewText(a, lang).fact, rawFact: raw };
   }
-  // receivables_overdue/receivables_due_soon carry real, per-request numbers
-  // (count/amount/customer) baked into title/summary — a.title alone (the
-  // Chinese default every other action_type falls back to in English mode)
-  // would leak Chinese here, so these two use their own English fields.
-  if (lang === 'en' && (a.action_type === 'receivables_overdue' || a.action_type === 'receivables_due_soon')) {
+  // receivables_overdue/receivables_due_soon and the 3 contract-status
+  // types (contract_revision_requested/contract_pending_signature/
+  // contract_quote_expired) all carry real, per-request numbers/customer
+  // names baked into title/summary — a.title alone (the Chinese default
+  // every other action_type falls back to in English mode) would leak
+  // Chinese here, so these use their own English fields.
+  const EN_TEXT_ACTION_TYPES = new Set([
+    'receivables_overdue', 'receivables_due_soon',
+    'contract_revision_requested', 'contract_pending_signature', 'contract_quote_expired',
+  ]);
+  if (lang === 'en' && EN_TEXT_ACTION_TYPES.has(a.action_type)) {
     return { fact: a.enSummary || a.enTitle || a.title, rawFact: null };
   }
   if (lang === 'en') return { fact: a.title, rawFact: null };
