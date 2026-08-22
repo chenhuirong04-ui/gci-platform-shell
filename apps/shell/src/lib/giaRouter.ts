@@ -112,9 +112,24 @@ export async function tryFileSearch(text: string): Promise<string | null> {
 // excluded here — that IS a real to-do (do it later), not an instruction to
 // create a folder right now, so it's left to fall through to the normal
 // BUSINESS_TODO capture router unchanged.
+// Bug fix (was `.{0,10}?` / `.{0,30}?`): the trigger must not depend on
+// folder-name length at all — a 10/30-char cap between the create-verb and
+// 文件夹/folder rejects any realistically long real-world folder name
+// ("HIGHWAYGLOBAL" alone is 13 chars, well past the old 10-char budget).
+// The trigger's only job is "does this sentence contain a create-action AND
+// a folder/directory word, in that order, within the same clause" — never
+// "is the name short enough". The character class now excludes sentence-
+// ending punctuation (，,。！!？?/.!?) so the two are still required to be in
+// the same clause (not just within N raw characters, which could span an
+// unrelated adjacent sentence in a longer message) — a semantic boundary
+// instead of an arbitrary count, with a generous 80-char backstop only to
+// bound worst-case regex cost, not to cap real folder names. Bare "建" gets
+// a negative lookahead against 议/设/成/筑 so widening the gap doesn't turn
+// "建议...文件夹" (suggest ... folder) into a false positive it wasn't
+// exposed to before at the old tight 10-char radius.
 const DRIVE_FOLDER_REMINDER_RE = /提醒我|记得|到时候|以后再|改天|下周|下个月|明天|后天/u;
-const DRIVE_FOLDER_ZH_TRIGGER_RE = /(?:新建|创建|建立|建).{0,10}?(?:文件夹|目录)/u;
-const DRIVE_FOLDER_EN_TRIGGER_RE = /(?:create|make)\s+(?:a\s+)?(?:new\s+)?.{0,30}?(?:folder|directory)\b/iu;
+const DRIVE_FOLDER_ZH_TRIGGER_RE = /(?:新建|创建|建立|建(?!议|设|成|筑))[^，,。！!？?]{0,80}?(?:文件夹|目录)/u;
+const DRIVE_FOLDER_EN_TRIGGER_RE = /(?:create|make)\s+(?:a\s+)?(?:new\s+)?[^.!?]{0,80}?(?:folder|directory)\b/iu;
 
 export function looksLikeDriveCreateFolderCommand(text: string): boolean {
   if (DRIVE_FOLDER_REMINDER_RE.test(text)) return false;
