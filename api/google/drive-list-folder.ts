@@ -26,8 +26,13 @@ export default async function handler(request: Request): Promise<Response> {
 
   if (fileId) {
     try {
+      // parents added (additive only, same drive.readonly scope, no new
+      // capability) — needed to resolve where a file actually landed after
+      // upload, both for this diagnostic mode and for the upload success
+      // card to show the file's real parent folder rather than the client's
+      // pre-upload selection.
       const res = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,modifiedTime,webViewLink`,
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,modifiedTime,webViewLink,parents`,
         { headers: { Authorization: `Bearer ${auth.accessToken}` } },
       );
       const data = await res.json();

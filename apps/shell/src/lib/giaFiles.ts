@@ -105,7 +105,7 @@ export async function uploadFileToDrive(
   file: File,
   targetFolderId: string,
   fileName: string,
-): Promise<{ ok: true; fileId: string; webViewLink: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; fileId: string; webViewLink: string; parentId: string | null } | { ok: false; error: string }> {
   try {
     const form = new FormData();
     form.append('file', file);
@@ -114,9 +114,30 @@ export async function uploadFileToDrive(
     const res = await fetch('/api/google/drive-upload-file', { method: 'POST', body: form });
     const data = await res.json();
     if (!data.ok) return { ok: false, error: data.error || 'Upload failed' };
-    return { ok: true, fileId: data.file.id, webViewLink: data.file.webViewLink };
+    // api/google/drive-upload-file.ts already requests `parents` in its
+    // Drive API fields projection — this was previously just discarded
+    // here. Reading it through is what lets callers verify where a file
+    // ACTUALLY landed instead of trusting the pre-upload target id.
+    const parents: string[] | undefined = data.file?.parents;
+    const parentId = Array.isArray(parents) && parents.length > 0 ? parents[0] : null;
+    return { ok: true, fileId: data.file.id, webViewLink: data.file.webViewLink, parentId };
   } catch (e: any) {
     return { ok: false, error: String(e?.message ?? e) };
+  }
+}
+
+// Resolves a folder id to its real, current Drive name — used to verify the
+// actual parent a file landed in after upload (see uploadAndRegisterLocalFile
+// below). Reuses drive-list-folder.ts's existing ?fileId= mode, unchanged
+// except for the `parents` field it now also returns.
+export async function getDriveFolderName(folderId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/google/drive-list-folder?fileId=${encodeURIComponent(folderId)}`);
+    const data = await res.json();
+    if (!data.ok || !data.results?.[0]) return null;
+    return data.results[0].name ?? null;
+  } catch {
+    return null;
   }
 }
 
@@ -293,10 +314,19 @@ export async function searchDriveFolders(query: string): Promise<DriveFolderOpti
 export async function uploadAndRegisterLocalFile(
   file: File,
   targetFolder: { id: string; name: string } = { id: DEFAULT_TARGET_FOLDER_ID, name: DEFAULT_TARGET_FOLDER_NAME },
-): Promise<{ ok: true; row: GiaFileRegistryRow } | { ok: false; error: string }> {
+): Promise<{ ok: true; row: GiaFileRegistryRow; actualFolderName: string } | { ok: false; error: string }> {
   const uploaded = await uploadFileToDrive(file, targetFolder.id, file.name);
   if (!uploaded.ok) return uploaded;
-  return registerFile({
+  // Verify where the file actually landed rather than trusting the
+  // pre-upload target: Drive's own upload response (parentId) is the source
+  // of truth, not the client's selection. Falls back to targetFolder.name
+  // only if the parent lookup itself fails (e.g. a transient read error) —
+  // never fabricated, and only ever used when the real parentId lookup
+  // couldn't be completed.
+  const actualFolderName = uploaded.parentId
+    ? (await getDriveFolderName(uploaded.parentId)) ?? targetFolder.name
+    : targetFolder.name;
+  const registered = await registerFile({
     fileName: file.name,
     displayName: file.name,
     documentType: 'other',
@@ -305,12 +335,14 @@ export async function uploadAndRegisterLocalFile(
     customerId: null,
     driveFileId: uploaded.fileId,
     driveUrl: uploaded.webViewLink,
-    driveFolder: targetFolder.name,
+    driveFolder: actualFolderName,
     isCurrent: false,
     tags: [],
     sourceType: 'upload',
     sourceRef: null,
   });
+  if (!registered.ok) return registered;
+  return { ok: true, row: registered.row, actualFolderName };
 }
 
 // Rule-based search — matches a recognized document type and/or a known

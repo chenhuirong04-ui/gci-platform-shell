@@ -358,15 +358,27 @@ export function BusinessAssistantEntry() {
     setManualNotice(null);
   }
 
+  // Hard upload gate — enforced here regardless of which button/UI path
+  // called it: selectedFile must exist, a destination must actually have
+  // been resolved (a real search match, a candidate the user picked, or the
+  // user's explicit "先存 Inbox" acknowledgment — never just "search
+  // failed" or "user pressed Enter"), and selectedFolder must carry a real
+  // Drive folder id. 'suggested'/'no_match' are the only two phases where a
+  // concrete recommendation has been surfaced for confirmation; 'describe'
+  // and 'candidates' are still ambiguous and must never reach upload.
   async function confirmFileUpload() {
-    if (!selectedFile) return;
+    const destinationResolved = uploadPhase === 'suggested' || uploadPhase === 'no_match';
+    if (!selectedFile || !destinationResolved || !selectedFolder.id) return;
     setUploadBusy(true);
     setUploadError(null);
     const res = await uploadAndRegisterLocalFile(selectedFile, selectedFolder);
     setUploadBusy(false);
     setMultiDropNotice(false);
     if (res.ok) {
-      setUploadedFile({ name: selectedFile.name, driveUrl: res.row.drive_url, folderName: selectedFolder.name });
+      // res.actualFolderName comes from Drive's own upload response
+      // (verified real parent), not the pre-upload selectedFolder guess —
+      // this is what the success card must show.
+      setUploadedFile({ name: selectedFile.name, driveUrl: res.row.drive_url, folderName: res.actualFolderName });
       setSelectedFile(null);
       setUploadPhase('describe');
       setFileDescription('');
