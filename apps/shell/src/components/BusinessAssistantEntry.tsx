@@ -62,6 +62,13 @@ export function BusinessAssistantEntry() {
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadedFile, setUploadedFile] = useState<{ name: string; driveUrl: string } | null>(null);
+  // Drag & drop — same pending-file preview as the "上传文件" button, just a
+  // second on-ramp into it. dragCounter survives dragenter/dragleave firing
+  // on child elements as the pointer moves within the box (a plain boolean
+  // would flicker off every time the pointer crosses a child's edge).
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounter = useRef(0);
+  const [multiDropNotice, setMultiDropNotice] = useState(false);
 
   async function go() {
     const v = value.trim();
@@ -154,18 +161,61 @@ export function BusinessAssistantEntry() {
     else setCaptureError(res.error);
   }
 
-  function handleFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0] ?? null;
-    e.target.value = ''; // allow re-selecting the exact same file later
+  // Shared by both entry points (button-triggered <input type="file"> and
+  // drag & drop below) — exactly one place decides what "a file was picked"
+  // means, so the two on-ramps can never drift into different behavior.
+  function acceptPickedFile(f: File | null) {
     if (!f) return;
     setUploadError(null);
     setUploadedFile(null);
     setSelectedFile(f);
   }
 
+  function handleFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    e.target.value = ''; // allow re-selecting the exact same file later
+    acceptPickedFile(f);
+  }
+
+  // dragover's preventDefault() is what stops the browser from navigating
+  // to/opening the dropped file directly (its default action for a file
+  // drag) — required on both dragOver and drop, not just drop.
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function handleDragEnter(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.dataTransfer.types.includes('Files')) return;
+    dragCounter.current += 1;
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current = Math.max(0, dragCounter.current - 1);
+    if (dragCounter.current === 0) setIsDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current = 0;
+    setIsDragging(false);
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+    // Single file only, same as the button — never batch-upload for this round.
+    setMultiDropNotice(files.length > 1);
+    acceptPickedFile(files[0]);
+  }
+
   function cancelFileUpload() {
     setSelectedFile(null);
     setUploadError(null);
+    setMultiDropNotice(false);
   }
 
   async function confirmFileUpload() {
@@ -174,6 +224,7 @@ export function BusinessAssistantEntry() {
     setUploadError(null);
     const res = await uploadAndRegisterLocalFile(selectedFile);
     setUploadBusy(false);
+    setMultiDropNotice(false);
     if (res.ok) {
       setUploadedFile({ name: selectedFile.name, driveUrl: res.row.drive_url });
       setSelectedFile(null);
@@ -199,7 +250,20 @@ export function BusinessAssistantEntry() {
         </span>
         <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,rgba(203,168,92,0.36),transparent)' }} />
       </div>
-      <div style={{ padding: '18px 20px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 14, boxShadow: '0 0 40px rgba(203,168,92,0.04)' }}>
+      <div
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        style={{ position: 'relative', padding: '18px 20px', background: CARD, border: `1px solid ${isDragging ? 'rgba(203,168,92,0.65)' : BORD}`, borderRadius: 14, boxShadow: '0 0 40px rgba(203,168,92,0.04)' }}
+      >
+        {isDragging && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(8,13,30,0.82)', border: `2px dashed ${GOLD}`, borderRadius: 14, pointerEvents: 'none' }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: GOLD }}>
+              {lang === 'zh' ? '松开以上传文件' : 'Drop file to upload'}
+            </span>
+          </div>
+        )}
         <div style={{ position: 'relative', marginBottom: 12 }}>
           <input
             value={value}
@@ -243,6 +307,11 @@ export function BusinessAssistantEntry() {
             <div style={{ fontSize: 12, fontWeight: 700, color: GOLD, marginBottom: 8 }}>
               {lang === 'zh' ? '准备收纳文件' : 'Ready to store file'}
             </div>
+            {multiDropNotice && (
+              <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 6 }}>
+                {lang === 'zh' ? '一次请上传一个文件，已选择第一个文件' : 'Please upload one file at a time — the first file was selected'}
+              </div>
+            )}
             <div style={{ fontSize: 12.5, color: TEXT, lineHeight: 1.7 }}>
               <div>{lang === 'zh' ? '文件：' : 'File: '}{selectedFile.name}</div>
               <div>{lang === 'zh' ? '大小：' : 'Size: '}{formatFileSize(selectedFile.size)}</div>
