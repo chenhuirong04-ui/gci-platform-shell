@@ -117,14 +117,49 @@ function scoreCatalogRow(query: string, row: ServiceCatalogRow): number {
   return Math.max(zhScore, enScore);
 }
 
-// Returns the catalog rows whose name most strongly matches the query —
-// only the top-scoring row(s), per a minimum floor. When two rows are a
-// real, deliberate split of one service (e.g. the two Bookkeeping tiers
-// share an identical base name), they tie for the top score and are BOTH
-// returned — never guessed down to one.
+// Bug fix — "VAT注册多少钱？" was scoring close enough (5 vs 3, a thin LCS
+// margin — VAT Registration's "...VAT登记" vs VAT Filing's "...VAT申报"
+// both share the "vat" run) that the two candidates were never reliably
+// separated across every phrasing/whitespace variant; LCS alone can't
+// structurally guarantee "注册" never matches a "申报" service. Business
+// action words are a closed, known vocabulary here — checked as a hard
+// filter BEFORE any fuzzy scoring, not left to a numeric margin.
+type ServiceActionCategory = 'registration' | 'filing' | 'bookkeeping' | 'tax_update' | 'advisory' | 'audit_coordination';
+const ACTION_CATEGORY_PATTERNS: [ServiceActionCategory, RegExp][] = [
+  ['registration', /注册|登记|registration/i],
+  ['filing', /申报|filing/i],
+  ['bookkeeping', /记账|bookkeeping/i],
+  ['tax_update', /更新|\bupdate\b/i],
+  ['advisory', /顾问|advisory/i],
+  ['audit_coordination', /审计协调|audit\s*coordination/i],
+];
+function detectActionCategory(text: string): ServiceActionCategory | null {
+  for (const [category, pattern] of ACTION_CATEGORY_PATTERNS) {
+    if (pattern.test(text)) return category;
+  }
+  return null;
+}
+
+// Returns the catalog rows whose name most strongly matches the query.
+// Step 1 (new): if the query names a specific business action (注册/登记,
+// 申报, 记账, etc.), the candidate pool is hard-filtered to only rows whose
+// OWN name is in that same action category — "VAT注册" can then only ever
+// be compared against other *_registration rows (VAT/Corporate
+// Tax/Electronic Invoicing ASP Registration), never against VAT Filing.
+// Step 2 (unchanged): fuzzy entity scoring picks the top-scoring row(s)
+// within that pool. When two rows are a real, deliberate split of one
+// service sharing the same action category and the same base name (e.g.
+// the two Bookkeeping tiers, or the two Corporate Tax Filing tiers), they
+// tie for the top score and are BOTH returned — never guessed down to one.
 export function matchServiceCatalog(query: string, rows: ServiceCatalogRow[]): ServiceCatalogRow[] {
   const FLOOR = 2;
-  const scored = rows.map((r) => ({ row: r, score: scoreCatalogRow(query, r) })).filter((x) => x.score >= FLOOR);
+  const queryCategory = detectActionCategory(query);
+  let pool = rows;
+  if (queryCategory) {
+    const filtered = rows.filter((r) => detectActionCategory(`${r.name_cn} ${r.name_en}`) === queryCategory);
+    if (filtered.length > 0) pool = filtered;
+  }
+  const scored = pool.map((r) => ({ row: r, score: scoreCatalogRow(query, r) })).filter((x) => x.score >= FLOOR);
   if (scored.length === 0) return [];
   const max = Math.max(...scored.map((x) => x.score));
   return scored.filter((x) => x.score === max).map((x) => x.row);
