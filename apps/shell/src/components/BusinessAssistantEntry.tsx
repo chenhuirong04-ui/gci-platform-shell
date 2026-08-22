@@ -17,6 +17,11 @@ import {
   findDriveFolderMemory, rememberDriveFolder, findBusinessAreaMemory, rememberBusinessArea, touchMemory, markMemoryStale,
   type DriveFolderMemoryValue, type BusinessAreaMemoryValue,
 } from '../lib/giaMemory';
+import {
+  looksLikeMultiStepDrivePlan, parseDriveActionPlan, resolveDrivePlan, applyRootResolution, isRootResolved,
+  getCreateStep, withChildFolderName, executeDrivePlan,
+  type DriveActionPlan, type DrivePlanExecutionResult,
+} from '../lib/driveActionPlan';
 import type { CrmCustomer } from '../lib/crmSupabase';
 
 const GOLD = '#CBA85C';
@@ -106,6 +111,20 @@ export function BusinessAssistantEntry() {
   const [manualCandidates, setManualCandidates] = useState<DriveFolderOption[] | null>(null);
   const [manualSearchBusy, setManualSearchBusy] = useState(false);
   const [manualNotice, setManualNotice] = useState<string | null>(null);
+  // Multi-step Drive Plan V1 — only reachable while selectedFile is set
+  // (every V1 plan ends in an upload step). Kept fully separate from
+  // pendingCapture/Planner state, same discipline as everything else in
+  // this file's local-tool-action flows: never touches classify-capture,
+  // never generates a BUSINESS_TODO.
+  const [pendingDrivePlan, setPendingDrivePlan] = useState<DriveActionPlan | null>(null);
+  const [drivePlanBusy, setDrivePlanBusy] = useState(false);
+  const [drivePlanError, setDrivePlanError] = useState<string | null>(null);
+  const [drivePlanCandidates, setDrivePlanCandidates] = useState<DriveFolderOption[] | null>(null);
+  const [drivePlanNotFound, setDrivePlanNotFound] = useState<string | null>(null);
+  const [drivePlanEditOpen, setDrivePlanEditOpen] = useState(false);
+  const [drivePlanEditChildName, setDrivePlanEditChildName] = useState('');
+  const [drivePlanEditParentQuery, setDrivePlanEditParentQuery] = useState('');
+  const [drivePlanResult, setDrivePlanResult] = useState<DrivePlanExecutionResult | null>(null);
   // Drive folder creation — a direct tool action, kept fully separate from
   // pendingCapture/Planner state, same discipline as the file upload flow
   // above. folderName===null means GIA is still waiting for a name; the
@@ -166,6 +185,17 @@ export function BusinessAssistantEntry() {
     // of whether the user typed into this top box or the preview card's own
     // description field below — both feed the exact same non-AI routing.
     if (selectedFile) {
+      if (pendingDrivePlan) {
+        // A plan is already up — its own candidate/edit/confirm buttons own
+        // the interaction now, not free-typed text.
+        setValue('');
+        return;
+      }
+      if (looksLikeMultiStepDrivePlan(v)) {
+        setValue('');
+        await handleDrivePlanInput(v);
+        return;
+      }
       setFileDescription(v);
       setValue('');
       await describeAndRouteFile(v);
@@ -333,6 +363,13 @@ export function BusinessAssistantEntry() {
     setManualQuery('');
     setManualCandidates(null);
     setManualNotice(null);
+    // Never carry a previous file's multi-step plan over to a new file.
+    setPendingDrivePlan(null);
+    setDrivePlanCandidates(null);
+    setDrivePlanNotFound(null);
+    setDrivePlanEditOpen(false);
+    setDrivePlanError(null);
+    setDrivePlanResult(null);
     // Clear any leftover Planner/capture confirm card — a stale pendingCapture
     // from an earlier, unrelated chat message rendering below the new upload
     // card is exactly what made an old classification (e.g. a BUSINESS_TODO
@@ -395,6 +432,119 @@ export function BusinessAssistantEntry() {
     setSelectedFolder({ id: f.id, name: f.name });
     setDescribeCandidates(null);
     setUploadPhase('suggested');
+  }
+
+  // Multi-step Drive Plan V1 — parses the sentence into a plan, then
+  // read-only resolves its FIND_FOLDER step (memory -> real Drive search)
+  // BEFORE ever showing a confirm card. Never writes to Drive here.
+  async function handleDrivePlanInput(text: string) {
+    const plan = parseDriveActionPlan(text);
+    if (!plan) {
+      // Couldn't confidently extract both a root and a new-folder name —
+      // fall back to the existing single-step description flow rather than
+      // showing a broken/incomplete plan.
+      setFileDescription(text);
+      await describeAndRouteFile(text);
+      return;
+    }
+    setDrivePlanBusy(true);
+    setDrivePlanError(null);
+    setDrivePlanNotFound(null);
+    setDrivePlanCandidates(null);
+    setDrivePlanResult(null);
+    const outcome = await resolveDrivePlan(plan);
+    setDrivePlanBusy(false);
+    if (outcome.ok) {
+      setPendingDrivePlan(outcome.plan);
+    } else if (outcome.reason === 'ambiguous') {
+      setPendingDrivePlan(outcome.plan);
+      setDrivePlanCandidates(outcome.candidates);
+    } else {
+      setPendingDrivePlan(outcome.plan);
+      setDrivePlanNotFound(outcome.query);
+    }
+  }
+
+  function pickDrivePlanRootCandidate(f: DriveFolderOption) {
+    if (!pendingDrivePlan) return;
+    setPendingDrivePlan(applyRootResolution(pendingDrivePlan, f.id, f.name));
+    setDrivePlanCandidates(null);
+    setDrivePlanNotFound(null);
+  }
+
+  // "修改" — V1 deliberately only allows editing the 3 things spec'd:
+  // parent folder (search + pick, same real Drive search), child folder
+  // name (plain text edit), and the final upload target — which in V1's
+  // fixed 3-step shape always IS the child folder, so there's nothing
+  // separate to edit there. No drag-reorder, no add/remove steps.
+  function openDrivePlanEdit() {
+    if (!pendingDrivePlan) return;
+    const createStep = getCreateStep(pendingDrivePlan);
+    setDrivePlanEditChildName(createStep?.folderName ?? '');
+    setDrivePlanEditParentQuery('');
+    setDrivePlanCandidates(null);
+    setDrivePlanEditOpen(true);
+  }
+
+  async function searchDrivePlanParentEdit() {
+    const q = drivePlanEditParentQuery.trim();
+    if (!q) return;
+    setDrivePlanBusy(true);
+    const results = await searchDriveFolders(q);
+    setDrivePlanBusy(false);
+    setDrivePlanCandidates(results.slice(0, 5));
+  }
+
+  function pickDrivePlanEditParent(f: DriveFolderOption) {
+    if (!pendingDrivePlan) return;
+    setPendingDrivePlan(applyRootResolution(pendingDrivePlan, f.id, f.name));
+    setDrivePlanCandidates(null);
+    setDrivePlanNotFound(null);
+  }
+
+  function applyDrivePlanChildNameEdit() {
+    if (!pendingDrivePlan) return;
+    const name = drivePlanEditChildName.trim();
+    if (!name) return;
+    setPendingDrivePlan(withChildFolderName(pendingDrivePlan, name));
+  }
+
+  function closeDrivePlanEdit() {
+    applyDrivePlanChildNameEdit();
+    setDrivePlanEditOpen(false);
+    setDrivePlanCandidates(null);
+  }
+
+  function cancelDrivePlan() {
+    setPendingDrivePlan(null);
+    setDrivePlanCandidates(null);
+    setDrivePlanNotFound(null);
+    setDrivePlanEditOpen(false);
+    setDrivePlanError(null);
+    setDrivePlanResult(null);
+  }
+
+  // Real execution — only ever invoked by an explicit "全部确认" click.
+  // executeDrivePlan() itself is strictly serial (no Promise.all) and stops
+  // at the first failed step; this function never retries and never
+  // fabricates success.
+  async function confirmDrivePlan() {
+    if (!pendingDrivePlan || !selectedFile || !isRootResolved(pendingDrivePlan)) return;
+    setDrivePlanBusy(true);
+    setDrivePlanError(null);
+    const result = await executeDrivePlan(pendingDrivePlan, selectedFile);
+    setDrivePlanBusy(false);
+    setDrivePlanResult(result);
+    if (result.ok && result.createdFolder) {
+      // GIA Memory V1 — remember the newly created child folder's real,
+      // verified location, same write-on-confirm discipline as the
+      // single-step upload flow. If the user used "修改" to correct the
+      // parent, this naturally remembers the corrected outcome, not the
+      // original guess.
+      await rememberDriveFolder(result.createdFolder.name, { folderId: result.createdFolder.id, folderName: result.createdFolder.name }, 'user_confirmation');
+      setPendingDrivePlan(null);
+      setSelectedFile(null);
+    }
   }
 
   // Fallback only — opened by "修改位置"/"Change location" when the user
@@ -597,7 +747,7 @@ export function BusinessAssistantEntry() {
           ))}
         </div>
 
-        {selectedFile && (
+        {selectedFile && !pendingDrivePlan && (
           <div style={{ marginTop: 14, padding: '14px 16px', background: 'rgba(203,168,92,0.05)', border: `1px solid ${BORD}`, borderRadius: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: GOLD, marginBottom: 8 }}>
               {lang === 'zh' ? '准备收纳文件' : 'Ready to store file'}
@@ -801,6 +951,178 @@ export function BusinessAssistantEntry() {
             <a href={folderCreated.webViewLink} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11.5, color: GOLD }}>
               {lang === 'zh' ? '查看文件夹 →' : 'View folder →'}
             </a>
+          </div>
+        )}
+
+        {pendingDrivePlan && (
+          <div style={{ marginTop: 14, padding: '14px 16px', background: 'rgba(203,168,92,0.05)', border: `1px solid ${BORD}`, borderRadius: 10 }}>
+            {drivePlanNotFound && !drivePlanEditOpen && (
+              <>
+                <div style={{ fontSize: 12.5, color: TEXT, marginBottom: 8 }}>
+                  {lang === 'zh' ? `未找到 ${drivePlanNotFound} 文件夹。` : `Could not find a "${drivePlanNotFound}" folder.`}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={openDrivePlanEdit} style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
+                    {lang === 'zh' ? '选择其他位置' : 'Choose other location'}
+                  </button>
+                  <button onClick={cancelDrivePlan} style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+                    {lang === 'zh' ? '取消' : 'Cancel'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {!drivePlanNotFound && drivePlanCandidates && !drivePlanEditOpen && (
+              <>
+                <div style={{ fontSize: 12.5, color: TEXT, marginBottom: 6 }}>
+                  {lang === 'zh' ? '我找到几个可能的位置：' : 'I found a few possible locations:'}
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                  {drivePlanCandidates.map((f) => (
+                    <button key={f.id} onClick={() => pickDrivePlanRootCandidate(f)} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
+                      {f.name}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={cancelDrivePlan} style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+                  {lang === 'zh' ? '取消' : 'Cancel'}
+                </button>
+              </>
+            )}
+
+            {!drivePlanNotFound && !drivePlanCandidates && !drivePlanEditOpen && (
+              <>
+                <div style={{ fontSize: 12, fontWeight: 700, color: GOLD, marginBottom: 8 }}>
+                  {lang === 'zh' ? '准备执行' : 'Ready to execute'}
+                </div>
+                <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: TEXT, lineHeight: 1.8 }}>
+                  {pendingDrivePlan.steps.map((step, i) => {
+                    if (step.type === 'FIND_FOLDER') {
+                      return (
+                        <li key={i}>
+                          {lang === 'zh' ? '找到：' : 'Find: '}
+                          {step.resolvedFolderName ?? step.query}
+                        </li>
+                      );
+                    }
+                    if (step.type === 'CREATE_FOLDER') {
+                      const parent = pendingDrivePlan.steps[step.parentRef];
+                      const parentName = parent && parent.type === 'FIND_FOLDER' ? (parent.resolvedFolderName ?? parent.query) : '?';
+                      return (
+                        <li key={i}>
+                          {lang === 'zh' ? `在 ${parentName} 下新建：${step.folderName}` : `Create "${step.folderName}" under ${parentName}`}
+                        </li>
+                      );
+                    }
+                    const createStep = getCreateStep(pendingDrivePlan);
+                    return (
+                      <li key={i}>
+                        {lang === 'zh' ? `上传当前文件到：${createStep?.folderName ?? ''}` : `Upload the current file to: ${createStep?.folderName ?? ''}`}
+                      </li>
+                    );
+                  })}
+                </ol>
+                {drivePlanError && <div style={{ fontSize: 11.5, color: RED, marginTop: 8 }}>{drivePlanError}</div>}
+                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                  <button
+                    disabled={drivePlanBusy || !isRootResolved(pendingDrivePlan)}
+                    onClick={confirmDrivePlan}
+                    style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#E2C988)`, border: 'none', color: '#080D1E', fontWeight: 700 }}
+                  >
+                    {drivePlanBusy ? (lang === 'zh' ? '执行中…' : 'Running…') : (lang === 'zh' ? '全部确认' : 'Confirm all')}
+                  </button>
+                  <button onClick={openDrivePlanEdit} style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+                    {lang === 'zh' ? '修改' : 'Edit'}
+                  </button>
+                  <button onClick={cancelDrivePlan} style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+                    {lang === 'zh' ? '取消' : 'Cancel'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {drivePlanEditOpen && (
+              <>
+                <div style={{ fontSize: 12, fontWeight: 700, color: GOLD, marginBottom: 8 }}>
+                  {lang === 'zh' ? '修改计划' : 'Edit plan'}
+                </div>
+                <div style={{ fontSize: 12, color: TEXT, marginBottom: 4 }}>{lang === 'zh' ? '父文件夹：' : 'Parent folder:'}</div>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                  <input
+                    value={drivePlanEditParentQuery}
+                    onChange={(e) => setDrivePlanEditParentQuery(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); searchDrivePlanParentEdit(); } }}
+                    placeholder={lang === 'zh' ? '搜索文件夹' : 'Search folders'}
+                    style={{ flex: 1, fontSize: 12, padding: '5px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: TEXT, outline: 'none' }}
+                  />
+                  <button disabled={drivePlanBusy || !drivePlanEditParentQuery.trim()} onClick={searchDrivePlanParentEdit} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
+                    {lang === 'zh' ? '搜索' : 'Search'}
+                  </button>
+                </div>
+                {drivePlanCandidates && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                    {drivePlanCandidates.map((f) => (
+                      <button key={f.id} onClick={() => pickDrivePlanEditParent(f)} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
+                        {f.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div style={{ fontSize: 12, color: TEXT, marginBottom: 4 }}>{lang === 'zh' ? '子文件夹名称：' : 'Child folder name:'}</div>
+                <input
+                  value={drivePlanEditChildName}
+                  onChange={(e) => setDrivePlanEditChildName(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box', fontSize: 12.5, padding: '6px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: TEXT, outline: 'none', marginBottom: 10 }}
+                />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={closeDrivePlanEdit} style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#E2C988)`, border: 'none', color: '#080D1E', fontWeight: 700 }}>
+                    {lang === 'zh' ? '完成' : 'Done'}
+                  </button>
+                  <button onClick={cancelDrivePlan} style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+                    {lang === 'zh' ? '取消' : 'Cancel'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {drivePlanResult && (
+          <div style={{ marginTop: 14, padding: '14px 16px', background: drivePlanResult.ok ? 'rgba(111,191,142,0.06)' : 'rgba(224,132,106,0.06)', border: `1px solid ${drivePlanResult.ok ? 'rgba(111,191,142,0.3)' : 'rgba(224,132,106,0.35)'}`, borderRadius: 10 }}>
+            {drivePlanResult.ok ? (
+              <>
+                <div style={{ fontSize: 12, fontWeight: 700, color: GREEN, marginBottom: 4 }}>
+                  {lang === 'zh' ? '✓ 已完成' : '✓ Done'}
+                </div>
+                {drivePlanResult.createdFolder && (
+                  <div style={{ fontSize: 12.5, color: TEXT }}>
+                    {lang === 'zh' ? '已创建：' : 'Created: '}{drivePlanResult.createdFolder.name}
+                  </div>
+                )}
+                {drivePlanResult.uploadedFile && (
+                  <>
+                    <div style={{ fontSize: 12.5, color: TEXT }}>
+                      {lang === 'zh' ? '最终位置：My Drive / ' : 'Final location: My Drive / '}{drivePlanResult.uploadedFile.folderName}
+                    </div>
+                    <a href={drivePlanResult.uploadedFile.driveUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11.5, color: GOLD }}>
+                      {lang === 'zh' ? '查看文件 →' : 'View file →'}
+                    </a>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 12, fontWeight: 700, color: RED, marginBottom: 4 }}>
+                  {lang === 'zh' ? '执行失败' : 'Execution failed'}
+                </div>
+                {drivePlanResult.folderCreatedButUploadFailed && (
+                  <div style={{ fontSize: 12.5, color: TEXT, marginBottom: 4 }}>
+                    {lang === 'zh' ? '文件夹已创建，但文件上传失败。' : 'Folder created, but file upload failed.'}
+                  </div>
+                )}
+                <div style={{ fontSize: 11.5, color: MUTED }}>{drivePlanResult.error}</div>
+              </>
+            )}
           </div>
         )}
 
