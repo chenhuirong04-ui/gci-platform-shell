@@ -12,7 +12,7 @@ import { useI18n } from '@gci/i18n';
 import { runGiaTopRouter, type GiaRouterState, type PendingDriveFolderCreate } from '../lib/giaRouter';
 import { confirmCaptureItem, completeOrCancelTask, rescheduleTask, type ResolvedCaptureItem } from '../lib/businessCapture';
 import { BUSINESS_AREA_LABEL, BUSINESS_AREA_LABEL_ZH, ALL_BUSINESS_AREAS, type ExecutiveTask, type TaskBusinessArea } from '../lib/executiveTasks';
-import { uploadAndRegisterLocalFile, searchDriveFolders, extractCompanyName, createFolderIfMissing, getDriveFolderName, DEFAULT_TARGET_FOLDER_ID, DEFAULT_TARGET_FOLDER_NAME, type DriveFolderOption } from '../lib/giaFiles';
+import { uploadAndRegisterLocalFile, searchDriveFolders, listChildFolders, extractCompanyName, createFolderIfMissing, getDriveFolderName, DEFAULT_TARGET_FOLDER_ID, DEFAULT_TARGET_FOLDER_NAME, type DriveFolderOption } from '../lib/giaFiles';
 import {
   findDriveFolderMemory, rememberDriveFolder, findBusinessAreaMemory, rememberBusinessArea, touchMemory, markMemoryStale,
   type DriveFolderMemoryValue, type BusinessAreaMemoryValue,
@@ -121,6 +121,22 @@ export function BusinessAssistantEntry() {
   const [manualCandidates, setManualCandidates] = useState<DriveFolderOption[] | null>(null);
   const [manualSearchBusy, setManualSearchBusy] = useState(false);
   const [manualNotice, setManualNotice] = useState<string | null>(null);
+  // Business History confirm card's own "修改位置" panel — separate from the
+  // manual picker above (that one belongs to the plain upload/describe flow).
+  // Local, not lifted to GiaFileWorkflowContext: it's transient UI for
+  // adjusting selectedFolder, not part of "the pending business document"
+  // itself (selectedFolder, the thing it actually writes, already persists).
+  const [bizDocFolderPanelOpen, setBizDocFolderPanelOpen] = useState(false);
+  const [bizDocFolderChildren, setBizDocFolderChildren] = useState<DriveFolderOption[] | null>(null);
+  const [bizDocFolderChildrenBusy, setBizDocFolderChildrenBusy] = useState(false);
+  const [bizDocFolderSearchQuery, setBizDocFolderSearchQuery] = useState('');
+  const [bizDocFolderSearchResults, setBizDocFolderSearchResults] = useState<DriveFolderOption[] | null>(null);
+  const [bizDocFolderSearchBusy, setBizDocFolderSearchBusy] = useState(false);
+  const [bizDocFolderSearchNotice, setBizDocFolderSearchNotice] = useState<string | null>(null);
+  const [bizDocFolderCreateOpen, setBizDocFolderCreateOpen] = useState(false);
+  const [bizDocFolderCreateName, setBizDocFolderCreateName] = useState('');
+  const [bizDocFolderCreateBusy, setBizDocFolderCreateBusy] = useState(false);
+  const [bizDocFolderCreateError, setBizDocFolderCreateError] = useState<string | null>(null);
   // Multi-step Drive Plan V1 — only reachable while selectedFile is set
   // (every V1 plan ends in an upload step). Kept fully separate from
   // pendingCapture/Planner state, same discipline as everything else in
@@ -413,6 +429,7 @@ export function BusinessAssistantEntry() {
     setBusinessDocError(null);
     setBusinessDocSaved(null);
     resetCrmActionPanel();
+    resetBizDocFolderPanel();
   }
 
   // The core routing step: "用户自然语言 + 文件名 → 真实 Drive 搜索 → 推荐".
@@ -668,6 +685,7 @@ export function BusinessAssistantEntry() {
     setPendingBusinessDocument(null);
     setBusinessDocError(null);
     resetCrmActionPanel();
+    resetBizDocFolderPanel();
   }
 
   // Business History / Document Timeline V1 Round 2 — read-only parse +
@@ -680,6 +698,95 @@ export function BusinessAssistantEntry() {
     setCrmLinkQuery('');
     setCrmLinkResults(null);
     setCrmLinkNotice(null);
+  }
+
+  function resetBizDocFolderPanel() {
+    setBizDocFolderPanelOpen(false);
+    setBizDocFolderChildren(null);
+    setBizDocFolderSearchQuery('');
+    setBizDocFolderSearchResults(null);
+    setBizDocFolderSearchNotice(null);
+    setBizDocFolderCreateOpen(false);
+    setBizDocFolderCreateName('');
+    setBizDocFolderCreateError(null);
+  }
+
+  function toggleBizDocFolderPanel() {
+    if (bizDocFolderPanelOpen) resetBizDocFolderPanel();
+    else setBizDocFolderPanelOpen(true);
+  }
+
+  // Read-only — lists selectedFolder's REAL immediate children via the
+  // existing drive-list-folder.ts ?parentId= mode. Never called until the
+  // user explicitly opens this panel and asks to see them.
+  async function loadBizDocFolderChildren() {
+    setBizDocFolderChildrenBusy(true);
+    const children = await listChildFolders(selectedFolder.id);
+    setBizDocFolderChildrenBusy(false);
+    setBizDocFolderChildren(children);
+  }
+
+  // Bakes the real parent name into the display string at the moment of
+  // selection ("HIGHWAYGLOBAL" + "ZIMO" -> "HIGHWAYGLOBAL / ZIMO") instead of
+  // fetching/reconstructing a full Drive path — both names are already known
+  // to be real and correct right here, so this is accurate, not fabricated,
+  // and avoids building a recursive Drive-tree path resolver for V1.
+  function pickBizDocFolderChild(child: DriveFolderOption) {
+    setSelectedFolder({ id: child.id, name: `${selectedFolder.name} / ${child.name}` });
+    if (pendingBusinessDocument) setPendingBusinessDocument({ ...pendingBusinessDocument, folderIsDefaultFallback: false });
+    resetBizDocFolderPanel();
+  }
+
+  async function runBizDocFolderSearch() {
+    const q = bizDocFolderSearchQuery.trim();
+    if (!q) return;
+    setBizDocFolderSearchBusy(true);
+    setBizDocFolderSearchNotice(null);
+    const results = await searchDriveFolders(q);
+    setBizDocFolderSearchBusy(false);
+    if (results.length === 0) {
+      setBizDocFolderSearchResults(null);
+      setBizDocFolderSearchNotice(lang === 'zh' ? `未找到匹配"${q}"的文件夹` : `No folder matched "${q}"`);
+    } else {
+      setBizDocFolderSearchResults(results.slice(0, 5));
+    }
+  }
+
+  // A search result is an absolute Drive folder the real search already
+  // named/found on its own — used as-is, never prefixed with the old
+  // selectedFolder's name (unlike a child pick, this isn't "under" it).
+  function pickBizDocFolderSearchResult(f: DriveFolderOption) {
+    setSelectedFolder({ id: f.id, name: f.name });
+    if (pendingBusinessDocument) setPendingBusinessDocument({ ...pendingBusinessDocument, folderIsDefaultFallback: false });
+    resetBizDocFolderPanel();
+  }
+
+  function openBizDocFolderCreate() {
+    setBizDocFolderCreateOpen(true);
+    setBizDocFolderCreateName('');
+    setBizDocFolderCreateError(null);
+  }
+
+  function cancelBizDocFolderCreate() {
+    setBizDocFolderCreateOpen(false);
+    setBizDocFolderCreateError(null);
+  }
+
+  // Explicit two-step confirm, same discipline as CRM create above — the
+  // Drive API is only ever called from this button's own click, never
+  // automatically. Reuses createFolderIfMissing() unchanged (no second
+  // create-folder implementation).
+  async function confirmBizDocFolderCreate() {
+    const name = bizDocFolderCreateName.trim();
+    if (!name) return;
+    setBizDocFolderCreateBusy(true);
+    setBizDocFolderCreateError(null);
+    const res = await createFolderIfMissing(name, selectedFolder.id);
+    setBizDocFolderCreateBusy(false);
+    if (!res.ok) { setBizDocFolderCreateError(res.error); return; }
+    setSelectedFolder({ id: res.folderId, name: `${selectedFolder.name} / ${name}` });
+    if (pendingBusinessDocument) setPendingBusinessDocument({ ...pendingBusinessDocument, folderIsDefaultFallback: false });
+    resetBizDocFolderPanel();
   }
 
   // V1, no AI: full entity_name first, then each "/"-separated part — an
@@ -759,6 +866,7 @@ export function BusinessAssistantEntry() {
     setBusinessDocBusy(true);
     setBusinessDocError(null);
     resetCrmActionPanel();
+    resetBizDocFolderPanel();
     const { customerId, customerName, candidateCustomers } = await resolveCrmCustomerForEntity(parsed.entityName);
     // A failed CRM lookup (network/query error) never blocks the flow —
     // it just means "尚未关联CRM客户", same as a genuine zero-match.
@@ -880,12 +988,14 @@ export function BusinessAssistantEntry() {
     setBusinessDocError(null);
     setFileDescription('');
     resetCrmActionPanel();
+    resetBizDocFolderPanel();
   }
 
   function cancelBusinessDocument() {
     setPendingBusinessDocument(null);
     setBusinessDocError(null);
     resetCrmActionPanel();
+    resetBizDocFolderPanel();
   }
 
   // The strict write sequence (spec section 八): upload+register to Drive
@@ -945,6 +1055,7 @@ export function BusinessAssistantEntry() {
     setPendingBusinessDocument(null);
     setSelectedFile(null);
     resetCrmActionPanel();
+    resetBizDocFolderPanel();
   }
 
   // Hard upload gate — enforced here regardless of which button/UI path
@@ -1434,8 +1545,98 @@ export function BusinessAssistantEntry() {
                     {lang === 'zh' ? '（默认兜底目录，未找到匹配文件夹）' : ' (default fallback — no matching folder found)'}
                   </span>
                 )}
+                {' '}
+                <span onClick={toggleBizDocFolderPanel} style={{ color: GOLD, fontSize: 11.5, cursor: 'pointer', textDecoration: 'underline' }}>
+                  {lang === 'zh' ? '修改位置' : 'Change location'}
+                </span>
               </div>
             </div>
+
+            {bizDocFolderPanelOpen && (
+              <div style={{ marginBottom: 8, padding: '10px 12px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORD}`, borderRadius: 8 }}>
+                <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 8 }}>
+                  {lang === 'zh' ? '当前目录：' : 'Current folder: '}<span style={{ color: TEXT }}>{selectedFolder.name}</span>
+                </div>
+
+                {!bizDocFolderCreateOpen && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                    <button disabled={bizDocFolderChildrenBusy} onClick={loadBizDocFolderChildren} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
+                      {bizDocFolderChildrenBusy ? (lang === 'zh' ? '加载中…' : 'Loading…') : (lang === 'zh' ? '查看子目录' : 'View subfolders')}
+                    </button>
+                    <button onClick={openBizDocFolderCreate} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
+                      {lang === 'zh' ? '新建子文件夹' : 'New subfolder'}
+                    </button>
+                  </div>
+                )}
+
+                {bizDocFolderChildren && !bizDocFolderCreateOpen && (
+                  <div style={{ marginBottom: 8 }}>
+                    {bizDocFolderChildren.length === 0 ? (
+                      <div style={{ fontSize: 11.5, color: MUTED }}>{lang === 'zh' ? '该目录下没有子文件夹' : 'No subfolders here'}</div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {bizDocFolderChildren.map((f) => (
+                          <button key={f.id} onClick={() => pickBizDocFolderChild(f)} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
+                            {f.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!bizDocFolderCreateOpen && (
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                    <input
+                      value={bizDocFolderSearchQuery}
+                      onChange={(e) => setBizDocFolderSearchQuery(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); runBizDocFolderSearch(); } }}
+                      placeholder={lang === 'zh' ? '搜索其他Drive文件夹' : 'Search other Drive folders'}
+                      style={{ flex: 1, fontSize: 12, padding: '6px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: TEXT, outline: 'none' }}
+                    />
+                    <button disabled={bizDocFolderSearchBusy || !bizDocFolderSearchQuery.trim()} onClick={runBizDocFolderSearch} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
+                      {bizDocFolderSearchBusy ? (lang === 'zh' ? '搜索中…' : 'Searching…') : (lang === 'zh' ? '搜索' : 'Search')}
+                    </button>
+                  </div>
+                )}
+                {bizDocFolderSearchResults && !bizDocFolderCreateOpen && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+                    {bizDocFolderSearchResults.map((f) => (
+                      <button key={f.id} onClick={() => pickBizDocFolderSearchResult(f)} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
+                        {f.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {bizDocFolderSearchNotice && !bizDocFolderCreateOpen && <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 6 }}>{bizDocFolderSearchNotice}</div>}
+
+                {bizDocFolderCreateOpen && (
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 11.5, color: TEXT, marginBottom: 4 }}>{lang === 'zh' ? '新文件夹名称：' : 'New folder name:'}</div>
+                    <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 6 }}>{lang === 'zh' ? '当前位置：' : 'Current location: '}{selectedFolder.name}</div>
+                    <input
+                      value={bizDocFolderCreateName}
+                      onChange={(e) => setBizDocFolderCreateName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirmBizDocFolderCreate(); } }}
+                      style={{ width: '100%', boxSizing: 'border-box', fontSize: 12.5, padding: '6px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: TEXT, outline: 'none', marginBottom: 6 }}
+                    />
+                    {bizDocFolderCreateError && <div style={{ fontSize: 11.5, color: RED, marginBottom: 6 }}>{bizDocFolderCreateError}</div>}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button disabled={bizDocFolderCreateBusy || !bizDocFolderCreateName.trim()} onClick={confirmBizDocFolderCreate} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#E2C988)`, border: 'none', color: '#080D1E', fontWeight: 700 }}>
+                        {bizDocFolderCreateBusy ? (lang === 'zh' ? '创建中…' : 'Creating…') : (lang === 'zh' ? '确认创建' : 'Confirm create')}
+                      </button>
+                      <button disabled={bizDocFolderCreateBusy} onClick={cancelBizDocFolderCreate} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+                        {lang === 'zh' ? '取消' : 'Cancel'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <button onClick={resetBizDocFolderPanel} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+                  {lang === 'zh' ? '收起' : 'Close'}
+                </button>
+              </div>
+            )}
 
             {pendingBusinessDocument.candidateCustomers && (
               <div style={{ marginBottom: 8 }}>

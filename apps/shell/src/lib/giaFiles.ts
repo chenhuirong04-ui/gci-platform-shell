@@ -301,6 +301,23 @@ export async function searchDriveFolders(query: string): Promise<DriveFolderOpti
   }
 }
 
+// Real, read-only child-folder listing — reuses drive-list-folder.ts's
+// existing ?parentId= mode (already lists a folder's immediate children;
+// previously only its ?fileId= mode had a client wrapper here), filtered to
+// folders only, same shape as searchDriveFolders. No new Drive endpoint.
+export async function listChildFolders(parentId: string): Promise<DriveFolderOption[]> {
+  try {
+    const res = await fetch(`/api/google/drive-list-folder?parentId=${encodeURIComponent(parentId)}`);
+    const data = await res.json();
+    if (!data.ok) return [];
+    return (data.results || [])
+      .filter((r: any) => r.mimeType === 'application/vnd.google-apps.folder')
+      .map((r: any) => ({ id: r.id, name: r.name, webViewLink: r.webViewLink }));
+  } catch {
+    return [];
+  }
+}
+
 // GIA Home local file upload entry point — a browser File the user picked
 // via a native file-select dialog or drag & drop (not chat text, not a
 // URL/Drive link). Deliberately skips classifyFileDescription(): no AI, no
