@@ -117,48 +117,75 @@ function scoreCatalogRow(query: string, row: ServiceCatalogRow): number {
   return Math.max(zhScore, enScore);
 }
 
-// Bug fix — "VAT注册多少钱？" was scoring close enough (5 vs 3, a thin LCS
-// margin — VAT Registration's "...VAT登记" vs VAT Filing's "...VAT申报"
-// both share the "vat" run) that the two candidates were never reliably
-// separated across every phrasing/whitespace variant; LCS alone can't
-// structurally guarantee "注册" never matches a "申报" service. Business
-// action words are a closed, known vocabulary here — checked as a hard
-// filter BEFORE any fuzzy scoring, not left to a numeric margin.
-type ServiceActionCategory = 'registration' | 'filing' | 'bookkeeping' | 'tax_update' | 'advisory' | 'audit_coordination';
+// Bug fix history: an action-only filter ("注册/登记/registration") still
+// let "VAT注册多少钱？" match every *_registration row in the catalog —
+// including pre-existing, unrelated placeholder services (Company
+// Registration, Free Zone Company Registration, ... at AED 0) that happen
+// to share the action word. An action word alone was never enough:
+// "registration" describes WHAT KIND of step it is, not WHICH service.
+// Real disambiguation needs a SUBJECT too — "VAT" registration vs
+// "Corporate Tax" registration vs "Electronic Invoicing" registration are
+// different services that all happen to be registrations. Entity is
+// checked first (a closed, known vocabulary of real subjects in this
+// catalog), then action narrows further within that subject — LCS scoring
+// only runs last, as a tie-breaker inside the already-narrowed pool, never
+// as the thing deciding which subject a query is about.
+type ServiceEntity = 'vat' | 'corporate_tax' | 'electronic_invoicing' | 'bookkeeping' | 'audit';
+const ENTITY_PATTERNS: [ServiceEntity, RegExp][] = [
+  ['vat', /\bvat\b/i],
+  ['corporate_tax', /企业税|corporate\s*tax/i],
+  ['electronic_invoicing', /电子发票|electronic\s*invoicing|e-?invoicing/i],
+  ['bookkeeping', /记账|bookkeeping/i],
+  ['audit', /审计|audit/i],
+];
+
+type ServiceActionCategory = 'registration' | 'filing' | 'advisory' | 'update' | 'coordination';
 const ACTION_CATEGORY_PATTERNS: [ServiceActionCategory, RegExp][] = [
   ['registration', /注册|登记|registration/i],
   ['filing', /申报|filing/i],
-  ['bookkeeping', /记账|bookkeeping/i],
-  ['tax_update', /更新|\bupdate\b/i],
   ['advisory', /顾问|advisory/i],
-  ['audit_coordination', /审计协调|audit\s*coordination/i],
+  ['update', /更新|\bupdate\b/i],
+  ['coordination', /协调|coordination/i],
 ];
-function detectActionCategory(text: string): ServiceActionCategory | null {
-  for (const [category, pattern] of ACTION_CATEGORY_PATTERNS) {
-    if (pattern.test(text)) return category;
+
+function detectFromPatterns<T extends string>(text: string, patterns: [T, RegExp][]): T | null {
+  for (const [key, pattern] of patterns) {
+    if (pattern.test(text)) return key;
   }
   return null;
 }
 
 // Returns the catalog rows whose name most strongly matches the query.
-// Step 1 (new): if the query names a specific business action (注册/登记,
-// 申报, 记账, etc.), the candidate pool is hard-filtered to only rows whose
-// OWN name is in that same action category — "VAT注册" can then only ever
-// be compared against other *_registration rows (VAT/Corporate
-// Tax/Electronic Invoicing ASP Registration), never against VAT Filing.
-// Step 2 (unchanged): fuzzy entity scoring picks the top-scoring row(s)
-// within that pool. When two rows are a real, deliberate split of one
-// service sharing the same action category and the same base name (e.g.
-// the two Bookkeeping tiers, or the two Corporate Tax Filing tiers), they
-// tie for the top score and are BOTH returned — never guessed down to one.
+// Step 1: if the query names a real subject (VAT / Corporate Tax /
+// Electronic Invoicing / Bookkeeping / Audit), hard-filter to only rows
+// whose own name is that same subject.
+// Step 2: if the query also names a business action (注册/登记, 申报,
+// 顾问, 更新, 协调), further hard-filter (within whatever step 1 already
+// narrowed to) to rows whose own name is that same action — this is what
+// makes "VAT注册" resolve to exactly VAT Registration and nothing else,
+// and "Corporate Tax Registration" never leaks into a "VAT" query.
+// Step 3 (unchanged): fuzzy LCS scoring picks the top-scoring row(s)
+// within whatever step 1+2 narrowed to — this is what still lets the two
+// deliberate tiers of one service (Bookkeeping, Corporate Tax Filing) tie
+// and both come back, since they share an identical base name.
+// When the query names no entity at all (e.g. "注册服务有哪些？"), no
+// entity filter is applied and the (possibly action-filtered) pool stays
+// broad — intentional, per the "只有用户没说清entity时才允许更宽结果" rule.
 export function matchServiceCatalog(query: string, rows: ServiceCatalogRow[]): ServiceCatalogRow[] {
   const FLOOR = 2;
-  const queryCategory = detectActionCategory(query);
+  const queryEntity = detectFromPatterns(query, ENTITY_PATTERNS);
+  const queryAction = detectFromPatterns(query, ACTION_CATEGORY_PATTERNS);
+
   let pool = rows;
-  if (queryCategory) {
-    const filtered = rows.filter((r) => detectActionCategory(`${r.name_cn} ${r.name_en}`) === queryCategory);
+  if (queryEntity) {
+    const filtered = pool.filter((r) => detectFromPatterns(`${r.name_cn} ${r.name_en}`, ENTITY_PATTERNS) === queryEntity);
     if (filtered.length > 0) pool = filtered;
   }
+  if (queryAction) {
+    const filtered = pool.filter((r) => detectFromPatterns(`${r.name_cn} ${r.name_en}`, ACTION_CATEGORY_PATTERNS) === queryAction);
+    if (filtered.length > 0) pool = filtered;
+  }
+
   const scored = pool.map((r) => ({ row: r, score: scoreCatalogRow(query, r) })).filter((x) => x.score >= FLOOR);
   if (scored.length === 0) return [];
   const max = Math.max(...scored.map((x) => x.score));
