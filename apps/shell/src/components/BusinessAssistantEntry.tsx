@@ -22,7 +22,7 @@ import {
   getCreateStep, withChildFolderName, executeDrivePlan,
   type DriveActionPlan, type DrivePlanExecutionResult,
 } from '../lib/driveActionPlan';
-import { findCustomerByName, type CrmCustomer } from '../lib/crmSupabase';
+import { findCustomerByName, createCustomerWithContact, type CrmCustomer } from '../lib/crmSupabase';
 import {
   looksLikeBusinessDocumentDescription, parseBusinessDocumentDescription, todayISO as bizDocTodayISO,
   createBusinessDocumentHistory, supersedeCurrentBusinessDocuments,
@@ -150,11 +150,26 @@ export function BusinessAssistantEntry() {
     versionNo: number | null; versionLabel: string | null; status: BusinessDocumentStatus;
     amount: number | null; currency: string | null; notes: string | null; documentDate: string;
     customerId: string | null; customerName: string | null; candidateCustomers: CrmCustomer[] | null;
+    // true only when no memory/search match resolved a real Drive folder and
+    // selectedFolder fell all the way back to the 00_Inbox_To_Sort default —
+    // the confirm card must say so explicitly rather than silently showing it.
+    folderIsDefaultFallback: boolean;
   }
   const [pendingBusinessDocument, setPendingBusinessDocument] = useState<PendingBusinessDocument | null>(null);
   const [businessDocBusy, setBusinessDocBusy] = useState(false);
   const [businessDocError, setBusinessDocError] = useState<string | null>(null);
   const [businessDocSaved, setBusinessDocSaved] = useState<{ title: string; driveUrl: string; folderName: string } | null>(null);
+  // CRM linking sub-panel inside the Business History confirm card — only
+  // relevant while pendingBusinessDocument.customerId is null. Three explicit
+  // choices (create / link existing / skip), never an automatic CRM create.
+  const [crmActionMode, setCrmActionMode] = useState<'idle' | 'create' | 'link'>('idle');
+  const [crmCreateName, setCrmCreateName] = useState('');
+  const [crmCreateBusy, setCrmCreateBusy] = useState(false);
+  const [crmCreateError, setCrmCreateError] = useState<string | null>(null);
+  const [crmLinkQuery, setCrmLinkQuery] = useState('');
+  const [crmLinkResults, setCrmLinkResults] = useState<CrmCustomer[] | null>(null);
+  const [crmLinkBusy, setCrmLinkBusy] = useState(false);
+  const [crmLinkNotice, setCrmLinkNotice] = useState<string | null>(null);
   // GIA Memory V1 — pre-fills each fresh BUSINESS_TODO's business area from
   // a remembered mapping (outranking Planner's own guess for this session,
   // per the read-only design's lookup priority), while leaving the
@@ -424,6 +439,7 @@ export function BusinessAssistantEntry() {
     setPendingBusinessDocument(null);
     setBusinessDocError(null);
     setBusinessDocSaved(null);
+    resetCrmActionPanel();
   }
 
   // The core routing step: "用户自然语言 + 文件名 → 真实 Drive 搜索 → 推荐".
@@ -678,17 +694,68 @@ export function BusinessAssistantEntry() {
     setManualNotice(null);
     setPendingBusinessDocument(null);
     setBusinessDocError(null);
+    resetCrmActionPanel();
   }
 
   // Business History / Document Timeline V1 Round 2 — read-only parse +
   // customer lookup, never writes anything yet (that only happens on the
   // explicit "确认保存" click in confirmBusinessDocumentSave below).
+  function resetCrmActionPanel() {
+    setCrmActionMode('idle');
+    setCrmCreateName('');
+    setCrmCreateError(null);
+    setCrmLinkQuery('');
+    setCrmLinkResults(null);
+    setCrmLinkNotice(null);
+  }
+
+  // V1, no AI: full entity_name first, then each "/"-separated part, then
+  // giaFiles.ts's known-company fallback — first candidate that resolves to
+  // a REAL, still-existing Drive folder (memory hit re-verified via
+  // getDriveFolderName, or a real search hit) wins. Never creates a folder.
+  function buildFolderCandidateKeys(entityName: string): string[] {
+    const keys: string[] = [];
+    const full = entityName.trim();
+    if (full) keys.push(full);
+    for (const part of full.split('/')) {
+      const p = part.trim();
+      if (p && !keys.includes(p)) keys.push(p);
+    }
+    const known = extractCompanyName(full);
+    if (known && !keys.some((k) => k.toLowerCase() === known.toLowerCase())) keys.push(known);
+    return keys;
+  }
+
+  async function resolveBusinessDocumentFolder(entityName: string): Promise<{ id: string; name: string; isDefaultFallback: boolean }> {
+    const candidates = buildFolderCandidateKeys(entityName);
+    for (const key of candidates) {
+      const memory = await findDriveFolderMemory(key);
+      if (!memory) continue;
+      const value = memory.value_json as DriveFolderMemoryValue;
+      const realName = await getDriveFolderName(value.folderId);
+      if (realName) {
+        touchMemory(memory.id);
+        return { id: value.folderId, name: realName, isDefaultFallback: false };
+      }
+      await markMemoryStale(memory.id);
+    }
+    for (const key of candidates) {
+      const results = await searchDriveFolders(key);
+      if (results.length === 0) continue;
+      const exact = results.find((r) => r.name.toLowerCase() === key.toLowerCase());
+      const pick = exact ?? results[0];
+      return { id: pick.id, name: pick.name, isDefaultFallback: false };
+    }
+    return { id: DEFAULT_TARGET_FOLDER_ID, name: DEFAULT_TARGET_FOLDER_NAME, isDefaultFallback: true };
+  }
+
   async function describeFileAsBusinessDocument(description: string) {
     if (!selectedFile) return;
     const parsed = parseBusinessDocumentDescription(description);
     if (!parsed) return;
     setBusinessDocBusy(true);
     setBusinessDocError(null);
+    resetCrmActionPanel();
     const res = await findCustomerByName(parsed.entityName);
     let customerId: string | null = null;
     let customerName: string | null = null;
@@ -701,13 +768,104 @@ export function BusinessAssistantEntry() {
     }
     // A failed CRM lookup (network/query error) never blocks the flow —
     // it just means "尚未关联CRM客户", same as a genuine zero-match.
+
+    // Drive folder priority (spec section 六): 1) already explicitly
+    // resolved/picked for this selectedFile this session (selectedFolder is
+    // no longer the default) 2) gia_memory for this entity 3) real Drive
+    // search 4) 00_Inbox_To_Sort. Only step 1 is "free" — it's just whatever
+    // describeAndRouteFile/the manual picker already resolved earlier for
+    // this same file; steps 2-3 only run when nothing has resolved it yet.
+    let folderIsDefaultFallback = false;
+    if (selectedFolder.id === DEFAULT_TARGET_FOLDER_ID) {
+      const resolved = await resolveBusinessDocumentFolder(parsed.entityName);
+      setSelectedFolder({ id: resolved.id, name: resolved.name });
+      folderIsDefaultFallback = resolved.isDefaultFallback;
+    }
+
     setBusinessDocBusy(false);
     setPendingBusinessDocument({
       entityName: parsed.entityName, documentType: parsed.documentType, title: parsed.title,
       versionNo: parsed.versionNo, versionLabel: parsed.versionLabel, status: parsed.status,
       amount: parsed.amount, currency: parsed.currency, notes: parsed.notes,
       documentDate: bizDocTodayISO(), customerId, customerName, candidateCustomers,
+      folderIsDefaultFallback,
     });
+  }
+
+  // Suggests a customer name to prefill the "创建CRM客户" confirm box —
+  // never auto-creates. "HIGHWAYGLOBAL / ZIMO" style entity names put the
+  // company first; anything unclear just falls back to the raw entity_name
+  // for the user to edit themselves (spec section 三).
+  function suggestCrmCustomerName(entityName: string): string {
+    if (entityName.includes('/')) {
+      const first = entityName.split('/')[0].trim();
+      if (first) return first;
+    }
+    return entityName;
+  }
+
+  function openCrmCreate() {
+    if (!pendingBusinessDocument) return;
+    setCrmActionMode('create');
+    setCrmCreateName(suggestCrmCustomerName(pendingBusinessDocument.entityName));
+    setCrmCreateError(null);
+  }
+
+  function openCrmLink() {
+    setCrmActionMode('link');
+    setCrmLinkQuery('');
+    setCrmLinkResults(null);
+    setCrmLinkNotice(null);
+  }
+
+  function cancelCrmAction() {
+    setCrmActionMode('idle');
+    setCrmCreateError(null);
+    setCrmLinkNotice(null);
+  }
+
+  function markCrmUnlinkedExplicit() {
+    if (!pendingBusinessDocument) return;
+    setPendingBusinessDocument({ ...pendingBusinessDocument, candidateCustomers: null });
+    setCrmActionMode('idle');
+  }
+
+  // Explicit two-step confirm (spec section十: never auto-create) — this is
+  // the ONLY place createCustomerWithContact() is called from this flow, and
+  // only ever from this button's own click, never automatically just
+  // because customer_id is null.
+  async function confirmCrmCreate() {
+    if (!pendingBusinessDocument) return;
+    const name = crmCreateName.trim();
+    if (!name) return;
+    setCrmCreateBusy(true);
+    setCrmCreateError(null);
+    const res = await createCustomerWithContact({ customerName: name });
+    setCrmCreateBusy(false);
+    if (!res.ok) { setCrmCreateError(res.error); return; }
+    setPendingBusinessDocument({ ...pendingBusinessDocument, customerId: res.customer.id, customerName: res.customer.customer_name, candidateCustomers: null });
+    setCrmActionMode('idle');
+  }
+
+  function pickCrmLinkCustomer(customer: CrmCustomer) {
+    if (!pendingBusinessDocument) return;
+    setPendingBusinessDocument({ ...pendingBusinessDocument, customerId: customer.id, customerName: customer.customer_name, candidateCustomers: null });
+    setCrmActionMode('idle');
+    setCrmLinkResults(null);
+  }
+
+  async function runCrmLinkSearch() {
+    const q = crmLinkQuery.trim();
+    if (!q) return;
+    setCrmLinkBusy(true);
+    setCrmLinkNotice(null);
+    const res = await findCustomerByName(q);
+    setCrmLinkBusy(false);
+    if (!res.ok) { setCrmLinkNotice(lang === 'zh' ? '搜索失败，请重试' : 'Search failed, please retry'); return; }
+    if (res.found) { pickCrmLinkCustomer(res.customer); return; }
+    if (res.multiple) { setCrmLinkResults(res.candidates); return; }
+    setCrmLinkResults(null);
+    setCrmLinkNotice(lang === 'zh' ? '未找到客户' : 'No customer found');
   }
 
   function pickBusinessDocumentCustomer(customer: CrmCustomer) {
@@ -727,11 +885,13 @@ export function BusinessAssistantEntry() {
     setPendingBusinessDocument(null);
     setBusinessDocError(null);
     setFileDescription('');
+    resetCrmActionPanel();
   }
 
   function cancelBusinessDocument() {
     setPendingBusinessDocument(null);
     setBusinessDocError(null);
+    resetCrmActionPanel();
   }
 
   // The strict write sequence (spec section 八): upload+register to Drive
@@ -790,6 +950,7 @@ export function BusinessAssistantEntry() {
     setBusinessDocSaved({ title: topic.title, driveUrl: uploaded.row.drive_url, folderName: uploaded.actualFolderName });
     setPendingBusinessDocument(null);
     setSelectedFile(null);
+    resetCrmActionPanel();
   }
 
   // Hard upload gate — enforced here regardless of which button/UI path
@@ -1252,15 +1413,15 @@ export function BusinessAssistantEntry() {
               {lang === 'zh' ? '准备记录业务文件' : 'Ready to record business document'}
             </div>
             <div style={{ fontSize: 12.5, color: TEXT, lineHeight: 1.8, marginBottom: 8 }}>
+              <div>{lang === 'zh' ? '客户/实体：' : 'Customer/Entity: '}{pendingBusinessDocument.entityName}</div>
               <div>
-                {lang === 'zh' ? '客户：' : 'Customer: '}
-                {pendingBusinessDocument.customerName ? (
-                  pendingBusinessDocument.customerName
+                {lang === 'zh' ? 'CRM：' : 'CRM: '}
+                {pendingBusinessDocument.customerId ? (
+                  <span style={{ color: GREEN }}>{lang === 'zh' ? '已关联 ' : 'Linked: '}{pendingBusinessDocument.customerName}</span>
+                ) : pendingBusinessDocument.candidateCustomers ? (
+                  <span style={{ color: MUTED }}>{lang === 'zh' ? '找到多个可能的客户' : 'Multiple possible customers found'}</span>
                 ) : (
-                  <span style={{ color: MUTED }}>
-                    {pendingBusinessDocument.entityName}
-                    {lang === 'zh' ? '（尚未关联CRM客户）' : ' (not linked to a CRM customer)'}
-                  </span>
+                  <span style={{ color: MUTED }}>{lang === 'zh' ? '尚未关联' : 'Not linked'}</span>
                 )}
               </div>
               <div>{lang === 'zh' ? '类型：' : 'Type: '}{lang === 'zh' ? DOC_TYPE_LABEL_ZH[pendingBusinessDocument.documentType] : DOC_TYPE_LABEL_EN[pendingBusinessDocument.documentType]}</div>
@@ -1272,7 +1433,14 @@ export function BusinessAssistantEntry() {
                 <div>{lang === 'zh' ? '金额：' : 'Amount: '}{pendingBusinessDocument.currency} {pendingBusinessDocument.amount}</div>
               )}
               <div>{lang === 'zh' ? '文件：' : 'File: '}{selectedFile?.name}</div>
-              <div>{lang === 'zh' ? '目标Drive目录：' : 'Target Drive folder: '}{selectedFolder.name}</div>
+              <div>
+                {lang === 'zh' ? '目标Drive目录：' : 'Target Drive folder: '}{selectedFolder.name}
+                {pendingBusinessDocument.folderIsDefaultFallback && (
+                  <span style={{ color: MUTED, fontSize: 11 }}>
+                    {lang === 'zh' ? '（默认兜底目录，未找到匹配文件夹）' : ' (default fallback — no matching folder found)'}
+                  </span>
+                )}
+              </div>
             </div>
 
             {pendingBusinessDocument.candidateCustomers && (
@@ -1290,6 +1458,75 @@ export function BusinessAssistantEntry() {
                     {lang === 'zh' ? '不关联客户' : 'No customer link'}
                   </button>
                 </div>
+              </div>
+            )}
+
+            {!pendingBusinessDocument.customerId && !pendingBusinessDocument.candidateCustomers && crmActionMode === 'idle' && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                <button onClick={openCrmCreate} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
+                  {lang === 'zh' ? '创建CRM客户' : 'Create CRM customer'}
+                </button>
+                <button onClick={openCrmLink} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
+                  {lang === 'zh' ? '关联已有客户' : 'Link existing customer'}
+                </button>
+                <button onClick={markCrmUnlinkedExplicit} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+                  {lang === 'zh' ? '暂不关联' : 'Skip for now'}
+                </button>
+              </div>
+            )}
+
+            {crmActionMode === 'create' && (
+              <div style={{ marginBottom: 8, paddingTop: 8, borderTop: `1px solid ${BORD}` }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: GOLD, marginBottom: 6 }}>
+                  {lang === 'zh' ? '准备创建CRM客户' : 'Ready to create CRM customer'}
+                </div>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                  <input
+                    value={crmCreateName}
+                    onChange={(e) => setCrmCreateName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirmCrmCreate(); } }}
+                    style={{ flex: 1, fontSize: 12.5, padding: '7px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: TEXT, outline: 'none' }}
+                  />
+                </div>
+                {crmCreateError && <div style={{ fontSize: 11.5, color: RED, marginBottom: 6 }}>{crmCreateError}</div>}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button disabled={crmCreateBusy || !crmCreateName.trim()} onClick={confirmCrmCreate} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#E2C988)`, border: 'none', color: '#080D1E', fontWeight: 700 }}>
+                    {crmCreateBusy ? (lang === 'zh' ? '创建中…' : 'Creating…') : (lang === 'zh' ? '确认创建' : 'Confirm create')}
+                  </button>
+                  <button disabled={crmCreateBusy} onClick={cancelCrmAction} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+                    {lang === 'zh' ? '取消' : 'Cancel'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {crmActionMode === 'link' && (
+              <div style={{ marginBottom: 8, paddingTop: 8, borderTop: `1px solid ${BORD}` }}>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                  <input
+                    value={crmLinkQuery}
+                    onChange={(e) => setCrmLinkQuery(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); runCrmLinkSearch(); } }}
+                    placeholder={lang === 'zh' ? '搜索CRM客户' : 'Search CRM customers'}
+                    style={{ flex: 1, fontSize: 12.5, padding: '7px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: TEXT, outline: 'none' }}
+                  />
+                  <button disabled={crmLinkBusy || !crmLinkQuery.trim()} onClick={runCrmLinkSearch} style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
+                    {crmLinkBusy ? (lang === 'zh' ? '搜索中…' : 'Searching…') : (lang === 'zh' ? '搜索' : 'Search')}
+                  </button>
+                </div>
+                {crmLinkResults && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+                    {crmLinkResults.map((c) => (
+                      <button key={c.id} onClick={() => pickCrmLinkCustomer(c)} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
+                        {c.customer_name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {crmLinkNotice && <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 6 }}>{crmLinkNotice}</div>}
+                <button onClick={cancelCrmAction} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+                  {lang === 'zh' ? '取消' : 'Cancel'}
+                </button>
               </div>
             )}
 
