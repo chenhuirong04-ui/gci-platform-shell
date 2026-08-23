@@ -22,7 +22,13 @@ import {
   getCreateStep, withChildFolderName, executeDrivePlan,
   type DriveActionPlan, type DrivePlanExecutionResult,
 } from '../lib/driveActionPlan';
-import type { CrmCustomer } from '../lib/crmSupabase';
+import { findCustomerByName, type CrmCustomer } from '../lib/crmSupabase';
+import {
+  looksLikeBusinessDocumentDescription, parseBusinessDocumentDescription, todayISO as bizDocTodayISO,
+  createBusinessDocumentHistory, supersedeCurrentBusinessDocuments,
+  DOC_TYPE_LABEL_ZH, DOC_TYPE_LABEL_EN, STATUS_LABEL_ZH, STATUS_LABEL_EN,
+  type BusinessDocumentType, type BusinessDocumentStatus,
+} from '../lib/businessDocumentHistory';
 
 const GOLD = '#CBA85C';
 const GOLD_L = '#E2C988';
@@ -133,6 +139,22 @@ export function BusinessAssistantEntry() {
   const [folderCreateBusy, setFolderCreateBusy] = useState(false);
   const [folderCreateError, setFolderCreateError] = useState<string | null>(null);
   const [folderCreated, setFolderCreated] = useState<{ name: string; webViewLink: string; alreadyExisted: boolean } | null>(null);
+  // Business History / Document Timeline V1 Round 2 — only reachable while
+  // selectedFile is set, same discipline as the multi-step Drive plan above:
+  // kept fully separate from pendingCapture/Planner state, never generates a
+  // BUSINESS_TODO. Only enters this flow when the user's own description
+  // names a recognized document type (looksLikeBusinessDocumentDescription);
+  // a plain "把这个放到HIGHWAYGLOBAL" never reaches it.
+  interface PendingBusinessDocument {
+    entityName: string; documentType: BusinessDocumentType; title: string;
+    versionNo: number | null; versionLabel: string | null; status: BusinessDocumentStatus;
+    amount: number | null; currency: string | null; notes: string | null; documentDate: string;
+    customerId: string | null; customerName: string | null; candidateCustomers: CrmCustomer[] | null;
+  }
+  const [pendingBusinessDocument, setPendingBusinessDocument] = useState<PendingBusinessDocument | null>(null);
+  const [businessDocBusy, setBusinessDocBusy] = useState(false);
+  const [businessDocError, setBusinessDocError] = useState<string | null>(null);
+  const [businessDocSaved, setBusinessDocSaved] = useState<{ title: string; driveUrl: string; folderName: string } | null>(null);
   // GIA Memory V1 — pre-fills each fresh BUSINESS_TODO's business area from
   // a remembered mapping (outranking Planner's own guess for this session,
   // per the read-only design's lookup priority), while leaving the
@@ -185,15 +207,21 @@ export function BusinessAssistantEntry() {
     // of whether the user typed into this top box or the preview card's own
     // description field below — both feed the exact same non-AI routing.
     if (selectedFile) {
-      if (pendingDrivePlan) {
-        // A plan is already up — its own candidate/edit/confirm buttons own
-        // the interaction now, not free-typed text.
+      if (pendingDrivePlan || pendingBusinessDocument) {
+        // A plan/confirm-card is already up — its own candidate/edit/confirm
+        // buttons own the interaction now, not free-typed text.
         setValue('');
         return;
       }
       if (looksLikeMultiStepDrivePlan(v)) {
         setValue('');
         await handleDrivePlanInput(v);
+        return;
+      }
+      if (looksLikeBusinessDocumentDescription(v)) {
+        setFileDescription(v);
+        setValue('');
+        await describeFileAsBusinessDocument(v);
         return;
       }
       setFileDescription(v);
@@ -379,6 +407,10 @@ export function BusinessAssistantEntry() {
     setCaptureDone(new Set());
     setCaptureError(null);
     setFileSearchReply(null);
+    // Never carry a previous file's business-document confirm card over.
+    setPendingBusinessDocument(null);
+    setBusinessDocError(null);
+    setBusinessDocSaved(null);
   }
 
   // The core routing step: "用户自然语言 + 文件名 → 真实 Drive 搜索 → 推荐".
@@ -631,6 +663,120 @@ export function BusinessAssistantEntry() {
     setManualPickerOpen(false);
     setManualCandidates(null);
     setManualNotice(null);
+    setPendingBusinessDocument(null);
+    setBusinessDocError(null);
+  }
+
+  // Business History / Document Timeline V1 Round 2 — read-only parse +
+  // customer lookup, never writes anything yet (that only happens on the
+  // explicit "确认保存" click in confirmBusinessDocumentSave below).
+  async function describeFileAsBusinessDocument(description: string) {
+    if (!selectedFile) return;
+    const parsed = parseBusinessDocumentDescription(description);
+    if (!parsed) return;
+    setBusinessDocBusy(true);
+    setBusinessDocError(null);
+    const res = await findCustomerByName(parsed.entityName);
+    let customerId: string | null = null;
+    let customerName: string | null = null;
+    let candidateCustomers: CrmCustomer[] | null = null;
+    if (res.ok && res.found) {
+      customerId = res.customer.id;
+      customerName = res.customer.customer_name;
+    } else if (res.ok && !res.found && res.multiple) {
+      candidateCustomers = res.candidates;
+    }
+    // A failed CRM lookup (network/query error) never blocks the flow —
+    // it just means "尚未关联CRM客户", same as a genuine zero-match.
+    setBusinessDocBusy(false);
+    setPendingBusinessDocument({
+      entityName: parsed.entityName, documentType: parsed.documentType, title: parsed.title,
+      versionNo: parsed.versionNo, versionLabel: parsed.versionLabel, status: parsed.status,
+      amount: parsed.amount, currency: parsed.currency, notes: parsed.notes,
+      documentDate: bizDocTodayISO(), customerId, customerName, candidateCustomers,
+    });
+  }
+
+  function pickBusinessDocumentCustomer(customer: CrmCustomer) {
+    if (!pendingBusinessDocument) return;
+    setPendingBusinessDocument({ ...pendingBusinessDocument, customerId: customer.id, customerName: customer.customer_name, candidateCustomers: null });
+  }
+
+  function useUnlinkedBusinessDocumentCustomer() {
+    if (!pendingBusinessDocument) return;
+    setPendingBusinessDocument({ ...pendingBusinessDocument, candidateCustomers: null });
+  }
+
+  // "修改" — V1 keeps this to re-typing the description rather than a field-
+  // by-field editor; simplest correct behavior for a minimal round, and
+  // consistent with "不要复杂查询分析/不要过度设计" for this round.
+  function editBusinessDocument() {
+    setPendingBusinessDocument(null);
+    setBusinessDocError(null);
+    setFileDescription('');
+  }
+
+  function cancelBusinessDocument() {
+    setPendingBusinessDocument(null);
+    setBusinessDocError(null);
+  }
+
+  // The strict write sequence (spec section 八): upload+register to Drive
+  // first (never parallel with the DB writes below), then supersede the old
+  // current record for this exact topic, then write the new current record.
+  // Any failure after the Drive upload succeeds is reported as a partial
+  // success, never disguised as a full failure or a full success.
+  async function confirmBusinessDocumentSave() {
+    if (!pendingBusinessDocument || !selectedFile || pendingBusinessDocument.candidateCustomers) return;
+    setBusinessDocBusy(true);
+    setBusinessDocError(null);
+
+    const uploaded = await uploadAndRegisterLocalFile(selectedFile, selectedFolder);
+    if (!uploaded.ok) {
+      setBusinessDocBusy(false);
+      setBusinessDocError(lang === 'zh' ? `上传失败：${uploaded.error}` : `Upload failed: ${uploaded.error}`);
+      return;
+    }
+
+    const topic = {
+      customerId: pendingBusinessDocument.customerId,
+      entityName: pendingBusinessDocument.entityName,
+      documentType: pendingBusinessDocument.documentType,
+      title: pendingBusinessDocument.title,
+    };
+
+    const superseded = await supersedeCurrentBusinessDocuments(topic);
+    if (!superseded.ok) {
+      setBusinessDocBusy(false);
+      setBusinessDocError(
+        lang === 'zh'
+          ? `文件已保存到 Drive，但业务历史登记失败（旧版本状态更新失败：${superseded.error}）`
+          : `File saved to Drive, but business history registration failed (could not update the previous version: ${superseded.error})`,
+      );
+      return;
+    }
+
+    const created = await createBusinessDocumentHistory({
+      customerId: topic.customerId, entityName: topic.entityName, documentType: topic.documentType, title: topic.title,
+      versionNo: pendingBusinessDocument.versionNo, versionLabel: pendingBusinessDocument.versionLabel,
+      amount: pendingBusinessDocument.amount, currency: pendingBusinessDocument.currency,
+      status: pendingBusinessDocument.status, documentDate: pendingBusinessDocument.documentDate, notes: pendingBusinessDocument.notes,
+      driveFileId: uploaded.row.drive_file_id, driveFileName: uploaded.row.file_name,
+      driveFolderId: selectedFolder.id, driveUrl: uploaded.row.drive_url,
+    });
+    setBusinessDocBusy(false);
+    if (!created.ok) {
+      setBusinessDocError(
+        lang === 'zh'
+          ? `文件已保存到 Drive，但业务历史登记失败：${created.error}`
+          : `File saved to Drive, but business history registration failed: ${created.error}`,
+      );
+      return;
+    }
+
+    setBusinessDocSaved({ title: topic.title, driveUrl: uploaded.row.drive_url, folderName: uploaded.actualFolderName });
+    setPendingBusinessDocument(null);
+    setSelectedFile(null);
   }
 
   // Hard upload gate — enforced here regardless of which button/UI path
@@ -747,7 +893,7 @@ export function BusinessAssistantEntry() {
           ))}
         </div>
 
-        {selectedFile && !pendingDrivePlan && (
+        {selectedFile && !pendingDrivePlan && !pendingBusinessDocument && (
           <div style={{ marginTop: 14, padding: '14px 16px', background: 'rgba(203,168,92,0.05)', border: `1px solid ${BORD}`, borderRadius: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: GOLD, marginBottom: 8 }}>
               {lang === 'zh' ? '准备收纳文件' : 'Ready to store file'}
@@ -1084,6 +1230,86 @@ export function BusinessAssistantEntry() {
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {pendingBusinessDocument && (
+          <div style={{ marginTop: 14, padding: '14px 16px', background: 'rgba(203,168,92,0.05)', border: `1px solid ${BORD}`, borderRadius: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: GOLD, marginBottom: 8 }}>
+              {lang === 'zh' ? '准备记录业务文件' : 'Ready to record business document'}
+            </div>
+            <div style={{ fontSize: 12.5, color: TEXT, lineHeight: 1.8, marginBottom: 8 }}>
+              <div>
+                {lang === 'zh' ? '客户：' : 'Customer: '}
+                {pendingBusinessDocument.customerName ? (
+                  pendingBusinessDocument.customerName
+                ) : (
+                  <span style={{ color: MUTED }}>
+                    {pendingBusinessDocument.entityName}
+                    {lang === 'zh' ? '（尚未关联CRM客户）' : ' (not linked to a CRM customer)'}
+                  </span>
+                )}
+              </div>
+              <div>{lang === 'zh' ? '类型：' : 'Type: '}{lang === 'zh' ? DOC_TYPE_LABEL_ZH[pendingBusinessDocument.documentType] : DOC_TYPE_LABEL_EN[pendingBusinessDocument.documentType]}</div>
+              <div>{lang === 'zh' ? '标题：' : 'Title: '}{pendingBusinessDocument.title}</div>
+              {pendingBusinessDocument.versionLabel && <div>{lang === 'zh' ? '版本：' : 'Version: '}{pendingBusinessDocument.versionLabel}</div>}
+              <div>{lang === 'zh' ? '状态：' : 'Status: '}{lang === 'zh' ? STATUS_LABEL_ZH[pendingBusinessDocument.status] : STATUS_LABEL_EN[pendingBusinessDocument.status]}</div>
+              <div>{lang === 'zh' ? '日期：' : 'Date: '}{pendingBusinessDocument.documentDate}</div>
+              {pendingBusinessDocument.amount != null && (
+                <div>{lang === 'zh' ? '金额：' : 'Amount: '}{pendingBusinessDocument.currency} {pendingBusinessDocument.amount}</div>
+              )}
+              <div>{lang === 'zh' ? '文件：' : 'File: '}{selectedFile?.name}</div>
+              <div>{lang === 'zh' ? '目标Drive目录：' : 'Target Drive folder: '}{selectedFolder.name}</div>
+            </div>
+
+            {pendingBusinessDocument.candidateCustomers && (
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 12, color: TEXT, marginBottom: 6 }}>
+                  {lang === 'zh' ? '找到多个可能的客户：' : 'Found multiple possible customers:'}
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {pendingBusinessDocument.candidateCustomers.map((c) => (
+                    <button key={c.id} onClick={() => pickBusinessDocumentCustomer(c)} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}>
+                      {c.customer_name}
+                    </button>
+                  ))}
+                  <button onClick={useUnlinkedBusinessDocumentCustomer} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+                    {lang === 'zh' ? '不关联客户' : 'No customer link'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {businessDocError && <div style={{ fontSize: 11.5, color: RED, marginBottom: 8 }}>{businessDocError}</div>}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                disabled={businessDocBusy || !!pendingBusinessDocument.candidateCustomers}
+                onClick={confirmBusinessDocumentSave}
+                style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#E2C988)`, border: 'none', color: '#080D1E', fontWeight: 700 }}
+              >
+                {businessDocBusy ? (lang === 'zh' ? '保存中…' : 'Saving…') : (lang === 'zh' ? '确认保存' : 'Confirm save')}
+              </button>
+              <button disabled={businessDocBusy} onClick={editBusinessDocument} style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+                {lang === 'zh' ? '修改' : 'Edit'}
+              </button>
+              <button disabled={businessDocBusy} onClick={cancelBusinessDocument} style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+                {lang === 'zh' ? '取消' : 'Cancel'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {businessDocSaved && (
+          <div style={{ marginTop: 14, padding: '14px 16px', background: 'rgba(111,191,142,0.06)', border: '1px solid rgba(111,191,142,0.3)', borderRadius: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: GREEN, marginBottom: 4 }}>
+              {lang === 'zh' ? '✓ 已记录业务文件' : '✓ Business document recorded'}
+            </div>
+            <div style={{ fontSize: 12.5, color: TEXT }}>{businessDocSaved.title}</div>
+            <div style={{ fontSize: 12.5, color: TEXT, marginBottom: 4 }}>{lang === 'zh' ? '位置：' : 'Location: '}{businessDocSaved.folderName}</div>
+            <a href={businessDocSaved.driveUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11.5, color: GOLD }}>
+              {lang === 'zh' ? '查看文件 →' : 'View file →'}
+            </a>
           </div>
         )}
 
