@@ -682,11 +682,14 @@ export function BusinessAssistantEntry() {
     setCrmLinkNotice(null);
   }
 
-  // V1, no AI: full entity_name first, then each "/"-separated part, then
-  // giaFiles.ts's known-company fallback — first candidate that resolves to
-  // a REAL, still-existing Drive folder (memory hit re-verified via
-  // getDriveFolderName, or a real search hit) wins. Never creates a folder.
-  function buildFolderCandidateKeys(entityName: string): string[] {
+  // V1, no AI: full entity_name first, then each "/"-separated part — an
+  // entity_name like "HIGHWAYGLOBAL / ZIMO" almost always packs a company
+  // AND a contact/customer name together, and a real CRM record or Drive
+  // folder is usually keyed to only ONE of those two, not the joined
+  // string. Shared by both the CRM lookup (describeFileAsBusinessDocument
+  // below) and the Drive folder resolver, so both stop guessing off the raw
+  // joined text the moment either half looks like a real match.
+  function buildEntityCandidateKeys(entityName: string): string[] {
     const keys: string[] = [];
     const full = entityName.trim();
     if (full) keys.push(full);
@@ -694,9 +697,36 @@ export function BusinessAssistantEntry() {
       const p = part.trim();
       if (p && !keys.includes(p)) keys.push(p);
     }
-    const known = extractCompanyName(full);
+    return keys;
+  }
+
+  // giaFiles.ts's known-company fallback, appended last — Drive-folder-
+  // specific (extractCompanyName's substring match is too loose to trust
+  // for CRM identity, only for "is there a Drive folder named roughly this").
+  function buildFolderCandidateKeys(entityName: string): string[] {
+    const keys = buildEntityCandidateKeys(entityName);
+    const known = extractCompanyName(entityName.trim());
     if (known && !keys.some((k) => k.toLowerCase() === known.toLowerCase())) keys.push(known);
     return keys;
+  }
+
+  // Tries each candidate key in order (full entity_name, then each "/"-
+  // split part) against the REAL crm_customers table, never stopping early
+  // just because an earlier candidate (e.g. "HIGHWAYGLOBAL") returned zero
+  // results — the first candidate that uniquely matches wins immediately.
+  // If nothing uniquely matches, the first candidate that returned MULTIPLE
+  // matches is surfaced as a pick-one list (never auto-picked); only when
+  // every candidate returns zero results does this report "not linked".
+  async function resolveCrmCustomerForEntity(entityName: string): Promise<{ customerId: string | null; customerName: string | null; candidateCustomers: CrmCustomer[] | null }> {
+    const candidates = buildEntityCandidateKeys(entityName);
+    let firstMultiple: CrmCustomer[] | null = null;
+    for (const key of candidates) {
+      const res = await findCustomerByName(key);
+      if (!res.ok) continue; // a failed lookup for one candidate never blocks trying the rest
+      if (res.found) return { customerId: res.customer.id, customerName: res.customer.customer_name, candidateCustomers: null };
+      if (res.multiple && !firstMultiple) firstMultiple = res.candidates;
+    }
+    return { customerId: null, customerName: null, candidateCustomers: firstMultiple };
   }
 
   async function resolveBusinessDocumentFolder(entityName: string): Promise<{ id: string; name: string; isDefaultFallback: boolean }> {
@@ -729,16 +759,7 @@ export function BusinessAssistantEntry() {
     setBusinessDocBusy(true);
     setBusinessDocError(null);
     resetCrmActionPanel();
-    const res = await findCustomerByName(parsed.entityName);
-    let customerId: string | null = null;
-    let customerName: string | null = null;
-    let candidateCustomers: CrmCustomer[] | null = null;
-    if (res.ok && res.found) {
-      customerId = res.customer.id;
-      customerName = res.customer.customer_name;
-    } else if (res.ok && !res.found && res.multiple) {
-      candidateCustomers = res.candidates;
-    }
+    const { customerId, customerName, candidateCustomers } = await resolveCrmCustomerForEntity(parsed.entityName);
     // A failed CRM lookup (network/query error) never blocks the flow —
     // it just means "尚未关联CRM客户", same as a genuine zero-match.
 
