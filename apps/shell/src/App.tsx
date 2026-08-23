@@ -8,6 +8,7 @@ import { Login } from './pages/Login';
 import { AccessDenied } from './pages/AccessDenied';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { GiaFileWorkflowProvider } from './contexts/GiaFileWorkflowContext';
 import { StartupLoading, StartupError } from './components/StartupScreen';
 import { AIPage } from './pages/AIPage';
 import { InvoicePage } from './pages/InvoicePage';
@@ -117,6 +118,7 @@ function Shell() {
 
   return (
     <LangContext.Provider value={{ lang, dict, setLang }}>
+    <GiaFileWorkflowProvider>
       <AppShell
         sidebar={
           <Sidebar
@@ -214,6 +216,7 @@ function Shell() {
         </Routes>
       </AppShell>
       <Toast message={toast} />
+    </GiaFileWorkflowProvider>
     </LangContext.Provider>
   );
 }

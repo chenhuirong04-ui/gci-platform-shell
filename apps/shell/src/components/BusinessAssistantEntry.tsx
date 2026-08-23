@@ -27,8 +27,8 @@ import {
   looksLikeBusinessDocumentDescription, parseBusinessDocumentDescription, todayISO as bizDocTodayISO,
   createBusinessDocumentHistory, supersedeCurrentBusinessDocuments,
   DOC_TYPE_LABEL_ZH, DOC_TYPE_LABEL_EN, STATUS_LABEL_ZH, STATUS_LABEL_EN,
-  type BusinessDocumentType, type BusinessDocumentStatus,
 } from '../lib/businessDocumentHistory';
+import { useGiaFileWorkflow } from '../contexts/GiaFileWorkflowContext';
 
 const GOLD = '#CBA85C';
 const GOLD_L = '#E2C988';
@@ -91,27 +91,31 @@ export function BusinessAssistantEntry() {
   // from pendingCapture/Planner state. Never sends the file name to Planner
   // V3, never generates a BUSINESS_TODO.
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadBusy, setUploadBusy] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadedFile, setUploadedFile] = useState<{ name: string; driveUrl: string; folderName: string } | null>(null);
-  // File routing — "用户负责告诉 GIA 文件是什么；GIA 负责记/找目录":
-  //   describe  -> user types what the file is / who it belongs to
-  //   suggested -> a single real Drive folder was found (or manually picked)
-  //   candidates-> 2-5 real Drive folders matched, user must pick one
-  //   no_match  -> nothing reliable matched; defaults to the Inbox
-  // selectedFolder is the one real target that will actually be used on
-  // upload — always has a value (defaults to the existing GIA intake
-  // folder), only ever set to a real folder searchDriveFolders() returned.
-  type UploadPhase = 'describe' | 'suggested' | 'candidates' | 'no_match';
-  const [uploadPhase, setUploadPhase] = useState<UploadPhase>('describe');
-  const [fileDescription, setFileDescription] = useState('');
-  const [describeBusy, setDescribeBusy] = useState(false);
-  const [selectedFolder, setSelectedFolder] = useState<{ id: string; name: string }>({ id: DEFAULT_TARGET_FOLDER_ID, name: DEFAULT_TARGET_FOLDER_NAME });
-  const [describeCandidates, setDescribeCandidates] = useState<DriveFolderOption[] | null>(null);
+  // The entire file-pending / Business Document workflow lives in a context
+  // provided above Home (see GiaFileWorkflowContext.tsx / App.tsx's Shell)
+  // instead of local useState — Home unmounts on internal navigation (it's
+  // one of react-router's <Routes> children), which used to silently wipe
+  // an in-progress confirm card (parsed fields, resolved Drive folder, a
+  // just-created CRM link) the moment the user checked another page. Shell
+  // itself never unmounts for the life of the session, so state held there
+  // survives SPA navigation (a hard browser refresh still loses it — a File
+  // object can't be serialized back from disk without the user re-picking
+  // it, which is out of scope for this round).
+  const {
+    selectedFile, setSelectedFile, uploadBusy, setUploadBusy, uploadError, setUploadError,
+    uploadedFile, setUploadedFile, uploadPhase, setUploadPhase, fileDescription, setFileDescription,
+    describeBusy, setDescribeBusy, selectedFolder, setSelectedFolder, describeCandidates, setDescribeCandidates,
+    pendingBusinessDocument, setPendingBusinessDocument, businessDocBusy, setBusinessDocBusy,
+    businessDocError, setBusinessDocError, businessDocSaved, setBusinessDocSaved,
+    crmActionMode, setCrmActionMode, crmCreateName, setCrmCreateName, crmCreateBusy, setCrmCreateBusy,
+    crmCreateError, setCrmCreateError, crmLinkQuery, setCrmLinkQuery, crmLinkResults, setCrmLinkResults,
+    crmLinkBusy, setCrmLinkBusy, crmLinkNotice, setCrmLinkNotice,
+  } = useGiaFileWorkflow();
   // Manual Folder Picker — fallback only, per spec: "只有用户不接受 GIA 推荐
   // 时才打开真实 Folder Picker". Reads the same real Drive search as the
   // automatic routing above; just a second, explicit entry point into it.
+  // Not lifted to the workflow context: a quick alternate-location search,
+  // not "the pending business document" itself (see this round's scope).
   const [manualPickerOpen, setManualPickerOpen] = useState(false);
   const [manualQuery, setManualQuery] = useState('');
   const [manualCandidates, setManualCandidates] = useState<DriveFolderOption[] | null>(null);
@@ -139,37 +143,6 @@ export function BusinessAssistantEntry() {
   const [folderCreateBusy, setFolderCreateBusy] = useState(false);
   const [folderCreateError, setFolderCreateError] = useState<string | null>(null);
   const [folderCreated, setFolderCreated] = useState<{ name: string; webViewLink: string; alreadyExisted: boolean } | null>(null);
-  // Business History / Document Timeline V1 Round 2 — only reachable while
-  // selectedFile is set, same discipline as the multi-step Drive plan above:
-  // kept fully separate from pendingCapture/Planner state, never generates a
-  // BUSINESS_TODO. Only enters this flow when the user's own description
-  // names a recognized document type (looksLikeBusinessDocumentDescription);
-  // a plain "把这个放到HIGHWAYGLOBAL" never reaches it.
-  interface PendingBusinessDocument {
-    entityName: string; documentType: BusinessDocumentType; title: string;
-    versionNo: number | null; versionLabel: string | null; status: BusinessDocumentStatus;
-    amount: number | null; currency: string | null; notes: string | null; documentDate: string;
-    customerId: string | null; customerName: string | null; candidateCustomers: CrmCustomer[] | null;
-    // true only when no memory/search match resolved a real Drive folder and
-    // selectedFolder fell all the way back to the 00_Inbox_To_Sort default —
-    // the confirm card must say so explicitly rather than silently showing it.
-    folderIsDefaultFallback: boolean;
-  }
-  const [pendingBusinessDocument, setPendingBusinessDocument] = useState<PendingBusinessDocument | null>(null);
-  const [businessDocBusy, setBusinessDocBusy] = useState(false);
-  const [businessDocError, setBusinessDocError] = useState<string | null>(null);
-  const [businessDocSaved, setBusinessDocSaved] = useState<{ title: string; driveUrl: string; folderName: string } | null>(null);
-  // CRM linking sub-panel inside the Business History confirm card — only
-  // relevant while pendingBusinessDocument.customerId is null. Three explicit
-  // choices (create / link existing / skip), never an automatic CRM create.
-  const [crmActionMode, setCrmActionMode] = useState<'idle' | 'create' | 'link'>('idle');
-  const [crmCreateName, setCrmCreateName] = useState('');
-  const [crmCreateBusy, setCrmCreateBusy] = useState(false);
-  const [crmCreateError, setCrmCreateError] = useState<string | null>(null);
-  const [crmLinkQuery, setCrmLinkQuery] = useState('');
-  const [crmLinkResults, setCrmLinkResults] = useState<CrmCustomer[] | null>(null);
-  const [crmLinkBusy, setCrmLinkBusy] = useState(false);
-  const [crmLinkNotice, setCrmLinkNotice] = useState<string | null>(null);
   // GIA Memory V1 — pre-fills each fresh BUSINESS_TODO's business area from
   // a remembered mapping (outranking Planner's own guess for this session,
   // per the read-only design's lookup priority), while leaving the
