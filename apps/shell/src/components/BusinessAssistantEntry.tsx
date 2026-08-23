@@ -197,36 +197,49 @@ export function BusinessAssistantEntry() {
   const dragCounter = useRef(0);
   const [multiDropNotice, setMultiDropNotice] = useState(false);
 
+  // The single dispatcher for "user typed text while a file is pending" —
+  // used by BOTH the top input box (go(), below) AND the file-pending
+  // card's own inline description box (uploadPhase === 'describe', in the
+  // JSX). Those used to be two separate code paths: the inline box called
+  // describeAndRouteFile() directly, so a business-document sentence typed
+  // there (the box's own placeholder — "例如：这是 SHADI 的劳务合同" — invites
+  // exactly that) never reached the Business History check at all and fell
+  // straight into plain Drive-folder routing. Routing both boxes through
+  // this one function is what forecloses that bug and the earlier
+  // "上传文件" BUSINESS_TODO bug alike: text typed while a file preview is
+  // showing must never reach classify-capture/runGiaTopRouter, and must be
+  // checked against Business History before plain folder routing gets a
+  // chance to swallow it.
+  // Priority order while a file is pending: 1) Business History (explicit
+  // document-type word) 2) Multi-step Drive Plan (create+move cues) 3)
+  // plain description / folder routing.
+  async function handleFileText(text: string) {
+    const v = text.trim();
+    if (!v || !selectedFile) return;
+    if (pendingDrivePlan || pendingBusinessDocument) {
+      // A plan/confirm-card is already up — its own candidate/edit/confirm
+      // buttons own the interaction now, not free-typed text.
+      return;
+    }
+    if (looksLikeBusinessDocumentDescription(v)) {
+      setFileDescription(v);
+      await describeFileAsBusinessDocument(v);
+      return;
+    }
+    if (looksLikeMultiStepDrivePlan(v)) {
+      await handleDrivePlanInput(v);
+      return;
+    }
+    setFileDescription(v);
+    await describeAndRouteFile(v);
+  }
+
   async function go() {
     const v = value.trim();
     if (!v) { navigate('/business-assistant'); return; }
-    // A file is pending — ANY submitted text here means "what/whose file is
-    // this", never a Planner/capture command. This guard is what forecloses
-    // the "上传文件" BUSINESS_TODO bug: text typed while a file preview is
-    // showing must never reach classify-capture/runGiaTopRouter, regardless
-    // of whether the user typed into this top box or the preview card's own
-    // description field below — both feed the exact same non-AI routing.
     if (selectedFile) {
-      if (pendingDrivePlan || pendingBusinessDocument) {
-        // A plan/confirm-card is already up — its own candidate/edit/confirm
-        // buttons own the interaction now, not free-typed text.
-        setValue('');
-        return;
-      }
-      if (looksLikeMultiStepDrivePlan(v)) {
-        setValue('');
-        await handleDrivePlanInput(v);
-        return;
-      }
-      if (looksLikeBusinessDocumentDescription(v)) {
-        setFileDescription(v);
-        setValue('');
-        await describeFileAsBusinessDocument(v);
-        return;
-      }
-      setFileDescription(v);
       setValue('');
-      await describeAndRouteFile(v);
+      await handleFileText(v);
       return;
     }
     // GIA is waiting for a folder name ("在谷歌云新建一个文件夹" with no name
@@ -917,13 +930,13 @@ export function BusinessAssistantEntry() {
                   <input
                     value={fileDescription}
                     onChange={(e) => setFileDescription(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); describeAndRouteFile(fileDescription); } }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleFileText(fileDescription); } }}
                     placeholder={lang === 'zh' ? '例如：这是 SHADI 的劳务合同' : "Example: This is SHADI's manpower contract"}
                     style={{ flex: 1, fontSize: 12.5, padding: '7px 10px', borderRadius: 7, background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: TEXT, outline: 'none' }}
                   />
                   <button
                     disabled={describeBusy || !fileDescription.trim()}
-                    onClick={() => describeAndRouteFile(fileDescription)}
+                    onClick={() => handleFileText(fileDescription)}
                     style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#E2C988)`, border: 'none', color: '#080D1E', fontWeight: 700 }}
                   >
                     {describeBusy ? (lang === 'zh' ? '搜索中…' : 'Searching…') : (lang === 'zh' ? '继续' : 'Continue')}

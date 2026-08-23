@@ -167,10 +167,22 @@ export async function getLatestBusinessDocument(
 // ── Natural-language parsing (deterministic, no AI) ─────────────────────────
 const DOC_TYPE_PATTERNS: [BusinessDocumentType, RegExp][] = [
   ['QUOTATION', /报价|quotation|quote\b/i],
-  ['CONTRACT', /合同|contract\b|agreement/i],
+  ['CONTRACT', /合同|协议|contract\b|agreement/i],
   ['PROPOSAL', /方案|proposal/i],
   ['OTHER', /其他资料|其他|other\b/i],
 ];
+
+// The first document-type pattern that matches, in the same priority order
+// detectBusinessDocumentType uses — shared by entity extraction below so the
+// "prefix before the type keyword" it slices is always the same keyword the
+// caller will actually classify the document as.
+function findTypeMatch(text: string): RegExpMatchArray | null {
+  for (const [, re] of DOC_TYPE_PATTERNS) {
+    const m = text.match(re);
+    if (m) return m;
+  }
+  return null;
+}
 
 export function detectBusinessDocumentType(text: string): BusinessDocumentType | null {
   for (const [type, re] of DOC_TYPE_PATTERNS) if (re.test(text)) return type;
@@ -190,26 +202,37 @@ export function looksLikeBusinessDocumentDescription(text: string): boolean {
 // not anyone's name).
 const ENTITY_STOPWORDS = new Set(['这', '这是', '这个', '也是', '还是', '就是', '客户', '对方', '顾客', '大家']);
 
-function cleanEntityCandidate(raw: string | undefined): string | null {
+function cleanEntityCandidate(raw: string | undefined | null): string | null {
   if (!raw) return null;
   const v = raw.trim();
-  if (!v || ENTITY_STOPWORDS.has(v)) return null;
+  // Length < 2 rejects stray single characters (e.g. a lone "是"/"的" left
+  // over from stripping) — every real name/company token this needs to
+  // catch (蒲总, 王旭, HIGHWAYGLOBAL, ZIMO, GCI...) is at least 2 characters.
+  if (!v || v.length < 2 || ENTITY_STOPWORDS.has(v)) return null;
   return v;
 }
 
+// Deliberately NOT a fixed "X的<类型词>" template — real descriptions put
+// arbitrary descriptive text between the entity and the type keyword (e.g.
+// "HIGHWAYGLOBAL / ZIMO 的 V1 劳务及项目服务合同": entity, 的, version, then
+// FOUR more descriptive characters before 合同 finally appears). Instead:
+// take everything before the matched type keyword, strip a leading "这是/
+// 这个/这/给" cue, and cut at the LAST "的" in what's left — that "的" is the
+// boundary between "who this is for" and "what kind of document/version/
+// description follows". If there's no "的" at all (e.g. "王旭最新合同"), the
+// whole prefix (minus a trailing 最新/最终) is the entity.
 export function extractBusinessDocumentEntityName(text: string): string | null {
-  // "给X的..." — most explicit form.
-  let m = text.match(/给\s*([^\s，,。的]{1,12})\s*的/);
-  let v = cleanEntityCandidate(m?.[1]);
-  if (v) return v;
-  // "X的[版本/最新/最终]<类型词>" — e.g. "蒲总的第3版报价".
-  m = text.match(/([^\s，,。的这个是]{1,12})\s*的\s*(?:第?\d+版|[Vv]\d+|version\s*\d+|最新|最终)?\s*(?:报价|quotation|quote|合同|contract|agreement|方案|proposal|其他)/i);
-  v = cleanEntityCandidate(m?.[1]);
-  if (v) return v;
-  // "X最新/最终<类型词>" — no particle, e.g. "王旭最新合同".
-  m = text.match(/([A-Za-z一-龥]{2,10})(?:最新|最终)(?:报价|quotation|quote|合同|contract|agreement|方案|proposal)/i);
-  v = cleanEntityCandidate(m?.[1]);
-  if (v) return v;
+  const typeMatch = findTypeMatch(text);
+  if (typeMatch && typeMatch.index !== undefined) {
+    let prefix = text.slice(0, typeMatch.index);
+    prefix = prefix.replace(/^(这是|这个|这|给)+/, '').trim();
+    const lastDe = prefix.lastIndexOf('的');
+    const candidate = lastDe >= 0
+      ? prefix.slice(0, lastDe).trim()
+      : prefix.replace(/(最新|最终)$/, '').trim();
+    const cleaned = cleanEntityCandidate(candidate.replace(/[，,、]+$/, ''));
+    if (cleaned) return cleaned;
+  }
   return extractCompanyName(text);
 }
 
