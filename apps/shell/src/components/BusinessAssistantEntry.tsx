@@ -269,6 +269,24 @@ export function BusinessAssistantEntry() {
     }
     if (looksLikeNotionFollowupCommand(v)) {
       setValue('');
+      // Hard stop: this branch returns before ever reaching runGiaTopRouter,
+      // which is the only place that normally clears a stale pendingCapture/
+      // fileSearchReply/task-lifecycle card left over from an EARLIER,
+      // unrelated message. Without this, an already-visible BUSINESS_TODO
+      // confirm card (e.g. from a message sent before this one) stayed on
+      // screen and confirmable alongside the new Notion Follow-up card,
+      // letting the two get written independently of each other even though
+      // only the follow-up was actually asked for this turn — which is
+      // exactly how a stray executive_task ("见面谈") could land in /tasks
+      // "at the same time" as a Notion follow-up confirm. Hitting
+      // NOTION_FOLLOWUP now unconditionally clears every other pending
+      // confirm surface before showing its own card.
+      setPendingCapture(null);
+      setCaptureDone(new Set());
+      setCaptureError(null);
+      setFileSearchReply(null);
+      setPendingTaskLifecycle(null);
+      setPendingTaskReschedule(null);
       describeNotionFollowup(v);
       return;
     }
