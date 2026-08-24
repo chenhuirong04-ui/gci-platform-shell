@@ -75,6 +75,29 @@ function looksLikeGenericNotification(a: BossAction): boolean {
   return JUNK_SENDER_PATTERNS.some((re) => re.test(sender));
 }
 
+// GCI Home Final Scope Cut — the Daily Business Brief is Chris's business
+// radar (customer/project progress, follow-ups, quotes/contracts, new
+// business, receivables/inventory/delivery risk, today's suggested action);
+// it must never surface internal system/tooling status. systems_review and
+// systems_audit exist specifically to report on things like "MIA's
+// production environment still needs a username/password login, and its
+// Supabase project ownership is unconfirmed" (see SYSTEM_REVIEW_TEXT below)
+// — exactly the MIA-login/Supabase/database content this excludes.
+// agent_decision/agent_warning are Agents Status asset go/keep questions
+// (also internal tooling, not a business event). mia_error/mia_warning/
+// chanya_error report on MIA/Chanya's own operational health, not a real
+// customer/business event. Left IN deliberately: mia_needs_chris (a real
+// lead replied — genuine new-business content) and chanya_payment_failure/
+// chanya_needs_chris (real payment/account impact — receivables/delivery
+// risk, not a tooling status report).
+const SYSTEM_TECHNICAL_ACTION_TYPES = new Set([
+  'systems_review', 'systems_audit', 'agent_decision', 'agent_warning', 'mia_error', 'mia_warning', 'chanya_error',
+]);
+
+function isSystemTechnicalNoise(a: BossAction): boolean {
+  return SYSTEM_TECHNICAL_ACTION_TYPES.has(a.action_type);
+}
+
 // Lower number = stronger claim to being "the" representative of a
 // deduped group — Task 15 §二's priority order: the real business record
 // first (CRM/quotation), then Commitment, then Decision Follow-through,
@@ -338,7 +361,7 @@ export async function getDailyBrief(lang: BriefLang = 'zh'): Promise<{ ok: true;
   // it again here as a full Brief card was the actual duplication. Excluded
   // at the source, not swapped for a "3 tasks today" count card: Home's
   // "我的事项" KPI already owns that reminder job.
-  const filtered = res.actions.filter((a) => !looksLikeGenericNotification(a) && a.source !== 'tasks');
+  const filtered = res.actions.filter((a) => !looksLikeGenericNotification(a) && a.source !== 'tasks' && !isSystemTechnicalNoise(a));
 
   const groups = new Map<string, BossAction[]>();
   for (const a of filtered) {
