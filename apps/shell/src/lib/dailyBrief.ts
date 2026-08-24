@@ -75,27 +75,25 @@ function looksLikeGenericNotification(a: BossAction): boolean {
   return JUNK_SENDER_PATTERNS.some((re) => re.test(sender));
 }
 
-// GCI Home Final Scope Cut — the Daily Business Brief is Chris's business
-// radar (customer/project progress, follow-ups, quotes/contracts, new
-// business, receivables/inventory/delivery risk, today's suggested action);
-// it must never surface internal system/tooling status. systems_review and
-// systems_audit exist specifically to report on things like "MIA's
-// production environment still needs a username/password login, and its
-// Supabase project ownership is unconfirmed" (see SYSTEM_REVIEW_TEXT below)
-// — exactly the MIA-login/Supabase/database content this excludes.
-// agent_decision/agent_warning are Agents Status asset go/keep questions
-// (also internal tooling, not a business event). mia_error/mia_warning/
-// chanya_error report on MIA/Chanya's own operational health, not a real
-// customer/business event. Left IN deliberately: mia_needs_chris (a real
-// lead replied — genuine new-business content) and chanya_payment_failure/
-// chanya_needs_chris (real payment/account impact — receivables/delivery
-// risk, not a tooling status report).
-const SYSTEM_TECHNICAL_ACTION_TYPES = new Set([
-  'systems_review', 'systems_audit', 'agent_decision', 'agent_warning', 'mia_error', 'mia_warning', 'chanya_error',
-]);
+// GCI Home Final Scope Cut (corrected round) — the Daily Business Brief is
+// Chris's business radar (customer/project progress, follow-ups, quotes/
+// contracts, new business, receivables/inventory/delivery risk, today's
+// suggested action); it must never surface MIA / Chanya Growth Agent /
+// Systems Registry status. First pass only excluded the technical action_
+// types (systems_review/agent_decision/mia_error/etc.) but kept
+// mia_needs_chris and chanya_payment_failure/chanya_needs_chris on the
+// theory they were "real business impact" — Chris's own read is that ANY
+// MIA/Chanya-sourced item reads as Agent/system status on Home, not a
+// business event, so this now excludes the whole source instead of picking
+// through its action_types. 'agents'/'systems' sources (Agents Status /
+// Systems Registry) are excluded the same way. todaysThreeActions is built
+// from this same filtered list further down, so a "建议今天先做" line
+// generated purely from one of these sources disappears along with it —
+// no separate filter needed there.
+const NON_BUSINESS_SOURCES = new Set<ActionSource>(['mia', 'chanya', 'agents', 'systems']);
 
-function isSystemTechnicalNoise(a: BossAction): boolean {
-  return SYSTEM_TECHNICAL_ACTION_TYPES.has(a.action_type);
+function isSystemOrAgentSource(a: BossAction): boolean {
+  return NON_BUSINESS_SOURCES.has(a.source);
 }
 
 // Lower number = stronger claim to being "the" representative of a
@@ -361,7 +359,7 @@ export async function getDailyBrief(lang: BriefLang = 'zh'): Promise<{ ok: true;
   // it again here as a full Brief card was the actual duplication. Excluded
   // at the source, not swapped for a "3 tasks today" count card: Home's
   // "我的事项" KPI already owns that reminder job.
-  const filtered = res.actions.filter((a) => !looksLikeGenericNotification(a) && a.source !== 'tasks' && !isSystemTechnicalNoise(a));
+  const filtered = res.actions.filter((a) => !looksLikeGenericNotification(a) && a.source !== 'tasks' && !isSystemOrAgentSource(a));
 
   const groups = new Map<string, BossAction[]>();
   for (const a of filtered) {
