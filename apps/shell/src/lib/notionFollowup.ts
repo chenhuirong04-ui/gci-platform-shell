@@ -110,15 +110,22 @@ function extractOwner(text: string): string | null {
   return matchOwnerName(bare?.[1]);
 }
 
-// "明天/后天/N天后" resolve to a real date. "下周"/"下个月"/"过几天" etc are
-// deliberately left unresolved — the explicit business rule this round is
-// never to invent a specific date from a vague relative phrase.
+// "明天/后天/N天后" resolve to a real date. A genuinely VAGUE relative phrase
+// ("下周"/"下个月"/"过几天"/...) is deliberately left unresolved — never guess
+// a specific date from those, the confirm card must ask the user to pin one
+// down. When the user gave NO date cue at all, default to tomorrow — GCI's
+// own follow-up rule is that the next follow-up always starts counting from
+// the day AFTER the entry date, so "unspecified" means "at least tomorrow",
+// not "no next follow-up".
+const VAGUE_NEXT_RE = /下周|下个月|过几天|改天|回头|稍后/;
+
 function resolveNextFollowUpDate(text: string, today: string): string | null {
   if (/明天/.test(text)) return addDaysISO(today, 1);
   if (/后天/.test(text)) return addDaysISO(today, 2);
   const m = text.match(/(\d+)\s*天[后後]/);
   if (m) return addDaysISO(today, Number(m[1]));
-  return null;
+  if (VAGUE_NEXT_RE.test(text)) return null;
+  return addDaysISO(today, 1);
 }
 
 // Deliberately excludes a bare "跟进" cue — it's part of the trigger phrase
