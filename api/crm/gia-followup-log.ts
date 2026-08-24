@@ -51,56 +51,61 @@ export default async function handler(request: Request): Promise<Response> {
     return json({ error: 'customerName, followUpDateToday and notes are required' }, 400);
   }
 
-  const properties: Record<string, any> = {
+  // Phase 1 — CORE properties only: title/date/rich_text. These property
+  // types cannot 400 on an "invalid option" the way select fields can, so
+  // Next Follow-up（下次跟进）is guaranteed to land on this very first
+  // request, never contingent on whether a guessed select value (method/
+  // status/businessType below) happens to match the database's real option
+  // list. This is the actual fix for "date computed correctly but missing
+  // in Notion" — previously all fields were sent together, so an invalid
+  // select option could 400 the whole page, and even though the retry also
+  // included Next Follow-up, decoupling it entirely removes any dependency
+  // between date fields and select-field correctness.
+  const coreProperties: Record<string, any> = {
     'Customer（客户）': { title: [{ type: 'text', text: { content: payload.customerName.trim().slice(0, 200) } }] },
     'Follow-up Date（跟进日期）': { date: { start: payload.followUpDateToday } },
     'Follow-up Notes（跟进内容）': { rich_text: [{ type: 'text', text: { content: payload.notes.slice(0, 2000) } }] },
   };
-  if (payload.nextFollowUpAt) properties['Next Follow-up（下次跟进）'] = { date: { start: payload.nextFollowUpAt } };
-  if (payload.nextAction) properties['下次行动内容'] = { rich_text: [{ type: 'text', text: { content: payload.nextAction.slice(0, 2000) } }] };
-  if (payload.method) properties['Follow-up Method（跟进方式）'] = { select: { name: payload.method } };
-  if (payload.status) properties['行动状态'] = { select: { name: payload.status } };
-  if (payload.businessType) properties['业务类型'] = { select: { name: payload.businessType } };
-  if (payload.owner) properties['Follow-up Owner（负责人）'] = { select: { name: payload.owner } };
+  if (payload.nextFollowUpAt) coreProperties['Next Follow-up（下次跟进）'] = { date: { start: payload.nextFollowUpAt } };
+  if (payload.nextAction) coreProperties['下次行动内容'] = { rich_text: [{ type: 'text', text: { content: payload.nextAction.slice(0, 2000) } }] };
 
-  const write = (props: Record<string, any>) =>
-    fetch('https://api.notion.com/v1/pages', {
-      method: 'POST',
+  const createRes = await fetch('https://api.notion.com/v1/pages', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ parent: { database_id: followupDbId }, properties: coreProperties }),
+  });
+
+  if (!createRes.ok) {
+    const errBody = await createRes.json().catch(() => ({}));
+    const errMsg = `Notion ${createRes.status}: ${(errBody as any)?.message || JSON.stringify(errBody).slice(0, 300)}`;
+    console.error('[gia-followup-log] Core write FAILED:', errMsg);
+    return json({ ok: false, error: errMsg });
+  }
+
+  const page = await createRes.json() as any;
+  console.log(`[gia-followup-log] OK — pageId: ${page.id} (Next Follow-up: ${payload.nextFollowUpAt ?? 'not set'})`);
+
+  // Phase 2 — best-effort select fields (method/status/businessType/owner).
+  // A wrong/unmatched select option here must never undo Phase 1's already-
+  // saved record — this PATCH failing is logged only, the page still exists
+  // with its core fields (including Next Follow-up) intact either way.
+  const selectProperties: Record<string, any> = {};
+  if (payload.method) selectProperties['Follow-up Method（跟进方式）'] = { select: { name: payload.method } };
+  if (payload.status) selectProperties['行动状态'] = { select: { name: payload.status } };
+  if (payload.businessType) selectProperties['业务类型'] = { select: { name: payload.businessType } };
+  if (payload.owner) selectProperties['Follow-up Owner（负责人）'] = { select: { name: payload.owner } };
+
+  if (Object.keys(selectProperties).length > 0) {
+    const patchRes = await fetch(`https://api.notion.com/v1/pages/${page.id}`, {
+      method: 'PATCH',
       headers: { Authorization: `Bearer ${token}`, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parent: { database_id: followupDbId }, properties: props }),
+      body: JSON.stringify({ properties: selectProperties }),
     });
-
-  const res = await write(properties);
-  if (res.ok) {
-    const page = await res.json() as any;
-    console.log(`[gia-followup-log] OK — pageId: ${page.id}`);
-    return json({ ok: true, pageId: page.id });
+    if (!patchRes.ok) {
+      const patchErr = await patchRes.json().catch(() => ({}));
+      console.error('[gia-followup-log] Best-effort select fields FAILED (core record already saved):', patchRes.status, patchErr);
+    }
   }
 
-  const errBody = await res.json().catch(() => ({}));
-  const errMsg = `Notion ${res.status}: ${(errBody as any)?.message || JSON.stringify(errBody).slice(0, 300)}`;
-  console.error('[gia-followup-log] FAILED:', errMsg);
-
-  // Retry with only the always-safe fields (title + date + notes) — same
-  // resilience pattern as notion-create-followup-only.ts / notion-write-lead.ts:
-  // a select option name that doesn't exactly match the DB's real options
-  // must never block the whole record from landing in Follow-up Log.
-  const minimal: Record<string, any> = {
-    'Customer（客户）': properties['Customer（客户）'],
-    'Follow-up Date（跟进日期）': properties['Follow-up Date（跟进日期）'],
-    'Follow-up Notes（跟进内容）': properties['Follow-up Notes（跟进内容）'],
-  };
-  if (properties['Next Follow-up（下次跟进）']) minimal['Next Follow-up（下次跟进）'] = properties['Next Follow-up（下次跟进）'];
-  if (properties['下次行动内容']) minimal['下次行动内容'] = properties['下次行动内容'];
-
-  const retry = await write(minimal);
-  if (!retry.ok) {
-    const retryErr = await retry.json().catch(() => ({}));
-    const retryErrMsg = `Notion ${retry.status}: ${(retryErr as any)?.message || JSON.stringify(retryErr).slice(0, 300)}`;
-    console.error('[gia-followup-log] Retry also FAILED:', retryErrMsg);
-    return json({ ok: false, error: retryErrMsg, firstError: errMsg });
-  }
-  const retryPage = await retry.json() as any;
-  console.log(`[gia-followup-log] Retry OK (minimal fields) — pageId: ${retryPage.id}`);
-  return json({ ok: true, pageId: retryPage.id, minimal: true });
+  return json({ ok: true, pageId: page.id });
 }
