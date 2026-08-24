@@ -726,9 +726,28 @@ export function categorizeAction(a: BossAction): BusinessStructureCategory {
   return '内部事项 / 其他';
 }
 
+// Google Drive file-intake chat actions (create folder / upload file / save
+// a link / find a file) go through GIA's own tool-action flow and can end
+// up as executive_tasks rows (e.g. a multi-step Drive plan's "下一步" step
+// literally restating "在谷歌云新建一个X文件夹") — those are real, valid
+// to-dos on /tasks, but they're chat/tool-action records, not a business/
+// project item, so they don't belong in Home's business-structure
+// breakdown. Display-only: nothing is deleted, reclassified, or hidden from
+// /tasks (which reads executive_tasks directly, not through this file) —
+// this only decides what summarizeBusinessStructure() counts/lists.
+const OPERATIONAL_NOISE_RE = /(新建|建|创建)[^，,。]{0,6}(文件夹|目录)|上传(文件|.{0,10}(到|至))|存储链接|存链接|保存链接|(找|查找|搜索)[^，,。]{0,4}文件|谷歌云|google\s*drive/i;
+
+function isOperationalNoise(a: BossAction): boolean {
+  if (a.source !== 'tasks') return false;
+  return OPERATIONAL_NOISE_RE.test(`${a.title} ${a.summary}`);
+}
+
 export function summarizeBusinessStructure(actions: BossAction[]): Record<BusinessStructureCategory, BossAction[]> {
   const out = Object.fromEntries(BUSINESS_STRUCTURE_CATEGORIES.map((c) => [c, [] as BossAction[]])) as Record<BusinessStructureCategory, BossAction[]>;
-  for (const a of actions) out[categorizeAction(a)].push(a);
+  for (const a of actions) {
+    if (isOperationalNoise(a)) continue;
+    out[categorizeAction(a)].push(a);
+  }
   return out;
 }
 
