@@ -144,6 +144,24 @@ export async function createBusinessDocumentHistory(row: {
   return { ok: true, row: data as BusinessDocumentHistoryRow };
 }
 
+// Home 7-day trend (homeTrends.ts) — QUOTATION/CONTRACT rows created in the
+// last N days, real per-day signal for the "报价"/"合同" trend series.
+// Read-only, no schema change.
+export async function getRecentDocumentCounts(
+  days = 7,
+): Promise<{ ok: true; rows: { document_type: BusinessDocumentType; created_at: string }[] } | { ok: false; error: string }> {
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  const { data, error } = await supabase
+    .from('business_document_history')
+    .select('document_type, created_at')
+    .in('document_type', ['QUOTATION', 'CONTRACT'])
+    .gte('created_at', since.toISOString())
+    .limit(500);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, rows: (data ?? []) as { document_type: BusinessDocumentType; created_at: string }[] };
+}
+
 export async function listBusinessDocumentHistory(
   topic: { customerId: string | null; entityName: string; documentType?: BusinessDocumentType },
 ): Promise<{ ok: true; rows: BusinessDocumentHistoryRow[] } | { ok: false; error: string }> {

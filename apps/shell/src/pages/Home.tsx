@@ -7,7 +7,6 @@ import { BusinessAssistantEntry } from '../components/BusinessAssistantEntry';
 import { BusinessLinesOverview } from '../components/BusinessLinesOverview';
 import { HomeKpiRow } from '../components/HomeKpiRow';
 import { HomeDashboardCharts } from '../components/HomeDashboardCharts';
-import { HomeDailyBrief } from '../components/HomeDailyBrief';
 import { getAllCustomerNames } from '../lib/crmSupabase';
 
 // ─── localStorage helpers (Trade module only — Task 17.1 removed the ────────
@@ -149,13 +148,7 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
       {/* B — Executive KPI: 我的事项 / 需要我决定 / 重要消息 / 新业务机会 */}
       <HomeKpiRow />
 
-      {/* C — real 7-day business trend (business-structure chart removed — no reliable real-business data source, see HomeDashboardCharts.tsx) */}
-      <HomeDashboardCharts />
-
-      {/* D — Daily Business Brief (Task 15): deduped across CRM/Quotation/Commitments/Decisions/Calendar, max 5, incl. "建议今天先做" — system/Agent technical status excluded */}
-      <HomeDailyBrief />
-
-      {/* E — Business Overview: real operating metrics only (business lines + CRM/quotation/order/inventory counts). External Agents technical status intentionally NOT restored here. */}
+      {/* C — Business Overview: real operating metrics only (business lines + CRM/quotation/order/inventory counts), moved directly below the KPI row. External Agents technical status intentionally NOT restored here. */}
       <SectionHeader label="经营概览 · BUSINESS OVERVIEW" />
       <div style={{ marginBottom: 16 }}>
         <BusinessLinesOverview />
@@ -180,6 +173,9 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
           />
         ))}
       </div>
+
+      {/* D — real 7-day business ACTIVITY trend: 新询盘/报价/合同/成交/跟进 (business-structure chart removed — no reliable real-business data source, see HomeDashboardCharts.tsx). Daily Business Brief removed from Home per this round's instruction (getDailyBrief() itself untouched — still used by Ask GCI). */}
+      <HomeDashboardCharts />
 
       {/* Inventory alert drawer */}
       {inventoryDrawerOpen && (

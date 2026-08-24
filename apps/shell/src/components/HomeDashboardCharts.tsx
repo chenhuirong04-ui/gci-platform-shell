@@ -1,8 +1,10 @@
 // GCI Executive Desk — Home Dashboard chart(s).
-// 近7天商务工作趋势 — real crm_followups + crm_customers counts (Task 4
-// functions), bucketed client-side by Dubai calendar day. No fabricated
-// trend: if there's no real signal across the 7 days, an empty state is
-// shown instead of a flat-zero chart.
+// 近7天经营活动趋势 — real business-activity counts (新询盘/报价/合同/成交/跟进,
+// see lib/homeTrends.ts for each series' real data source), bucketed
+// client-side by Dubai calendar day. No fabricated trend: a series with
+// zero real hits across all 7 days is omitted entirely rather than drawn
+// as a flat-zero bar, and if NO series has any signal the whole chart
+// shows an empty state instead.
 //
 // 当前业务事项结构 (removed) — this card counted executive_tasks/BossAction
 // rows (operational to-dos: file uploads, reminders, invoices due, etc.),
@@ -21,15 +23,26 @@
 import { useEffect, useState } from 'react';
 import { colors } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { getSevenDayTrend, type TrendDay } from '../lib/homeTrends';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
+import { getSevenDayTrend, type TrendDay, type TrendSeriesAvailability } from '../lib/homeTrends';
 
 const GOLD = '#CBA85C';
 const RED = '#E0846A';
 const BLUE = '#8FA6D4';
+const GREEN = '#6FBF8E';
+const AMBER = '#D4A843';
+const PURPLE = '#B08FD4';
 const MUTED = '#7A8494';
 const CARD = 'rgba(255,255,255,0.025)';
 const BORD = 'rgba(255,255,255,0.07)';
+
+const SERIES: { key: keyof TrendSeriesAvailability; dataKey: keyof TrendDay; nameZh: string; nameEn: string; color: string }[] = [
+  { key: 'inquiries', dataKey: 'inquiries', nameZh: '新询盘', nameEn: 'New Inquiries', color: GOLD },
+  { key: 'quotations', dataKey: 'quotations', nameZh: '报价', nameEn: 'Quotations', color: AMBER },
+  { key: 'contracts', dataKey: 'contracts', nameZh: '合同', nameEn: 'Contracts', color: PURPLE },
+  { key: 'deals', dataKey: 'deals', nameZh: '成交', nameEn: 'Deals Closed', color: GREEN },
+  { key: 'followups', dataKey: 'followups', nameZh: '跟进', nameEn: 'Follow-ups', color: BLUE },
+];
 
 function ChartCard({ title, onOpen, lang, children }: { title: string; onOpen?: () => void; lang: 'zh' | 'en'; children: React.ReactNode }) {
   return (
@@ -49,17 +62,20 @@ function TrendChart() {
   const { lang } = useI18n();
   const [days, setDays] = useState<TrendDay[] | null>(null);
   const [hasSignal, setHasSignal] = useState(true);
+  const [availableSeries, setAvailableSeries] = useState<TrendSeriesAvailability | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getSevenDayTrend().then((res) => {
-      if (res.ok) { setDays(res.days); setHasSignal(res.hasSignal); }
+      if (res.ok) { setDays(res.days); setHasSignal(res.hasSignal); setAvailableSeries(res.availableSeries); }
       else setError(res.error);
     });
   }, []);
 
+  const visibleSeries = SERIES.filter((s) => availableSeries?.[s.key]);
+
   return (
-    <ChartCard title={lang === 'zh' ? '近7天商务工作趋势 · CRM跟进 / 新客户' : '7-Day Business Activity · CRM Follow-ups / New Clients'} lang={lang}>
+    <ChartCard title={lang === 'zh' ? '近7天经营活动趋势 · 新询盘 / 报价 / 合同 / 成交 / 跟进' : '7-Day Business Activity · Inquiries / Quotations / Contracts / Deals / Follow-ups'} lang={lang}>
       {error ? (
         <div style={{ fontSize: 12, color: RED, padding: '20px 0', textAlign: 'center' }}>{lang === 'zh' ? `读取失败:${error}` : `Failed to load: ${error}`}</div>
       ) : !days ? (
@@ -67,7 +83,7 @@ function TrendChart() {
       ) : !hasSignal ? (
         <div style={{ fontSize: 12, color: MUTED, padding: '30px 0', textAlign: 'center' }}>{lang === 'zh' ? '历史数据不足，暂无可展示的趋势' : 'Not enough history yet to show a trend.'}</div>
       ) : (
-        <div style={{ width: '100%', height: 180 }}>
+        <div style={{ width: '100%', height: 200 }}>
           <ResponsiveContainer>
             <BarChart data={days} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
@@ -77,8 +93,10 @@ function TrendChart() {
                 contentStyle={{ background: '#14161C', border: `1px solid ${BORD}`, borderRadius: 8, fontSize: 12 }}
                 labelStyle={{ color: colors.textPrimary }}
               />
-              <Bar dataKey="followups" name="CRM跟进" fill={BLUE} radius={[3, 3, 0, 0]} />
-              <Bar dataKey="newCustomers" name="新客户" fill={GOLD} radius={[3, 3, 0, 0]} />
+              <Legend wrapperStyle={{ fontSize: 11 }} formatter={(value) => <span style={{ color: MUTED }}>{value}</span>} />
+              {visibleSeries.map((s) => (
+                <Bar key={s.dataKey} dataKey={s.dataKey} name={lang === 'zh' ? s.nameZh : s.nameEn} fill={s.color} radius={[3, 3, 0, 0]} />
+              ))}
             </BarChart>
           </ResponsiveContainer>
         </div>
