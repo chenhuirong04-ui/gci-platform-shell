@@ -26,6 +26,7 @@ import {
 } from './businessMemory';
 import { matchWhatsAppQuery, answerWhatsAppQuery } from './whatsapp';
 import { looksLikeServiceKnowledgeQuery, answerServiceKnowledgeQuery } from './serviceKnowledge';
+import { looksLikeNotionFollowupCommand } from './notionFollowup';
 import { isPlannerV3Enabled, callPlannerV3, classifyPlanV3Actions } from './plannerV3';
 import type { ExecutiveTask } from './executiveTasks';
 import type { CrmCustomer } from './crmSupabase';
@@ -418,6 +419,24 @@ const NEW_CUSTOMER_TRIGGER_RE = /(建|新建|登记|添加).{0,2}(一个|新)?.{
 export async function runGiaCaptureChain(text: string, state: GiaRouterState): Promise<boolean> {
   const t = text.trim();
   if (!t) return false;
+
+  // Checked BEFORE anything else (file search, Service Knowledge, Chanya,
+  // Business Memory, WhatsApp, QuotePrep, Planner V3/classify-capture) — a
+  // "记录跟进/记录沟通/..." sentence must never be answered as a service/price
+  // question or turned into a BUSINESS_TODO. The full Notion Follow-up Log
+  // confirm-card flow itself only exists on Home (BusinessAssistantEntry.tsx's
+  // own go(), which never even reaches this shared chain for such text); this
+  // guard is what protects every OTHER caller of runGiaCaptureChain (namely
+  // /business-assistant's own top input) from misrouting the same sentence
+  // into Service Knowledge — which is exactly the bug this fixes.
+  if (looksLikeNotionFollowupCommand(t)) {
+    state.setFileSearchReply(
+      state.lang === 'en'
+        ? 'This looks like a follow-up note — please confirm it from the Home page GIA box, where the follow-up confirm card is available.'
+        : '这是一条跟进记录 — 请回到 Home 页面顶部的 GIA 输入框确认记录（跟进确认卡功能目前仅在 Home 提供）。',
+    );
+    return true;
+  }
 
   const searchReply = await tryFileSearch(t);
   if (searchReply) { state.setFileSearchReply(searchReply); return true; }
