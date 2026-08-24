@@ -52,6 +52,39 @@ export interface FileClassification {
   tags: string[];
 }
 
+// Business-area keyword sets — one per real TaskBusinessArea value (see
+// executiveTasks.ts), deliberately sized/scoped so no single area wins by
+// being listed/checked first. classifyBusinessArea() below scores every
+// area independently and picks the one with the most hits, instead of a
+// first-match ternary (the previous shape: WORKFORCE checked first, TRADE
+// second, 25H_AI third, COMPANY_ADMIN last, ECOMMERCE never handled at all —
+// which is exactly the "quietly favors Workforce" bias this replaces).
+const BUSINESS_AREA_KEYWORDS: Record<Exclude<TaskBusinessAreaKey, 'OTHER'>, RegExp[]> = {
+  COMPANY_ADMIN: [/营业执照/i, /执照/i, /工商/i, /税务/i, /公司注册/i, /公司资料/i, /公司文件/i, /行政/i, /\badmin\b/i, /\blicense\b/i, /银行开户/i, /抬头纸/i, /\bVAT\b/i],
+  '25H_AI': [/25h/i, /系统开发/i, /AI项目/i, /平台开发/i, /部署/i, /上线/i, /\bdeploy\b/i, /\bapi\b/i, /小程序/i, /网站开发/i, /写代码|改代码|代码报错/i],
+  TRADE: [/报价/i, /合同/i, /贸易/i, /进出口/i, /采购/i, /供应商/i, /询盘/i, /订单/i, /出口/i, /清关/i, /\bquotation\b/i, /\bcontract\b/i, /\btrade\b/i, /\bsupplier\b/i],
+  WORKFORCE: [/劳务/i, /工人/i, /保姆/i, /用工/i, /招工/i, /招聘/i, /劳工/i, /\bworkforce\b/i, /\bmanpower\b/i, /电工/i, /焊工/i, /司机/i],
+  ECOMMERCE: [/电商/i, /shopify/i, /亚马逊/i, /\bamazon\b/i, /独立站/i, /网店/i, /\becommerce\b/i, /抖音小店/i, /tiktok\s*shop/i],
+};
+type TaskBusinessAreaKey = '25H_AI' | 'TRADE' | 'WORKFORCE' | 'ECOMMERCE' | 'COMPANY_ADMIN' | 'OTHER';
+
+function scoreBusinessArea(text: string, area: Exclude<TaskBusinessAreaKey, 'OTHER'>): number {
+  return BUSINESS_AREA_KEYWORDS[area].reduce((n, re) => n + (re.test(text) ? 1 : 0), 0);
+}
+
+// No confident single winner (zero hits, or a genuine tie between two
+// areas) → OTHER, never a forced guess (explicit rule this round: "不确定
+// 时归其他，不要硬猜").
+function classifyBusinessArea(text: string): TaskBusinessAreaKey {
+  const areas = Object.keys(BUSINESS_AREA_KEYWORDS) as Exclude<TaskBusinessAreaKey, 'OTHER'>[];
+  const scores = areas.map((area) => ({ area, score: scoreBusinessArea(text, area) }));
+  const max = Math.max(...scores.map((s) => s.score));
+  if (max === 0) return 'OTHER';
+  const top = scores.filter((s) => s.score === max);
+  if (top.length > 1) return 'OTHER';
+  return top[0].area;
+}
+
 // Rule-based only — no AI/full-text call. If Chris already said what the
 // file is, classify straight from his words; only filename is used as a
 // secondary signal, never file content.
@@ -62,11 +95,7 @@ export function classifyFileDescription(description: string, fileName: string): 
   const documentTypeLabel = matched?.label ?? '其他';
 
   const companyName = extractCompanyName(description) || extractCompanyName(fileName);
-  const businessArea = /workforce|保姆|工人|劳务/i.test(text) ? 'WORKFORCE'
-    : /trade|贸易|进出口/i.test(text) ? 'TRADE'
-    : /25h[_-]?ai/i.test(text) ? '25H_AI'
-    : /行政|admin|公司资料|公司文件/i.test(text) ? 'COMPANY_ADMIN'
-    : null;
+  const businessArea = classifyBusinessArea(text);
 
   const displayName = description.trim() || fileName;
   const tags = [documentTypeLabel, companyName].filter((v): v is string => Boolean(v));
