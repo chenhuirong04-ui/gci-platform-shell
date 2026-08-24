@@ -38,7 +38,7 @@ function addDaysISO(base: string, days: number): string {
 // added this session. Checked before ANY other routing (file-pending flows,
 // Business Document History, Planner/classify-capture) so a follow-up note
 // never turns into a BUSINESS_TODO or gets swallowed by an unrelated intent.
-const TRIGGER_RE = /记录跟进|记录沟通|记一下|记下来|先记|这个客户今天|follow[\s-]?up|log[\s-]?follow-up/i;
+const TRIGGER_RE = /记录跟进|跟进记录|记录沟通|记一下|记下来|先记|这个客户今天|follow[\s-]?up|log[\s-]?follow-up/i;
 
 export function looksLikeNotionFollowupCommand(text: string): boolean {
   return TRIGGER_RE.test(text);

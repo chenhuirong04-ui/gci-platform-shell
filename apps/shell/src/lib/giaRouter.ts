@@ -420,24 +420,6 @@ export async function runGiaCaptureChain(text: string, state: GiaRouterState): P
   const t = text.trim();
   if (!t) return false;
 
-  // Checked BEFORE anything else (file search, Service Knowledge, Chanya,
-  // Business Memory, WhatsApp, QuotePrep, Planner V3/classify-capture) — a
-  // "记录跟进/记录沟通/..." sentence must never be answered as a service/price
-  // question or turned into a BUSINESS_TODO. The full Notion Follow-up Log
-  // confirm-card flow itself only exists on Home (BusinessAssistantEntry.tsx's
-  // own go(), which never even reaches this shared chain for such text); this
-  // guard is what protects every OTHER caller of runGiaCaptureChain (namely
-  // /business-assistant's own top input) from misrouting the same sentence
-  // into Service Knowledge — which is exactly the bug this fixes.
-  if (looksLikeNotionFollowupCommand(t)) {
-    state.setFileSearchReply(
-      state.lang === 'en'
-        ? 'This looks like a follow-up note — please confirm it from the Home page GIA box, where the follow-up confirm card is available.'
-        : '这是一条跟进记录 — 请回到 Home 页面顶部的 GIA 输入框确认记录（跟进确认卡功能目前仅在 Home 提供）。',
-    );
-    return true;
-  }
-
   const searchReply = await tryFileSearch(t);
   if (searchReply) { state.setFileSearchReply(searchReply); return true; }
 
@@ -490,6 +472,29 @@ export async function runGiaTopRouter(text: string, state: GiaRouterState): Prom
   state.setPendingCapture(null);
   state.setCaptureDone(new Set());
   state.setCaptureError(null);
+
+  // Checked before EVERYTHING else — checkExplicitDestination, BARE_NAME_RE,
+  // Service Knowledge, BUSINESS_TODO/classify-capture — determined purely by
+  // the action phrase (记录跟进/跟进记录/记录沟通/记一下/...), never by the
+  // customer/contact name that follows it. Placing this inside
+  // runGiaCaptureChain (its previous location) let BARE_NAME_RE's own early
+  // `return false` — which fires for any short, punctuation-free message —
+  // skip straight past it before runGiaCaptureChain was ever reached, so a
+  // terse follow-up naming an unfamiliar contact could still fall through to
+  // /business-assistant's own resolve() or, once BARE_NAME_RE didn't apply,
+  // to Service Knowledge. Checking it here, first, closes both gaps at once.
+  // The full Notion Follow-up Log confirm-card flow itself only exists on
+  // Home (BusinessAssistantEntry.tsx's own go(), which never even reaches
+  // this router for such text); this guard is what protects every OTHER
+  // caller (namely /business-assistant's own top input).
+  if (looksLikeNotionFollowupCommand(t)) {
+    state.setFileSearchReply(
+      state.lang === 'en'
+        ? 'This looks like a follow-up note — please confirm it from the Home page GIA box, where the follow-up confirm card is available.'
+        : '这是一条跟进记录 — 请回到 Home 页面顶部的 GIA 输入框确认记录（跟进确认卡功能目前仅在 Home 提供）。',
+    );
+    return true;
+  }
 
   // 显式目的地指令永远最先检查 — 在 BARE_NAME_RE 等一切其他判断之前，
   // 确保不会被其他 Router 抢走。
