@@ -103,6 +103,14 @@ export async function updateExecutiveTaskStatus(
   return { ok: true };
 }
 
+// /tasks "已完成" tab only — a real hard delete, called only after the
+// page's own confirm step. Never used for open/in_progress tasks.
+export async function deleteExecutiveTask(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { error } = await supabase.from('executive_tasks').delete().eq('id', id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
 // Task 16 §十四 — priority derived from due_at, same real-epoch comparison
 // rule used everywhere else in this codebase (never a Dubai-shifted epoch
 // for the comparison itself, only for date-string display).

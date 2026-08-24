@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
 import {
-  getExecutiveTasks, updateExecutiveTaskStatus, updateExecutiveTaskDueDate, taskUrgency, BUSINESS_AREA_LABEL,
+  getExecutiveTasks, updateExecutiveTaskStatus, updateExecutiveTaskDueDate, deleteExecutiveTask, taskUrgency, BUSINESS_AREA_LABEL,
   type ExecutiveTask, type TaskBusinessArea, type TaskStatus,
 } from '../lib/executiveTasks';
 
@@ -99,6 +99,18 @@ export function Tasks() {
     const res = await updateExecutiveTaskStatus(id, status);
     setBusyId(null);
     if (res.ok) load();
+  }
+
+  // "已完成" tab only (view === 'completed', which lists both completed and
+  // cancelled tasks) — window.confirm is the second confirmation the spec
+  // requires; a real delete only ever runs after the user accepts it.
+  async function removeTask(id: string) {
+    if (!window.confirm(lang === 'zh' ? '确定要永久删除这条已完成的待办吗？此操作不可撤销。' : 'Permanently delete this completed to-do? This cannot be undone.')) return;
+    setBusyId(id);
+    const res = await deleteExecutiveTask(id);
+    setBusyId(null);
+    if (res.ok) load();
+    else setError(res.error);
   }
 
   async function saveReschedule(id: string) {
@@ -197,6 +209,13 @@ export function Tasks() {
                 {t.due_at && <span style={{ marginLeft: 'auto', fontSize: 10.5, color: MUTED, fontFamily: 'IBM Plex Mono,monospace' }}>{formatDate(t.due_at)}</span>}
               </div>
               {t.description && <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5, marginBottom: 8 }}>{t.description}</div>}
+              {isDone && view === 'completed' && (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button disabled={busyId === t.id} onClick={() => removeTask(t.id)} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(224,132,106,0.1)', border: `1px solid ${RED}40`, color: RED }}>
+                    {lang === 'zh' ? '删除' : 'Delete'}
+                  </button>
+                </div>
+              )}
               {!isDone && (
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   {t.status === 'open' && (
