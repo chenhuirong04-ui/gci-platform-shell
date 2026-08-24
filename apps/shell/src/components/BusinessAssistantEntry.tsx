@@ -29,6 +29,10 @@ import {
   DOC_TYPE_LABEL_ZH, DOC_TYPE_LABEL_EN, STATUS_LABEL_ZH, STATUS_LABEL_EN,
 } from '../lib/businessDocumentHistory';
 import { useGiaFileWorkflow } from '../contexts/GiaFileWorkflowContext';
+import {
+  looksLikeNotionFollowupCommand, parseNotionFollowup, createNotionFollowupLog,
+  type ParsedNotionFollowup,
+} from '../lib/notionFollowup';
 
 const GOLD = '#CBA85C';
 const GOLD_L = '#E2C988';
@@ -111,6 +115,18 @@ export function BusinessAssistantEntry() {
     crmCreateError, setCrmCreateError, crmLinkQuery, setCrmLinkQuery, crmLinkResults, setCrmLinkResults,
     crmLinkBusy, setCrmLinkBusy, crmLinkNotice, setCrmLinkNotice,
   } = useGiaFileWorkflow();
+  // GIA → Notion Follow-up Log — a direct tool action, fully independent of
+  // selectedFile/Business Document History. Local state only (not lifted to
+  // GiaFileWorkflowContext): a single-step confirm card, not a multi-panel
+  // workflow worth persisting across navigation this round. Never touches
+  // Supabase crm_followups, never creates a second Notion database, never
+  // writes anything the existing Notion → Telegram reminder automation reads
+  // differently — this is additive rows in the same Follow-up Log it already
+  // watches.
+  const [pendingNotionFollowup, setPendingNotionFollowup] = useState<ParsedNotionFollowup | null>(null);
+  const [notionFollowupBusy, setNotionFollowupBusy] = useState(false);
+  const [notionFollowupError, setNotionFollowupError] = useState<string | null>(null);
+  const [notionFollowupSaved, setNotionFollowupSaved] = useState<{ customerName: string } | null>(null);
   // Manual Folder Picker — fallback only, per spec: "只有用户不接受 GIA 推荐
   // 时才打开真实 Folder Picker". Reads the same real Drive search as the
   // automatic routing above; just a second, explicit entry point into it.
@@ -241,6 +257,21 @@ export function BusinessAssistantEntry() {
   async function go() {
     const v = value.trim();
     if (!v) { navigate('/business-assistant'); return; }
+    // GIA → Notion Follow-up Log — checked FIRST, before selectedFile/
+    // Business Document History/runGiaTopRouter, so a follow-up sentence
+    // never falls into BUSINESS_TODO/classify-capture or gets swallowed by
+    // an unrelated intent, regardless of whether a file also happens to be
+    // pending right now.
+    if (pendingNotionFollowup) {
+      // Confirm card already up — its own buttons own the interaction now.
+      setValue('');
+      return;
+    }
+    if (looksLikeNotionFollowupCommand(v)) {
+      setValue('');
+      describeNotionFollowup(v);
+      return;
+    }
     if (selectedFile) {
       setValue('');
       await handleFileText(v);
@@ -859,6 +890,39 @@ export function BusinessAssistantEntry() {
     return { id: DEFAULT_TARGET_FOLDER_ID, name: DEFAULT_TARGET_FOLDER_NAME, isDefaultFallback: true };
   }
 
+  // GIA → Notion Follow-up Log — parse only, no network call yet (the Notion
+  // write only ever happens from confirmNotionFollowup()'s explicit click).
+  function describeNotionFollowup(text: string) {
+    const parsed = parseNotionFollowup(text);
+    if (!parsed) return;
+    setNotionFollowupError(null);
+    setNotionFollowupSaved(null);
+    setPendingNotionFollowup(parsed);
+  }
+
+  // "修改" — same minimal V1 choice as Business Document History's own
+  // "修改": re-typing the sentence rather than a field-by-field editor.
+  function editNotionFollowup() {
+    setPendingNotionFollowup(null);
+    setNotionFollowupError(null);
+  }
+
+  function cancelNotionFollowup() {
+    setPendingNotionFollowup(null);
+    setNotionFollowupError(null);
+  }
+
+  async function confirmNotionFollowup() {
+    if (!pendingNotionFollowup) return;
+    setNotionFollowupBusy(true);
+    setNotionFollowupError(null);
+    const res = await createNotionFollowupLog(pendingNotionFollowup);
+    setNotionFollowupBusy(false);
+    if (!res.ok) { setNotionFollowupError(res.error); return; }
+    setNotionFollowupSaved({ customerName: pendingNotionFollowup.customerName });
+    setPendingNotionFollowup(null);
+  }
+
   async function describeFileAsBusinessDocument(description: string) {
     if (!selectedFile) return;
     const parsed = parseBusinessDocumentDescription(description);
@@ -1171,6 +1235,57 @@ export function BusinessAssistantEntry() {
             </span>
           ))}
         </div>
+
+        {pendingNotionFollowup && (
+          <div style={{ marginTop: 14, padding: '14px 16px', background: 'rgba(203,168,92,0.05)', border: `1px solid ${BORD}`, borderRadius: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: GOLD, marginBottom: 8 }}>
+              {lang === 'zh' ? '准备记录跟进' : 'Ready to log follow-up'}
+            </div>
+            <div style={{ fontSize: 12.5, color: TEXT, lineHeight: 1.8, marginBottom: 8 }}>
+              <div>{lang === 'zh' ? '客户/联系人：' : 'Customer/Contact: '}{pendingNotionFollowup.customerName}</div>
+              <div>{lang === 'zh' ? '日期：' : 'Date: '}{pendingNotionFollowup.followUpDateToday}</div>
+              {pendingNotionFollowup.method && <div>{lang === 'zh' ? '方式：' : 'Method: '}{pendingNotionFollowup.method}</div>}
+              <div>{lang === 'zh' ? '跟进内容：' : 'Notes: '}{pendingNotionFollowup.notes}</div>
+              {pendingNotionFollowup.status && <div>{lang === 'zh' ? '行动状态：' : 'Status: '}{pendingNotionFollowup.status}</div>}
+              {pendingNotionFollowup.businessType && <div>{lang === 'zh' ? '业务类型：' : 'Business type: '}{pendingNotionFollowup.businessType}</div>}
+              <div>
+                {lang === 'zh' ? '下次跟进：' : 'Next follow-up: '}
+                {pendingNotionFollowup.nextFollowUpAt ?? (
+                  <span style={{ color: MUTED }}>{lang === 'zh' ? '未指定具体日期' : 'No specific date given'}</span>
+                )}
+              </div>
+              {pendingNotionFollowup.nextAction && <div>{lang === 'zh' ? '下次行动：' : 'Next action: '}{pendingNotionFollowup.nextAction}</div>}
+              {pendingNotionFollowup.owner && <div>{lang === 'zh' ? '负责人：' : 'Owner: '}{pendingNotionFollowup.owner}</div>}
+            </div>
+            {notionFollowupError && <div style={{ fontSize: 11.5, color: RED, marginBottom: 8 }}>{notionFollowupError}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                disabled={notionFollowupBusy}
+                onClick={confirmNotionFollowup}
+                style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#E2C988)`, border: 'none', color: '#080D1E', fontWeight: 700 }}
+              >
+                {notionFollowupBusy ? (lang === 'zh' ? '记录中…' : 'Saving…') : (lang === 'zh' ? '确认记录' : 'Confirm log')}
+              </button>
+              <button disabled={notionFollowupBusy} onClick={editNotionFollowup} style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+                {lang === 'zh' ? '修改' : 'Edit'}
+              </button>
+              <button disabled={notionFollowupBusy} onClick={cancelNotionFollowup} style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+                {lang === 'zh' ? '取消' : 'Cancel'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {notionFollowupSaved && (
+          <div style={{ marginTop: 14, padding: '14px 16px', background: 'rgba(111,191,142,0.06)', border: '1px solid rgba(111,191,142,0.3)', borderRadius: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: GREEN, marginBottom: 4 }}>
+              {lang === 'zh' ? '✓ 已记录跟进' : '✓ Follow-up logged'}
+            </div>
+            <div style={{ fontSize: 12.5, color: TEXT }}>
+              {lang === 'zh' ? `已写入 Notion Follow-up Log：${notionFollowupSaved.customerName}` : `Written to Notion Follow-up Log: ${notionFollowupSaved.customerName}`}
+            </div>
+          </div>
+        )}
 
         {selectedFile && !pendingDrivePlan && !pendingBusinessDocument && (
           <div style={{ marginTop: 14, padding: '14px 16px', background: 'rgba(203,168,92,0.05)', border: `1px solid ${BORD}`, borderRadius: 10 }}>
