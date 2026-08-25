@@ -5,7 +5,6 @@
 // write, quote change, system deletion, Calendar change, or Agent action.
 import { supabase } from './supabase';
 import { getBossDecisions } from './crmSupabase';
-import { getSystemRegistry } from './systemRegistry';
 import { AGENTS } from '../components/AgentsStatus';
 import { parseRelativeDateZh } from '../ai/crmAskGciParsers';
 
@@ -52,13 +51,6 @@ const QUOTE_OPTIONS: DecisionOption[] = [
   { key: 'continue_followup', label: '继续跟进' },
   { key: 'adjust_offer', label: '调整方案/价格' },
   { key: 'pause', label: '暂停' },
-  LATER,
-];
-
-const SYSTEMS_OPTIONS: DecisionOption[] = [
-  { key: 'keep', label: '保留' },
-  { key: 'archive_candidate', label: '归档候选' },
-  { key: 'needs_audit', label: '需要进一步审计' },
   LATER,
 ];
 
@@ -138,9 +130,8 @@ function parseDueDateInput(text: string | undefined | null): string | null {
 async function collectCandidates(): Promise<DecisionCandidate[]> {
   const candidates: DecisionCandidate[] = [];
 
-  const [quotationFollowups, systemRegistry, bossDecisions] = await Promise.all([
+  const [quotationFollowups, bossDecisions] = await Promise.all([
     safeFetchJson<any>(`${base()}/api/trade/check-quotation-followups`),
-    getSystemRegistry(),
     getBossDecisions(),
   ]);
 
@@ -163,24 +154,13 @@ async function collectCandidates(): Promise<DecisionCandidate[]> {
     }
   }
 
-  if (systemRegistry.ok) {
-    for (const r of systemRegistry.rows) {
-      if (r.deletion_status !== 'review') continue;
-      candidates.push({
-        source: 'systems',
-        source_ref: `sys-${r.id}`,
-        category: 'Systems',
-        title: `${r.system_name} — 系统资产待复核`,
-        summary: r.notes || '需要确认是否仍在使用',
-        reason: `系统资产的删除状态为 review,需要决定保留还是归档候选`,
-        priority: 'P2',
-        decision_options: SYSTEMS_OPTIONS,
-        related_customer_id: null,
-        related_system_id: r.id,
-        due_at: null,
-      });
-    }
-  }
+  // Systems Registry asset-review candidates removed (2026-08-25) — "XXX —
+  // 系统资产待复核" (MIA / Chanya Growth Agent / etc.) is internal tooling
+  // status, not a genuine business decision Chris wants surfaced in Decision
+  // Inbox. Same principle already applied to the Home Daily Brief (system/
+  // Agent technical status excluded there too). getSystemRegistry() is no
+  // longer called from this file at all — was: for each systemRegistry row
+  // with deletion_status==='review', push a 'systems'-source candidate.
 
   const stagnantCustomerNames: string[] = [];
   if (bossDecisions.ok) {
@@ -302,7 +282,13 @@ export async function getDecisions(filter?: {
   if (filter?.status) q = q.eq('status', filter.status);
   const { data, error } = await q;
   if (error) return { ok: false, error: error.message };
-  return { ok: true, rows: (data ?? []) as ExecutiveDecision[] };
+  const rows = (data ?? []) as ExecutiveDecision[];
+  // Read-time exclusion, not a delete: rows already inserted by the old
+  // Systems Registry candidate generator (source='systems', "XXX — 系统资产
+  // 待复核") stay in executive_decisions untouched, but never surface in
+  // Decision Inbox — same "system/tooling status isn't a business decision"
+  // rule collectCandidates() above now enforces at generation time too.
+  return { ok: true, rows: rows.filter((r) => r.source !== 'systems') };
 }
 
 export async function refreshPendingDecisions(): Promise<
