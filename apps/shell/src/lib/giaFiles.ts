@@ -43,6 +43,17 @@ const DOC_TYPE_RULES: { type: string; label: string; keywords: string[] }[] = [
   { type: 'proposal', label: '方案', keywords: ['方案', 'proposal'] },
 ];
 
+// Fallback-search synonym terms — deliberately separate from DOC_TYPE_RULES
+// keywords above (those exist to DETECT the doc type from a user's sentence
+// and must stay narrow/precise for that). These are what actually get sent
+// to Drive as the topic filter in searchDriveFallback, so they can carry
+// broader real-world synonyms (e.g. "commission"/"referral") without risking
+// a false-positive doc-type detection. Falls back to a rule's own keywords
+// for any type not listed here.
+const SEARCH_SYNONYMS: Record<string, string[]> = {
+  agreement: ['佣金协议', '服务协议', 'commission', 'referral', 'introduction agreement'],
+};
+
 export interface FileClassification {
   documentType: string;
   documentTypeLabel: string;
@@ -411,19 +422,51 @@ export async function searchFileRegistryByQuery(text: string): Promise<GiaFileRe
   return (data as GiaFileRegistryRow[]) || [];
 }
 
+// Client-side relevance pass over what Drive's own query returns — Drive
+// itself has no notion of "how well does this match the topic", so once
+// results come back we re-check the file NAME (the only field the client
+// has) against the same topic synonym list. When at least one result's name
+// actually contains a topic term, every result that doesn't is dropped —
+// this is what keeps unrelated same-company files ("其他HIGHWAY文件") out
+// of the top 5 once a real match exists. If literally none of the returned
+// names contain any topic term (Drive's own fullText tier matched on file
+// content, not the name), the original order is kept rather than emptied —
+// that's a legitimate case, not something to hide.
+function filterAndRankByTopic<T extends { name: string }>(results: T[], topicTerms: string[]): T[] {
+  if (topicTerms.length === 0) return results;
+  const nameMatches = (name: string) => topicTerms.some((t) => name.toLowerCase().includes(t.toLowerCase()));
+  const withTopic = results.filter((r) => nameMatches(r.name));
+  return withTopic.length > 0 ? withTopic : results;
+}
+
 // Drive fallback (per Task 17 §6 priority: Registry → Drive) when nothing
 // registered yet matches. Read-only, drive.readonly — same endpoint the
 // existing Ask GCI file lookups already use.
+//
+// Company and topic are sent as SEPARATE params (not one joined string) so
+// drive-search.ts can require both to hit (Tier 1/2) before ever loosening
+// to company-only — previously this joined `rule.label` ("服务/佣金协议",
+// a compound string a real filename essentially never contains verbatim)
+// into the same free-text query, which made Tier 1 fail immediately and
+// dropped straight into an OR-only Tier 2 where the company name alone was
+// enough to match — that's why every Highway file came back regardless of
+// topic. Topic terms now come from SEARCH_SYNONYMS (real, single-concept
+// words a filename or its content is likely to actually contain), not the
+// compound display label.
 export async function searchDriveFallback(text: string): Promise<{ id: string; name: string; webViewLink: string }[]> {
   const rule = DOC_TYPE_RULES.find((r) => r.keywords.some((k) => text.toLowerCase().includes(k.toLowerCase())));
   const company = extractCompanyName(text);
-  const q = [company, rule?.label].filter(Boolean).join(' ');
-  if (!q) return [];
+  const topicTerms = rule ? (SEARCH_SYNONYMS[rule.type] ?? rule.keywords) : [];
+  if (!company && topicTerms.length === 0) return [];
   try {
-    const res = await fetch(`/api/google/drive-search?q=${encodeURIComponent(q)}&max=5`);
+    const params = new URLSearchParams();
+    if (company) params.set('q', company);
+    if (topicTerms.length > 0) params.set('topic', topicTerms.join(','));
+    params.set('max', '5');
+    const res = await fetch(`/api/google/drive-search?${params.toString()}`);
     const data = await res.json();
     if (!data.ok) return [];
-    return data.results || [];
+    return filterAndRankByTopic(data.results || [], topicTerms);
   } catch {
     return [];
   }
