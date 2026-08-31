@@ -1135,7 +1135,7 @@ export const zh: typeof en = {
       daysCount: '天数',
       pickDueDate: '选择到期日',
       calculatedDue: '计算到期日',
-      addItem: '添加产品',
+      addItem: '加入清单',
       remove: '删除',
       preview: '预览',
       generatePI: '生成PI',

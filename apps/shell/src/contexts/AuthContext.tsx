@@ -83,18 +83,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // (Task 16.1 history preserved: every branch below still unconditionally
     // resolves `loading: false`, so a thrown exception anywhere can't leave
     // it stuck and silently blank the screen again.)
+    // Whether this applySession() call actually needs a fresh profile
+    // fetch, decided once inside the setState updater below (so it sees
+    // the true previous state, not a stale outer closure) and reused by
+    // the loadProfile() call after. A same-user session refresh (Supabase's
+    // background TOKEN_REFRESHED, silent renewal, post-reconnect auth
+    // refresh) must never flip profileLoading back to true — ProtectedRoute
+    // swaps `children` for <StartupLoading/> while profileLoading is true,
+    // which unmounts whatever page is live (e.g. a half-filled PI form) and
+    // wipes its local state. Only a genuinely new session — first login, a
+    // retry() after a failed profile load (which explicitly clears
+    // prev.profile first), or a real account switch — needs one.
     function applySession(session: Session | null) {
       if (cancelled) return;
-      setState((prev) => ({
-        ...prev,
-        session,
-        user: session?.user ?? null,
-        loading: false,
-        error: null,
-        profile: session?.user ? prev.profile : null,
-        profileLoading: !!session?.user,
-      }));
-      if (session?.user) {
+      let needsProfileFetch = false;
+      setState((prev) => {
+        const newUserId = session?.user?.id ?? null;
+        const sameUserAlreadyProfiled = !!newUserId && prev.user?.id === newUserId && !!prev.profile;
+        needsProfileFetch = !!newUserId && !sameUserAlreadyProfiled;
+        return {
+          ...prev,
+          session,
+          user: session?.user ?? null,
+          loading: false,
+          error: null,
+          profile: session?.user ? prev.profile : null,
+          // No session (logout) always resolves to false, same as before;
+          // a same-user refresh preserves whatever profileLoading already
+          // was instead of forcing it either way.
+          profileLoading: !session?.user ? false : (needsProfileFetch ? true : prev.profileLoading),
+        };
+      });
+      if (needsProfileFetch && session?.user) {
         const userId = session.user.id;
         loadProfile(userId).then((profile) => {
           if (cancelled) return;
