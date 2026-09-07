@@ -24,6 +24,7 @@ export const en = {
     consignment: 'Consignment',
     stockLedger: 'Stock Ledger',
     internalTasks: 'Internal Tasks',
+    companyDocuments: 'Company Documents',
     cashFlow: 'Cash Flow',
     financeLedger: 'Finance Ledger',
     invoiceManager: 'Invoice Manager',

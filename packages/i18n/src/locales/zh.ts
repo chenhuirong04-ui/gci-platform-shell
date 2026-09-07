@@ -26,6 +26,7 @@ export const zh: typeof en = {
     consignment: '寄售',
     stockLedger: '库存流水',
     internalTasks: '内部事项',
+    companyDocuments: '公司文件',
     cashFlow: '资金流水',
     financeLedger: '财务账',
     invoiceManager: '发票管理',

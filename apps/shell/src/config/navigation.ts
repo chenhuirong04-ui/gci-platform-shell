@@ -19,6 +19,7 @@ export interface ModuleDef {
     | 'consignment'
     | 'stockLedger'
     | 'internalTasks'
+    | 'companyDocuments'
     | 'cashFlow'
     | 'financeLedger'
     | 'invoiceManager'
@@ -94,6 +95,7 @@ export const sections: SectionDef[] = [
     labelKey: 'operationsSection',
     items: [
       { code: 'IT', nameKey: 'internalTasks', path: '/crm?tab=internal' },
+      { code: 'CD', nameKey: 'companyDocuments', path: '/company-documents' },
     ],
   },
   {
