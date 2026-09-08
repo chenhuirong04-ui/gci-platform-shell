@@ -13,6 +13,7 @@ export const en = {
     historyArchive: 'History Archive',
     businessOverview: 'Business Overview',
     customersAndProjects: 'Customers & Projects',
+    tradeOps: 'Trade Operations',
     piQuote: 'PI Quote',
     engineeringQuote: 'Engineering / BOQ Quote',
     supplierQuote: 'Supplier Quote',

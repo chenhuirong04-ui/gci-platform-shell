@@ -8,6 +8,7 @@ export interface ModuleDef {
     | 'historyArchive'
     | 'businessOverview'
     | 'customersAndProjects'
+    | 'tradeOps'
     | 'piQuote'
     | 'engineeringQuote'
     | 'supplierQuote'
@@ -46,9 +47,13 @@ export interface SectionDef {
  * params the modules already read for deep-linking; this is a navigation
  * and grouping change only.
  *
- * Known product gap (not a nav bug — see SL comment below): "Stock Ledger"
- * has no real list view anywhere in Trade yet, so it points at the closest
- * existing screen (Inventory) rather than a dedicated ledger page. */
+ * Nav consolidation V1 (2026-09): Trade's own PI Quote / Quote History /
+ * Inventory / Consignment / Stock Ledger rows were collapsed into a single
+ * "Trade" entry (see the supplyChainSection comment below) — TradeModule's
+ * own top tab strip is now the one place those live, instead of duplicating
+ * them as flat sidebar rows too. "Stock Ledger" still has no real list view
+ * of its own anywhere in Trade (pre-existing product gap, not a nav bug) —
+ * its tab still just points at the closest existing screen (Inventory). */
 export const sections: SectionDef[] = [
   {
     labelKey: 'salesSection',
@@ -66,25 +71,22 @@ export const sections: SectionDef[] = [
     ],
   },
   {
+    // Nav consolidation V1 (2026-09) — PI Quote / Quote History / Inventory /
+    // Consignment / Stock Ledger used to each get their own flat sidebar row,
+    // all five pointing into TradeModule via ?tab= -- duplicating the tab
+    // strip TradeModule already has internally. Collapsed into one "Trade"
+    // entry (lands on TradeModule's own home dashboard, not a specific tab);
+    // those five pages are still fully reachable, now via Trade's own top
+    // tab strip (see TradeModule.tsx). VL/EQ/SQ/PK/BS are genuinely separate
+    // modules with no TradeModule equivalent, so they keep their own rows.
     labelKey: 'supplyChainSection',
     items: [
+      { code: 'TR', nameKey: 'tradeOps', path: '/trade' },
       { code: 'VL', nameKey: 'supplierLibrary', path: '/suppliers' },
-      { code: 'PQ', nameKey: 'piQuote', path: '/trade?tab=quote' },
       { code: 'EQ', nameKey: 'engineeringQuote', count: '4', badgeColor: '#A89878', badgeBg: 'rgba(255,255,255,0.07)', path: '/quotation?mode=customer-quote' },
       { code: 'SQ', nameKey: 'supplierQuote', path: '/quotation?mode=supplier-quote' },
       { code: 'PK', nameKey: 'packageQuote', path: '/quotation?mode=package-quote' },
       { code: 'BS', nameKey: 'businessSolutions', path: '/business-solutions' },
-      { code: 'QH', nameKey: 'quoteHistory', path: '/trade?tab=history' },
-      { code: 'IV', nameKey: 'inventory', count: '2', badgeColor: '#D0906A', badgeBg: 'rgba(224,132,106,0.14)', path: '/trade?tab=inventory' },
-      { code: 'CS', nameKey: 'consignment', path: '/trade?tab=consignment' },
-      // Was '/trade?tab=history' (Step 1 guess) -- confirmed wrong on review:
-      // HistoryDashboard's tabs are 报价历史/订单中心/应收核销, no stock-ledger
-      // view exists there. InventoryManager (库存 tab) is the closest real
-      // destination -- it's the only place that writes to STOCK_LEDGER (an
-      // adjustment form), even though there's no ledger list view yet. A
-      // real "view stock ledger history" page doesn't exist in the product
-      // yet; flagged separately as a feature gap, not a nav fix.
-      { code: 'SL', nameKey: 'stockLedger', path: '/trade?tab=inventory' },
     ],
   },
   {

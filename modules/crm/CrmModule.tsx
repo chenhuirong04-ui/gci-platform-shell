@@ -6,6 +6,7 @@ import { FollowUpTask, CMOResponse, Project, ProjectType, ProjectStatus, Project
 import { PersistenceService } from './services/persistenceService';
 import { notionSyncService } from './services/notionSync';
 import { getCustomerCode } from './utils/customerCode';
+import { supabase } from '../../apps/shell/src/lib/supabase';
 
 import { ADMIN_IMPORT_TASKS, ADMIN_IMPORT_PROJECTS } from './adminImportData';
 import LeadMasterDetail from './components/LeadMasterDetail';
@@ -1694,6 +1695,31 @@ function isLegacySyncDisabled(): boolean {
 }
 
 function LegacyCrmBanner() {
+  // Nav consolidation V1 (2026-09): this used to render full-width with its
+  // buttons always visible on every CrmModule tab, permanently occupying
+  // primary visual space above the real content. Collapsed to a single
+  // lightweight line by default — same export/clear functionality, still
+  // one click away via "管理 →", nothing removed or deleted.
+  const [expanded, setExpanded] = React.useState(false);
+  // Frontend-only gate (2026-09 review): this banner had no permission check
+  // at all — any logged-in user could see and use "清空历史数据"/"导出备份".
+  // isAdminMode elsewhere in this file is just a self-declared ?admin=1 URL
+  // flag, not real auth, so it doesn't count. Mirrors CompanyDocuments.tsx's
+  // own convention (role_label==='Admin' on user_profiles) via the shared
+  // Supabase client already imported by other modules/* files the same way
+  // (see modules/suppliers/components/QuoteHistory.tsx) — no new permission
+  // system, no change to what handleExportBackup/handleClear actually do.
+  const [isAdmin, setIsAdmin] = React.useState(false);
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from('user_profiles').select('role_label').eq('id', user.id).maybeSingle();
+      if (!cancelled && data?.role_label === 'Admin') setIsAdmin(true);
+    })();
+    return () => { cancelled = true; };
+  }, []);
   const [backedUp, setBackedUp] = React.useState(false);
   const [confirming, setConfirming] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
@@ -1740,8 +1766,21 @@ function LegacyCrmBanner() {
 
   if (cleared) {
     return (
-      <div style={{ padding: '10px 20px', background: 'rgba(212,168,67,0.08)', borderBottom: '1px solid rgba(212,168,67,0.25)', color: '#D4A843', fontSize: 12.5, fontWeight: 600, textAlign: 'center' }}>
+      <div style={{ padding: '4px 20px', background: 'rgba(212,168,67,0.05)', borderBottom: '1px solid rgba(212,168,67,0.15)', color: '#D4A843', fontSize: 11, fontWeight: 400, textAlign: 'center' }}>
         历史客户记录 / Legacy — 正式客户请使用 GIA（Business Assistant）。旧 ICARE_HISTORY_V1 客户/跟进数据已清空，Legacy 同步已停用。
+      </div>
+    );
+  }
+
+  if (!expanded || !isAdmin) {
+    return (
+      <div style={{ padding: '4px 20px', background: 'rgba(212,168,67,0.05)', borderBottom: '1px solid rgba(212,168,67,0.15)', color: '#D4A843', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+        <span>历史客户记录 / Legacy（共 {count} 条，非正式主档，正式客户请使用 GIA）</span>
+        {isAdmin && (
+          <span onClick={() => setExpanded(true)} style={{ cursor: 'pointer', textDecoration: 'underline', fontWeight: 700 }}>
+            管理 →
+          </span>
+        )}
       </div>
     );
   }
@@ -1750,6 +1789,9 @@ function LegacyCrmBanner() {
     <div style={{ padding: '10px 20px', background: 'rgba(212,168,67,0.08)', borderBottom: '1px solid rgba(212,168,67,0.25)', color: '#D4A843', fontSize: 12.5, fontWeight: 600, textAlign: 'center' }}>
       <div>历史客户记录 / Legacy — 正式客户请使用 GIA（Business Assistant），本页数据不再是主档（共 {count} 条）</div>
       <div style={{ marginTop: 8, display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' }}>
+        <span onClick={() => setExpanded(false)} style={{ cursor: 'pointer', textDecoration: 'underline', fontWeight: 400, fontSize: 11 }}>
+          收起 ←
+        </span>
         <button onClick={handleExportBackup} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(212,168,67,0.4)', color: '#D4A843', fontWeight: 700 }}>
           ⬇ 导出备份 (JSON){backedUp ? ' ✓' : ''}
         </button>

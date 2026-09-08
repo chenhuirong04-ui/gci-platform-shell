@@ -54,6 +54,12 @@ export default function TradeModule({ initialTab }: TradeModuleProps = {}) {
   const [currency, setCurrency] = useState<Currency>('AED');
   const [currentUserId] = useState('Admin'); // 物理隔离：默认 Admin
 
+  // Nav consolidation V1 (2026-09): cashflow/finance dropped from this strip
+  // — they're reachable from the global Sidebar's own 财务 (Finance) section
+  // now (/trade?tab=cashflow, /trade?tab=finance), which was the actual
+  // "same page reachable two different ways" duplication being cleaned up.
+  // Both tabs/components/routes are fully intact and still reachable by
+  // deep link — only the in-module button is removed, nothing is deleted.
   const navTabs = [
     { id: 'home',        code: 'HM', label: dict.trade.nav.home },
     { id: 'quote',       code: 'QT', label: dict.trade.pi.navLabel },
@@ -61,8 +67,6 @@ export default function TradeModule({ initialTab }: TradeModuleProps = {}) {
     { id: 'inventory',   code: 'IV', label: dict.trade.nav.inventory },
     { id: 'consignment', code: 'CS', label: dict.trade.nav.consignment },
     { id: 'history',     code: 'HS', label: dict.trade.nav.history },
-    { id: 'cashflow',    code: 'CF', label: dict.trade.nav.cashflow },
-    { id: 'finance',     code: 'FN', label: dict.trade.nav.finance },
   ] as const;
 
   return (
