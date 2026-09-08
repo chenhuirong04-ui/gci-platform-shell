@@ -40,9 +40,8 @@ export default defineConfig(({ mode }) => {
           rewrite: (p) => p.replace(/^\/api\/trade/, '/api'),
         },
         '/api/crm': {
-          target: 'https://leads.globalcareinfo.com',
+          target: 'https://app.globalcareinfo.com',
           changeOrigin: true,
-          rewrite: (p) => p.replace(/^\/api\/crm/, '/api'),
         },
       },
     },
