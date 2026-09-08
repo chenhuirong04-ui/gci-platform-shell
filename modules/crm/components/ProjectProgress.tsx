@@ -363,7 +363,7 @@ const ProjectProgress: React.FC<ProjectProgressProps> = ({
                           {/* 项目型 → Quote Type Selection (user chooses path) */}
                           {isProjectRecord(selected) && (
                             <a
-                              href={`https://app.globalcareinfo.com/quotation?mode=customer-quote&client=${encodeURIComponent(selected.clientName)}&project=${encodeURIComponent(selected.name)}&salesperson=${encodeURIComponent(selected.owner || '')}&businessId=${encodeURIComponent((selected as any).businessId || '')}&source=DEAL&returnUrl=${encodeURIComponent(window.location.href)}`}
+                              href={`https://app.globalcareinfo.com/quotation?mode=customer-quote&client=${encodeURIComponent(selected.clientName)}&project=${encodeURIComponent(selected.name)}&salesperson=${encodeURIComponent(selected.owner || '')}&businessId=${encodeURIComponent((selected as any).businessId || '')}&source=DEAL&returnUrl=${encodeURIComponent('https://app.globalcareinfo.com/crm')}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-black transition-all hover:opacity-80"
