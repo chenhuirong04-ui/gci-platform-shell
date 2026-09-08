@@ -13,7 +13,7 @@ import {
   Archive, Trash2, Target, User, UploadCloud, ExternalLink,
 } from 'lucide-react';
 
-const QUOTATION_CENTER_URL = 'https://gci-living-engineering-studio.vercel.app';
+const QUOTATION_CENTER_URL = 'https://app.globalcareinfo.com/quotation';
 import { getTaskBusinessId } from '../utils/businessId';
 
 interface LeadMasterDetailProps {
@@ -690,12 +690,13 @@ const LeadMasterDetail: React.FC<LeadMasterDetailProps> = ({ task, onClose, onUp
                     const bizId = (task as any).businessId || getTaskBusinessId(task.id);
                     const isTrade = task.businessType === 'TRADE';
                     const paramObj: Record<string, string> = {
+                      mode: 'customer-quote',
                       client: task.clientName || '',
                       businessId: bizId || '',
                       salesperson: task.owner || '',
                       phone: task.phoneE164 || task.whatsapp || '',
                       source: 'DEAL',
-                      returnUrl: 'https://leads.globalcareinfo.com',
+                      returnUrl: 'https://app.globalcareinfo.com/crm',
                     };
                     if (isTrade) paramObj.quoteType = 'TRADE';
                     window.open(`${QUOTATION_CENTER_URL}?${new URLSearchParams(paramObj).toString()}`, '_blank');
