@@ -231,6 +231,33 @@ export interface CrmNewCustomerRow {
   status: string | null;
 }
 
+// CRM Legacy cleanup (2026-09) — Business Overview's "最近更新的业务" block
+// used to be derived from legacy FollowUpTask.updatedAt (Notion-sourced,
+// localStorage). This is its real-CRM replacement: crm_customers.updated_at
+// is already stamped on every real follow-up (see logFollowup() above), so
+// ordering by it directly is the most reliable existing signal for "which
+// business had something happen recently" without inventing new logic.
+export interface CrmRecentlyUpdatedRow {
+  id: string;
+  customer_name: string;
+  updated_at: string;
+  status: string | null;
+  business_type: string | null;
+}
+
+export async function getRecentlyUpdatedCustomers(
+  limit = 4,
+): Promise<{ ok: true; rows: CrmRecentlyUpdatedRow[] } | { ok: false; error: string }> {
+  const { data, error } = await supabase
+    .from('crm_customers')
+    .select('id, customer_name, updated_at, status, business_type')
+    .eq('is_active', true)
+    .order('updated_at', { ascending: false })
+    .limit(limit);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, rows: (data ?? []) as CrmRecentlyUpdatedRow[] };
+}
+
 export async function getRecentNewCustomers(
   days = 7
 ): Promise<{ ok: true; rows: CrmNewCustomerRow[] } | { ok: false; error: string }> {

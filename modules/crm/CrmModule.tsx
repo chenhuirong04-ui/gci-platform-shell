@@ -4,11 +4,9 @@ import { useI18n } from '@gci/i18n';
 import { generateTaskContent } from './services/geminiService';
 import { FollowUpTask, CMOResponse, Project, ProjectType, ProjectStatus, ProjectLogEntry } from './types';
 import { PersistenceService } from './services/persistenceService';
-import { notionSyncService } from './services/notionSync';
 import { getCustomerCode } from './utils/customerCode';
 import { supabase } from '../../apps/shell/src/lib/supabase';
 
-import { ADMIN_IMPORT_TASKS, ADMIN_IMPORT_PROJECTS } from './adminImportData';
 import LeadMasterDetail from './components/LeadMasterDetail';
 import CustomerWorkspacePage from './pages/CustomerWorkspacePage';
 import BusinessDetailPage from './pages/BusinessDetailPage';
@@ -250,7 +248,6 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
   };
 
   const handleWorkspaceCreateBusiness = (formData: Partial<FollowUpTask>) => { handleAddTask(formData); };
-  const isAdminMode = new URLSearchParams(window.location.search).get('admin') === '1';
   const [tasks, setTasks] = useState<FollowUpTask[]>(() => demoMode ? createDemoLeads() : []);
   const [projects, setProjects] = useState<Project[]>([]);
   // Sidebar deep-links into a specific tab via ?tab=. Falls back to reading
@@ -266,8 +263,6 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
   useEffect(() => {
     if (initialTab && _crmValidTabs.includes(initialTab)) setActiveTab(initialTab);
   }, [initialTab]);
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error'>('idle');
-  const [lastSyncAt, setLastSyncAt] = useState<string | null>(() => demoMode ? null : notionSyncService.getLastSyncAt());
   // Authoritative today-follow-up count from API (Follow-up Log only, before orphan merge)
   const [todayFollowupCount, setTodayFollowupCount] = useState<number | null>(null);
   const [selectedTask, setSelectedTask] = useState<FollowUpTask | null>(null);
@@ -291,9 +286,6 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
 
   const [hydrated, setHydrated] = useState(false);
   const firstHydrateRef = useRef(true);
-  // When Notion overwrite is running, block the ordinary save effect from
-  // firing a merge-push that would re-inflate ICARE_HISTORY_V1 back to 68.
-  const notionOverwriteInProgressRef = useRef(false);
 
   // 明确排除名单（不进入业务跟进中心）
   const BIZ_EXCLUDE = new Set([
@@ -450,40 +442,6 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
     setTimeout(() => setToast(null), 2500);
   };
 
-  const syncFromNotion = async () => {
-    if (demoMode) return;
-    // Legacy CRM Cleanup: once Chris clears ICARE_HISTORY_V1, this flag stops
-    // every sync path (init load, 10-min interval, post-submit, manual button)
-    // from silently re-pulling the same 25 legacy records back from Notion.
-    if (isLegacySyncDisabled()) return;
-    setSyncStatus('syncing');
-    try {
-      const result = await notionSyncService.sync();
-
-      // ── result.tasks is already the merged set (Notion + preserved HIST_ from localStorage) ──
-      // notionSync.sync() reads localStorage directly so local HIST_ records are preserved
-      // even when tasks React state is empty (e.g. during initial page load race condition).
-      notionOverwriteInProgressRef.current = true;
-      setTasks(result.tasks);
-      setLastSyncAt(result.syncedAt);
-      setTodayFollowupCount(result.todayFollowupCount);
-
-      // Write the same 20 records to localStorage and cloud (no local-only preserved).
-      await PersistenceService.overwriteFromNotion(ICARE_HISTORY_V1, result.notionTasks);
-
-      // Flag cleared only after cloud push completes — future user edits save ~20.
-      notionOverwriteInProgressRef.current = false;
-
-      showToast(`已同步 ${result.newCount} 新 / ${result.updatedCount} 更新`, 'success');
-      setSyncStatus('idle');
-    } catch (e: any) {
-      notionOverwriteInProgressRef.current = false;
-      console.warn('[App] Notion sync failed:', e);
-      setSyncStatus('error');
-      showToast('Notion 同步失败，使用本地数据', 'error');
-    }
-  };
-
   useEffect(() => {
     if (demoMode) {
       setTasks(createDemoLeads());
@@ -493,11 +451,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
       return;
     }
     let alive = true;
-    let intervalId: ReturnType<typeof setInterval> | null = null;
     (async () => {
-      // Sync from Notion first (before loading localStorage fallback)
-      syncFromNotion().catch(() => {});
-
       try {
         const [t, p] = await Promise.all([
           PersistenceService.load(ICARE_HISTORY_V1),
@@ -515,15 +469,9 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
         setHydrated(true);
         firstHydrateRef.current = false;
       }
-
-      // Auto-sync every 10 minutes
-      intervalId = setInterval(() => {
-        if (alive) syncFromNotion().catch(() => {});
-      }, 10 * 60 * 1000);
     })();
     return () => {
       alive = false;
-      if (intervalId) clearInterval(intervalId);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [demoMode]);
@@ -532,9 +480,6 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
     if (demoMode) return;
     if (!hydrated) return;
     if (firstHydrateRef.current) return;
-    // Skip when Notion overwrite is in progress — overwriteFromNotion handles
-    // the cloud write directly; a merge-push here would re-inflate to 68.
-    if (notionOverwriteInProgressRef.current) return;
     PersistenceService.save(ICARE_HISTORY_V1, tasks);
   }, [tasks, hydrated, demoMode]);
 
@@ -717,7 +662,6 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
             const codeLabel = result.sbId ? ` · ${result.sbId}${result.sbReused ? '（已有）' : ''}` : '';
             const dbLabel = businessType === 'TRADE' ? '贸易客户池' : businessType === 'PROJECT' ? '项目客户表' : 'Follow-up Log';
             showToast(`✓ 已同步到 Notion ${dbLabel}${codeLabel}`, 'success');
-            syncFromNotion().catch((e: any) => console.warn('[LeadSubmit] sync after write failed', e));
           }
         } else {
           console.error('[LeadSubmit] Notion write failed', result);
@@ -1061,100 +1005,6 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
     }
   };
 
-  // ── 补写 Follow-up Log（partial 失败时重试）──────────────────────────
-  const [retryFollowupSyncing, setRetryFollowupSyncing] = useState(false);
-  const retryFollowupLog = async () => {
-    const failedTasks = tasks.filter(t => (t as any).notionSyncStatus === 'followup_failed' && (t as any).customerCode);
-    if (failedTasks.length === 0) {
-      showToast('没有需要补写的 Follow-up Log 记录', 'info');
-      return;
-    }
-    setRetryFollowupSyncing(true);
-    showToast(`正在补写 ${failedTasks.length} 条 Follow-up Log…`, 'info');
-    const base = typeof window !== 'undefined' ? window.location.origin : '';
-    let ok = 0, fail = 0;
-    for (const task of failedTasks) {
-      try {
-        const res = await fetch(`${base}/api/crm/notion-create-followup-only`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sbId: (task as any).customerCode,
-            customerName: task.clientName,
-            tradeStatus: task.tradeStatus,
-            businessType: task.businessType,
-            owner: task.owner,
-            notes: task.lastContext || task.notes,
-            goal: task.goal,
-            nextFollowUpAt: task.nextFollowUpAt,
-            phone: task.phoneE164,
-            whatsapp: task.whatsapp,
-          }),
-        });
-        const result = await res.json();
-        if (result.ok) {
-          ok++;
-          setTasks(prev => prev.map(t =>
-            t.id === task.id
-              ? { ...t, leadId: result.followupPageId || t.leadId, notionSyncStatus: 'ok' } as any
-              : t
-          ));
-        } else {
-          fail++;
-          console.error('[retryFollowupLog] failed for', task.clientName, result.error);
-        }
-      } catch (e: any) {
-        fail++;
-        console.error('[retryFollowupLog] error for', task.clientName, e?.message);
-      }
-    }
-    setRetryFollowupSyncing(false);
-    if (fail === 0) {
-      showToast(`✓ ${ok} 条 Follow-up Log 已补写成功`, 'success');
-    } else {
-      showToast(`补写完成：${ok} 成功 / ${fail} 失败，请查看控制台`, fail > 0 ? 'error' : 'success');
-    }
-  };
-
-  // ── 批量同步本地已归档记录 → Notion ────────────────────────────────
-  // For records that were archived before Notion write-back was available,
-  // or if individual write-backs failed. Runs in parallel, shows summary.
-  const [batchSyncing, setBatchSyncing] = useState(false);
-
-  const syncArchivedToNotion = async () => {
-    const archived = tasks.filter(t =>
-      t.status === 'archived' &&
-      t.leadId &&
-      !/^(LEAD_|HIST_|SYNTH_|INT_|NOTION-)/i.test(t.leadId) &&
-      t.leadId.includes('-')
-    );
-    if (archived.length === 0) {
-      showToast('没有需要同步到 Notion 的归档记录', 'info');
-      return;
-    }
-    setBatchSyncing(true);
-    showToast(`正在同步 ${archived.length} 条归档记录到 Notion…`, 'info');
-    const base = typeof window !== 'undefined' ? window.location.origin : '';
-    let ok = 0, fail = 0;
-    await Promise.allSettled(
-      archived.map(task =>
-        fetch(`${base}/api/crm/notion-update`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pageId: task.leadId, action: 'close_followup', tradeStatus: '暂缓' }),
-        })
-          .then(res => { if (res.ok) ok++; else fail++; })
-          .catch(() => { fail++; })
-      )
-    );
-    setBatchSyncing(false);
-    if (fail === 0) {
-      showToast(`✓ ${ok} 条归档已同步到 Notion`, 'success');
-    } else {
-      showToast(`同步完成：${ok} 成功 / ${fail} 失败`, fail > 0 ? 'error' : 'success');
-    }
-  };
-
   const deleteTask = (id: string) => {
     if (demoMode) {
       showToast('Demo模式已禁用删除', 'info');
@@ -1203,23 +1053,6 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
     }
   };
 
-  const handleAdminImport = () => {
-    const existingTaskIds = new Set(tasks.map(t => t.id));
-    const existingProjectIds = new Set(projects.map(p => p.id));
-    const newTasks = ADMIN_IMPORT_TASKS
-      .filter(t => !existingTaskIds.has(t.id))
-      .map(t => ({ ...t, importedHistorical: true as const }));
-    const newProjects = ADMIN_IMPORT_PROJECTS
-      .filter(p => !existingProjectIds.has(p.id))
-      .map(p => ({ ...p, importedHistorical: true as const }));
-    if (newTasks.length === 0 && newProjects.length === 0) {
-      showToast('所有记录已存在，无需导入', 'info');
-      return;
-    }
-    setTasks(prev => [...prev, ...newTasks]);
-    setProjects(prev => [...prev, ...newProjects]);
-    showToast(`已导入 ${newTasks.length} 条 Task、${newProjects.length} 个 Project，正在同步云端…`, 'success');
-  };
 
   const toastClass =
     toast?.type === 'success'
@@ -1287,61 +1120,6 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
                 </button>
               </React.Fragment>
             ))}
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            {!demoMode && lastSyncAt && (
-              <span className="text-[10px] font-bold whitespace-nowrap hidden md:inline" style={{ color: '#4A6080' }}>
-                {dict.crm.sync.lastSynced}: {(() => {
-                  const diff = Math.floor((Date.now() - new Date(lastSyncAt).getTime()) / 60000);
-                  return diff < 1 ? dict.crm.sync.justNow : dict.crm.sync.minutesAgo.replace('{n}', String(diff));
-                })()}
-              </span>
-            )}
-            {/* 补写 Follow-up Log（partial 失败时） */}
-            {!demoMode && tasks.some(t => (t as any).notionSyncStatus === 'followup_failed') && (
-              <button
-                onClick={retryFollowupLog}
-                disabled={retryFollowupSyncing}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black transition-all disabled:opacity-50"
-                style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.35)' }}
-                title={dict.crm.sync.retryFollowupLogTooltip}
-              >
-                <RefreshCw className={`w-3 h-3 ${retryFollowupSyncing ? 'animate-spin' : ''}`} />
-                {retryFollowupSyncing ? dict.crm.sync.retryingFollowupLog : dict.crm.sync.retryFollowupLog}
-              </button>
-            )}
-            {/* 批量同步归档→Notion */}
-            {!demoMode && tasks.some(t => t.status === 'archived' && t.leadId?.includes('-') && !/^(LEAD_|HIST_|SYNTH_|INT_|NOTION-)/i.test(t.leadId)) && (
-              <button
-                onClick={syncArchivedToNotion}
-                disabled={batchSyncing}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black transition-all disabled:opacity-50"
-                style={{ backgroundColor: 'rgba(184,150,12,0.15)', color: '#B8960C', border: '1px solid rgba(184,150,12,0.35)' }}
-                title={dict.crm.sync.archiveToNotionTooltip}
-              >
-                <RefreshCw className={`w-3 h-3 ${batchSyncing ? 'animate-spin' : ''}`} />
-                {batchSyncing ? dict.crm.sync.syncing : dict.crm.sync.archiveToNotion}
-              </button>
-            )}
-            {!demoMode && <button
-              onClick={() => syncFromNotion()}
-              disabled={syncStatus === 'syncing' || isLegacySyncDisabled()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black text-white transition-all disabled:opacity-50"
-              style={{ backgroundColor: '#B8960C' }}
-              title={isLegacySyncDisabled() ? 'Legacy 同步已停用（Task 17.1 清理）' : dict.crm.sync.syncTooltip}
-            >
-              <RefreshCw className={`w-3 h-3 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
-              {isLegacySyncDisabled() ? 'Legacy 同步已停用' : (syncStatus === 'syncing' ? dict.crm.sync.syncing : dict.crm.sync.sync)}
-            </button>}
-            {!demoMode && isAdminMode && (
-              <button
-                onClick={handleAdminImport}
-                className="px-3 py-1.5 rounded-xl text-[10px] font-black text-white"
-                style={{ backgroundColor: '#1E3A5F' }}
-              >
-                {dict.crm.sync.adminImport}
-              </button>
-            )}
           </div>
         </div>
         {isInCustomersAndProjects && (
@@ -1675,152 +1453,6 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
   );
 }
 
-// Task 17.1 — legacy CRM cleanup: crm_customers/crm_contacts/crm_followups
-// (Supabase, via Business Assistant / GIA) is now the one正式 customer
-// master. This module still reads/writes its own localStorage + Notion
-// sync (ICARE_HISTORY_V1) and is kept reachable for historical records only
-// — never delete anything here, just make the distinction unmissable at
-// the top of every tab. No routing/logic changes below this banner.
-//
-// Legacy CRM Cleanup (explicit Chris request): export ICARE_HISTORY_V1 as a
-// JSON backup, then let Chris clear it from his own browser's localStorage —
-// confirm-gated, same pattern as every other destructive action in this
-// app. Clearing also flips GCI_LEGACY_SYNC_DISABLED_V1, which
-// syncFromNotion() checks before every pull (init load, 10-min interval,
-// post-submit, manual button) — without that flag, the very next Notion
-// sync would silently re-populate the same records right back.
-const LEGACY_SYNC_DISABLED_KEY = 'GCI_LEGACY_SYNC_DISABLED_V1';
-function isLegacySyncDisabled(): boolean {
-  try { return localStorage.getItem(LEGACY_SYNC_DISABLED_KEY) === '1'; } catch { return false; }
-}
-
-function LegacyCrmBanner() {
-  // Nav consolidation V1 (2026-09): this used to render full-width with its
-  // buttons always visible on every CrmModule tab, permanently occupying
-  // primary visual space above the real content. Collapsed to a single
-  // lightweight line by default — same export/clear functionality, still
-  // one click away via "管理 →", nothing removed or deleted.
-  const [expanded, setExpanded] = React.useState(false);
-  // Frontend-only gate (2026-09 review): this banner had no permission check
-  // at all — any logged-in user could see and use "清空历史数据"/"导出备份".
-  // isAdminMode elsewhere in this file is just a self-declared ?admin=1 URL
-  // flag, not real auth, so it doesn't count. Mirrors CompanyDocuments.tsx's
-  // own convention (role_label==='Admin' on user_profiles) via the shared
-  // Supabase client already imported by other modules/* files the same way
-  // (see modules/suppliers/components/QuoteHistory.tsx) — no new permission
-  // system, no change to what handleExportBackup/handleClear actually do.
-  const [isAdmin, setIsAdmin] = React.useState(false);
-  React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase.from('user_profiles').select('role_label').eq('id', user.id).maybeSingle();
-      if (!cancelled && data?.role_label === 'Admin') setIsAdmin(true);
-    })();
-    return () => { cancelled = true; };
-  }, []);
-  const [backedUp, setBackedUp] = React.useState(false);
-  const [confirming, setConfirming] = React.useState(false);
-  const [err, setErr] = React.useState<string | null>(null);
-  const [cleared, setCleared] = React.useState(() => {
-    try { return !localStorage.getItem('ICARE_HISTORY_V1') && isLegacySyncDisabled(); } catch { return false; }
-  });
-  const [count] = React.useState(() => {
-    try {
-      const arr = JSON.parse(localStorage.getItem('ICARE_HISTORY_V1') || '[]');
-      return Array.isArray(arr) ? arr.length : 0;
-    } catch { return 0; }
-  });
-
-  function handleExportBackup() {
-    try {
-      const raw = localStorage.getItem('ICARE_HISTORY_V1') || '[]';
-      const blob = new Blob([raw], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `icare_history_v1_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setBackedUp(true);
-      setErr(null);
-    } catch (e: any) {
-      setErr('备份失败: ' + String(e?.message ?? e));
-    }
-  }
-
-  function handleClear() {
-    try {
-      localStorage.removeItem('ICARE_HISTORY_V1');
-      localStorage.setItem(LEGACY_SYNC_DISABLED_KEY, '1');
-      setCleared(true);
-      setConfirming(false);
-      setTimeout(() => window.location.reload(), 600);
-    } catch (e: any) {
-      setErr('清空失败: ' + String(e?.message ?? e));
-    }
-  }
-
-  if (cleared) {
-    return (
-      <div style={{ padding: '4px 20px', background: 'rgba(212,168,67,0.05)', borderBottom: '1px solid rgba(212,168,67,0.15)', color: '#D4A843', fontSize: 11, fontWeight: 400, textAlign: 'center' }}>
-        历史客户记录 / Legacy — 正式客户请使用 GIA（Business Assistant）。旧 ICARE_HISTORY_V1 客户/跟进数据已清空，Legacy 同步已停用。
-      </div>
-    );
-  }
-
-  if (!expanded || !isAdmin) {
-    return (
-      <div style={{ padding: '4px 20px', background: 'rgba(212,168,67,0.05)', borderBottom: '1px solid rgba(212,168,67,0.15)', color: '#D4A843', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-        <span>历史客户记录 / Legacy（共 {count} 条，非正式主档，正式客户请使用 GIA）</span>
-        {isAdmin && (
-          <span onClick={() => setExpanded(true)} style={{ cursor: 'pointer', textDecoration: 'underline', fontWeight: 700 }}>
-            管理 →
-          </span>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ padding: '10px 20px', background: 'rgba(212,168,67,0.08)', borderBottom: '1px solid rgba(212,168,67,0.25)', color: '#D4A843', fontSize: 12.5, fontWeight: 600, textAlign: 'center' }}>
-      <div>历史客户记录 / Legacy — 正式客户请使用 GIA（Business Assistant），本页数据不再是主档（共 {count} 条）</div>
-      <div style={{ marginTop: 8, display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' }}>
-        <span onClick={() => setExpanded(false)} style={{ cursor: 'pointer', textDecoration: 'underline', fontWeight: 400, fontSize: 11 }}>
-          收起 ←
-        </span>
-        <button onClick={handleExportBackup} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(212,168,67,0.4)', color: '#D4A843', fontWeight: 700 }}>
-          ⬇ 导出备份 (JSON){backedUp ? ' ✓' : ''}
-        </button>
-        {!confirming ? (
-          <button
-            disabled={!backedUp}
-            onClick={() => setConfirming(true)}
-            title={!backedUp ? '请先导出备份' : ''}
-            style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11, cursor: backedUp ? 'pointer' : 'not-allowed', opacity: backedUp ? 1 : 0.4, background: 'rgba(224,132,106,0.1)', border: '1px solid rgba(224,132,106,0.4)', color: '#E0846A', fontWeight: 700 }}
-          >
-            清空 Legacy 客户数据…
-          </button>
-        ) : (
-          <>
-            <span style={{ fontSize: 11, fontWeight: 400, color: '#E0846A' }}>确认清空这 {count} 条 Legacy 数据？已导出备份，Supabase 新 CRM 不受影响</span>
-            <button onClick={handleClear} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11, cursor: 'pointer', background: 'rgba(224,132,106,0.16)', border: '1px solid rgba(224,132,106,0.5)', color: '#E0846A', fontWeight: 700 }}>
-              确认清空
-            </button>
-            <button onClick={() => setConfirming(false)} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: '#7A8494', fontWeight: 400 }}>
-              取消
-            </button>
-          </>
-        )}
-      </div>
-      {err && <div style={{ marginTop: 6, fontSize: 11, color: '#E0846A', fontWeight: 400 }}>{err}</div>}
-    </div>
-  );
-}
-
 /* =========================
    Root — Gate + ErrorBoundary，与原 App() 完全一致，
    只是 AppInner 改名 CrmInner 且不再渲染 AppShell。
@@ -1828,7 +1460,6 @@ function LegacyCrmBanner() {
 export default function CrmModule({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoMode?: boolean } = {}) {
   return (
     <ErrorBoundary>
-      <LegacyCrmBanner />
       <CrmInner initialTab={initialTab} demoMode={demoMode} />
     </ErrorBoundary>
   );

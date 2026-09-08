@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Calendar, AlertTriangle, Briefcase,
   ChevronRight, TrendingUp, Users, MessageSquare
@@ -9,7 +10,15 @@ import { FollowUpTask, Project } from '../types';
 
 import { getTaskBusinessId, getProjectBusinessId } from '../utils/businessId';
 import { buildDashboardStats } from '../utils/dashboardStats';
-import { isRealCommLog } from '../utils/commLog';
+// CRM Legacy cleanup (2026-09) — "最近更新的业务/最近新增客户/最近新增沟通" now
+// read the real Supabase CRM (crm_customers/crm_followups) instead of the
+// legacy Notion-sourced FollowUpTask[] used everywhere else on this page.
+// Same cross-module import convention already used elsewhere (e.g.
+// modules/suppliers/components/QuoteHistory.tsx).
+import {
+  getRecentlyUpdatedCustomers, getRecentNewCustomers, getRecentFollowupsWithNotes,
+  type CrmRecentlyUpdatedRow, type CrmNewCustomerRow, type CrmFollowupWithCustomer,
+} from '../../../apps/shell/src/lib/crmSupabase';
 
 interface Props {
   tasks: FollowUpTask[];
@@ -110,9 +119,53 @@ function ProjectRow({ project }: { project: Project }) {
   );
 }
 
+// Real-CRM row for the three "recent activity" blocks — deliberately not
+// reusing TaskRow (that one is shaped around legacy FollowUpTask fields:
+// goal/nextFollowUpAt, neither of which crm_customers/crm_followups have).
+// Clicking navigates to the real customer, same deep-link convention
+// already used elsewhere for crm/business items (see actionCenter.ts's
+// deepLinkFor: /business-assistant?customer=...).
+function RealCrmRow({ name, sub, dateLabel, onClick }: { name: string; sub: string | null; dateLabel: string | null; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-colors mb-2"
+      style={{ background: CARD2, border: `1px solid ${BORDER}` }}
+      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(184,150,12,0.08)')}
+      onMouseLeave={e => (e.currentTarget.style.background = CARD2)}
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: GOLD }} />
+        <div className="min-w-0">
+          <div className="text-sm font-black truncate" style={{ color: T1 }}>{name}</div>
+          {sub && <div className="text-xs truncate mt-0.5" style={{ color: T2 }}>{sub}</div>}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+        {dateLabel && <span className="text-[10px] font-bold" style={{ color: T2 }}>{dateLabel}</span>}
+        <ChevronRight className="w-3.5 h-3.5" style={{ color: T2 }} />
+      </div>
+    </button>
+  );
+}
+
 export default function ControlCenter({ tasks, projects, todayFollowupCount, onTabSwitch, onSelectTask, onSelectBusiness }: Props) {
   const { dict, lang } = useI18n();
   const ct = dict.crm.controlCenter;
+  const navigate = useNavigate();
+
+  // ── Real CRM data for the 3 "recent activity" blocks (CRM Legacy cleanup,
+  // 2026-09) — fetched independently of the legacy tasks/projects props,
+  // which still drive the stat cards above/below (out of this round's scope).
+  const [recentUpdated, setRecentUpdated] = useState<CrmRecentlyUpdatedRow[] | null>(null);
+  const [recentNewCustomers, setRecentNewCustomers] = useState<CrmNewCustomerRow[] | null>(null);
+  const [recentFollowups, setRecentFollowups] = useState<CrmFollowupWithCustomer[] | null>(null);
+  useEffect(() => {
+    getRecentlyUpdatedCustomers(4).then(res => { if (res.ok) setRecentUpdated(res.rows); });
+    getRecentNewCustomers(7).then(res => { if (res.ok) setRecentNewCustomers(res.rows.slice(0, 4)); });
+    getRecentFollowupsWithNotes(30).then(res => { if (res.ok) setRecentFollowups(res.rows.slice(0, 4)); });
+  }, []);
+  const goToCustomer = (name: string) => navigate(`/business-assistant?customer=${encodeURIComponent(name)}`);
 
   // ── Single source of truth for all dashboard numbers ────────────────────────
   const dashboardStats = useMemo(
@@ -152,32 +205,10 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
       active30: nonDeleted.filter(t => daysAgo(t.updatedAt || t.createdAt) <= 30 && t.status !== 'archived').length,
       quoting: nonDeleted.filter(t => t.tradeStatus === '待报价' && t.status !== 'archived').length,
       archived: nonDeleted.filter(t => t.status === 'archived').length,
-      // Most recently updated businesses / customers / communications, for
-      // the three "recent activity" lists below.
-      recentBusinesses: [...nonDeleted]
-        .filter(t => t.status !== 'archived')
-        .sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''))
-        .slice(0, 4),
-      recentCustomers: (() => {
-        const firstSeen = new Map<string, FollowUpTask>();
-        for (const t of nonDeleted) {
-          const key = (t.contactKey || '').trim().toLowerCase() || (t.clientName || '').trim().toLowerCase() || t.id;
-          const existing = firstSeen.get(key);
-          if (!existing || (t.createdAt || '') < (existing.createdAt || '')) firstSeen.set(key, t);
-        }
-        return [...firstSeen.values()].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')).slice(0, 4);
-      })(),
-      // Real human/customer communications only — excludes system audit
-      // entries like "已记录（AI分析中）" / "AI 分析完成" / status-change logs.
-      recentComms: (() => {
-        const flat: { task: FollowUpTask; timestamp: string; message: string }[] = [];
-        for (const t of nonDeleted) {
-          for (const h of (t.history || [])) {
-            if (h?.timestamp && h?.message && isRealCommLog(h)) flat.push({ task: t, timestamp: h.timestamp, message: h.message });
-          }
-        }
-        return flat.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 4);
-      })(),
+      // recentBusinesses/recentCustomers/recentComms (legacy-derived) removed
+      // (CRM Legacy cleanup, 2026-09) — the three "recent activity" blocks
+      // below now read real crm_customers/crm_followups via recentUpdated/
+      // recentNewCustomers/recentFollowups state instead.
     };
   }, [tasks]);
 
@@ -230,26 +261,53 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="rounded-[18px] border p-5 shadow-sm" style={{ backgroundColor: CARD, borderColor: BORDER }}>
           <SectionHeader icon={<Briefcase className="w-4 h-4" />} title={ct.recentBusinessesTitle} />
-          {overview.recentBusinesses.length === 0
-            ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{ct.noRecentItems}</div>
-            : overview.recentBusinesses.map(t => <TaskRow key={t.id} task={t} onClick={() => onSelectBusiness(t)} />)}
+          {recentUpdated === null
+            ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{(lang === 'zh' ? '加载中…' : 'Loading…')}</div>
+            : recentUpdated.length === 0
+              ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{ct.noRecentItems}</div>
+              : recentUpdated.map(c => (
+                  <RealCrmRow
+                    key={c.id}
+                    name={c.customer_name}
+                    sub={c.status || c.business_type}
+                    dateLabel={c.updated_at?.slice(0, 10) || null}
+                    onClick={() => goToCustomer(c.customer_name)}
+                  />
+                ))}
         </div>
         <div className="rounded-[18px] border p-5 shadow-sm" style={{ backgroundColor: CARD, borderColor: BORDER }}>
           <SectionHeader icon={<Users className="w-4 h-4" />} title={ct.recentCustomersTitle} />
-          {overview.recentCustomers.length === 0
-            ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{ct.noRecentItems}</div>
-            : overview.recentCustomers.map(t => <TaskRow key={t.id} task={t} onClick={() => onSelectTask(t)} />)}
+          {recentNewCustomers === null
+            ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{(lang === 'zh' ? '加载中…' : 'Loading…')}</div>
+            : recentNewCustomers.length === 0
+              ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{ct.noRecentItems}</div>
+              : recentNewCustomers.map(c => (
+                  <RealCrmRow
+                    key={c.id}
+                    name={c.customer_name}
+                    sub={c.business_type || c.source}
+                    dateLabel={c.created_at?.slice(0, 10) || null}
+                    onClick={() => goToCustomer(c.customer_name)}
+                  />
+                ))}
         </div>
         <div className="rounded-[18px] border p-5 shadow-sm" style={{ backgroundColor: CARD, borderColor: BORDER }}>
           <SectionHeader icon={<MessageSquare className="w-4 h-4" />} title={ct.recentCommsTitle} />
-          {overview.recentComms.length === 0
-            ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{ct.noRecentItems}</div>
-            : overview.recentComms.map((c, i) => (
-                <div key={i} className="px-3 py-2.5 rounded-xl mb-2" style={{ background: CARD2, border: `1px solid ${BORDER}` }}>
-                  <div className="text-xs font-black truncate" style={{ color: T1 }}>{c.task.clientName}</div>
-                  <div className="text-[11px] truncate mt-0.5" style={{ color: T2 }}>{c.message}</div>
-                </div>
-              ))}
+          {recentFollowups === null
+            ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{(lang === 'zh' ? '加载中…' : 'Loading…')}</div>
+            : recentFollowups.length === 0
+              ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{ct.noRecentItems}</div>
+              : recentFollowups.map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => f.customer_name && goToCustomer(f.customer_name)}
+                    className="w-full text-left px-3 py-2.5 rounded-xl mb-2 transition-colors"
+                    style={{ background: CARD2, border: `1px solid ${BORDER}` }}
+                  >
+                    <div className="text-xs font-black truncate" style={{ color: T1 }}>{f.customer_name || '—'}</div>
+                    <div className="text-[11px] truncate mt-0.5" style={{ color: T2 }}>{f.notes || f.next_action || '—'}</div>
+                  </button>
+                ))}
         </div>
       </div>
 
