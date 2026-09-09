@@ -28,6 +28,25 @@ const inputSt: React.CSSProperties = {
   border: `1px solid ${BORD}`, color: colors.textPrimary,
 };
 
+// Scoped to this page only (className below is unique to it) — native <select> popups ignore
+// most inline styling, but Windows Chrome/Edge do honor `color-scheme` plus `option{}` rules, so
+// this is enough to stop the default white dropdown/near-invisible text without touching any
+// other module's <select>. Same scoped-CSS-via-<style> convention already used by
+// InvoicePreview.tsx (INVOICE_SCOPED_CSS).
+const COMPANY_DOCUMENTS_SELECT_CSS = `
+.gci-cd-select { color-scheme: dark; }
+.gci-cd-select option {
+  background-color: #0F1830;
+  color: #F0EAD2;
+}
+.gci-cd-select option:checked,
+.gci-cd-select option:hover,
+.gci-cd-select option:focus {
+  background-color: #CBA85C;
+  color: #1A1206;
+}
+`;
+
 function formatBytes(n: number | null): string {
   if (n === null) return '';
   if (n < 1024) return `${n} B`;
@@ -185,6 +204,7 @@ export function CompanyDocuments() {
 
   return (
     <div style={{ maxWidth: 1180, margin: '0 auto', padding: '40px 32px 80px' }}>
+      <style dangerouslySetInnerHTML={{ __html: COMPANY_DOCUMENTS_SELECT_CSS }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
         <button onClick={() => navigate('/')} style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 13, cursor: 'pointer' }}>
           ← {isZh ? '返回' : 'Back'}
@@ -201,7 +221,7 @@ export function CompanyDocuments() {
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
-        <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={inputSt}>
+        <select className="gci-cd-select" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={inputSt}>
           <option value="">{isZh ? '全部分类' : 'All Categories'}</option>
           {COMPANY_DOCUMENT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
@@ -255,7 +275,7 @@ export function CompanyDocuments() {
             />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}>
-            <select value={uploadForm.category} onChange={e => setUploadForm(f => ({ ...f, category: e.target.value }))} style={inputSt}>
+            <select className="gci-cd-select" value={uploadForm.category} onChange={e => setUploadForm(f => ({ ...f, category: e.target.value }))} style={inputSt}>
               <option value="">{isZh ? '— 选择分类 —' : '— Select Category —'}</option>
               {COMPANY_DOCUMENT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
