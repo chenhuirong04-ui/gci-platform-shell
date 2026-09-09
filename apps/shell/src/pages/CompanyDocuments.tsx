@@ -1,9 +1,9 @@
 // GCI Company Documents — direct port of 25H-WorkforceOS's Company Documents module (see
 // companyDocumentsService.ts). Flat filterable list per this feature's own spec, rather than
 // WorkforceOS's category-cards-then-drill-down home screen — same underlying data/service, a
-// different page shape was explicitly requested for GCI. View is open to any authenticated user;
-// upload/delete are Active-Admin-only, enforced for real by RLS (see the migration) — the isAdmin
-// check here is convenience only.
+// different page shape was explicitly requested for GCI. View/upload are open to any authenticated
+// user; delete is Active-Admin-only. Enforced for real by RLS (see the migration) — the
+// canUpload/isAdmin checks here are convenience only.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
@@ -59,6 +59,10 @@ export function CompanyDocuments() {
   // loadProfile() already filters .eq('is_active', true), so any loaded profile is guaranteed
   // active; this is a UX convenience only, RLS is the real boundary.
   const isAdmin = profile?.role_label === 'Admin';
+  // Upload permission (2026-09): any authenticated user, not just Admin — matches the
+  // authenticated-can-INSERT RLS policy (see the migration). loadProfile() only ever returns a
+  // row for an active user, so a loaded profile is sufficient here.
+  const canUpload = !!profile;
   // Display-only i18n (same convention as Tasks.tsx): switches with the app's EN/中文 toggle via
   // localStorage, no shared i18n dict entries needed for this page's body text.
   const isZh = (localStorage.getItem('gci_platform_language_v1') || 'zh') === 'zh';
@@ -112,12 +116,12 @@ export function CompanyDocuments() {
     setUploadForm(f => ({ ...f, file, document_name: f.document_name || file.name }));
     setShowUpload(true);
   };
-  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); if (isAdmin) setIsDraggingOver(true); };
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); if (canUpload) setIsDraggingOver(true); };
   const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDraggingOver(false); };
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDraggingOver(false);
-    if (!isAdmin) return;
+    if (!canUpload) return;
     acceptFile(e.dataTransfer.files?.[0]);
   };
 
@@ -188,7 +192,7 @@ export function CompanyDocuments() {
         <h1 style={{ fontSize: 22, fontWeight: 700, color: colors.textPrimary, margin: 0, fontFamily: "'Space Grotesk',sans-serif", flex: 1 }}>
           {isZh ? '公司文件' : 'Company Documents'}
         </h1>
-        {isAdmin && (
+        {canUpload && (
           <button onClick={openUpload} style={{ padding: '9px 18px', borderRadius: 10, fontSize: 13.5, fontWeight: 600, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#B8935A)`, color: '#1A1206', border: 'none' }}>
             {isZh ? '上传文件' : 'Upload File'}
           </button>
@@ -231,7 +235,7 @@ export function CompanyDocuments() {
       </div>
 
       {/* Upload panel */}
-      {isAdmin && showUpload && (
+      {canUpload && showUpload && (
         <div style={{ padding: 16, marginBottom: 16, background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, display: 'grid', gap: 10 }}>
           <div
             onDragOver={handleDragOver}
