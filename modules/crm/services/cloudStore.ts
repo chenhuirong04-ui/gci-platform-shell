@@ -23,7 +23,7 @@ function getGatePassword(): string {
 
 async function invokeQuickApi(body: any) {
   const action = body?.action || 'unknown';
-  console.log(`[CloudStore] invokeQuickApi → action=${action} | project=mrrsbixkuqsynpucmggc`);
+  console.log(`[CloudStore] invokeQuickApi → action=${action} | project=efrkvwhzpgahjgfukjth`);
   const { data, error } = await supabase.functions.invoke('quick-api', { body });
   if (error) {
     console.error(`[CloudStore] ❌ quick-api error (${action}):`, error.message || error);
