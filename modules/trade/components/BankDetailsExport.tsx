@@ -102,6 +102,18 @@ export function BankDetailsModal({ account, onClose, onExportPdf }: BankDetailsM
   const [copied, setCopied] = React.useState(false);
   const [exporting, setExporting] = React.useState(false);
 
+  // Lock background page scroll while this modal is mounted (the parent
+  // conditionally renders it, so mount/unmount tracks open/close) — same
+  // pattern as FinanceTracker's "新增银行账户" modal. Always restored on
+  // unmount.
+  React.useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, []);
+
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(formatBankDetailsText(account));
@@ -126,7 +138,10 @@ export function BankDetailsModal({ account, onClose, onExportPdf }: BankDetailsM
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-xl z-[6000] flex items-center justify-center p-4 sm:p-8">
-      <div className="bg-white rounded-[40px] shadow-2xl w-full flex flex-col" style={{ maxHeight: '90vh', maxWidth: 760 }}>
+      <div
+        className="bg-white rounded-[40px] shadow-2xl w-full flex flex-col overflow-hidden"
+        style={{ maxHeight: 'calc(100dvh - 32px)', maxWidth: 760 }}
+      >
         <div className="shrink-0 flex items-center justify-between px-8 pt-8 pb-5">
           <h3 className="text-sm font-black text-[#080D1E] uppercase tracking-[0.2em]">银行信息 / Bank Details</h3>
           <button onClick={onClose} className="text-gray-300 hover:text-gray-600 shrink-0">
@@ -134,7 +149,10 @@ export function BankDetailsModal({ account, onClose, onExportPdf }: BankDetailsM
           </button>
         </div>
 
-        <div className="overflow-y-auto px-8 pb-4">
+        {/* flex-1 + min-h-0 is load-bearing — see FinanceTracker.tsx's
+            "新增银行账户" modal for the full explanation of why this exact
+            combination was missing the real fix earlier. */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-8 pb-4">
           <div className="border border-gray-100 rounded-2xl overflow-hidden shadow-sm" style={{ transform: 'scale(1)', transformOrigin: 'top left' }}>
             <div style={{ maxWidth: '100%', overflow: 'auto' }}>
               <BankDetailsCard ref={cardRef} account={account} />

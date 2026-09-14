@@ -555,7 +555,10 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
 
       {showAddAccount && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-xl z-[6000] flex items-center justify-center p-4 sm:p-8">
-          <div className="bg-white rounded-[40px] shadow-2xl max-w-md w-full flex flex-col" style={{ maxHeight: '90vh' }}>
+          <div
+            className="bg-white rounded-[40px] shadow-2xl max-w-md w-full flex flex-col overflow-hidden"
+            style={{ maxHeight: 'calc(100dvh - 32px)' }}
+          >
             {/* Header — fixed, never scrolls */}
             <div className="shrink-0 flex items-center justify-between px-10 pt-10 pb-6">
               <h3 className="text-sm font-black text-[#080D1E] uppercase tracking-[0.2em]">新增银行账户</h3>
@@ -564,8 +567,14 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
               </button>
             </div>
 
-            {/* Body — the only part that scrolls, everything else stays put */}
-            <div className="overflow-y-auto px-10">
+            {/* Body — the only part that scrolls, everything else stays put.
+                flex-1 + min-h-0 is load-bearing here: without min-h-0, a flex
+                item defaults to min-height:auto (sized to its content), so
+                this div would grow to fit ALL fields instead of shrinking to
+                the space actually left after Header/Footer — which is what
+                pushed the card taller than the viewport and the button off
+                the bottom of the screen in Production. */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-10">
             <div className="space-y-5 pb-8">
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">账户名称</label>
