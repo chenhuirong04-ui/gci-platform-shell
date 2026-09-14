@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   TrendingUp, TrendingDown, DollarSign, Trash2, Calendar, FileText, PlusCircle,
   Building2, User, Wallet, Lock, Landmark, Plus, X, CreditCard, FileDown
@@ -553,7 +554,18 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
         </>
       )}
 
-      {showAddAccount && (
+      {showAddAccount && createPortal(
+        // Portal fix (2026-09): rendering this overlay from inside
+        // FinanceTracker's own DOM subtree meant `fixed inset-0` could be
+        // hijacked by any ancestor that establishes a new containing block
+        // for fixed-position elements (a `transform`/`filter`/`will-change`
+        // on ANY ancestor — including ones added transiently by animation
+        // utility classes — makes `fixed` behave like `absolute` relative
+        // to that ancestor instead of the real viewport). Confirmed in
+        // Production: the modal's position drifted further down on each
+        // open. Mounting straight onto document.body via a portal sidesteps
+        // the whole ancestor chain — there is no longer any ancestor between
+        // this overlay and <body> that could reinterpret `fixed`.
         <div className="fixed inset-0 bg-black/70 backdrop-blur-xl z-[6000] flex items-center justify-center p-4 sm:p-8">
           <div
             className="bg-white rounded-[40px] shadow-2xl max-w-md w-full flex flex-col overflow-hidden"
@@ -715,7 +727,8 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {showBankDetailsFor && (

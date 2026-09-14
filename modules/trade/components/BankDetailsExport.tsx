@@ -1,4 +1,5 @@
 import React, { forwardRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Copy, FileDown, Check } from 'lucide-react';
 import { colors, logoGradient } from '@gci/design-system';
 import type { BankAccount } from '../types';
@@ -136,7 +137,12 @@ export function BankDetailsModal({ account, onClose, onExportPdf }: BankDetailsM
     }
   };
 
-  return (
+  // Portal fix (2026-09): mount straight onto document.body so `fixed
+  // inset-0` is always anchored to the real viewport, regardless of any
+  // ancestor (in FinanceTracker or wherever else this modal is used) that
+  // might establish its own containing block for fixed-position elements.
+  // Same fix, same reasoning as FinanceTracker's "新增银行账户" modal.
+  return createPortal(
     <div className="fixed inset-0 bg-black/70 backdrop-blur-xl z-[6000] flex items-center justify-center p-4 sm:p-8">
       <div
         className="bg-white rounded-[40px] shadow-2xl w-full flex flex-col overflow-hidden"
@@ -178,6 +184,7 @@ export function BankDetailsModal({ account, onClose, onExportPdf }: BankDetailsM
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
