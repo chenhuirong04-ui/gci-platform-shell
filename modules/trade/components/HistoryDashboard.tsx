@@ -9,18 +9,20 @@ import {
 } from 'lucide-react';
 import { useI18n } from '@gci/i18n';
 
-import {
+import type {
   QuoteRecord,
   QuoteItemRecord,
   OrderRecord,
   PaymentRecord,
   OrderItemRecord,
   TransactionRecord,
-  ConsignmentStockRecord
+  ConsignmentStockRecord,
+  BankAccount
 } from '../types';
 
 import { roundTo2, calculateOutstanding, verifyFinancialBalance } from '../services/currencyUtils';
 import { persistence } from '../services/persistenceService';
+import { bankAccountsService } from '../services/bankAccountsService';
 
 // New isolated interface for consignment settlements (Consignment_Settlements storage)
 interface ConsignmentSettlementRecord {
@@ -89,6 +91,8 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
   const [selectedQuote, setSelectedQuote] = useState<QuoteRecord | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState<{ orderId: string, total: number } | null>(null);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [payAccountId, setPayAccountId] = useState<string>('');
 
   // ✅ AR view mode
   const [arMode, setArMode] = useState<'OUTSTANDING' | 'ALL'>('OUTSTANDING');
@@ -170,6 +174,12 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
   // ✅ mount 时也加载一次（关键）
   useEffect(() => { loadLocalData(); }, []);
   useEffect(() => { loadLocalData(); }, [activeSubTab]);
+  useEffect(() => {
+    bankAccountsService.list().then(list => {
+      setBankAccounts(list);
+      setPayAccountId(prev => prev || list[0]?.id || '');
+    });
+  }, []);
 
   // =========================
   // ✅ PDF Export (Stable)
@@ -770,9 +780,13 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
   };
 
   const handleUpdateOrderMetadata = async (orderId: string, updates: Partial<OrderRecord>) => {
-    const updated = (orders || []).map((o: OrderRecord) => o.id === orderId ? { ...o, ...updates } : o);
-    await persistence.updateOrders(updated);
-    setOrders(updated);
+    const target = (orders || []).find((o: OrderRecord) => o.id === orderId);
+    if (!target) return;
+    const updatedOrder = { ...target, ...updates };
+    // Finance V1 fix (2026-09): only this order's own row is touched now —
+    // see persistenceService.updateOrder().
+    await persistence.updateOrder(updatedOrder);
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? updatedOrder : o)));
     if (selectedOrder && selectedOrder.id === orderId) {
       setSelectedOrder({ ...selectedOrder, ...updates });
     }
@@ -858,10 +872,10 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
   const handleVoidOrder = async (orderId: string) => {
     if (!window.confirm(`确认作废订单 ${orderId}？\n作废后不计入统计，但保留记录。`)) return;
     const targetOrder = (orders || []).find(o => o.id === orderId);
-    const updated = (orders || []).map(o =>
-      o.id === orderId ? { ...o, status: 'VOIDED' as any } : o
-    );
-    await persistence.updateOrders(updated);
+    if (!targetOrder) return;
+    // Finance V1 fix (2026-09): only this order's own row is touched now —
+    // see persistenceService.updateOrder().
+    await persistence.updateOrder({ ...targetOrder, status: 'VOIDED' as any });
 
     // If this was a Consignment order, mark its consignment_stock entries as cancelled
     if ((targetOrder as any)?.transactionMode === 'Consignment') {
@@ -903,8 +917,9 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
       updated_at: now,
       updatedAt: now,
     };
-    const updatedQuotes = (quotes || []).map(x => x.id === quoteId ? archived : x);
-    await persistence.updateQuotes(updatedQuotes);
+    // Finance V1 fix (2026-09): only this quote's own row is touched now —
+    // see persistenceService.updateQuote().
+    await persistence.updateQuote(archived);
     await loadLocalData();
     setSelectedQuote(null);
     alert(`✅ 报价单 ${quoteId} 已归档（未成交）。可通过"显示归档"查看。`);
@@ -914,28 +929,32 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
     const target = (payments || []).find(p => p.id === paymentId);
     if (!target) return;
     if (!window.confirm(`确认删除收款记录 ${paymentId}（AED ${target.amount}）？\n将自动还原应收金额。`)) return;
-    const newPayments = (payments || []).filter(p => p.id !== paymentId);
-    const orderPayments = newPayments.filter(p => p.orderId === target.orderId);
+    const remainingPayments = (payments || []).filter(p => p.id !== paymentId);
+    const orderPayments = remainingPayments.filter(p => p.orderId === target.orderId);
     const newPaid = roundTo2(orderPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0));
-    const updatedOrders = (orders || []).map(o => {
-      if (o.id !== target.orderId) return o;
-      const newOutstanding = calculateOutstanding(o.grandTotal, newPaid);
+    const targetOrder = (orders || []).find(o => o.id === target.orderId);
+    // Finance V1 fix (2026-09): delete only this one payment's own row —
+    // see persistenceService.deletePayment(). Was previously re-uploading
+    // the entire payments array via updatePayments().
+    const writes: Promise<void>[] = [persistence.deletePayment(target)];
+    if (targetOrder) {
+      const newOutstanding = calculateOutstanding(targetOrder.grandTotal, newPaid);
       const newStatus = newOutstanding <= 0 ? 'PAID' as const : newPaid > 0 ? 'PARTIAL' as const : 'PENDING' as const;
-      return { ...o, paidAmount: newPaid, outstandingAmount: newOutstanding, status: newStatus };
-    });
-    await Promise.all([
-      persistence.updateOrders(updatedOrders),
-      persistence.updatePayments(newPayments)
-    ]);
+      // Finance V1 fix (2026-09): only this order's own row is touched now —
+      // see persistenceService.updateOrder().
+      writes.push(persistence.updateOrder({ ...targetOrder, paidAmount: newPaid, outstandingAmount: newOutstanding, status: newStatus }));
+    }
+    await Promise.all(writes);
     await loadLocalData();
   };
 
   const handleVoidAdjustment = async (adjId: string) => {
     if (!window.confirm(`确认撤销冲账单 ${adjId}？\n撤销后不计入统计，但保留记录。`)) return;
-    const updated = (orders || []).map(o =>
-      o.id === adjId ? { ...o, status: 'VOIDED' as any } : o
-    );
-    await persistence.updateOrders(updated);
+    const targetOrder = (orders || []).find(o => o.id === adjId);
+    if (!targetOrder) return;
+    // Finance V1 fix (2026-09): only this adjustment order's own row is
+    // touched now — see persistenceService.updateOrder().
+    await persistence.updateOrder({ ...targetOrder, status: 'VOIDED' as any });
     await loadLocalData();
     alert(`✅ 冲账单 ${adjId} 已撤销`);
   };
@@ -1096,12 +1115,13 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
         lineTotal: roundTo2(si.lineTotal)
       }));
 
-      const updatedQuotes = (quotes || []).map(q =>
-        q.id === quote.id ? { ...q, status: 'CONVERTED' as const, convertedOrderId: soNo } : q
-      );
+      const updatedQuote = { ...quote, status: 'CONVERTED' as const, convertedOrderId: soNo };
 
+      // Finance V1 fix (2026-09): only this quote's own row is touched now
+      // — see persistenceService.updateQuote(). Business status/fields,
+      // numbering, PDF flow are all unchanged.
       await Promise.all([
-        persistence.updateQuotes(updatedQuotes),
+        persistence.updateQuote(updatedQuote),
         persistence.saveOrder(newOrder),
         persistence.saveOrderItems(newOrderItems)
       ]);
@@ -1166,7 +1186,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
     }
   };
 
-  const recordPayment = async (amount: number, method: any, note: string) => {
+  const recordPayment = async (amount: number, method: any, note: string, bankAccountId: string) => {
     if (!showPaymentModal) return;
     const amt = roundTo2(amount);
 
@@ -1182,6 +1202,10 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
     }
     if (amt <= 0) {
       alert("⚠️ 收款金额必须大于 0。");
+      return;
+    }
+    if (!bankAccountId) {
+      alert("⚠️ 请选择收款账户。");
       return;
     }
 
@@ -1203,39 +1227,41 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
       userId: currentUserId
     };
 
+    // Finance V1 (2026-09): unified ledger format — was previously writing
+    // type:'IN' (uppercase) with no bank_account_id, which meant order
+    // payments never matched FinanceTracker's account filter and never
+    // showed up in 财务账. See chat report §A for the historical-data count.
     const newTxn: TransactionRecord = {
       id: `TXN-${Date.now()}`,
       date: newPayment.date,
-      type: 'IN',
+      type: 'in',
       amount: newPayment.amount,
-      method: newPayment.method as any,
-      refType: 'PAYMENT',
-      refId: newPayment.id,
-      orderId: newPayment.orderId,
-      customerName: targetOrder.customerName,
+      bank_account_id: bankAccountId,
+      ref_type: 'ORDER_PAYMENT',
+      ref_id: newPayment.id,
+      customer: targetOrder.customerName,
       note: newPayment.note || 'Payment received',
-      createdAt: new Date().toISOString(),
       userId: currentUserId
     };
 
-    const updatedOrders = (orders || []).map(o => {
-      if (o.id === showPaymentModal.orderId) {
-        return {
-          ...o,
-          paidAmount: newPaid,
-          outstandingAmount: newOutstanding,
-          status: newOutstanding <= 0 ? 'PAID' as const : 'PARTIAL' as const
-        };
-      }
-      return o;
-    });
+    const updatedOrder = {
+      ...targetOrder,
+      paidAmount: newPaid,
+      outstandingAmount: newOutstanding,
+      status: newOutstanding <= 0 ? 'PAID' as const : 'PARTIAL' as const
+    };
 
-    const existingTxns = await persistence.getTransactions();
-
+    // Finance V1 fix (2026-09): a payment now produces exactly one order
+    // update (this order's own row only, via updateOrder — no more
+    // re-uploading the whole `orders` array) and exactly one new
+    // transaction row (via addTransaction — no more re-uploading the whole
+    // ledger history). Those two patterns together were the root cause of
+    // the duplicate PENDING/PAID/VOIDED order rows and the ~7700-row
+    // transactions pileup found in the audit.
     await Promise.all([
-      persistence.updateOrders(updatedOrders),
+      persistence.updateOrder(updatedOrder),
       persistence.savePayment(newPayment),
-      persistence.saveTransactions([newTxn, ...existingTxns])
+      persistence.addTransaction(newTxn)
     ]);
 
     await loadLocalData();
@@ -2482,6 +2508,23 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                 </select>
               </div>
 
+              <div className="space-y-3">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-wide ml-4">收款账户</label>
+                {bankAccounts.length === 0 ? (
+                  <p className="text-[11px] text-[#E0846A] font-bold px-4">
+                    还没有银行账户，请先去「财务账」新增一个，否则这笔收款不会进入资金流水。
+                  </p>
+                ) : (
+                  <select
+                    value={payAccountId}
+                    onChange={e => setPayAccountId(e.target.value)}
+                    className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-[28px] font-black text-xs uppercase tracking-widest outline-none focus:border-[#CBA85C] appearance-none shadow-inner cursor-pointer"
+                  >
+                    {bankAccounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
+                  </select>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-4 pt-8">
                 <button
                   onClick={() => setShowPaymentModal(null)}
@@ -2491,13 +2534,14 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                 </button>
 
                 <button
+                  disabled={!payAccountId}
                   onClick={async () => {
                     const amtElement = document.getElementById('pay-amount-ar') as HTMLInputElement;
                     const amt = parseFloat(amtElement.value);
                     const mtd = (document.getElementById('pay-method-ar') as HTMLSelectElement).value;
-                    await recordPayment(amt, mtd as any, "Received from client");
+                    await recordPayment(amt, mtd as any, "Received from client", payAccountId);
                   }}
-                  className="py-5 bg-[#3F7D58] text-white rounded-[24px] font-black uppercase text-xs tracking-wide shadow-xl hover:bg-black transition-all"
+                  className="py-5 bg-[#3F7D58] text-white rounded-[24px] font-black uppercase text-xs tracking-wide shadow-xl hover:bg-black transition-all disabled:opacity-40"
                 >
                   确认核销
                 </button>

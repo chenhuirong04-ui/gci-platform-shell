@@ -1,4 +1,4 @@
-import {
+import type {
   QuoteRecord,
   QuoteItemRecord,
   OrderRecord,
@@ -45,6 +45,13 @@ const normalizeCloudRow = (row: any) => {
   return {
     ...payload,
     id: businessId,
+    // Real Postgres row id (Finance V1 fix, 2026-09) — lets a later targeted
+    // update (cloudDb.updateById) hit exactly this physical row instead of
+    // guessing an id and upserting, which is what caused the duplicate-row
+    // bug. Whichever physical row wins mergeById's "latest updated_at"
+    // dedup carries its own _rowId forward, so updates keep landing on the
+    // row the app is already treating as current.
+    _rowId: row?.id,
     // Preserve row-level state so cancelled/archived records can be filtered out
     state: row?.state ?? 'active',
 
@@ -114,6 +121,61 @@ const enrichRecord = (item: any) => {
   return enriched;
 };
 
+/**
+ * Shared safe-write path for updateOrder/updatePayment/updateQuote
+ * (Finance V1 fix, 2026-09).
+ *
+ * When the record already carries a `_rowId` (the normal case for anything
+ * touched since this fix), this is a plain PATCH — no lookup needed.
+ *
+ * When it doesn't (a record cached before this fix, or one whose insert
+ * response never made it back), this used to fall back to a single-row
+ * `upsert()` with a guessed id — which could still insert a NEW duplicate
+ * physical row for THIS record if the guess didn't match. That fallback is
+ * gone. Instead:
+ *   1. Look up the real row(s) for this business id.
+ *   2. Exactly one match → PATCH it.
+ *   3. More than one match → an old duplicate already exists from before
+ *      this fix. Refuse to guess which one is "right" — do NOT write to
+ *      cloud, just warn. No new row is ever created in this case.
+ *   4. No match → this business id genuinely doesn't exist in the table
+ *      yet, so a single INSERT is the correct action, not a guess.
+ * In every branch, at most one physical row is ever created or touched.
+ */
+const safeWriteRow = async (table: string, enriched: any, knownRowId?: string): Promise<string | undefined> => {
+  if (knownRowId) {
+    try {
+      await cloudDb.updateById(table, knownRowId, enriched);
+    } catch (e) {
+      console.warn(`[persistence] Cloud update failed for ${table}:`, e);
+    }
+    return knownRowId;
+  }
+
+  try {
+    const resolved = await cloudDb.resolveRowId(table, enriched.id);
+    if (resolved.status === 'found') {
+      await cloudDb.updateById(table, resolved.rowId, enriched);
+      return resolved.rowId;
+    }
+    if (resolved.status === 'ambiguous') {
+      console.warn(
+        `[persistence] ${table}: business id "${enriched.id}" already has ${resolved.rowIds.length}+ physical rows ` +
+        `(${resolved.rowIds.join(', ')}) — refusing to guess which one to update. Cloud was NOT changed for this ` +
+        `edit; this record has a pre-existing duplicate from before the Finance V1 fix and needs manual cleanup.`
+      );
+      return undefined;
+    }
+    // not_found — this business id has no row yet, so creating one is
+    // correct, not a guess.
+    const inserted = await cloudDb.insertOne(table, enriched);
+    return inserted?.id;
+  } catch (e) {
+    console.warn(`[persistence] Cloud update failed for ${table}:`, e);
+    return undefined;
+  }
+};
+
 let isHydrated = false;
 
 /**
@@ -171,14 +233,37 @@ export const persistence = {
 
   async saveQuote(quote: QuoteRecord): Promise<void> {
     const enriched = enrichRecord(quote);
+    // Finance V1 fix (2026-09): a new quote/PI is a real INSERT, never a
+    // guessed-id upsert — see cloudDb.insertOne(). Capture the real row id
+    // so a later archive/convert on THIS quote can target it directly.
+    let withRowId: any = enriched;
     try {
-      await cloudDb.upsert('quotes', [enriched]);
+      const inserted = await cloudDb.insertOne('quotes', enriched);
+      if (inserted?.id) withRowId = { ...enriched, _rowId: inserted.id };
     } catch (e) {
-      console.warn("[persistence] Cloud save failed for quote:", e);
+      console.warn("[persistence] Cloud insert failed for quote:", e);
     }
 
     const local = getLocal('quotes');
-    setLocal('quotes', sortByCreatedDesc([enriched, ...local.filter((q: any) => q.id !== enriched.id)]));
+    setLocal('quotes', sortByCreatedDesc([withRowId, ...local.filter((q: any) => q.id !== enriched.id)]));
+  },
+
+  /**
+   * Update exactly ONE quote/PI (Finance V1 fix, 2026-09). Replaces the old
+   * pattern of mapping the whole in-memory `quotes` array and calling
+   * updateQuotes() on all of it (used by quote→order conversion and
+   * archive) — that re-stamped and re-upserted every quote on every single
+   * conversion/archive, the same duplication mechanism found on orders.
+   * PATCHes this quote's own row by _rowId — never touches any other quote.
+   * Business status/fields, PDF, numbering are all untouched by this change
+   * — same payload shape as before, just a targeted write instead of a
+   * broadcast one.
+   */
+  async updateQuote(quote: QuoteRecord): Promise<void> {
+    const enriched = enrichRecord(quote);
+    const rowId = await safeWriteRow('quotes', enriched, (quote as any)._rowId);
+    const local = getLocal('quotes');
+    setLocal('quotes', local.map((q: any) => (q.id === enriched.id ? { ...enriched, _rowId: rowId } : q)));
   },
 
   async updateQuotes(quotes: QuoteRecord[]): Promise<void> {
@@ -216,14 +301,37 @@ export const persistence = {
 
   async saveOrder(order: OrderRecord): Promise<void> {
     const enriched = enrichRecord(order);
+    // Finance V1 fix (2026-09): a brand-new order is a real INSERT, never a
+    // guessed-id upsert — see cloudDb.insertOne(). Capture the real row id
+    // it comes back with so any later edit/void/adjustment/payment on THIS
+    // order can target it directly via updateOrder() instead of falling
+    // back to the old broken merge path.
+    let withRowId: any = enriched;
     try {
-      await cloudDb.upsert('orders', [enriched]);
+      const inserted = await cloudDb.insertOne('orders', enriched);
+      if (inserted?.id) withRowId = { ...enriched, _rowId: inserted.id };
     } catch (e) {
-      console.warn("[persistence] Cloud save failed for order:", e);
+      console.warn("[persistence] Cloud insert failed for order:", e);
     }
 
     const local = getLocal('orders');
-    setLocal('orders', sortByCreatedDesc([enriched, ...local.filter((o: any) => o.id !== enriched.id)]));
+    setLocal('orders', sortByCreatedDesc([withRowId, ...local.filter((o: any) => o.id !== enriched.id)]));
+  },
+
+  /**
+   * Update exactly ONE order (Finance V1 fix, 2026-09). Replaces the old
+   * pattern of mapping the whole in-memory `orders` array and calling
+   * updateOrders() on all of it — that re-stamped every order's updated_at
+   * and re-upserted every order on every single edit/void/adjustment/
+   * payment, which is the mechanism that produced the duplicate PENDING/
+   * PAID/VOIDED rows found in the audit. This touches only `order`'s own
+   * row (by _rowId when known) and leaves every other order untouched.
+   */
+  async updateOrder(order: OrderRecord): Promise<void> {
+    const enriched = enrichRecord(order);
+    const rowId = await safeWriteRow('orders', enriched, (order as any)._rowId);
+    const local = getLocal('orders');
+    setLocal('orders', local.map((o: any) => (o.id === enriched.id ? { ...enriched, _rowId: rowId } : o)));
   },
 
   async updateOrders(orders: OrderRecord[]): Promise<void> {
@@ -261,14 +369,49 @@ export const persistence = {
 
   async savePayment(payment: PaymentRecord): Promise<void> {
     const enriched = enrichRecord(payment);
+    // Finance V1 fix (2026-09): a new payment is a real INSERT, never a
+    // guessed-id upsert — see cloudDb.insertOne(). Capture the real row id
+    // so a later edit/delete on THIS payment can target it directly.
+    let withRowId: any = enriched;
     try {
-      await cloudDb.upsert('payments', [enriched]);
+      const inserted = await cloudDb.insertOne('payments', enriched);
+      if (inserted?.id) withRowId = { ...enriched, _rowId: inserted.id };
     } catch (e) {
-      console.warn("[persistence] Cloud save failed for payment:", e);
+      console.warn("[persistence] Cloud insert failed for payment:", e);
     }
 
     const local = getLocal('payments');
-    setLocal('payments', sortByCreatedDesc([enriched, ...local]));
+    setLocal('payments', sortByCreatedDesc([withRowId, ...local]));
+  },
+
+  /**
+   * Update exactly ONE payment (Finance V1 fix, 2026-09). PATCHes this
+   * payment's own row by _rowId — never touches any other payment.
+   */
+  async updatePayment(payment: PaymentRecord): Promise<void> {
+    const enriched = enrichRecord(payment);
+    const rowId = await safeWriteRow('payments', enriched, (payment as any)._rowId);
+    const local = getLocal('payments');
+    setLocal('payments', local.map((p: any) => (p.id === enriched.id ? { ...enriched, _rowId: rowId } : p)));
+  },
+
+  /**
+   * Delete exactly ONE payment (Finance V1 fix, 2026-09). Deletes this
+   * payment's own row by _rowId — never touches any other payment.
+   */
+  async deletePayment(payment: PaymentRecord): Promise<void> {
+    const rowId = (payment as any)._rowId as string | undefined;
+    try {
+      if (rowId) {
+        await cloudDb.remove('payments', [rowId]);
+      } else {
+        console.warn('[persistence] deletePayment: no _rowId known for', payment.id, '— cloud row left untouched, deleted locally only.');
+      }
+    } catch (e) {
+      console.warn("[persistence] Cloud delete failed for payment:", e);
+    }
+    const local = getLocal('payments');
+    setLocal('payments', local.filter((p: any) => p.id !== payment.id));
   },
 
   // --- Finance Transactions (Ledger) ---
@@ -285,6 +428,41 @@ export const persistence = {
       console.warn("[persistence] Cloud save failed for transactions:", e);
     }
     setLocal('transactions', sortByCreatedDesc(enriched));
+  },
+
+  /**
+   * Cache a transactions list locally WITHOUT touching cloud (Finance V1
+   * fix, 2026-09). Found while checking for remaining re-upload risk:
+   * FinanceTracker was calling saveTransactions() just to cache a list it
+   * had already fetched from (or was intentionally keeping local-only
+   * after) an edit — but saveTransactions() silently re-upserts every
+   * record it's given to cloud, which is exactly the "read/modify the
+   * whole list, write the whole list back" pattern this fix removes
+   * everywhere else. Use this whenever the intent is purely "remember this
+   * locally," not "persist these changes to cloud."
+   */
+  async cacheTransactionsLocally(transactions: TransactionRecord[]): Promise<void> {
+    setLocal('transactions', sortByCreatedDesc(transactions));
+  },
+
+  /**
+   * Add exactly ONE new ledger row (Finance V1 fix, 2026-09). The old
+   * pattern — `saveTransactions([newTxn, ...existingTxns])` — re-upserted
+   * the ENTIRE transaction history on every single payment, which combined
+   * with the same guessed-id merge bug is what produced the ~7700 duplicate
+   * "Initial Capital"/"Office Supplies" seed rows and the 1029-row PAYMENT
+   * pileup (see chat audit). A brand-new transaction is always a genuine
+   * INSERT — it never needs to touch any other row.
+   */
+  async addTransaction(transaction: TransactionRecord): Promise<void> {
+    const enriched = enrichRecord(transaction);
+    try {
+      await cloudDb.insertOne('transactions', enriched);
+    } catch (e) {
+      console.warn("[persistence] Cloud insert failed for transaction:", e);
+    }
+    const local = getLocal('transactions');
+    setLocal('transactions', sortByCreatedDesc([enriched, ...local]));
   },
 
   async updatePayments(payments: PaymentRecord[]): Promise<void> {

@@ -42,6 +42,8 @@ export interface QuoteRecord {
   marginRate?: number;
   profitAmount?: number;
   notes?: string; // supplier terms, payment terms, lead time — from Quotation Center
+  /** Real Postgres row id (Finance V1, 2026-09) — see OrderRecord._rowId. */
+  _rowId?: string;
 }
 
 export interface OrderRecord {
@@ -65,6 +67,10 @@ export interface OrderRecord {
   order_type?: 'NORMAL' | 'ADJUSTMENT';
   adjustmentOf?: string;
   adjReason?: string;
+  /** Real Postgres row id (Finance V1, 2026-09) — set by normalizeCloudRow
+   * so updateOrder() can PATCH this exact physical row instead of guessing
+   * an id and upserting. Not present on orders created before this fix. */
+  _rowId?: string;
 }
 
 export interface ConsignmentStockRecord {
@@ -100,13 +106,47 @@ export interface PaymentRecord {
   method: 'CASH' | 'BANK' | 'CHEQUE' | 'OTHER';
   note: string;
   userId: string;
+  /** Real Postgres row id (Finance V1, 2026-09) — see OrderRecord._rowId. */
+  _rowId?: string;
 }
 
+/**
+ * Unified 财务账 ledger row (Finance V1, 2026-09).
+ *
+ * `bank_account_id` is the real join key going forward — every NEW row must
+ * carry it (FK to bank_accounts.id). `account` is kept as a display-only
+ * legacy label for rows written before this change (Trade order payments
+ * had none at all; FinanceTracker's manual entries had this string). It is
+ * never read for balance math anymore, only shown as a fallback label for
+ * old rows that predate bank_account_id.
+ *
+ * ref_type/ref_id trace a row back to what produced it (a manual entry, an
+ * order payment, a service payment, etc) without needing a join.
+ */
 export interface TransactionRecord {
   id: string;
   date: string;
   note: string;
   type: 'in' | 'out';
   amount: number;
-  account: 'Corporate' | 'Personal' | 'Cash';
+  bank_account_id?: string;
+  account?: 'Corporate' | 'Personal' | 'Cash' | 'Other'; // legacy label — display fallback only
+  ref_type?: 'MANUAL' | 'ORDER_PAYMENT' | 'SERVICE_PAYMENT' | 'ADJUSTMENT';
+  ref_id?: string;
+  customer?: string;
+  supplier?: string;
+  userId?: string;
+}
+
+export interface BankAccount {
+  id: string;
+  account_name: string;
+  account_type: 'Corporate' | 'Personal' | 'Cash' | 'Other';
+  bank_name?: string;
+  currency: string;
+  opening_balance: number;
+  is_active: boolean;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
 }

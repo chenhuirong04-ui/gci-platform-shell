@@ -1,116 +1,172 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   TrendingUp, TrendingDown, DollarSign, Trash2, Calendar, FileText, PlusCircle,
-  Building2, User, Wallet, Camera, Loader2, Lock
+  Building2, User, Wallet, Lock, Landmark, Plus, X
 } from 'lucide-react';
-import { parseFinancialDocument } from '../services/geminiService';
 import { roundTo2 } from '../services/currencyUtils';
 import { persistence } from '../services/persistenceService';
-import { cloudDb } from '../services/cloudDb'; // ✅ NEW: read/write Supabase
-import { TransactionRecord } from '../types';
-
-type AccountType = 'Corporate' | 'Personal' | 'Cash';
+import { cloudDb } from '../services/cloudDb';
+import { bankAccountsService } from '../services/bankAccountsService';
+import { useAuth } from '../../../apps/shell/src/contexts/AuthContext';
+import type { TransactionRecord, BankAccount } from '../types';
 
 interface FinanceTrackerProps {
   onCancel: () => void;
 }
 
-const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [password, setPassword] = useState('');
-  const MASTER_PWD = "241027";
+const ACCOUNT_ICON: Record<BankAccount['account_type'], React.ElementType> = {
+  Corporate: Building2,
+  Personal: User,
+  Cash: Wallet,
+  Other: Landmark,
+};
 
-  const [activeAccount, setActiveAccount] = useState<AccountType>('Corporate');
+const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
+  const { can } = useAuth();
+
+  const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
+  const [activeAccountId, setActiveAccountId] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+
   const [note, setNote] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [showAddAccount, setShowAddAccount] = useState(false);
+  const [newAccName, setNewAccName] = useState('');
+  const [newAccType, setNewAccType] = useState<BankAccount['account_type']>('Corporate');
+  const [newAccBank, setNewAccBank] = useState('');
+  const [newAccOpening, setNewAccOpening] = useState('');
+  const [savingAccount, setSavingAccount] = useState(false);
 
   /**
-   * ✅ SAFE LOADING STRATEGY (no risk of "nothing shows"):
-   * 1) Try Supabase first: transactions table -> payload[]
-   * 2) If cloud empty/unavailable, fallback to local persistence
-   * 3) If local also empty, seed defaults to BOTH local + cloud
+   * Cloud-first, local-fallback read — same shape as before, minus the
+   * seeding step. If both cloud and local come back empty, the ledger is
+   * simply empty; nothing is ever auto-written to Production anymore.
    */
-  useEffect(() => {
-    const loadData = async () => {
-      // 1) cloud first
-      try {
-        const rows = await cloudDb.query('transactions', 500, 0, {});
-        const cloudList: TransactionRecord[] = (rows || [])
-          .map((r: any) => r?.payload)
-          .filter(Boolean);
-
-        if (cloudList.length > 0) {
-          setTransactions(cloudList);
-          // also cache locally to reduce fear & allow offline view
-          await persistence.saveTransactions(cloudList);
-          return;
-        }
-      } catch (e) {
-        // ignore, fallback to local
-      }
-
-      // 2) local fallback
-      const saved = await persistence.getTransactions();
-      if (saved && saved.length > 0) {
-        setTransactions(saved);
-
-        // best-effort: backfill to cloud once (so future refresh has cloud)
-        try { await cloudDb.upsert('transactions', saved as any); } catch {}
+  const loadTransactions = async () => {
+    try {
+      const rows = await cloudDb.query('transactions', 1000, 0, {});
+      const cloudList: TransactionRecord[] = (rows || []).map((r: any) => r?.payload).filter(Boolean);
+      if (cloudList.length > 0) {
+        setTransactions(cloudList);
+        // Finance V1 fix (2026-09): this is caching what we just read, not
+        // persisting a change — saveTransactions() would silently re-upsert
+        // the whole list to cloud on every page load. cacheTransactionsLocally
+        // never touches cloud.
+        await persistence.cacheTransactionsLocally(cloudList);
         return;
       }
+    } catch (e) {
+      // ignore, fall back to local
+    }
 
-      // 3) seed defaults (first-ever run)
-      const defaults: TransactionRecord[] = [
-        { id: '1', date: '2025-12-16', note: 'Initial Capital (启动资金)', type: 'in', amount: 50000.00, account: 'Corporate' },
-        { id: '2', date: '2025-12-17', note: 'Office Supplies (办公用品)', type: 'out', amount: 450.00, account: 'Corporate' },
-      ];
-      setTransactions(defaults);
-      await persistence.saveTransactions(defaults);
-      try { await cloudDb.upsert('transactions', defaults as any); } catch {}
-    };
+    const saved = await persistence.getTransactions();
+    setTransactions(saved || []);
+  };
 
-    loadData();
-  }, []);
-
-  const handleVerify = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password === MASTER_PWD) {
-      setIsAuthorized(true);
+  const loadAccounts = async () => {
+    const list = await bankAccountsService.list();
+    setAccounts(list);
+    if (list.length > 0) {
+      setActiveAccountId(prev => (list.find(a => a.id === prev) ? prev : list[0].id));
     } else {
-      alert("Access Denied");
-      onCancel();
+      setActiveAccountId('');
     }
   };
 
+  useEffect(() => {
+    if (!can('finance')) return;
+    (async () => {
+      setLoading(true);
+      await Promise.all([loadAccounts(), loadTransactions()]);
+      setLoading(false);
+    })();
+  }, []);
+
+  if (!can('finance')) {
+    return (
+      <div className="h-[calc(100vh-250px)] flex items-center justify-center">
+        <div className="bg-white p-12 rounded-[40px] shadow-2xl border border-gray-100 max-w-md w-full text-center space-y-8">
+          <div className="w-20 h-20 bg-[#CBA85C]/10 rounded-full flex items-center justify-center mx-auto text-[#CBA85C]">
+            <Lock className="w-10 h-10" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-black text-[#080D1E] uppercase tracking-tighter">Private Area</h2>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+              你的账号没有财务权限，请联系管理员开通 “finance” 权限
+            </p>
+          </div>
+          <button
+            onClick={onCancel}
+            className="w-full py-4 rounded-[20px] bg-[#080D1E] text-white font-black text-[10px] uppercase"
+          >
+            Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── balance math: opening_balance + matching transactions. Never a
+  // stored/cached number — always derived so it can't drift from the ledger. ──
+  const balanceForAccount = (accountId: string) => {
+    const acc = accounts.find(a => a.id === accountId);
+    if (!acc) return 0;
+    const rows = transactions.filter(t => t.bank_account_id === accountId);
+    const income = rows.filter(t => t.type === 'in').reduce((s, t) => s + t.amount, 0);
+    const expense = rows.filter(t => t.type === 'out').reduce((s, t) => s + t.amount, 0);
+    return roundTo2(acc.opening_balance + income - expense);
+  };
+
+  const stats = useMemo(() => {
+    const bankTotal = roundTo2(
+      accounts.filter(a => a.account_type !== 'Cash').reduce((s, a) => s + balanceForAccount(a.id), 0)
+    );
+    const cashTotal = roundTo2(
+      accounts.filter(a => a.account_type === 'Cash').reduce((s, a) => s + balanceForAccount(a.id), 0)
+    );
+    const thisMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const linkedTxns = transactions.filter(t => t.bank_account_id && accounts.some(a => a.id === t.bank_account_id));
+    const monthIncome = roundTo2(
+      linkedTxns.filter(t => t.type === 'in' && (t.date || '').startsWith(thisMonth)).reduce((s, t) => s + t.amount, 0)
+    );
+    const monthExpense = roundTo2(
+      linkedTxns.filter(t => t.type === 'out' && (t.date || '').startsWith(thisMonth)).reduce((s, t) => s + t.amount, 0)
+    );
+    return { bankTotal, cashTotal, monthIncome, monthExpense };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts, transactions]);
+
+  const activeAccount = accounts.find(a => a.id === activeAccountId) || null;
+  const currentTransactions = transactions
+    .filter(t => t.bank_account_id === activeAccountId)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const activeBalance = activeAccountId ? balanceForAccount(activeAccountId) : 0;
+  const activeIncome = roundTo2(currentTransactions.filter(t => t.type === 'in').reduce((s, t) => s + t.amount, 0));
+  const activeExpense = roundTo2(currentTransactions.filter(t => t.type === 'out').reduce((s, t) => s + t.amount, 0));
+
   const addTransaction = async (type: 'in' | 'out') => {
-    if (!note.trim() || !amount || Number(amount) <= 0) return;
+    if (!activeAccountId || !note.trim() || !amount || Number(amount) <= 0) return;
 
     const newTransaction: TransactionRecord = {
-      id: Date.now().toString(),
+      id: `TXN-${Date.now()}`,
       date,
       note,
       type,
       amount: roundTo2(Number(amount)),
-      account: activeAccount,
+      bank_account_id: activeAccountId,
+      ref_type: 'MANUAL',
+      userId: 'Admin',
     };
 
-    const updated = [newTransaction, ...transactions];
-    setTransactions(updated);
-
-    // ✅ write local first (instant, safe)
-    await persistence.saveTransactions(updated);
-
-    // ✅ then best-effort write to cloud (keeps all records after refresh)
-    try {
-      await cloudDb.upsert('transactions', [newTransaction as any]);
-    } catch (e) {
-      // keep quiet; local already saved
-      console.warn('[FinanceTracker] cloud upsert failed, kept local.', e);
-    }
+    // Finance V1 fix (2026-09): a single new INSERT, not a re-upload of the
+    // whole ledger history — see persistenceService.addTransaction(). The
+    // old `saveTransactions([newTransaction, ...transactions])` pattern is
+    // exactly what produced the ~7700 duplicate seed rows in Production.
+    setTransactions(prev => [newTransaction, ...prev]);
+    await persistence.addTransaction(newTransaction);
 
     setNote('');
     setAmount('');
@@ -120,251 +176,345 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
   const handleDelete = async (id: string) => {
     const updated = transactions.filter(t => t.id !== id);
     setTransactions(updated);
-    await persistence.saveTransactions(updated);
-
-    // NOTE: we are NOT changing DB delete rules now (stability first)
-    // keeping it local-only delete to avoid accidental data loss.
+    // Local-only delete on purpose (unchanged from before) — no cloud delete
+    // rule yet, keeps this a low-risk V1 change. Finance V1 fix (2026-09):
+    // this now genuinely IS local-only — saveTransactions() was silently
+    // re-upserting the whole remaining list to cloud, contradicting this
+    // comment. cacheTransactionsLocally never touches cloud.
+    await persistence.cacheTransactionsLocally(updated);
   };
 
-  const currentTransactions = transactions.filter(t => t.account === activeAccount);
-  const totalIncome = roundTo2(currentTransactions.filter(t => t.type === 'in').reduce((sum, t) => sum + t.amount, 0));
-  const totalExpense = roundTo2(currentTransactions.filter(t => t.type === 'out').reduce((sum, t) => sum + t.amount, 0));
-  const balance = roundTo2(totalIncome - totalExpense);
+  const handleCreateAccount = async () => {
+    if (!newAccName.trim()) return;
+    setSavingAccount(true);
+    try {
+      const created = await bankAccountsService.create({
+        account_name: newAccName.trim(),
+        account_type: newAccType,
+        bank_name: newAccType === 'Cash' ? undefined : newAccBank.trim() || undefined,
+        opening_balance: newAccOpening ? Number(newAccOpening) : 0,
+      });
+      if (created) {
+        await loadAccounts();
+        setActiveAccountId(created.id);
+      }
+      setShowAddAccount(false);
+      setNewAccName(''); setNewAccBank(''); setNewAccOpening(''); setNewAccType('Corporate');
+    } catch (e: any) {
+      alert(`创建账户失败：${e?.message || '未知错误'}`);
+    } finally {
+      setSavingAccount(false);
+    }
+  };
 
-  if (!isAuthorized) {
-    return (
-      <div className="h-[calc(100vh-250px)] flex items-center justify-center">
-        <div className="bg-white p-12 rounded-[40px] shadow-2xl border border-gray-100 max-w-md w-full text-center space-y-8 animate-in zoom-in-95 duration-300">
-          <div className="w-20 h-20 bg-[#CBA85C]/10 rounded-full flex items-center justify-center mx-auto text-[#CBA85C]">
-            <Lock className="w-10 h-10" />
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-xl font-black text-[#080D1E] uppercase tracking-tighter">Private Area</h2>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Please Enter Password to Access Ledger</p>
-          </div>
-          <form onSubmit={handleVerify} className="space-y-4">
-            <input
-              type="password"
-              autoFocus
-              className="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-[24px] outline-none font-black text-center text-2xl tracking-[0.5em] focus:border-[#CBA85C]"
-              placeholder="••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={onCancel}
-                className="flex items-center justify-center gap-2 py-4 rounded-[20px] bg-gray-50 text-gray-400 font-black text-[10px] uppercase"
-              >
-                Back
-              </button>
-              <button
-                type="submit"
-                className="flex items-center justify-center gap-2 py-4 rounded-[20px] bg-[#080D1E] text-white font-black text-[10px] uppercase shadow-lg hover:bg-[#CBA85C] transition-all"
-              >
-                Verify
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
+  if (loading) {
+    return <div className="h-[calc(100vh-250px)] flex items-center justify-center text-gray-300 text-xs font-black uppercase tracking-widest">Loading...</div>;
   }
-
-  const accounts: { id: AccountType; label: string; icon: React.ElementType }[] = [
-    { id: 'Corporate', label: 'Corporate (对公)', icon: Building2 },
-    { id: 'Personal', label: 'Personal (对私)', icon: User },
-    { id: 'Cash', label: 'Cash (现金)', icon: Wallet },
-  ];
 
   return (
     <div className="h-full flex flex-col gap-6 animate-in fade-in duration-500">
-      {/* FINANCE 分区页面标题 */}
-      <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>财务账</h1>
-      <div className="bg-white p-2 rounded-2xl border border-gray-200 shadow-md flex flex-col sm:flex-row gap-2">
-        {accounts.map((acc) => (
-          <button
-            key={acc.id}
-            onClick={() => setActiveAccount(acc.id)}
-            className={`flex-1 flex items-center justify-center gap-2 py-4 px-4 rounded-xl text-sm font-black transition-all ${
-              activeAccount === acc.id
-                ? 'bg-[#080D1E] text-white shadow-lg'
-                : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
-            }`}
-          >
-            <acc.icon className={`w-4 h-4 ${activeAccount === acc.id ? 'text-white' : 'text-gray-400'}`} />
-            {acc.label}
-          </button>
-        ))}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>财务账</h1>
+        <button
+          onClick={() => setShowAddAccount(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-[#080D1E] text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-[#CBA85C] transition-all"
+        >
+          <Plus className="w-4 h-4" /> 新增账户
+        </button>
       </div>
 
-      <div className="flex-1 flex flex-col lg:flex-row gap-8">
-        <div className="lg:w-2/5 flex flex-col gap-6">
-          <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100 relative overflow-hidden group">
-            <div className={`absolute top-0 left-0 w-1.5 h-full transition-colors ${balance >= 0 ? 'bg-[#6FBF8E]' : 'bg-[#E0846A]'}`} />
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">
-                  Current Balance ({activeAccount})
-                </p>
-                <p className={`text-4xl font-black font-mono tracking-tighter ${balance >= 0 ? 'text-gray-800' : 'text-[#E0846A]'}`}>
-                  AED {balance.toFixed(2)}
-                </p>
+      {/* Top summary */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">总银行余额</p>
+          <p className="text-xl font-black font-mono text-gray-800">AED {stats.bankTotal.toFixed(2)}</p>
+        </div>
+        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Cash 余额</p>
+          <p className="text-xl font-black font-mono text-gray-800">AED {stats.cashTotal.toFixed(2)}</p>
+        </div>
+        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">本月收款</p>
+          <p className="text-xl font-black font-mono text-[#3F7D58]">+{stats.monthIncome.toFixed(2)}</p>
+        </div>
+        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">本月付款</p>
+          <p className="text-xl font-black font-mono text-[#E0846A]">-{stats.monthExpense.toFixed(2)}</p>
+        </div>
+      </div>
+
+      {accounts.length === 0 ? (
+        <div className="bg-white p-12 rounded-2xl border border-gray-100 shadow-sm text-center space-y-4">
+          <Landmark className="w-10 h-10 text-gray-300 mx-auto" />
+          <p className="text-sm font-black text-gray-500">还没有任何银行账户</p>
+          <p className="text-xs text-gray-400">点右上角「新增账户」先建一个对公/对私/现金账户，才能开始记流水</p>
+        </div>
+      ) : (
+        <>
+          {/* Account picker — replaces the old hardcoded Corporate/Personal/Cash tabs */}
+          <div className="bg-white p-2 rounded-2xl border border-gray-200 shadow-md flex flex-wrap gap-2">
+            {accounts.map((acc) => {
+              const Icon = ACCOUNT_ICON[acc.account_type] || Landmark;
+              const isActive = activeAccountId === acc.id;
+              return (
+                <button
+                  key={acc.id}
+                  onClick={() => setActiveAccountId(acc.id)}
+                  className={`flex-1 min-w-[180px] flex items-center justify-between gap-2 py-3 px-4 rounded-xl text-xs font-black transition-all ${
+                    isActive ? 'bg-[#080D1E] text-white shadow-lg' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                  }`}
+                >
+                  <span className="flex items-center gap-2 truncate">
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-gray-400'}`} />
+                    <span className="truncate">{acc.account_name}</span>
+                  </span>
+                  <span className="font-mono opacity-80 shrink-0">{balanceForAccount(acc.id).toFixed(2)}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex-1 flex flex-col lg:flex-row gap-8">
+            <div className="lg:w-2/5 flex flex-col gap-6">
+              <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100 relative overflow-hidden group">
+                <div className={`absolute top-0 left-0 w-1.5 h-full transition-colors ${activeBalance >= 0 ? 'bg-[#6FBF8E]' : 'bg-[#E0846A]'}`} />
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">
+                      Current Balance ({activeAccount?.account_name || '-'})
+                    </p>
+                    <p className={`text-4xl font-black font-mono tracking-tighter ${activeBalance >= 0 ? 'text-gray-800' : 'text-[#E0846A]'}`}>
+                      {activeAccount?.currency || 'AED'} {activeBalance.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className={`p-4 rounded-2xl ${activeBalance >= 0 ? 'bg-[#6FBF8E]/10 text-[#3F7D58]' : 'bg-[#E0846A]/10 text-[#E0846A]'}`}>
+                    <DollarSign className="w-8 h-8" />
+                  </div>
+                </div>
+
+                <div className="mt-8 grid grid-cols-2 gap-6 border-t border-gray-50 pt-6">
+                  <div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Income</p>
+                    <p className="text-lg font-black text-[#3F7D58] flex items-center gap-1.5 font-mono">
+                      <TrendingUp className="w-4 h-4" />
+                      {activeIncome.toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Expense</p>
+                    <p className="text-lg font-black text-[#E0846A] flex items-center gap-1.5 font-mono">
+                      <TrendingDown className="w-4 h-4" />
+                      {activeExpense.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className={`p-4 rounded-2xl ${balance >= 0 ? 'bg-[#6FBF8E]/10 text-[#3F7D58]' : 'bg-[#E0846A]/10 text-[#E0846A]'}`}>
-                <DollarSign className="w-8 h-8" />
+
+              <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
+                <div className="flex justify-between items-center mb-8 pb-4 border-b border-gray-50">
+                  <h3 className="font-black text-gray-800 flex items-center gap-3 uppercase text-sm tracking-widest">
+                    <PlusCircle className="w-5 h-5 text-[#CBA85C]" />
+                    Quick Entry
+                  </h3>
+                </div>
+
+                <div className="space-y-5">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Account</label>
+                    <select
+                      className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700"
+                      value={activeAccountId}
+                      onChange={e => setActiveAccountId(e.target.value)}
+                    >
+                      {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Transaction Date</label>
+                    <div className="relative">
+                      <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="date"
+                        className="w-full pl-10 p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] focus:ring-4 focus:ring-[#CBA85C]/20 bg-white font-bold text-gray-700 font-mono"
+                        value={date}
+                        onChange={e => setDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Memo / Note</label>
+                    <div className="relative">
+                      <FileText className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        className="w-full pl-10 p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] focus:ring-4 focus:ring-[#CBA85C]/20 bg-white font-bold text-gray-700"
+                        placeholder="e.g. Sales Deposit"
+                        value={note}
+                        onChange={e => setNote(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Amount</label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="w-full pl-10 p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] focus:ring-4 focus:ring-[#CBA85C]/20 bg-white font-bold text-gray-700 font-mono text-xl"
+                        placeholder="0.00"
+                        value={amount}
+                        onChange={e => setAmount(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-4">
+                    <button
+                      onClick={() => addTransaction('in')}
+                      disabled={!activeAccountId || !note || !amount}
+                      className="flex items-center justify-center gap-2 p-4 rounded-xl bg-[#3F7D58] text-white hover:bg-[#2d5c40] shadow-lg font-black uppercase text-xs tracking-widest disabled:opacity-40"
+                    >
+                      <TrendingUp className="w-4 h-4" /> Income
+                    </button>
+                    <button
+                      onClick={() => addTransaction('out')}
+                      disabled={!activeAccountId || !note || !amount}
+                      className="flex items-center justify-center gap-2 p-4 rounded-xl bg-[#A85D45] text-white hover:bg-[#8b4c37] shadow-lg font-black uppercase text-xs tracking-widest disabled:opacity-40"
+                    >
+                      <TrendingDown className="w-4 h-4" /> Expense
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="mt-8 grid grid-cols-2 gap-6 border-t border-gray-50 pt-6">
-              <div>
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Income</p>
-                <p className="text-lg font-black text-[#3F7D58] flex items-center gap-1.5 font-mono">
-                  <TrendingUp className="w-4 h-4" />
-                  {totalIncome.toFixed(2)}
-                </p>
+            <div className="flex-1 bg-white rounded-2xl shadow-xl border border-gray-100 flex flex-col overflow-hidden">
+              <div className="p-6 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
+                <span className="font-black text-gray-800 uppercase text-xs tracking-[0.2em] flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-[#CBA85C]" />
+                  {activeAccount?.account_name || '-'} Ledger
+                </span>
+                <span className="text-[10px] px-3 py-1 bg-white border border-gray-200 rounded-full text-gray-600 font-black tracking-widest">
+                  {currentTransactions.length} ENTRIES
+                </span>
               </div>
-              <div>
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Expense</p>
-                <p className="text-lg font-black text-[#E0846A] flex items-center gap-1.5 font-mono">
-                  <TrendingDown className="w-4 h-4" />
-                  {totalExpense.toFixed(2)}
-                </p>
+
+              <div className="flex-1 overflow-auto custom-scrollbar">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50/50 text-[10px] font-black text-gray-400 uppercase tracking-widest sticky top-0 shadow-sm z-10">
+                    <tr>
+                      <th className="px-6 py-4">Date</th>
+                      <th className="px-6 py-4">Memo</th>
+                      <th className="px-6 py-4 text-right">Value</th>
+                      <th className="px-4 py-4 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {currentTransactions.map(t => (
+                      <tr key={t.id} className="hover:bg-[#CBA85C]/5 transition-colors group">
+                        <td className="px-6 py-5 text-gray-400 font-mono text-[11px] whitespace-nowrap">{t.date}</td>
+                        <td className="px-6 py-5">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-2 h-2 rounded-full ${t.type === 'in' ? 'bg-[#6FBF8E]' : 'bg-[#E0846A]'}`} />
+                            <span className="text-sm font-bold text-gray-700 uppercase">{t.note}</span>
+                            {t.ref_type && t.ref_type !== 'MANUAL' && (
+                              <span className="text-[8px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 font-black uppercase">{t.ref_type}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className={`px-6 py-5 text-right font-black font-mono text-sm tracking-tighter ${t.type === 'in' ? 'text-[#3F7D58]' : 'text-[#E0846A]'}`}>
+                          {t.type === 'in' ? '+' : '-'}{t.amount.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-5 text-right">
+                          <button
+                            onClick={() => handleDelete(t.id)}
+                            className="text-gray-200 hover:text-[#E0846A] p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {currentTransactions.length === 0 && (
+                      <tr><td colSpan={4} className="px-6 py-16 text-center text-gray-300 text-xs font-black uppercase tracking-widest">No entries yet</td></tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
+        </>
+      )}
 
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
-            <div className="flex justify-between items-center mb-8 pb-4 border-b border-gray-50">
-              <h3 className="font-black text-gray-800 flex items-center gap-3 uppercase text-sm tracking-widest">
-                <PlusCircle className="w-5 h-5 text-[#CBA85C]" />
-                Quick Entry
-              </h3>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isAnalyzing}
-                className="flex items-center gap-2 px-4 py-2 bg-[#CBA85C]/10 text-[#CBA85C] rounded-xl hover:bg-[#CBA85C]/20 transition-all text-[11px] font-black uppercase tracking-widest border border-[#CBA85C]/20 shadow-sm"
-              >
-                {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
-                {isAnalyzing ? "Processing..." : "AI Scan"}
-              </button>
-              <input type="file" ref={fileInputRef} className="hidden" accept="image/*" />
-            </div>
-
+      {showAddAccount && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xl z-[6000] flex items-center justify-center p-8">
+          <div className="bg-white p-10 rounded-[40px] shadow-2xl max-w-md w-full relative">
+            <button onClick={() => setShowAddAccount(false)} className="absolute top-6 right-6 text-gray-300 hover:text-gray-600">
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-sm font-black text-[#080D1E] uppercase tracking-[0.2em] mb-8">新增银行账户</h3>
             <div className="space-y-5">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Transaction Date</label>
-                <div className="relative">
-                  <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="date"
-                    className="w-full pl-10 p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] focus:ring-4 focus:ring-[#CBA85C]/20 bg-white font-bold text-gray-700 font-mono"
-                    value={date}
-                    onChange={e => setDate(e.target.value)}
-                  />
-                </div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">账户名称</label>
+                <input
+                  type="text"
+                  className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                  placeholder="e.g. Emirates NBD - GCI Trading"
+                  value={newAccName}
+                  onChange={e => setNewAccName(e.target.value)}
+                />
               </div>
-
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Memo / Note</label>
-                <div className="relative">
-                  <FileText className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">账户类型</label>
+                <select
+                  className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                  value={newAccType}
+                  onChange={e => setNewAccType(e.target.value as BankAccount['account_type'])}
+                >
+                  <option value="Corporate">Corporate (对公)</option>
+                  <option value="Personal">Personal (对私)</option>
+                  <option value="Cash">Cash (现金)</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              {newAccType !== 'Cash' && (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">银行名称</label>
                   <input
                     type="text"
-                    className="w-full pl-10 p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] focus:ring-4 focus:ring-[#CBA85C]/20 bg-white font-bold text-gray-700"
-                    placeholder="e.g. Sales Deposit"
-                    value={note}
-                    onChange={e => setNote(e.target.value)}
+                    className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                    placeholder="e.g. Emirates NBD"
+                    value={newAccBank}
+                    onChange={e => setNewAccBank(e.target.value)}
                   />
                 </div>
-              </div>
-
+              )}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Amount (AED)</label>
-                <div className="relative">
-                  <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="w-full pl-10 p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] focus:ring-4 focus:ring-[#CBA85C]/20 bg-white font-bold text-gray-700 font-mono text-xl"
-                    placeholder="0.00"
-                    value={amount}
-                    onChange={e => setAmount(e.target.value)}
-                  />
-                </div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">期初余额（可选，默认 0）</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono"
+                  placeholder="0.00"
+                  value={newAccOpening}
+                  onChange={e => setNewAccOpening(e.target.value)}
+                />
               </div>
-
-              <div className="grid grid-cols-2 gap-4 pt-4">
-                <button
-                  onClick={() => addTransaction('in')}
-                  disabled={!note || !amount || isAnalyzing}
-                  className="flex items-center justify-center gap-2 p-4 rounded-xl bg-[#3F7D58] text-white hover:bg-[#2d5c40] shadow-lg font-black uppercase text-xs tracking-widest"
-                >
-                  <TrendingUp className="w-4 h-4" /> Income
-                </button>
-                <button
-                  onClick={() => addTransaction('out')}
-                  disabled={!note || !amount || isAnalyzing}
-                  className="flex items-center justify-center gap-2 p-4 rounded-xl bg-[#A85D45] text-white hover:bg-[#8b4c37] shadow-lg font-black uppercase text-xs tracking-widest"
-                >
-                  <TrendingDown className="w-4 h-4" /> Expense
-                </button>
-              </div>
+              <button
+                onClick={handleCreateAccount}
+                disabled={!newAccName.trim() || savingAccount}
+                className="w-full py-4 rounded-[20px] bg-[#080D1E] text-white font-black text-[10px] uppercase disabled:opacity-40"
+              >
+                {savingAccount ? '创建中...' : '创建账户'}
+              </button>
             </div>
           </div>
         </div>
-
-        <div className="flex-1 bg-white rounded-2xl shadow-xl border border-gray-100 flex flex-col overflow-hidden">
-          <div className="p-6 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-            <span className="font-black text-gray-800 uppercase text-xs tracking-[0.2em] flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-[#CBA85C]" />
-              {activeAccount} Ledger
-            </span>
-            <span className="text-[10px] px-3 py-1 bg-white border border-gray-200 rounded-full text-gray-600 font-black tracking-widest">
-              {currentTransactions.length} ENTRIES
-            </span>
-          </div>
-
-          <div className="flex-1 overflow-auto custom-scrollbar">
-            <table className="w-full text-left">
-              <thead className="bg-gray-50/50 text-[10px] font-black text-gray-400 uppercase tracking-widest sticky top-0 shadow-sm z-10">
-                <tr>
-                  <th className="px-6 py-4">Date</th>
-                  <th className="px-6 py-4">Memo</th>
-                  <th className="px-6 py-4 text-right">Value (AED)</th>
-                  <th className="px-4 py-4 w-10"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {currentTransactions.map(t => (
-                  <tr key={t.id} className="hover:bg-[#CBA85C]/5 transition-colors group">
-                    <td className="px-6 py-5 text-gray-400 font-mono text-[11px] whitespace-nowrap">{t.date}</td>
-                    <td className="px-6 py-5">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full ${t.type === 'in' ? 'bg-[#6FBF8E]' : 'bg-[#E0846A]'}`} />
-                        <span className="text-sm font-bold text-gray-700 uppercase">{t.note}</span>
-                      </div>
-                    </td>
-                    <td className={`px-6 py-5 text-right font-black font-mono text-sm tracking-tighter ${t.type === 'in' ? 'text-[#3F7D58]' : 'text-[#E0846A]'}`}>
-                      {t.type === 'in' ? '+' : '-'}{t.amount.toFixed(2)}
-                    </td>
-                    <td className="px-4 py-5 text-right">
-                      <button
-                        onClick={() => handleDelete(t.id)}
-                        className="text-gray-200 hover:text-[#E0846A] p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-        </div>
-      </div>
+      )}
     </div>
   );
 };

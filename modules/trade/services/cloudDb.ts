@@ -182,6 +182,82 @@ export const cloudDb = {
     return Array.isArray(data) ? data : [];
   },
 
+  /**
+   * Look up the real physical row(s) for a business id, without guessing
+   * (Finance V1 fix, 2026-09). Used as the fallback when a record has no
+   * cached `_rowId` — e.g. it was cached before this fix, or the app never
+   * round-tripped its insert response. Replaces the old "just upsert with a
+   * guessed id" fallback, which is exactly the mechanism that produced the
+   * duplicate PENDING/PAID/VOIDED order rows (see chat audit).
+   *
+   * Returns:
+   * - {status:'found', rowId} — exactly one physical row for this business
+   *   id; safe to PATCH.
+   * - {status:'ambiguous', rowIds} — more than one physical row already
+   *   exists for this business id (a pre-existing duplicate from before this
+   *   fix). Refuses to pick one — the caller must not write to cloud.
+   * - {status:'not_found'} — no physical row exists yet; safe to INSERT.
+   */
+  async resolveRowId(
+    table: string,
+    businessId: string
+  ): Promise<{ status: "found"; rowId: string } | { status: "ambiguous"; rowIds: string[] } | { status: "not_found" }> {
+    if (!hasConfig() || !businessId) return { status: "not_found" };
+    const path = `/rest/v1/${encodeURIComponent(table)}?select=id&payload->>id=eq.${encodeURIComponent(businessId)}&limit=2`;
+    const data = await sbFetch(path, { method: "GET" });
+    const rows = Array.isArray(data) ? data : [];
+    if (rows.length === 0) return { status: "not_found" };
+    if (rows.length === 1) return { status: "found", rowId: rows[0].id };
+    return { status: "ambiguous", rowIds: rows.map((r: any) => r.id) };
+  },
+
+  /**
+   * Insert exactly ONE brand-new row (Finance V1 fix, 2026-09).
+   * No `id`, no `on_conflict`, no merge — Postgres always generates a fresh
+   * uuid. Use this for anything that is genuinely a new business record
+   * (new order, new transaction). Never use it to "save" something that
+   * might already exist — that's what updateById() is for. Returns the
+   * inserted row (real DB `id` included) so the caller can keep it for
+   * future targeted updates.
+   */
+  async insertOne(table: string, row: AnyRow): Promise<AnyRow | null> {
+    if (!hasConfig()) return null;
+    const now = new Date().toISOString();
+    const wrapped = {
+      created_at: row.created_at ?? now,
+      updated_at: row.updated_at ?? now,
+      state: row.state ?? "active",
+      payload: row,
+    };
+    const path = `/rest/v1/${encodeURIComponent(table)}`;
+    const data = await sbFetch(path, {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(wrapped),
+    });
+    return Array.isArray(data) && data.length > 0 ? data[0] : null;
+  },
+
+  /**
+   * Update exactly ONE existing row by its real DB `id` (Finance V1 fix,
+   * 2026-09). A PATCH with a `WHERE id = <rowId>` clause can only ever
+   * touch that one physical row — it can never insert a duplicate, unlike
+   * upsert()'s client-guessed-id + on_conflict merge (which is what caused
+   * the orders/transactions duplication — see chat report). Every other
+   * row in the table, including other rows for the same business id, is
+   * left completely untouched (its updated_at does not move).
+   */
+  async updateById(table: string, rowId: string, row: AnyRow): Promise<void> {
+    if (!hasConfig() || !rowId) return;
+    const now = new Date().toISOString();
+    const path = `/rest/v1/${encodeURIComponent(table)}?id=eq.${encodeURIComponent(rowId)}`;
+    await sbFetch(path, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ updated_at: row.updated_at ?? now, payload: row }),
+    });
+  },
+
   /** Remove records by IDs */
   async remove(table: string, ids: string[]): Promise<void> {
     if (!ids || ids.length === 0 || !hasConfig()) return;
