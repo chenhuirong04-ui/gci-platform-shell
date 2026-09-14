@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useI18n } from '@gci/i18n';
 import QuoteManager from './components/QuoteManager';
-import FinanceTracker from './components/FinanceTracker';
+import FinanceCenter from './components/FinanceCenter';
 import OrderConverter from './components/OrderConverter';
 import HistoryDashboard from './components/HistoryDashboard';
-import CashFlowDashboard from './components/CashFlowDashboard';
 import SalesDashboard from './components/SalesDashboard';
 import HomeDashboard from './components/HomeDashboard';
 import InventoryManager from './components/InventoryManager';
@@ -30,8 +29,8 @@ const ENABLE_ORDER_CONVERSION_AI = false;
  * sub-navigation, shown at all sizes, since the global Sidebar just has one
  * "Trade" entry.
  */
-type TradeTab = 'home' | 'quote' | 'finance' | 'convert' | 'history' | 'cashflow' | 'dashboard' | 'inventory' | 'consignment';
-const _validTabs = ['home', 'quote', 'finance', 'convert', 'history', 'cashflow', 'dashboard', 'inventory', 'consignment'];
+type TradeTab = 'home' | 'quote' | 'finance' | 'finance-center' | 'convert' | 'history' | 'cashflow' | 'dashboard' | 'inventory' | 'consignment';
+const _validTabs = ['home', 'quote', 'finance', 'finance-center', 'convert', 'history', 'cashflow', 'dashboard', 'inventory', 'consignment'];
 
 interface TradeModuleProps {
   /** Sidebar deep-link target (?tab=). Optional — falls back to reading the
@@ -60,6 +59,15 @@ export default function TradeModule({ initialTab }: TradeModuleProps = {}) {
   // "same page reachable two different ways" duplication being cleaned up.
   // Both tabs/components/routes are fully intact and still reachable by
   // deep link — only the in-module button is removed, nothing is deleted.
+  //
+  // Nav consolidation V2 (2026-09): 'finance' and 'cashflow' now both
+  // render FinanceCenter (a single hub with its own 总览/银行账户/资金流水
+  // tab strip) instead of FinanceTracker/CashFlowDashboard directly — see
+  // FinanceCenter.tsx. New 'finance-center' tab is what the Sidebar's
+  // consolidated "财务中心" entry points at, defaulting to the overview
+  // sub-tab; the two legacy tab ids keep resolving to their own matching
+  // sub-tab so every existing /trade?tab=finance / ?tab=cashflow deep link
+  // (AI capability map, action center, etc.) still lands in the right place.
   const navTabs = [
     { id: 'home',        code: 'HM', label: dict.trade.nav.home },
     { id: 'quote',       code: 'QT', label: dict.trade.pi.navLabel },
@@ -115,8 +123,9 @@ export default function TradeModule({ initialTab }: TradeModuleProps = {}) {
           )
         )}
         {activeTab === 'history' && <HistoryDashboard currentUserId={currentUserId} />}
-        {activeTab === 'cashflow' && <CashFlowDashboard />}
-        {activeTab === 'finance' && <FinanceTracker onCancel={() => setActiveTab('quote')} />}
+        {activeTab === 'finance-center' && <FinanceCenter initialSubTab="overview" />}
+        {activeTab === 'cashflow' && <FinanceCenter initialSubTab="cashflow" />}
+        {activeTab === 'finance' && <FinanceCenter initialSubTab="accounts" />}
       </div>
     </div>
   );

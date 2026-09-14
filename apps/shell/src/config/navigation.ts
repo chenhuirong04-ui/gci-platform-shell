@@ -23,6 +23,7 @@ export interface ModuleDef {
     | 'companyDocuments'
     | 'cashFlow'
     | 'financeLedger'
+    | 'financeCenter'
     | 'invoiceManager'
     | 'aiAssistant'
     | 'settings'
@@ -101,10 +102,19 @@ export const sections: SectionDef[] = [
     ],
   },
   {
+    // Nav consolidation V2 (2026-09): 资金流水 (CH) and 财务账 (FL) used to
+    // be two separate sidebar rows pointing at two separate TradeModule
+    // tabs. Collapsed into one "财务中心 / Finance" entry landing on a new
+    // FinanceCenter hub (see modules/trade/components/FinanceCenter.tsx)
+    // with its own internal tab strip (总览/银行账户/资金流水) — same
+    // consolidation pattern already used for the "Trade" entry above.
+    // /trade?tab=cashflow and /trade?tab=finance keep working as deep
+    // links (TradeModule still resolves both, landing on the matching
+    // FinanceCenter sub-tab) — nothing that already links to either old
+    // path (AI capability map, action center, etc.) needed to change.
     labelKey: 'financeSection',
     items: [
-      { code: 'CH', nameKey: 'cashFlow', path: '/trade?tab=cashflow' },
-      { code: 'FL', nameKey: 'financeLedger', path: '/trade?tab=finance' },
+      { code: 'FC', nameKey: 'financeCenter', path: '/trade?tab=finance-center' },
       { code: 'IV', nameKey: 'invoiceManager', path: '/invoice' },
     ],
   },
