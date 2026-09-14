@@ -12,6 +12,40 @@ export type CompanyDocumentCategory = typeof COMPANY_DOCUMENT_CATEGORIES[number]
 
 const BUCKET = 'company-documents';
 
+// Fixed-map Storage-key slug per category — avoids feeding spaces/Chinese/slashes (MOA/AOA would
+// otherwise create a nested "AOA" folder) straight into an object key. Covers every entry in
+// COMPANY_DOCUMENT_CATEGORIES above; slugifyCategory() below is the fallback for anything not
+// listed here (defensive only — the frontend dropdown only ever sends one of those categories).
+const CATEGORY_SLUGS: Record<string, string> = {
+  'Trade License': 'trade-license',
+  'MOA/AOA': 'moa-aoa',
+  'POA': 'poa',
+  'VAT': 'vat',
+  'Corporate Tax': 'corporate-tax',
+  'Bank': 'bank',
+  'Contracts': 'contracts',
+  'Government Documents': 'government-documents',
+  'Insurance': 'insurance',
+  'Vehicles': 'vehicles',
+  'HR/Employee': 'hr-employee',
+  'Projects': 'projects',
+  'Other': 'other',
+};
+
+function slugifyCategory(category: string): string {
+  const slug = category.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return slug || 'other';
+}
+
+// Keeps only a plain alphanumeric extension (max 10 chars, guards against a pathological
+// "filename.ThisIsNotAnExtension..." match) off the ORIGINAL filename — never used to derive
+// anything else about the file. No recognizable extension → no extension in the Storage key.
+function safeExtension(fileName: string): string {
+  const match = /\.([a-zA-Z0-9]{1,10})$/.exec(fileName);
+  if (!match) return '';
+  return `.${match[1].toLowerCase()}`;
+}
+
 export interface CompanyDocument {
   id: string;
   category: string;
@@ -44,11 +78,15 @@ export interface UploadCompanyDocumentInput {
   notes: string;
 }
 
-// Uploads the file to Storage first (path: company/{category}/{uuid}-{original filename}), then
-// inserts the metadata row pointing at it. If the DB insert fails after a successful upload, the
-// orphaned Storage object is cleaned up so a failed attempt never leaves an untracked file behind.
+// Uploads the file to Storage first (path: company/{category-slug}/{uuid}{.ext}), then inserts
+// the metadata row pointing at it. The original filename never appears in the Storage key — it's
+// only stored as file_name below — so spaces, Chinese characters, "&", parentheses, and
+// category-name slashes (e.g. MOA/AOA) never make it into an object key. If the DB insert fails
+// after a successful upload, the orphaned Storage object is cleaned up so a failed attempt never
+// leaves an untracked file behind.
 export async function uploadCompanyDocument(input: UploadCompanyDocumentInput): Promise<{ error: string | null }> {
-  const storagePath = `company/${input.category}/${crypto.randomUUID()}-${input.file.name}`;
+  const categorySlug = CATEGORY_SLUGS[input.category] || slugifyCategory(input.category);
+  const storagePath = `company/${categorySlug}/${crypto.randomUUID()}${safeExtension(input.file.name)}`;
   const { error: uploadError } = await supabase.storage.from(BUCKET).upload(storagePath, input.file);
   if (uploadError) return { error: `Storage: ${uploadError.message}` };
 
