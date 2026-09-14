@@ -18,6 +18,7 @@ export const en = {
     engineeringQuote: 'Engineering / BOQ Quote',
     supplierQuote: 'Supplier Quote',
     packageQuote: 'Package Quote',
+    quotationCenter: 'Quotation Center',
     serviceQuote: 'Service Quote',
     businessSolutions: 'Business Solutions',
     quoteHistory: 'Quote History',

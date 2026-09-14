@@ -20,6 +20,7 @@ export const zh: typeof en = {
     engineeringQuote: '工程 / BOQ 报价',
     supplierQuote: '供应商报价',
     packageQuote: '套餐报价',
+    quotationCenter: '报价中心',
     serviceQuote: '服务报价',
     businessSolutions: '企业解决方案',
     quoteHistory: '报价历史',

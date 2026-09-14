@@ -13,6 +13,7 @@ export interface ModuleDef {
     | 'engineeringQuote'
     | 'supplierQuote'
     | 'packageQuote'
+    | 'quotationCenter'
     | 'serviceQuote'
     | 'businessSolutions'
     | 'quoteHistory'
@@ -78,15 +79,28 @@ export const sections: SectionDef[] = [
     // strip TradeModule already has internally. Collapsed into one "Trade"
     // entry (lands on TradeModule's own home dashboard, not a specific tab);
     // those five pages are still fully reachable, now via Trade's own top
-    // tab strip (see TradeModule.tsx). VL/EQ/SQ/PK/BS are genuinely separate
-    // modules with no TradeModule equivalent, so they keep their own rows.
+    // tab strip (see TradeModule.tsx). VL/BS are genuinely separate modules
+    // with no TradeModule equivalent, so they keep their own rows.
+    //
+    // Nav consolidation V2 (2026-09) — Engineering/BOQ Quote, Supplier
+    // Quote, and Package Quote used to be three separate rows, all pointing
+    // into QuotationModule via ?mode= -- same "same page reachable several
+    // different ways" duplication as Trade above, except here the three
+    // ?mode= values were already just one component's own internal appMode
+    // switch (QuotationModule.tsx), not three separate components. Collapsed
+    // into one "报价中心 / Quotation Center" entry; QuotationModule gained a
+    // small always-visible tab strip (customer-quote/supplier-quote/
+    // package-quote only — not landing/service-quote) so users can move
+    // between the three without leaving the module. Defaults to
+    // customer-quote (工程/BOQ报价, the most-used one) rather than the
+    // existing 4-card `landing` picker, per explicit instruction — landing
+    // itself is untouched and still reachable from inside the module.
+    // All three old ?mode= deep links keep working unchanged.
     labelKey: 'supplyChainSection',
     items: [
       { code: 'TR', nameKey: 'tradeOps', path: '/trade' },
       { code: 'VL', nameKey: 'supplierLibrary', path: '/suppliers' },
-      { code: 'EQ', nameKey: 'engineeringQuote', count: '4', badgeColor: '#A89878', badgeBg: 'rgba(255,255,255,0.07)', path: '/quotation?mode=customer-quote' },
-      { code: 'SQ', nameKey: 'supplierQuote', path: '/quotation?mode=supplier-quote' },
-      { code: 'PK', nameKey: 'packageQuote', path: '/quotation?mode=package-quote' },
+      { code: 'QC', nameKey: 'quotationCenter', count: '4', badgeColor: '#A89878', badgeBg: 'rgba(255,255,255,0.07)', path: '/quotation?mode=customer-quote' },
       { code: 'BS', nameKey: 'businessSolutions', path: '/business-solutions' },
     ],
   },

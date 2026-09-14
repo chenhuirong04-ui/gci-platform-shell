@@ -9201,6 +9201,34 @@ Leave a field as empty string if not present. Never fabricate values.`;
           </div>
         </header>
 
+        {/* 报价中心 tab strip (2026-09 nav consolidation) — lets users move
+            between the three quote workflows without going back to the
+            `landing` 4-card picker, which is untouched and still reachable
+            (e.g. via its own cards, or if appMode is ever reset to it).
+            Deliberately excludes 'landing'/'service-quote'/history view —
+            those keep their own existing navigation as-is. */}
+        {(appMode === 'customer-quote' || appMode === 'supplier-quote' || appMode === 'package-quote') && view !== 'history' && (
+          <div className="mb-6 flex justify-center">
+            <div className="inline-flex bg-white p-1.5 rounded-2xl shadow-md border border-brand-beige gap-1">
+              {([
+                { id: 'customer-quote', label: '工程 / BOQ 报价' },
+                { id: 'supplier-quote', label: '供应商报价' },
+                { id: 'package-quote', label: '套餐报价' },
+              ] as { id: QuoteAppMode; label: string }[]).map(qt => (
+                <button
+                  key={qt.id}
+                  onClick={() => setAppMode(qt.id)}
+                  className={`px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all ${
+                    appMode === qt.id ? 'bg-[#0C1B3A] text-white shadow-lg' : 'text-[#0C1B3A]/50 hover:bg-[#0C1B3A]/5'
+                  }`}
+                >
+                  {qt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <main className="bg-white rounded-[56px] shadow-[0_45px_120px_-30px_rgba(62,39,35,0.08)] border border-brand-beige overflow-hidden">
           <div className="p-8 sm:p-20 min-h-[650px] flex flex-col">
 
