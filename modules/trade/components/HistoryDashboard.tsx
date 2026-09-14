@@ -23,6 +23,10 @@ import type {
 import { roundTo2, calculateOutstanding, verifyFinancialBalance } from '../services/currencyUtils';
 import { persistence } from '../services/persistenceService';
 import { bankAccountsService } from '../services/bankAccountsService';
+import {
+  PaymentMethodFields, emptyPaymentMethodValue, validatePaymentMethodValue, buildPaymentMethodPayload,
+  type PaymentMethodFormValue,
+} from './PaymentMethodFields';
 
 // New isolated interface for consignment settlements (Consignment_Settlements storage)
 interface ConsignmentSettlementRecord {
@@ -92,7 +96,11 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
   const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState<{ orderId: string, total: number } | null>(null);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const [payAccountId, setPayAccountId] = useState<string>('');
+  // Finance V1 (2026-09): payment_method + bank_account_id replaces the old
+  // plain method/account dropdowns — shared PaymentMethodFields component,
+  // same rules as FinanceTracker and consignment settlements.
+  const [paymentMethodValue, setPaymentMethodValue] = useState<PaymentMethodFormValue>(emptyPaymentMethodValue());
+  const [settlementPaymentMethodValue, setSettlementPaymentMethodValue] = useState<PaymentMethodFormValue>(emptyPaymentMethodValue());
 
   // ✅ AR view mode
   const [arMode, setArMode] = useState<'OUTSTANDING' | 'ALL'>('OUTSTANDING');
@@ -175,10 +183,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
   useEffect(() => { loadLocalData(); }, []);
   useEffect(() => { loadLocalData(); }, [activeSubTab]);
   useEffect(() => {
-    bankAccountsService.list().then(list => {
-      setBankAccounts(list);
-      setPayAccountId(prev => prev || list[0]?.id || '');
-    });
+    bankAccountsService.list().then(setBankAccounts);
   }, []);
 
   // =========================
@@ -981,6 +986,17 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
       return;
     }
 
+    // Guard 4 (Finance V1): 结算实收必须带 payment_method / bank_account_id
+    const settlementSyncError = validatePaymentMethodValue(settlementPaymentMethodValue, 'in');
+    if (settlementSyncError) { alert(`⚠️ ${settlementSyncError}`); return; }
+    let settlementCashAccountId: string | null = null;
+    if (settlementPaymentMethodValue.payment_method === 'CASH') {
+      const resolved = await bankAccountsService.resolveActiveCashAccount();
+      if (!resolved.ok) { alert(`⚠️ ${resolved.error}`); return; }
+      settlementCashAccountId = resolved.account.id;
+    }
+    const settlementPaymentFields = buildPaymentMethodPayload(settlementPaymentMethodValue, settlementCashAccountId, 'in');
+
     // Compute inclusive price (fallback in case tax_inclusive_price wasn't set)
     const inclPrice = setForm.tax_inclusive_price > 0
       ? setForm.tax_inclusive_price
@@ -1007,6 +1023,22 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
     await persistence.saveSettlements(selectedOrder.id, updated);
     setOrderSettlements(updated);
 
+    // Finance V1: also write a unified ledger transaction for the actual cash
+    // received on this settlement — additive, doesn't change saveSettlements().
+    const settlementTxn: TransactionRecord = {
+      id: `TXN-${Date.now()}`,
+      date: newSettlement.created_at.split('T')[0],
+      type: 'in',
+      amount: roundTo2(setForm.paid_amount),
+      ref_type: 'CONSIGNMENT_SETTLEMENT',
+      ref_id: newSettlement.id,
+      customer: selectedOrder.customerName,
+      note: finalMemo,
+      userId: currentUserId,
+      ...settlementPaymentFields,
+    };
+    await persistence.addTransaction(settlementTxn);
+
     // Complete form reset after save — default paid_amount = 1 × inclusive price (ready for next entry)
     const nextInclPrice = roundTo2(setForm.unit_price * 1.05);
     setSetForm(prev => ({
@@ -1018,6 +1050,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
       memo: '',
       selectedItemName: prev.selectedItemName,
     }));
+    setSettlementPaymentMethodValue(emptyPaymentMethodValue());
   };
 
   const handleVoidSettlement = async (settlId: string) => {
@@ -1186,7 +1219,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
     }
   };
 
-  const recordPayment = async (amount: number, method: any, note: string, bankAccountId: string) => {
+  const recordPayment = async (amount: number, note: string, pmValue: PaymentMethodFormValue) => {
     if (!showPaymentModal) return;
     const amt = roundTo2(amount);
 
@@ -1204,10 +1237,20 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
       alert("⚠️ 收款金额必须大于 0。");
       return;
     }
-    if (!bankAccountId) {
-      alert("⚠️ 请选择收款账户。");
-      return;
+
+    // Finance V1 (2026-09): payment_method + bank_account_id, never a bare
+    // "Corporate"/"Cash" label — same validation + Cash resolution used by
+    // FinanceTracker's manual entries and consignment settlements, so all
+    // three entry points can never disagree on the rules.
+    const syncError = validatePaymentMethodValue(pmValue, 'in');
+    if (syncError) { alert(`⚠️ ${syncError}`); return; }
+    let cashAccountId: string | null = null;
+    if (pmValue.payment_method === 'CASH') {
+      const resolved = await bankAccountsService.resolveActiveCashAccount();
+      if (!resolved.ok) { alert(`⚠️ ${resolved.error}`); return; }
+      cashAccountId = resolved.account.id;
     }
+    const paymentFields = buildPaymentMethodPayload(pmValue, cashAccountId, 'in');
 
     const newPaid = roundTo2((targetOrder.paidAmount || 0) + amt);
     const newOutstanding = calculateOutstanding(targetOrder.grandTotal, newPaid);
@@ -1217,12 +1260,16 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
       return;
     }
 
+    // PaymentRecord.method keeps its own pre-existing CASH/BANK/CHEQUE/OTHER
+    // shape (payments table, out of this round's scope) — mapped from the
+    // new payment_method rather than changed itself.
+    const legacyMethod = pmValue.payment_method === 'BANK_TRANSFER' ? 'BANK' : pmValue.payment_method;
     const newPayment: PaymentRecord = {
       id: `PAY-${Date.now()}`,
       orderId: showPaymentModal.orderId,
       date: new Date().toISOString().split('T')[0],
       amount: amt,
-      method,
+      method: legacyMethod as any,
       note,
       userId: currentUserId
     };
@@ -1236,12 +1283,12 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
       date: newPayment.date,
       type: 'in',
       amount: newPayment.amount,
-      bank_account_id: bankAccountId,
       ref_type: 'ORDER_PAYMENT',
       ref_id: newPayment.id,
       customer: targetOrder.customerName,
       note: newPayment.note || 'Payment received',
-      userId: currentUserId
+      userId: currentUserId,
+      ...paymentFields,
     };
 
     const updatedOrder = {
@@ -1847,7 +1894,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                     <button
                       type="button"
                       disabled={isPaid}
-                      onClick={() => setShowPaymentModal({ orderId: o.id, total: o.outstandingAmount })}
+                      onClick={() => { setShowPaymentModal({ orderId: o.id, total: o.outstandingAmount }); setPaymentMethodValue(emptyPaymentMethodValue()); }}
                       className={`w-full py-5 rounded-[28px] font-black uppercase text-xs tracking-wide shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 ${isPaid ? 'bg-gray-100 text-gray-300 cursor-not-allowed shadow-none' : 'bg-gray-900 text-white hover:bg-[#3F7D58]'}`}
                     >
                       <CreditCard className="w-4 h-4" /> 录入收款
@@ -2287,6 +2334,16 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                         </div>
                       </div>
 
+                      {/* Finance V1: 收付款方式 — 与订单收款、FinanceTracker 共用同一组件 */}
+                      <div className="mb-8">
+                        <PaymentMethodFields
+                          value={settlementPaymentMethodValue}
+                          onChange={setSettlementPaymentMethodValue}
+                          accounts={bankAccounts}
+                          type="in"
+                        />
+                      </div>
+
                       <button
                         type="button"
                         onClick={handleAddSettlement}
@@ -2495,51 +2552,26 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                 />
               </div>
 
-              <div className="space-y-3">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-wide ml-4">付款方式</label>
-                <select
-                  id="pay-method-ar"
-                  className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-[28px] font-black text-xs uppercase tracking-widest outline-none focus:border-[#CBA85C] appearance-none shadow-inner cursor-pointer"
-                >
-                  <option value="CASH">CASH</option>
-                  <option value="BANK">BANK TRANSFER</option>
-                  <option value="CHEQUE">CHEQUE</option>
-                  <option value="OTHER">OTHER</option>
-                </select>
-              </div>
-
-              <div className="space-y-3">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-wide ml-4">收款账户</label>
-                {bankAccounts.length === 0 ? (
-                  <p className="text-[11px] text-[#E0846A] font-bold px-4">
-                    还没有银行账户，请先去「财务账」新增一个，否则这笔收款不会进入资金流水。
-                  </p>
-                ) : (
-                  <select
-                    value={payAccountId}
-                    onChange={e => setPayAccountId(e.target.value)}
-                    className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-[28px] font-black text-xs uppercase tracking-widest outline-none focus:border-[#CBA85C] appearance-none shadow-inner cursor-pointer"
-                  >
-                    {bankAccounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
-                  </select>
-                )}
-              </div>
+              {/* Finance V1 (2026-09): payment_method + bank_account_id,
+                  same shared component/rules as FinanceTracker and
+                  consignment settlements — no more bare CASH/BANK/CHEQUE
+                  dropdown disconnected from a real account. */}
+              <PaymentMethodFields value={paymentMethodValue} onChange={setPaymentMethodValue} accounts={bankAccounts} compact type="in" />
 
               <div className="grid grid-cols-2 gap-4 pt-8">
                 <button
-                  onClick={() => setShowPaymentModal(null)}
+                  onClick={() => { setShowPaymentModal(null); setPaymentMethodValue(emptyPaymentMethodValue()); }}
                   className="py-5 bg-gray-100 text-gray-400 rounded-[24px] font-black uppercase text-xs tracking-wide hover:bg-gray-200 transition-all"
                 >
                   取消
                 </button>
 
                 <button
-                  disabled={!payAccountId}
                   onClick={async () => {
                     const amtElement = document.getElementById('pay-amount-ar') as HTMLInputElement;
                     const amt = parseFloat(amtElement.value);
-                    const mtd = (document.getElementById('pay-method-ar') as HTMLSelectElement).value;
-                    await recordPayment(amt, mtd as any, "Received from client", payAccountId);
+                    await recordPayment(amt, "Received from client", paymentMethodValue);
+                    setPaymentMethodValue(emptyPaymentMethodValue());
                   }}
                   className="py-5 bg-[#3F7D58] text-white rounded-[24px] font-black uppercase text-xs tracking-wide shadow-xl hover:bg-black transition-all disabled:opacity-40"
                 >

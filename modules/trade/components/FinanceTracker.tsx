@@ -10,8 +10,18 @@ import { cloudDb } from '../services/cloudDb';
 import { bankAccountsService } from '../services/bankAccountsService';
 import { exportElementToPdf, exportElementsToPdf } from '../services/pdfExport';
 import { BankDetailsCard, BankDetailsModal } from './BankDetailsExport';
+import {
+  PaymentMethodFields, emptyPaymentMethodValue, validatePaymentMethodValue, buildPaymentMethodPayload,
+  bankTransferEligible, type PaymentMethodFormValue,
+} from './PaymentMethodFields';
 import { useAuth } from '../../../apps/shell/src/contexts/AuthContext';
 import type { TransactionRecord, BankAccount } from '../types';
+
+/** Finance V1 (2026-09) — a cheque only counts toward any account's balance
+ * once it has actually cleared; PENDING/BOUNCED/CANCELLED never do. Shared
+ * by every place FinanceTracker sums transactions, so the rule can't drift
+ * between the balance card, the top stats, and the per-account totals. */
+const countsTowardBalance = (t: TransactionRecord) => t.payment_method !== 'CHEQUE' || t.cheque_status === 'CLEARED';
 
 interface FinanceTrackerProps {
   onCancel: () => void;
@@ -35,6 +45,15 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
   const [note, setNote] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentMethodValue, setPaymentMethodValue] = useState<PaymentMethodFormValue>(emptyPaymentMethodValue());
+  // Finance V1 (2026-09) — FinanceTracker is the only entry point that can
+  // write either direction (Trade order payments / consignment settlements
+  // are always 'in'), so a CHEQUE here needs to know up front whether it's
+  // being received or issued — the Income/Expense buttons below only fire
+  // at submit time, too late to label "Deposited To" vs "Issued From"
+  // correctly while the form is still being filled in. addTransaction()
+  // cross-checks this against whichever button is actually clicked.
+  const [chequeDirection, setChequeDirection] = useState<'in' | 'out'>('in');
 
   const [showAddAccount, setShowAddAccount] = useState(false);
   const emptyNewAccount = {
@@ -62,6 +81,13 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
   const [showBankDetailsFor, setShowBankDetailsFor] = useState<BankAccount | null>(null);
   const [exportingAll, setExportingAll] = useState(false);
   const exportAllCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Cheque PENDING -> CLEARED/BOUNCED/CANCELLED (Finance V1, 2026-09) — the
+  // account to deposit into is only asked for at this point, never at entry
+  // time (matches real workflow: you don't always know where a cheque will
+  // be deposited until you actually go deposit it).
+  const [clearingChequeId, setClearingChequeId] = useState<string | null>(null);
+  const [clearingDepositAccount, setClearingDepositAccount] = useState('');
 
   // Modal viewport fix (2026-09): lock background page scroll while the
   // "新增银行账户" modal is open, so only the modal's own body scrolls —
@@ -150,7 +176,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
   const balanceForAccount = (accountId: string) => {
     const acc = accounts.find(a => a.id === accountId);
     if (!acc) return 0;
-    const rows = transactions.filter(t => t.bank_account_id === accountId);
+    const rows = transactions.filter(t => t.bank_account_id === accountId && countsTowardBalance(t));
     const income = rows.filter(t => t.type === 'in').reduce((s, t) => s + t.amount, 0);
     const expense = rows.filter(t => t.type === 'out').reduce((s, t) => s + t.amount, 0);
     return roundTo2(acc.opening_balance + income - expense);
@@ -164,7 +190,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
       accounts.filter(a => a.account_type === 'Cash').reduce((s, a) => s + balanceForAccount(a.id), 0)
     );
     const thisMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-    const linkedTxns = transactions.filter(t => t.bank_account_id && accounts.some(a => a.id === t.bank_account_id));
+    const linkedTxns = transactions.filter(t => t.bank_account_id && accounts.some(a => a.id === t.bank_account_id) && countsTowardBalance(t));
     const monthIncome = roundTo2(
       linkedTxns.filter(t => t.type === 'in' && (t.date || '').startsWith(thisMonth)).reduce((s, t) => s + t.amount, 0)
     );
@@ -180,11 +206,38 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
     .filter(t => t.bank_account_id === activeAccountId)
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const activeBalance = activeAccountId ? balanceForAccount(activeAccountId) : 0;
-  const activeIncome = roundTo2(currentTransactions.filter(t => t.type === 'in').reduce((s, t) => s + t.amount, 0));
-  const activeExpense = roundTo2(currentTransactions.filter(t => t.type === 'out').reduce((s, t) => s + t.amount, 0));
+  const activeIncome = roundTo2(currentTransactions.filter(t => t.type === 'in' && countsTowardBalance(t)).reduce((s, t) => s + t.amount, 0));
+  const activeExpense = roundTo2(currentTransactions.filter(t => t.type === 'out' && countsTowardBalance(t)).reduce((s, t) => s + t.amount, 0));
+
+  // Finance V1 (2026-09) — cheques awaiting clearance, shown regardless of
+  // the currently selected account since a PENDING cheque has no
+  // bank_account_id yet (see types.ts TransactionRecord doc comment).
+  const pendingCheques = transactions
+    .filter(t => t.payment_method === 'CHEQUE' && t.cheque_status === 'PENDING')
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
   const addTransaction = async (type: 'in' | 'out') => {
-    if (!activeAccountId || !note.trim() || !amount || Number(amount) <= 0) return;
+    if (!note.trim() || !amount || Number(amount) <= 0) return;
+
+    // A CHEQUE's direction was already declared while filling in the form
+    // (it decides Deposited To vs Issued From) — the clicked button must
+    // agree, or the record would end up with the wrong cheque fields.
+    if (paymentMethodValue.payment_method === 'CHEQUE' && chequeDirection !== type) {
+      alert(`⚠️ 这张支票是「${chequeDirection === 'in' ? '收款支票 In' : '付款支票 Out'}」，请点击对应的 ${chequeDirection === 'in' ? 'Income' : 'Expense'} 按钮提交。`);
+      return;
+    }
+
+    const syncError = validatePaymentMethodValue(paymentMethodValue, type);
+    if (syncError) { alert(`⚠️ ${syncError}`); return; }
+
+    let cashAccountId: string | null = null;
+    if (paymentMethodValue.payment_method === 'CASH') {
+      const resolved = await bankAccountsService.resolveActiveCashAccount();
+      if (!resolved.ok) { alert(`⚠️ ${resolved.error}`); return; }
+      cashAccountId = resolved.account.id;
+    }
+
+    const paymentFields = buildPaymentMethodPayload(paymentMethodValue, cashAccountId, type);
 
     const newTransaction: TransactionRecord = {
       id: `TXN-${Date.now()}`,
@@ -192,9 +245,9 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
       note,
       type,
       amount: roundTo2(Number(amount)),
-      bank_account_id: activeAccountId,
       ref_type: 'MANUAL',
       userId: 'Admin',
+      ...paymentFields,
     };
 
     // Finance V1 fix (2026-09): a single new INSERT, not a re-upload of the
@@ -204,9 +257,45 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
     setTransactions(prev => [newTransaction, ...prev]);
     await persistence.addTransaction(newTransaction);
 
+    // Jump the ledger view to wherever the money actually landed — a
+    // PENDING cheque has no bank_account_id yet, so it stays wherever the
+    // user was looking (it'll show up in "待清算支票" instead).
+    if (newTransaction.bank_account_id) setActiveAccountId(newTransaction.bank_account_id);
+
     setNote('');
     setAmount('');
     setDate(new Date().toISOString().split('T')[0]);
+    setPaymentMethodValue(emptyPaymentMethodValue());
+    setChequeDirection('in');
+  };
+
+  // Finance V1 (2026-09): 'in' cheques ask for a deposit account at
+  // clearing time (depositAccountId param); 'out' cheques already had
+  // their Issued From account chosen at creation, so clearing one just
+  // needs the status flip — no account picker required here.
+  const markChequeStatus = async (t: TransactionRecord, status: 'CLEARED' | 'BOUNCED' | 'CANCELLED', depositAccountId?: string) => {
+    const isOut = t.type === 'out';
+    if (status === 'CLEARED') {
+      if (isOut) {
+        if (!t.issued_from_bank_account_id) {
+          alert('⚠️ 该支票缺少开票账户 (Issued From)，无法标记为已清算。');
+          return;
+        }
+      } else if (!depositAccountId) {
+        alert('⚠️ 标记为 Cleared 时必须选择存入哪个银行账户。');
+        return;
+      }
+    }
+    const clearedAccountId = isOut ? t.issued_from_bank_account_id : depositAccountId;
+    const updated: TransactionRecord = {
+      ...t,
+      cheque_status: status,
+      bank_account_id: status === 'CLEARED' ? clearedAccountId : undefined,
+      ...(isOut ? {} : { deposited_to_bank_account_id: status === 'CLEARED' ? depositAccountId : undefined }),
+    };
+    setTransactions(prev => prev.map(x => (x.id === t.id ? updated : x)));
+    await persistence.updateTransaction(updated);
+    if (status === 'CLEARED' && clearedAccountId) setActiveAccountId(clearedAccountId);
   };
 
   const handleDelete = async (id: string) => {
@@ -369,6 +458,92 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
             })}
           </div>
 
+          {/* Pending cheques (Finance V1, 2026-09) — account-independent,
+              since a PENDING cheque has no bank_account_id yet. */}
+          {pendingCheques.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+              <div className="p-6 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
+                <span className="font-black text-gray-800 uppercase text-xs tracking-[0.2em]">待清算支票 / Pending Cheques</span>
+                <span className="text-[10px] px-3 py-1 bg-white border border-gray-200 rounded-full text-gray-600 font-black tracking-widest">{pendingCheques.length}</span>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {pendingCheques.map(t => {
+                  const isOut = t.type === 'out';
+                  const issuedFromAccount = isOut ? accounts.find(a => a.id === t.issued_from_bank_account_id) : null;
+                  return (
+                    <div key={t.id} className="p-6 flex flex-col gap-4">
+                      <div className="flex items-center justify-between flex-wrap gap-3">
+                        <div>
+                          <p className="text-sm font-bold text-gray-700">
+                            <span className={`inline-block px-2 py-0.5 mr-2 rounded-md text-[9px] font-black uppercase tracking-widest align-middle ${isOut ? 'bg-[#A85D45]/10 text-[#A85D45]' : 'bg-[#3F7D58]/10 text-[#3F7D58]'}`}>
+                              {isOut ? '付款 OUT' : '收款 IN'}
+                            </span>
+                            {t.note} — <span className="font-mono">{t.cheque_bank}</span> #{t.cheque_number}
+                          </p>
+                          <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">
+                            {t.date} · {t.cheque_date} · AED {(t.cheque_amount ?? t.amount).toFixed(2)}
+                            {isOut && (issuedFromAccount ? ` · Issued From ${issuedFromAccount.account_name}` : ' · ⚠️ 缺少 Issued From 账户')}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              if (isOut) {
+                                markChequeStatus(t, 'CLEARED');
+                              } else {
+                                setClearingChequeId(clearingChequeId === t.id ? null : t.id);
+                                setClearingDepositAccount('');
+                              }
+                            }}
+                            className="px-4 py-2 rounded-xl bg-[#3F7D58] text-white text-[10px] font-black uppercase tracking-widest hover:bg-[#2d5c40]"
+                          >
+                            标记已清算
+                          </button>
+                          <button
+                            onClick={() => markChequeStatus(t, 'BOUNCED')}
+                            className="px-4 py-2 rounded-xl bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-widest hover:bg-gray-200"
+                          >
+                            退票
+                          </button>
+                          <button
+                            onClick={() => markChequeStatus(t, 'CANCELLED')}
+                            className="px-4 py-2 rounded-xl bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-widest hover:bg-gray-200"
+                          >
+                            作废
+                          </button>
+                        </div>
+                      </div>
+                      {!isOut && clearingChequeId === t.id && (
+                        <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-4">
+                          <select
+                            className="flex-1 p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700 text-sm"
+                            value={clearingDepositAccount}
+                            onChange={e => setClearingDepositAccount(e.target.value)}
+                          >
+                            <option value="">选择存入账户 Deposited To…</option>
+                            {bankTransferEligible(accounts).map(a => (
+                              <option key={a.id} value={a.id}>{a.account_name}{a.bank_name ? ' · ' + a.bank_name : ''} · {a.currency}</option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={async () => {
+                              await markChequeStatus(t, 'CLEARED', clearingDepositAccount);
+                              setClearingChequeId(null);
+                            }}
+                            disabled={!clearingDepositAccount}
+                            className="px-5 py-3 rounded-xl bg-[#080D1E] text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
+                          >
+                            确认
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="flex-1 flex flex-col lg:flex-row gap-8">
             <div className="lg:w-2/5 flex flex-col gap-6">
               <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100 relative overflow-hidden group">
@@ -423,16 +598,39 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                 </div>
 
                 <div className="space-y-5">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Account</label>
-                    <select
-                      className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700"
-                      value={activeAccountId}
-                      onChange={e => setActiveAccountId(e.target.value)}
-                    >
-                      {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
-                    </select>
-                  </div>
+                  {/* Finance V1 (2026-09): payment method now decides which
+                      account the entry lands on — CASH auto-resolves,
+                      BANK_TRANSFER/CHEQUE ask explicitly. Replaces the old
+                      plain "Account" dropdown, which let a manual entry get
+                      written to any account regardless of how the money
+                      actually moved. */}
+                  {paymentMethodValue.payment_method === 'CHEQUE' && (
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cheque Direction / 支票方向</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setChequeDirection('in')}
+                          className={`p-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${chequeDirection === 'in' ? 'bg-[#3F7D58] text-white' : 'bg-gray-100 text-gray-400'}`}
+                        >
+                          收款支票 / In
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setChequeDirection('out')}
+                          className={`p-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${chequeDirection === 'out' ? 'bg-[#A85D45] text-white' : 'bg-gray-100 text-gray-400'}`}
+                        >
+                          付款支票 / Out
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  <PaymentMethodFields
+                    value={paymentMethodValue}
+                    onChange={setPaymentMethodValue}
+                    accounts={accounts}
+                    type={paymentMethodValue.payment_method === 'CHEQUE' ? chequeDirection : 'in'}
+                  />
 
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Transaction Date</label>
@@ -479,14 +677,14 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                   <div className="grid grid-cols-2 gap-4 pt-4">
                     <button
                       onClick={() => addTransaction('in')}
-                      disabled={!activeAccountId || !note || !amount}
+                      disabled={!note || !amount}
                       className="flex items-center justify-center gap-2 p-4 rounded-xl bg-[#3F7D58] text-white hover:bg-[#2d5c40] shadow-lg font-black uppercase text-xs tracking-widest disabled:opacity-40"
                     >
                       <TrendingUp className="w-4 h-4" /> Income
                     </button>
                     <button
                       onClick={() => addTransaction('out')}
-                      disabled={!activeAccountId || !note || !amount}
+                      disabled={!note || !amount}
                       className="flex items-center justify-center gap-2 p-4 rounded-xl bg-[#A85D45] text-white hover:bg-[#8b4c37] shadow-lg font-black uppercase text-xs tracking-widest disabled:opacity-40"
                     >
                       <TrendingDown className="w-4 h-4" /> Expense
@@ -527,6 +725,11 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                             <span className="text-sm font-bold text-gray-700 uppercase">{t.note}</span>
                             {t.ref_type && t.ref_type !== 'MANUAL' && (
                               <span className="text-[8px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 font-black uppercase">{t.ref_type}</span>
+                            )}
+                            {t.payment_method && (
+                              <span className="text-[8px] px-2 py-0.5 rounded-full bg-[#CBA85C]/10 text-[#8A6D2F] font-black uppercase">
+                                {t.payment_method === 'CHEQUE' ? `CHEQUE · ${t.cheque_status}` : t.payment_method}
+                              </span>
                             )}
                           </div>
                         </td>

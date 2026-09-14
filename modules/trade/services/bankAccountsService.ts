@@ -72,4 +72,28 @@ export const bankAccountsService = {
       throw error;
     }
   },
+
+  /**
+   * Resolve the single active Cash-type account for payment_method='CASH'
+   * (Finance V1, 2026-09). Shared by every entry point that writes a CASH
+   * transaction — Trade order payments, consignment settlements,
+   * FinanceTracker manual entries — so they can never disagree on which
+   * account "Cash" means, and never silently pick one out of several.
+   * Never guesses: 0 or >1 active Cash accounts is a hard stop, not a
+   * best-effort pick.
+   */
+  async resolveActiveCashAccount(): Promise<{ ok: true; account: BankAccount } | { ok: false; error: string }> {
+    const active = await this.list();
+    const cashAccounts = active.filter(a => a.account_type === 'Cash');
+    if (cashAccounts.length === 0) {
+      return { ok: false, error: '没有可用的 Cash 账户，请先在"银行账户"里新建一个 Cash 类型账户，再记录现金收付款。' };
+    }
+    if (cashAccounts.length > 1) {
+      return {
+        ok: false,
+        error: `找到 ${cashAccounts.length} 个启用中的 Cash 账户，无法自动判断记到哪一个——请停用多余的 Cash 账户（只保留一个），或改用银行转账方式。`,
+      };
+    }
+    return { ok: true, account: cashAccounts[0] };
+  },
 };

@@ -456,13 +456,33 @@ export const persistence = {
    */
   async addTransaction(transaction: TransactionRecord): Promise<void> {
     const enriched = enrichRecord(transaction);
+    // Capture the real row id the insert comes back with (Finance V1,
+    // 2026-09) so a later edit on THIS transaction — e.g. marking a cheque
+    // Cleared — can target it directly via updateTransaction() instead of
+    // falling back to the resolve-by-business-id path.
+    let withRowId: any = enriched;
     try {
-      await cloudDb.insertOne('transactions', enriched);
+      const inserted = await cloudDb.insertOne('transactions', enriched);
+      if (inserted?.id) withRowId = { ...enriched, _rowId: inserted.id };
     } catch (e) {
       console.warn("[persistence] Cloud insert failed for transaction:", e);
     }
     const local = getLocal('transactions');
-    setLocal('transactions', sortByCreatedDesc([enriched, ...local]));
+    setLocal('transactions', sortByCreatedDesc([withRowId, ...local]));
+  },
+
+  /**
+   * Update exactly ONE transaction (Finance V1, 2026-09) — e.g. moving a
+   * cheque from PENDING to CLEARED/BOUNCED/CANCELLED. Same safeWriteRow
+   * pattern as updateOrder/updatePayment/updateQuote: PATCH by _rowId when
+   * known; otherwise resolve by business id first and refuse to guess if
+   * that's ambiguous (see safeWriteRow's own doc comment above).
+   */
+  async updateTransaction(transaction: TransactionRecord): Promise<void> {
+    const enriched = enrichRecord(transaction);
+    const rowId = await safeWriteRow('transactions', enriched, (transaction as any)._rowId);
+    const local = getLocal('transactions');
+    setLocal('transactions', local.map((t: any) => (t.id === enriched.id ? { ...enriched, _rowId: rowId } : t)));
   },
 
   async updatePayments(payments: PaymentRecord[]): Promise<void> {
