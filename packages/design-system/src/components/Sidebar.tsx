@@ -47,6 +47,12 @@ interface SidebarProps {
   onSignOut?: () => void;
   footer?: ReactNode;
   className?: string;
+  /** Mobile nav drawer (2026-09): renders the exact same sidebar markup/data
+   * inside the drawer overlay. Default `hidden md:flex` hides this component
+   * below the md breakpoint — forceVisible swaps that to `flex` so the
+   * drawer's copy actually renders. Desktop usage (omitted/false) is
+   * unchanged. */
+  forceVisible?: boolean;
 }
 
 function NavRow({ item }: { item: NavModItem }) {
@@ -114,7 +120,7 @@ function NavRow({ item }: { item: NavModItem }) {
   );
 }
 
-export function Sidebar({ navTop, workspaceLabel, sections, userName, userRole, visibleModules, onSignOut, footer, className }: SidebarProps) {
+export function Sidebar({ navTop, workspaceLabel, sections, userName, userRole, visibleModules, onSignOut, footer, className, forceVisible }: SidebarProps) {
   // When visibleModules is provided, filter nav items by module path prefix.
   // Items without a path (e.g. AI, Settings) are always shown.
   // Section headers are hidden when all their items are filtered out.
@@ -143,12 +149,12 @@ export function Sidebar({ navTop, workspaceLabel, sections, userName, userRole, 
   return (
     <aside
       translate="no"
-      className={`notranslate shrink-0 hidden md:flex md:flex-col relative sticky top-0 overflow-y-auto gci-sidebar${className ? ` ${className}` : ''}`}
+      className={`notranslate shrink-0 ${forceVisible ? 'flex flex-col' : 'hidden md:flex md:flex-col'} relative overflow-y-auto gci-sidebar${forceVisible ? '' : ' sticky top-0'}${className ? ` ${className}` : ''}`}
       style={{
-        width: 'var(--sidebar-w)',
+        width: forceVisible ? '100%' : 'var(--sidebar-w)',
         height: '100vh',
         background: 'var(--bg-shell)',
-        borderRight: '1px solid rgba(203,168,92,0.07)',
+        borderRight: forceVisible ? 'none' : '1px solid rgba(203,168,92,0.07)',
         padding: '22px 14px',
       }}
     >

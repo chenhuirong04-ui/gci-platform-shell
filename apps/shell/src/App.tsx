@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { AppShell, Sidebar, Header, LangToggle, Toast, type NavSection } from '@gci/design-system';
+import { AppShell, Sidebar, Header, MobileNavDrawer, LangToggle, Toast, type NavSection } from '@gci/design-system';
 import { LangContext, dictionaries, type Lang } from '@gci/i18n';
 import { sections as sectionDefs } from './config/navigation';
 import { Home } from './pages/Home';
@@ -42,12 +42,20 @@ function Shell() {
     setLangState(l);
   };
   const [toast, setToast] = useState<string | null>(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const dict = dictionaries[lang];
   const navigate = useNavigate();
   const location = useLocation();
   const currentUrl = location.pathname + location.search;
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+
+  // Mobile nav drawer (2026-09): belt-and-braces close on route change, on
+  // top of the drawer's own click-a-nav-row close — covers back/forward
+  // navigation and any route change that didn't originate from a `.nv` click.
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   const { loading, session, profile, signOut, error: authError, retry: retryAuth } = useAuth();
 
@@ -117,27 +125,31 @@ function Shell() {
   const displayName = profile?.display_name ?? 'User';
   const roleLabel = profile?.role_label ?? '';
 
+  // Built once so the desktop sidebar and the mobile drawer's copy are
+  // provably the same navigation data/permission filter — not two things
+  // that could drift apart, just the same props object rendered twice.
+  const sidebarProps = {
+    navTop: { code: 'WS', name: dict.nav.workspace, active: location.pathname === '/', onClick: () => navigate('/') },
+    workspaceLabel: dict.nav.workspaceSection,
+    sections,
+    userName: displayName,
+    userRole: roleLabel,
+    visibleModules,
+    onSignOut: handleSignOut,
+  };
+
   return (
     <LangContext.Provider value={{ lang, dict, setLang }}>
     <GiaFileWorkflowProvider>
       <AppShell
-        sidebar={
-          <Sidebar
-            navTop={{ code: 'WS', name: dict.nav.workspace, active: location.pathname === '/', onClick: () => navigate('/') }}
-            workspaceLabel={dict.nav.workspaceSection}
-            sections={sections}
-            userName={displayName}
-            userRole={roleLabel}
-            visibleModules={visibleModules}
-            onSignOut={handleSignOut}
-          />
-        }
+        sidebar={<Sidebar {...sidebarProps} />}
         header={
           <Header
             eyebrow={dict.header.eyebrow}
             dateLine={dateLine}
             searchPlaceholder={dict.header.searchPlaceholder}
             syncedLabel={dict.header.synced}
+            onMenuClick={() => setMobileNavOpen(true)}
             trailing={<LangToggle lang={lang} onChange={setLang} />}
           />
         }
@@ -217,6 +229,9 @@ function Shell() {
           />
         </Routes>
       </AppShell>
+      <MobileNavDrawer open={mobileNavOpen} onClose={() => setMobileNavOpen(false)}>
+        <Sidebar {...sidebarProps} forceVisible />
+      </MobileNavDrawer>
       <Toast message={toast} />
     </GiaFileWorkflowProvider>
     </LangContext.Provider>

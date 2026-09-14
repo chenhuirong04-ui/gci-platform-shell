@@ -8,9 +8,13 @@ interface HeaderProps {
   syncedLabel: string;
   trailing?: ReactNode;
   className?: string;
+  /** Mobile nav drawer (2026-09): when provided, a hamburger button renders
+   * before `eyebrow`, visible only below the md breakpoint (`md:hidden`) —
+   * desktop layout is untouched when this prop is omitted. */
+  onMenuClick?: () => void;
 }
 
-export function Header({ eyebrow, dateLine, searchPlaceholder, syncedLabel, trailing, className }: HeaderProps) {
+export function Header({ eyebrow, dateLine, searchPlaceholder, syncedLabel, trailing, className, onMenuClick }: HeaderProps) {
   return (
     <div
       className={`flex items-center justify-between sticky top-0 z-10${className ? ` ${className}` : ''}`}
@@ -23,6 +27,25 @@ export function Header({ eyebrow, dateLine, searchPlaceholder, syncedLabel, trai
       }}
     >
       <div className="flex items-center" style={{ gap: 22 }}>
+        {onMenuClick && (
+          <button
+            type="button"
+            onClick={onMenuClick}
+            aria-label="Open navigation menu"
+            className="md:hidden flex items-center justify-center shrink-0"
+            style={{
+              width: 30,
+              height: 30,
+              marginLeft: -6,
+              borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(255,255,255,0.03)',
+              color: colors.textPrimary,
+            }}
+          >
+            <span style={{ fontSize: 16, lineHeight: 1 }}>☰</span>
+          </button>
+        )}
         <span className="font-mono-label" style={{ fontSize: 11, letterSpacing: '0.1em', color: colors.goldBase }}>
           {eyebrow}
         </span>
