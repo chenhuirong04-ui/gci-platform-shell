@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   TrendingUp, TrendingDown, DollarSign, Trash2, Calendar, FileText, PlusCircle,
-  Building2, User, Wallet, Lock, Landmark, Plus, X
+  Building2, User, Wallet, Lock, Landmark, Plus, X, CreditCard, FileDown
 } from 'lucide-react';
 import { roundTo2 } from '../services/currencyUtils';
 import { persistence } from '../services/persistenceService';
 import { cloudDb } from '../services/cloudDb';
 import { bankAccountsService } from '../services/bankAccountsService';
+import { exportElementToPdf, exportElementsToPdf } from '../services/pdfExport';
+import { BankDetailsCard, BankDetailsModal } from './BankDetailsExport';
 import { useAuth } from '../../../apps/shell/src/contexts/AuthContext';
 import type { TransactionRecord, BankAccount } from '../types';
 
@@ -51,6 +53,27 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
   const setNewAccField = (field: keyof typeof emptyNewAccount, value: string) =>
     setNewAcc(prev => ({ ...prev, [field]: value }));
   const [savingAccount, setSavingAccount] = useState(false);
+
+  // Bank details export (Finance V1, 2026-09) — view/copy/export a single
+  // Corporate account's bank details, or export all active Corporate
+  // accounts as one combined PDF. Read-only against bank_accounts — no
+  // schema, RLS, balance, or transactions changes.
+  const [showBankDetailsFor, setShowBankDetailsFor] = useState<BankAccount | null>(null);
+  const [exportingAll, setExportingAll] = useState(false);
+  const exportAllCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Modal viewport fix (2026-09): lock background page scroll while the
+  // "新增银行账户" modal is open, so only the modal's own body scrolls —
+  // matches the pattern already used by MobileNavDrawer. Always restored on
+  // close/unmount.
+  useEffect(() => {
+    if (!showAddAccount) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [showAddAccount]);
 
   /**
    * Cloud-first, local-fallback read — same shape as before, minus the
@@ -229,20 +252,69 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
     }
   };
 
+  const slugify = (s: string) => (s || 'account').trim().replace(/[^a-zA-Z0-9]+/g, '_').slice(0, 60);
+
+  const handleExportSingleBankDetails = async (el: HTMLDivElement, account: BankAccount) => {
+    await exportElementToPdf(el, `GCI_Bank_Details_${slugify(account.account_name)}.pdf`, { scale: 2 });
+  };
+
+  const activeCorporateAccounts = accounts.filter(a => a.account_type === 'Corporate' && a.is_active);
+
+  const handleExportAllCorporate = async () => {
+    if (activeCorporateAccounts.length === 0) {
+      alert('没有可导出的 Corporate 账户（需要 account_type=Corporate 且 is_active）。');
+      return;
+    }
+    setExportingAll(true);
+    try {
+      const els = activeCorporateAccounts
+        .map(a => exportAllCardRefs.current[a.id])
+        .filter((el): el is HTMLDivElement => !!el);
+      await exportElementsToPdf(els, `GCI_Corporate_Bank_Details_${new Date().toISOString().slice(0, 10)}.pdf`, { scale: 2 });
+    } catch (e: any) {
+      alert(`导出失败：${e?.message || '未知错误'}`);
+    } finally {
+      setExportingAll(false);
+    }
+  };
+
   if (loading) {
     return <div className="h-[calc(100vh-250px)] flex items-center justify-center text-gray-300 text-xs font-black uppercase tracking-widest">Loading...</div>;
   }
 
   return (
     <div className="h-full flex flex-col gap-6 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>财务账</h1>
-        <button
-          onClick={() => setShowAddAccount(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#080D1E] text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-[#CBA85C] transition-all"
-        >
-          <Plus className="w-4 h-4" /> 新增账户
-        </button>
+        <div className="flex items-center gap-2">
+          {activeCorporateAccounts.length > 0 && (
+            <button
+              onClick={handleExportAllCorporate}
+              disabled={exportingAll}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-[11px] font-black uppercase tracking-widest hover:border-[#CBA85C] transition-all disabled:opacity-40"
+              title="导出全部 Corporate 账户的银行信息（Cash/Personal/Other 不包含）"
+            >
+              <FileDown className="w-4 h-4" />
+              {exportingAll ? '导出中...' : 'Export All Corporate Accounts'}
+            </button>
+          )}
+          <button
+            onClick={() => setShowAddAccount(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-[#080D1E] text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-[#CBA85C] transition-all"
+          >
+            <Plus className="w-4 h-4" /> 新增账户
+          </button>
+        </div>
+      </div>
+
+      {/* Off-screen render targets for "Export All Corporate Accounts" —
+          same BankDetailsCard template as the on-screen view modal, laid
+          out off-screen so html2canvas can capture each one. Not visible,
+          not interactive. */}
+      <div style={{ position: 'fixed', left: -99999, top: 0, pointerEvents: 'none' }} aria-hidden="true">
+        {activeCorporateAccounts.map(acc => (
+          <BankDetailsCard key={acc.id} account={acc} ref={(el) => { exportAllCardRefs.current[acc.id] = el; }} />
+        ))}
       </div>
 
       {/* Top summary */}
@@ -330,6 +402,15 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                     </p>
                   </div>
                 </div>
+
+                {activeAccount?.account_type === 'Corporate' && (
+                  <button
+                    onClick={() => setShowBankDetailsFor(activeAccount)}
+                    className="mt-6 w-full flex items-center justify-center gap-2 py-3.5 rounded-xl border border-gray-200 text-gray-700 font-black text-[10px] uppercase tracking-widest hover:border-[#CBA85C] hover:text-[#CBA85C] transition-all"
+                  >
+                    <CreditCard className="w-4 h-4" /> 银行信息 / Bank Details
+                  </button>
+                )}
               </div>
 
               <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
@@ -473,13 +554,19 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
       )}
 
       {showAddAccount && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xl z-[6000] flex items-center justify-center p-8 overflow-y-auto">
-          <div className="bg-white p-10 rounded-[40px] shadow-2xl max-w-md w-full relative my-8">
-            <button onClick={() => { setShowAddAccount(false); setNewAcc(emptyNewAccount); }} className="absolute top-6 right-6 text-gray-300 hover:text-gray-600">
-              <X className="w-5 h-5" />
-            </button>
-            <h3 className="text-sm font-black text-[#080D1E] uppercase tracking-[0.2em] mb-8">新增银行账户</h3>
-            <div className="space-y-5">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xl z-[6000] flex items-center justify-center p-4 sm:p-8">
+          <div className="bg-white rounded-[40px] shadow-2xl max-w-md w-full flex flex-col" style={{ maxHeight: '90vh' }}>
+            {/* Header — fixed, never scrolls */}
+            <div className="shrink-0 flex items-center justify-between px-10 pt-10 pb-6">
+              <h3 className="text-sm font-black text-[#080D1E] uppercase tracking-[0.2em]">新增银行账户</h3>
+              <button onClick={() => { setShowAddAccount(false); setNewAcc(emptyNewAccount); }} className="text-gray-300 hover:text-gray-600 shrink-0">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body — the only part that scrolls, everything else stays put */}
+            <div className="overflow-y-auto px-10">
+            <div className="space-y-5 pb-8">
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">账户名称</label>
                 <input
@@ -605,7 +692,11 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                   onChange={e => setNewAccField('opening_balance', e.target.value)}
                 />
               </div>
+            </div>
+            </div>
 
+            {/* Footer — fixed, the submit button is always reachable without scrolling */}
+            <div className="shrink-0 px-10 pt-6 pb-10 border-t border-gray-100">
               <button
                 onClick={handleCreateAccount}
                 disabled={!newAcc.account_name.trim() || savingAccount}
@@ -616,6 +707,14 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {showBankDetailsFor && (
+        <BankDetailsModal
+          account={showBankDetailsFor}
+          onClose={() => setShowBankDetailsFor(null)}
+          onExportPdf={handleExportSingleBankDetails}
+        />
       )}
     </div>
   );

@@ -126,6 +126,62 @@ export async function exportElementToPdf(
   pdf.save(filename);
 }
 
+/**
+ * Export MULTIPLE DOM elements as one combined PDF, one element per page
+ * (Finance V1, 2026-09 — "Export All Corporate Accounts"). Unlike
+ * exportElementToPdf's canvas-height slicing (built for one long document),
+ * this guarantees each element starts on its own page — no risk of a
+ * card getting cut across a page boundary when concatenating several
+ * short, independent documents (bank detail cards, in this case).
+ */
+export async function exportElementsToPdf(
+  elements: HTMLElement[],
+  filename: string,
+  options?: {
+    scale?: number;
+    format?: "a4";
+    orientation?: "p" | "l";
+    marginMm?: number;
+    background?: string;
+  }
+) {
+  if (elements.length === 0) return;
+
+  const scale = options?.scale ?? 2;
+  const orientation = options?.orientation ?? "p";
+  const format = options?.format ?? "a4";
+  const marginMm = options?.marginMm ?? 0;
+  const background = options?.background ?? "#ffffff";
+
+  await waitForFonts();
+  for (const el of elements) await waitForImages(el);
+
+  const pdf = new jsPDF({ orientation, unit: "mm", format, compress: true });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const usableWidth = pageWidth - marginMm * 2;
+  const usableHeight = pageHeight - marginMm * 2;
+
+  for (let i = 0; i < elements.length; i++) {
+    const canvas = await html2canvas(elements[i], {
+      scale,
+      useCORS: true,
+      backgroundColor: background,
+      logging: false,
+      windowWidth: document.documentElement.clientWidth,
+      windowHeight: document.documentElement.clientHeight,
+    });
+    const imgData = canvas.toDataURL("image/png", 1.0);
+    const imgWidthMm = usableWidth;
+    const imgHeightMm = Math.min((canvas.height * imgWidthMm) / canvas.width, usableHeight);
+
+    if (i > 0) pdf.addPage();
+    pdf.addImage(imgData, "PNG", marginMm, marginMm, imgWidthMm, imgHeightMm, undefined, "FAST");
+  }
+
+  pdf.save(filename);
+}
+
 async function waitForFonts() {
   // @ts-ignore
   if (document.fonts && document.fonts.ready) {
