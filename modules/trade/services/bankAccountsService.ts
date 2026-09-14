@@ -31,6 +31,14 @@ export const bankAccountsService = {
     currency?: string;
     opening_balance?: number;
     notes?: string;
+    // Banking detail fields (Finance V1, 2026-09) — all optional, left null
+    // for Cash accounts which have no bank.
+    account_holder_name?: string;
+    account_number?: string;
+    iban?: string;
+    swift_bic?: string;
+    bank_address?: string;
+    branch_name?: string;
   }): Promise<BankAccount | null> {
     const { data, error } = await supabase
       .from('bank_accounts')
@@ -41,6 +49,12 @@ export const bankAccountsService = {
         currency: input.currency || 'AED',
         opening_balance: input.opening_balance || 0,
         notes: input.notes || '',
+        account_holder_name: input.account_holder_name || null,
+        account_number: input.account_number || null,
+        iban: input.iban || null,
+        swift_bic: input.swift_bic || null,
+        bank_address: input.bank_address || null,
+        branch_name: input.branch_name || null,
       })
       .select('*')
       .single();

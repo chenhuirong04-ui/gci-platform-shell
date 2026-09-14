@@ -147,6 +147,15 @@ export interface BankAccount {
   opening_balance: number;
   is_active: boolean;
   notes?: string;
+  // Banking detail fields (Finance V1, 2026-09) — all optional. Cash
+  // accounts have no bank, so none of these are required by the form for
+  // account_type:'Cash'.
+  account_holder_name?: string;
+  account_number?: string;
+  iban?: string;
+  swift_bic?: string;
+  bank_address?: string;
+  branch_name?: string;
   created_at?: string;
   updated_at?: string;
 }

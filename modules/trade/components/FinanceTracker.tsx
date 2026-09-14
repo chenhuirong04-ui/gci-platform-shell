@@ -34,10 +34,22 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
   const [showAddAccount, setShowAddAccount] = useState(false);
-  const [newAccName, setNewAccName] = useState('');
-  const [newAccType, setNewAccType] = useState<BankAccount['account_type']>('Corporate');
-  const [newAccBank, setNewAccBank] = useState('');
-  const [newAccOpening, setNewAccOpening] = useState('');
+  const emptyNewAccount = {
+    account_name: '',
+    account_type: 'Corporate' as BankAccount['account_type'],
+    account_holder_name: '',
+    bank_name: '',
+    account_number: '',
+    iban: '',
+    swift_bic: '',
+    currency: 'AED',
+    bank_address: '',
+    branch_name: '',
+    opening_balance: '',
+  };
+  const [newAcc, setNewAcc] = useState(emptyNewAccount);
+  const setNewAccField = (field: keyof typeof emptyNewAccount, value: string) =>
+    setNewAcc(prev => ({ ...prev, [field]: value }));
   const [savingAccount, setSavingAccount] = useState(false);
 
   /**
@@ -185,21 +197,31 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
   };
 
   const handleCreateAccount = async () => {
-    if (!newAccName.trim()) return;
+    if (!newAcc.account_name.trim()) return;
+    const isCash = newAcc.account_type === 'Cash';
     setSavingAccount(true);
     try {
       const created = await bankAccountsService.create({
-        account_name: newAccName.trim(),
-        account_type: newAccType,
-        bank_name: newAccType === 'Cash' ? undefined : newAccBank.trim() || undefined,
-        opening_balance: newAccOpening ? Number(newAccOpening) : 0,
+        account_name: newAcc.account_name.trim(),
+        account_type: newAcc.account_type,
+        currency: newAcc.currency.trim() || 'AED',
+        opening_balance: newAcc.opening_balance ? Number(newAcc.opening_balance) : 0,
+        // Cash accounts have no bank — banking detail fields stay empty
+        // regardless of what's in the form (they're hidden for Cash anyway).
+        bank_name: isCash ? undefined : newAcc.bank_name.trim() || undefined,
+        account_holder_name: isCash ? undefined : newAcc.account_holder_name.trim() || undefined,
+        account_number: isCash ? undefined : newAcc.account_number.trim() || undefined,
+        iban: isCash ? undefined : newAcc.iban.trim() || undefined,
+        swift_bic: isCash ? undefined : newAcc.swift_bic.trim() || undefined,
+        bank_address: isCash ? undefined : newAcc.bank_address.trim() || undefined,
+        branch_name: isCash ? undefined : newAcc.branch_name.trim() || undefined,
       });
       if (created) {
         await loadAccounts();
         setActiveAccountId(created.id);
       }
       setShowAddAccount(false);
-      setNewAccName(''); setNewAccBank(''); setNewAccOpening(''); setNewAccType('Corporate');
+      setNewAcc(emptyNewAccount);
     } catch (e: any) {
       alert(`创建账户失败：${e?.message || '未知错误'}`);
     } finally {
@@ -451,9 +473,9 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
       )}
 
       {showAddAccount && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xl z-[6000] flex items-center justify-center p-8">
-          <div className="bg-white p-10 rounded-[40px] shadow-2xl max-w-md w-full relative">
-            <button onClick={() => setShowAddAccount(false)} className="absolute top-6 right-6 text-gray-300 hover:text-gray-600">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xl z-[6000] flex items-center justify-center p-8 overflow-y-auto">
+          <div className="bg-white p-10 rounded-[40px] shadow-2xl max-w-md w-full relative my-8">
+            <button onClick={() => { setShowAddAccount(false); setNewAcc(emptyNewAccount); }} className="absolute top-6 right-6 text-gray-300 hover:text-gray-600">
               <X className="w-5 h-5" />
             </button>
             <h3 className="text-sm font-black text-[#080D1E] uppercase tracking-[0.2em] mb-8">新增银行账户</h3>
@@ -464,16 +486,30 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                   type="text"
                   className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
                   placeholder="e.g. Emirates NBD - GCI Trading"
-                  value={newAccName}
-                  onChange={e => setNewAccName(e.target.value)}
+                  value={newAcc.account_name}
+                  onChange={e => setNewAccField('account_name', e.target.value)}
                 />
               </div>
+
+              {newAcc.account_type !== 'Cash' && (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">账户持有人</label>
+                  <input
+                    type="text"
+                    className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                    placeholder="e.g. Globalcare Info General Trading FZCO"
+                    value={newAcc.account_holder_name}
+                    onChange={e => setNewAccField('account_holder_name', e.target.value)}
+                  />
+                </div>
+              )}
+
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">账户类型</label>
                 <select
                   className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
-                  value={newAccType}
-                  onChange={e => setNewAccType(e.target.value as BankAccount['account_type'])}
+                  value={newAcc.account_type}
+                  onChange={e => setNewAccField('account_type', e.target.value)}
                 >
                   <option value="Corporate">Corporate (对公)</option>
                   <option value="Personal">Personal (对私)</option>
@@ -481,32 +517,98 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                   <option value="Other">Other</option>
                 </select>
               </div>
-              {newAccType !== 'Cash' && (
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">银行名称</label>
-                  <input
-                    type="text"
-                    className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
-                    placeholder="e.g. Emirates NBD"
-                    value={newAccBank}
-                    onChange={e => setNewAccBank(e.target.value)}
-                  />
-                </div>
+
+              {newAcc.account_type !== 'Cash' && (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">银行名称</label>
+                    <input
+                      type="text"
+                      className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                      placeholder="e.g. WIO Bank PJSC"
+                      value={newAcc.bank_name}
+                      onChange={e => setNewAccField('bank_name', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Account Number / 账号</label>
+                    <input
+                      type="text"
+                      className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono"
+                      value={newAcc.account_number}
+                      onChange={e => setNewAccField('account_number', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">IBAN</label>
+                    <input
+                      type="text"
+                      className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono"
+                      value={newAcc.iban}
+                      onChange={e => setNewAccField('iban', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">SWIFT / BIC</label>
+                    <input
+                      type="text"
+                      className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono"
+                      value={newAcc.swift_bic}
+                      onChange={e => setNewAccField('swift_bic', e.target.value)}
+                    />
+                  </div>
+                </>
               )}
+
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">期初余额（可选，默认 0）</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Currency</label>
+                <input
+                  type="text"
+                  className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                  placeholder="AED"
+                  value={newAcc.currency}
+                  onChange={e => setNewAccField('currency', e.target.value.toUpperCase())}
+                />
+              </div>
+
+              {newAcc.account_type !== 'Cash' && (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Bank Address</label>
+                    <input
+                      type="text"
+                      className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                      value={newAcc.bank_address}
+                      onChange={e => setNewAccField('bank_address', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Branch</label>
+                    <input
+                      type="text"
+                      className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                      value={newAcc.branch_name}
+                      onChange={e => setNewAccField('branch_name', e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Opening Balance（可选，默认 0）</label>
                 <input
                   type="number"
                   step="0.01"
                   className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono"
                   placeholder="0.00"
-                  value={newAccOpening}
-                  onChange={e => setNewAccOpening(e.target.value)}
+                  value={newAcc.opening_balance}
+                  onChange={e => setNewAccField('opening_balance', e.target.value)}
                 />
               </div>
+
               <button
                 onClick={handleCreateAccount}
-                disabled={!newAccName.trim() || savingAccount}
+                disabled={!newAcc.account_name.trim() || savingAccount}
                 className="w-full py-4 rounded-[20px] bg-[#080D1E] text-white font-black text-[10px] uppercase disabled:opacity-40"
               >
                 {savingAccount ? '创建中...' : '创建账户'}
