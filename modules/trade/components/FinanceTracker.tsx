@@ -15,6 +15,13 @@ import {
   bankTransferEligible, type PaymentMethodFormValue,
 } from './PaymentMethodFields';
 import { useAuth } from '../../../apps/shell/src/contexts/AuthContext';
+import { CustomerProjectSelector, emptyCustomerProjectSelection, type CustomerProjectSelection } from '../../../apps/shell/src/components/CustomerProjectSelector';
+import { listSuppliers } from '../../suppliers/lib/suppliersCloud';
+import type { Supplier } from '../../suppliers/types';
+import {
+  INCOME_CATEGORIES, MANUAL_EXPENSE_CATEGORIES, NON_OPERATING_INFLOW_CATEGORIES, TRANSFER_CATEGORIES,
+  isIncomeCategory, isTransferCategory, classifyTransaction,
+} from '../services/transactionCategories';
 import type { TransactionRecord, BankAccount } from '../types';
 
 /** Finance V1 (2026-09) — a cheque only counts toward any account's balance
@@ -54,6 +61,20 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
   // correctly while the form is still being filled in. addTransaction()
   // cross-checks this against whichever button is actually clicked.
   const [chequeDirection, setChequeDirection] = useState<'in' | 'out'>('in');
+
+  // Finance Reporting V1 (2026-09-15) — manual entry now requires a
+  // category (income list while about to click Income, expense list while
+  // about to click Expense — the same "which button, which rules apply"
+  // pattern chequeDirection already uses above) and optionally links to a
+  // real customer/project or supplier. Never both at once — a manual entry
+  // is either sales-adjacent or supplier-adjacent, not both.
+  const [category, setCategory] = useState('');
+  const [subcategory, setSubcategory] = useState('');
+  const [linkMode, setLinkMode] = useState<'none' | 'customer' | 'supplier'>('none');
+  const [cpSelection, setCpSelection] = useState<CustomerProjectSelection>(emptyCustomerProjectSelection());
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierQuery, setSupplierQuery] = useState('');
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
 
   const [showAddAccount, setShowAddAccount] = useState(false);
   const emptyNewAccount = {
@@ -145,7 +166,14 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
       await Promise.all([loadAccounts(), loadTransactions()]);
       setLoading(false);
     })();
+    listSuppliers({ limit: 300 }).then(setSuppliers).catch(() => setSuppliers([]));
   }, []);
+
+  const filteredSuppliers = useMemo(() => {
+    if (!supplierQuery.trim()) return suppliers.slice(0, 20);
+    const q = supplierQuery.trim().toLowerCase();
+    return suppliers.filter(s => s.supplier_name_display?.toLowerCase().includes(q)).slice(0, 20);
+  }, [suppliers, supplierQuery]);
 
   if (!can('finance')) {
     return (
@@ -219,6 +247,21 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
   const addTransaction = async (type: 'in' | 'out') => {
     if (!note.trim() || !amount || Number(amount) <= 0) return;
 
+    // Finance Reporting V1 (2026-09-15) — category is required, and must
+    // match the button actually clicked (an Income category can't be
+    // submitted via the Expense button and vice versa) — same
+    // cross-check pattern as the CHEQUE direction guard right below.
+    if (!category) { alert('⚠️ 请选择分类 Category。'); return; }
+    // INTERNAL_TRANSFER is the one bidirectional category (2026-09-15) —
+    // a transfer between the company's own accounts is recorded as two
+    // ordinary manual entries, one 'out' on the source account and one
+    // 'in' on the destination account, both tagged INTERNAL_TRANSFER — so
+    // it skips the normal income/expense direction cross-check entirely.
+    if (!isTransferCategory(category) && isIncomeCategory(category) !== (type === 'in')) {
+      alert(`⚠️ 「${category}」是${isIncomeCategory(category) ? '收入' : '支出'}分类，请点击对应的 ${isIncomeCategory(category) ? 'Income' : 'Expense'} 按钮提交。`);
+      return;
+    }
+
     // A CHEQUE's direction was already declared while filling in the form
     // (it decides Deposited To vs Issued From) — the clicked button must
     // agree, or the record would end up with the wrong cheque fields.
@@ -247,6 +290,14 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
       amount: roundTo2(Number(amount)),
       ref_type: 'MANUAL',
       userId: 'Admin',
+      category,
+      subcategory: subcategory.trim() || undefined,
+      source_module: 'FINANCE_MANUAL',
+      customer_id: linkMode === 'customer' ? cpSelection.customerId || undefined : undefined,
+      project_id: linkMode === 'customer' ? cpSelection.projectId || undefined : undefined,
+      customer: linkMode === 'customer' ? cpSelection.customerName || undefined : undefined,
+      supplier_id: linkMode === 'supplier' ? selectedSupplier?.id || undefined : undefined,
+      supplier: linkMode === 'supplier' ? selectedSupplier?.supplier_name_display || undefined : undefined,
       ...paymentFields,
     };
 
@@ -267,6 +318,12 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
     setDate(new Date().toISOString().split('T')[0]);
     setPaymentMethodValue(emptyPaymentMethodValue());
     setChequeDirection('in');
+    setCategory('');
+    setSubcategory('');
+    setLinkMode('none');
+    setCpSelection(emptyCustomerProjectSelection());
+    setSelectedSupplier(null);
+    setSupplierQuery('');
   };
 
   // Finance V1 (2026-09): 'in' cheques ask for a deposit account at
@@ -598,6 +655,97 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                 </div>
 
                 <div className="space-y-5">
+                  {/* Finance Reporting V1 (2026-09-15) — category decides
+                      which report bucket this manual entry lands in
+                      (income/expense breakdown, customer/supplier ranking).
+                      Required; the list shown here is neutral (both income
+                      and expense options together, grouped) since the form
+                      doesn't know Income vs Expense until the user clicks
+                      one of the two submit buttons below — addTransaction()
+                      cross-checks the pick against whichever was clicked. */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Category / 分类 *</label>
+                    <select
+                      className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700"
+                      value={category}
+                      onChange={e => setCategory(e.target.value)}
+                    >
+                      <option value="">选择分类…</option>
+                      <optgroup label="收入 Income">
+                        {INCOME_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      </optgroup>
+                      <optgroup label="非经营流入 Non-Operating（仅 Income 按钮）">
+                        {NON_OPERATING_INFLOW_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      </optgroup>
+                      <optgroup label="转账 Transfer（Income/Expense 均可）">
+                        {TRANSFER_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      </optgroup>
+                      <optgroup label="支出 Expense">
+                        {MANUAL_EXPENSE_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      </optgroup>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Subcategory / 子分类（可选）</label>
+                    <input
+                      type="text"
+                      className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                      value={subcategory}
+                      onChange={e => setSubcategory(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Optional relation — either a real customer/project or a
+                      real supplier, never both (a manual entry is either
+                      sales-adjacent or supplier-adjacent). */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">关联 Link（可选）</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['none', 'customer', 'supplier'] as const).map(m => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setLinkMode(m)}
+                          className={`p-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${linkMode === m ? 'bg-[#080D1E] text-white' : 'bg-gray-100 text-gray-400'}`}
+                        >
+                          {m === 'none' ? '不关联' : m === 'customer' ? '客户/项目' : '供应商'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {linkMode === 'customer' && (
+                    <CustomerProjectSelector value={cpSelection} onChange={setCpSelection} />
+                  )}
+
+                  {linkMode === 'supplier' && (
+                    <div className="space-y-1.5 relative">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Supplier / 供应商</label>
+                      <input
+                        type="text"
+                        className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                        placeholder="搜索供应商名称…"
+                        value={selectedSupplier ? selectedSupplier.supplier_name_display : supplierQuery}
+                        onChange={e => { setSupplierQuery(e.target.value); setSelectedSupplier(null); }}
+                      />
+                      {!selectedSupplier && supplierQuery.trim() && filteredSuppliers.length > 0 && (
+                        <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl">
+                          {filteredSuppliers.map(s => (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => { setSelectedSupplier(s); setSupplierQuery(''); }}
+                              className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-50 last:border-0 text-sm font-bold text-gray-700"
+                            >
+                              {s.supplier_name_display}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Finance V1 (2026-09): payment method now decides which
                       account the entry lands on — CASH auto-resolves,
                       BANK_TRANSFER/CHEQUE ask explicitly. Replaces the old
@@ -677,14 +825,14 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                   <div className="grid grid-cols-2 gap-4 pt-4">
                     <button
                       onClick={() => addTransaction('in')}
-                      disabled={!note || !amount}
+                      disabled={!note || !amount || !category}
                       className="flex items-center justify-center gap-2 p-4 rounded-xl bg-[#3F7D58] text-white hover:bg-[#2d5c40] shadow-lg font-black uppercase text-xs tracking-widest disabled:opacity-40"
                     >
                       <TrendingUp className="w-4 h-4" /> Income
                     </button>
                     <button
                       onClick={() => addTransaction('out')}
-                      disabled={!note || !amount}
+                      disabled={!note || !amount || !category}
                       className="flex items-center justify-center gap-2 p-4 rounded-xl bg-[#A85D45] text-white hover:bg-[#8b4c37] shadow-lg font-black uppercase text-xs tracking-widest disabled:opacity-40"
                     >
                       <TrendingDown className="w-4 h-4" /> Expense
@@ -723,6 +871,9 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                           <div className="flex items-center gap-3">
                             <div className={`w-2 h-2 rounded-full ${t.type === 'in' ? 'bg-[#6FBF8E]' : 'bg-[#E0846A]'}`} />
                             <span className="text-sm font-bold text-gray-700 uppercase">{t.note}</span>
+                            {classifyTransaction(t) && (
+                              <span className="text-[8px] px-2 py-0.5 rounded-full bg-[#080D1E]/5 text-[#080D1E] font-black uppercase">{classifyTransaction(t)}</span>
+                            )}
                             {t.ref_type && t.ref_type !== 'MANUAL' && (
                               <span className="text-[8px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 font-black uppercase">{t.ref_type}</span>
                             )}

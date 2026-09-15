@@ -1038,6 +1038,11 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
       // entry point so the two don't drift into different formats again.
       customer_id: selectedOrder.crmCustomerId,
       project_id: selectedOrder.crmProjectId,
+      // Finance Reporting V1 (2026-09-15) — see recordPayment()'s newTxn
+      // above; consignment settlements are always CONSIGNMENT_REVENUE
+      // regardless of project_id.
+      category: 'CONSIGNMENT_REVENUE',
+      source_module: 'TRADE_CONSIGNMENT',
       note: finalMemo,
       userId: currentUserId,
       ...settlementPaymentFields,
@@ -1301,6 +1306,12 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
       // stays undefined here too, on purpose.
       customer_id: targetOrder.crmCustomerId,
       project_id: targetOrder.crmProjectId,
+      // Finance Reporting V1 (2026-09-15) — auto income classification: a
+      // project-linked order is PROJECT_REVENUE, everything else is plain
+      // SALES_REVENUE. See transactionCategories.classifyTransaction() for
+      // the same rule applied to older rows that don't have this stamped.
+      category: targetOrder.crmProjectId ? 'PROJECT_REVENUE' : 'SALES_REVENUE',
+      source_module: 'TRADE_ORDER',
       note: newPayment.note || 'Payment received',
       userId: currentUserId,
       ...paymentFields,

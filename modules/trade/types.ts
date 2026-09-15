@@ -173,6 +173,23 @@ export interface TransactionRecord {
    * payments against orders that predate this round. */
   customer_id?: string;
   project_id?: string;
+  /** Finance Reporting V1 (2026-09-15) — see
+   * modules/trade/services/transactionCategories.ts. category/subcategory
+   * are stamped at write time for rows the frontend writes; rows that don't
+   * carry one yet (pre-this-round history, and supplier-payment rows
+   * written by the create_supplier_payment() RPC) are classified at
+   * report-render time by classifyTransaction() instead — never guessed
+   * from `note`/`customer`/`supplier` text. */
+  category?: string;
+  subcategory?: string;
+  /** Which module produced this row — informational only, not used for any
+   * balance/report math (ref_type already drives classification). */
+  source_module?: string;
+  /** Real FK to suppliers.id — set alongside `supplier` (display snapshot)
+   * when a manual expense entry is linked to a real supplier. Supplier
+   * Payment rows already carry their own `ref_id` -> supplier_payments.id
+   * -> supplier_id chain instead of duplicating it here. */
+  supplier_id?: string;
   // Finance V1 payment method fields (2026-09) — see PaymentMethod above.
   payment_method?: PaymentMethod;
   cheque_number?: string;

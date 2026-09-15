@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutGrid, Landmark, ArrowLeftRight, Building2, Wallet, FileStack, Receipt } from 'lucide-react';
+import { LayoutGrid, Landmark, ArrowLeftRight, FileStack, Receipt } from 'lucide-react';
 import { colors } from '@gci/design-system';
 import FinanceTracker from './FinanceTracker';
 import CashFlowDashboard from './CashFlowDashboard';
 import AccountsPayable from './AccountsPayable';
+import FinanceReportingOverview from './FinanceReportingOverview';
 import { InvoicePage } from '../../../apps/shell/src/pages/InvoicePage';
-import { bankAccountsService } from '../services/bankAccountsService';
-import type { BankAccount } from '../types';
 
 /**
  * Finance Center (2026-09) — single entry point replacing the old two
@@ -35,59 +34,6 @@ const SUB_TABS: { id: FinanceSubTab; label: string; icon: React.ElementType }[] 
   { id: 'ap', label: '应付账款', icon: FileStack },
   { id: 'invoice', label: '发票管理', icon: Receipt },
 ];
-
-function FinanceOverview({ onNavigate }: { onNavigate: (tab: FinanceSubTab) => void }) {
-  const [accounts, setAccounts] = useState<BankAccount[] | null>(null);
-
-  useEffect(() => {
-    bankAccountsService.list().then(setAccounts).catch(() => setAccounts([]));
-  }, []);
-
-  const corporateCount = accounts?.filter(a => a.account_type === 'Corporate').length ?? 0;
-  const cashCount = accounts?.filter(a => a.account_type === 'Cash').length ?? 0;
-
-  return (
-    <div className="flex flex-col gap-6 animate-in fade-in duration-500">
-      <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>财务总览</h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <button
-          onClick={() => onNavigate('accounts')}
-          className="text-left bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm hover:shadow-xl hover:border-[#CBA85C] transition-all group"
-        >
-          <div className="flex items-start justify-between mb-6">
-            <div className="p-4 rounded-2xl bg-[#080D1E]/5 text-[#080D1E] group-hover:bg-[#CBA85C]/10 group-hover:text-[#CBA85C] transition-all">
-              <Landmark className="w-7 h-7" />
-            </div>
-          </div>
-          <h3 className="text-lg font-black text-gray-800 mb-1">银行账户 / Bank Accounts</h3>
-          <p className="text-xs text-gray-400 mb-4">管理对公/对私/现金账户、记流水、导出银行信息 PDF</p>
-          <div className="flex items-center gap-4 text-[11px] font-black text-gray-500 uppercase tracking-widest">
-            <span className="flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5" /> {accounts === null ? '…' : corporateCount} Corporate</span>
-            <span className="flex items-center gap-1.5"><Wallet className="w-3.5 h-3.5" /> {accounts === null ? '…' : cashCount} Cash</span>
-          </div>
-        </button>
-
-        <button
-          onClick={() => onNavigate('cashflow')}
-          className="text-left bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm hover:shadow-xl hover:border-[#CBA85C] transition-all group"
-        >
-          <div className="flex items-start justify-between mb-6">
-            <div className="p-4 rounded-2xl bg-[#080D1E]/5 text-[#080D1E] group-hover:bg-[#CBA85C]/10 group-hover:text-[#CBA85C] transition-all">
-              <ArrowLeftRight className="w-7 h-7" />
-            </div>
-          </div>
-          <h3 className="text-lg font-black text-gray-800 mb-1">资金流水 / Cash Flow</h3>
-          <p className="text-xs text-gray-400 mb-4">按日/月查看订单收款、代销结算、冲账的汇总流水</p>
-        </button>
-      </div>
-
-      <div className="flex items-center gap-3 text-gray-300 py-6 justify-center">
-        <span className="text-[10px] font-black uppercase tracking-widest">点上面的卡片，或用顶部的 Tab 切换</span>
-      </div>
-    </div>
-  );
-}
 
 export default function FinanceCenter({ initialSubTab }: FinanceCenterProps) {
   const [activeSubTab, setActiveSubTab] = useState<FinanceSubTab>(initialSubTab || 'overview');
@@ -122,7 +68,7 @@ export default function FinanceCenter({ initialSubTab }: FinanceCenterProps) {
         })}
       </div>
 
-      {activeSubTab === 'overview' && <FinanceOverview onNavigate={setActiveSubTab} />}
+      {activeSubTab === 'overview' && <FinanceReportingOverview />}
       {activeSubTab === 'accounts' && <FinanceTracker onCancel={() => setActiveSubTab('overview')} />}
       {activeSubTab === 'cashflow' && <CashFlowDashboard />}
       {activeSubTab === 'ap' && <AccountsPayable />}
