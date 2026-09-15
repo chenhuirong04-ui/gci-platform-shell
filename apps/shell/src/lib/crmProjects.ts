@@ -54,6 +54,23 @@ export async function listContactsForCustomer(customerId: string): Promise<CrmCo
   return (data ?? []) as CrmContact[];
 }
 
+/** Finance Profitability V1 (2026-09-15) — every non-cancelled project
+ * across all customers, for resolving a transaction's project_id to a real
+ * project_name/customer_id (never guessed from any snapshot text). */
+export async function listAllProjects(): Promise<CrmProject[]> {
+  const { data, error } = await supabase
+    .from('crm_projects')
+    .select('*')
+    .neq('status', 'cancelled')
+    .order('created_at', { ascending: false })
+    .limit(2000);
+  if (error) {
+    console.error('[crmProjects] listAllProjects failed:', error);
+    return [];
+  }
+  return (data ?? []) as CrmProject[];
+}
+
 export async function listProjectsForCustomer(customerId: string): Promise<CrmProject[]> {
   const { data, error } = await supabase
     .from('crm_projects')

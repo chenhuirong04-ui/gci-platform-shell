@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutGrid, Landmark, ArrowLeftRight, FileStack, Receipt } from 'lucide-react';
+import { LayoutGrid, Landmark, ArrowLeftRight, FileStack, Receipt, Layers, BookOpenCheck } from 'lucide-react';
 import { colors } from '@gci/design-system';
 import FinanceTracker from './FinanceTracker';
 import CashFlowDashboard from './CashFlowDashboard';
 import AccountsPayable from './AccountsPayable';
 import FinanceReportingOverview from './FinanceReportingOverview';
+import FinanceProfitability from './FinanceProfitability';
+import Bookkeeping from './Bookkeeping';
 import { InvoicePage } from '../../../apps/shell/src/pages/InvoicePage';
 
 /**
@@ -16,7 +18,7 @@ import { InvoicePage } from '../../../apps/shell/src/pages/InvoicePage';
  * and /trade?tab=cashflow deep links still resolve here.
  */
 
-export type FinanceSubTab = 'overview' | 'accounts' | 'cashflow' | 'ap' | 'invoice';
+export type FinanceSubTab = 'overview' | 'accounts' | 'cashflow' | 'ap' | 'invoice' | 'profitability' | 'bookkeeping';
 
 interface FinanceCenterProps {
   initialSubTab?: FinanceSubTab;
@@ -33,6 +35,8 @@ const SUB_TABS: { id: FinanceSubTab; label: string; icon: React.ElementType }[] 
   { id: 'cashflow', label: '资金流水', icon: ArrowLeftRight },
   { id: 'ap', label: '应付账款', icon: FileStack },
   { id: 'invoice', label: '发票管理', icon: Receipt },
+  { id: 'profitability', label: '项目与客户利润', icon: Layers },
+  { id: 'bookkeeping', label: '记账与对账', icon: BookOpenCheck },
 ];
 
 export default function FinanceCenter({ initialSubTab }: FinanceCenterProps) {
@@ -73,6 +77,8 @@ export default function FinanceCenter({ initialSubTab }: FinanceCenterProps) {
       {activeSubTab === 'cashflow' && <CashFlowDashboard />}
       {activeSubTab === 'ap' && <AccountsPayable />}
       {activeSubTab === 'invoice' && <InvoicePage />}
+      {activeSubTab === 'profitability' && <FinanceProfitability />}
+      {activeSubTab === 'bookkeeping' && <Bookkeeping />}
     </div>
   );
 }

@@ -190,6 +190,19 @@ export interface TransactionRecord {
    * Payment rows already carry their own `ref_id` -> supplier_payments.id
    * -> supplier_id chain instead of duplicating it here. */
   supplier_id?: string;
+  /** Bookkeeping & Reconciliation V1 (2026-09-15) — 'matched' when this row
+   * came from a confirmed bank statement line (银行对账), 'manual' when it
+   * came from Voucher Entry (凭证录入) or FinanceTracker's own Quick Entry,
+   * undefined for every row written before this round. Purely
+   * informational (which pipeline produced this row), not used in any
+   * balance/report math. */
+  reconciliation_status?: 'matched' | 'manual';
+  /** Evidence file (receipt/invoice/payment screenshot) carried over from
+   * whichever bookkeeping pipeline produced this row — path inside the
+   * private `finance-documents` Storage bucket, resolved to a signed URL
+   * on demand, never a public link. */
+  attachment_storage_path?: string;
+  attachment_file_name?: string;
   // Finance V1 payment method fields (2026-09) — see PaymentMethod above.
   payment_method?: PaymentMethod;
   cheque_number?: string;
@@ -281,4 +294,71 @@ export interface SupplierPayment {
   notes?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+/**
+ * Bookkeeping & Reconciliation V1 (2026-09-15) — real Postgres columns +
+ * RLS, same pattern as SupplierPayable/SupplierPayment. See
+ * supabase/migrations/20260915_finance_bookkeeping_v1.sql.
+ */
+export interface BankStatementImport {
+  id: string;
+  bank_account_id: string;
+  file_name: string;
+  storage_path: string;
+  /** SHA-256 of the file's bytes — UNIQUE(bank_account_id, file_hash) in the
+   * DB blocks re-importing the same statement against the same account. */
+  file_hash: string;
+  status: 'reviewing' | 'completed';
+  created_at?: string;
+}
+
+/** ai_suggested_* fields are read-only AI guidance — never written to
+ * `transactions` until a user confirms this line (see bookkeepingService.ts). */
+export interface BankStatementLine {
+  id: string;
+  import_id: string;
+  bank_account_id: string;
+  line_date: string | null;
+  direction: 'in' | 'out' | null;
+  amount: number;
+  bank_description: string;
+  ai_suggested_category?: string;
+  ai_suggested_customer_id?: string;
+  ai_suggested_supplier_id?: string;
+  ai_suggested_project_id?: string;
+  ai_confidence?: string;
+  storage_path?: string;
+  file_name?: string;
+  mime_type?: string;
+  status: 'pending' | 'confirmed' | 'matched' | 'ignored';
+  confirmed_transaction_ref?: string;
+  matched_transaction_ref?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface FinanceVoucher {
+  id: string;
+  storage_path: string;
+  file_name: string;
+  mime_type?: string;
+  payment_context: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE';
+  bank_account_id?: string;
+  purpose_note: string;
+  ai_date?: string;
+  ai_amount?: number;
+  ai_counterparty?: string;
+  ai_invoice_no?: string;
+  ai_vat_amount?: number;
+  ai_description?: string;
+  ai_suggested_category?: string;
+  ai_suggested_subcategory?: string;
+  ai_suggested_customer_id?: string;
+  ai_suggested_supplier_id?: string;
+  ai_suggested_project_id?: string;
+  status: 'pending' | 'confirmed';
+  resulting_transaction_ref?: string;
+  resulting_payable_id?: string;
+  created_at?: string;
 }
