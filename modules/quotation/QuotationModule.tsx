@@ -80,6 +80,7 @@ import { useI18n } from '@gci/i18n';
 import { StepIndicator } from './components/StepIndicator';
 import { TypeSelection, QuoteType } from './components/TypeSelection';
 import { CustomerProjectSelector, emptyCustomerProjectSelection, type CustomerProjectSelection } from '../../apps/shell/src/components/CustomerProjectSelector';
+import { SupplierSelector, emptySupplierSelection, type SupplierSelection } from '../../apps/shell/src/components/SupplierSelector';
 import { saveQuotation, updateQuotation, loadByQuoteNo, listQuotations, markSentToTrade, deleteQuotation, QuotationItem, QuotationRecord } from './lib/quotationCloud';
 import {
   saveSupplierQuote, listSupplierQuotes, loadSupplierQuote, markSupplierQuoteConverted,
@@ -266,6 +267,24 @@ interface PkgQuoteProject {
   sourceFileName: string;
   currency: string;
   packages: PkgQuoteGroup[];
+  /** Quotation Center master-data unification (2026-09-15) — real FKs
+   * alongside the display-name snapshots above (projectName/supplierName
+   * stay as-is for display/PDF; these are the real relation, when picked
+   * via CustomerProjectSelector/SupplierSelector instead of free text). No
+   * Supabase table backs Package Quote, so these are in-memory only for
+   * now — kept here rather than dropped so a future persistence round has
+   * them ready. */
+  customerId?: string;
+  projectId?: string;
+  supplierId?: string;
+  /** Quotation Center master-data unification (2026-09-15, second revision)
+   * — the real crm_customers snapshot, separate from `projectName` (which
+   * already holds the project — or customer, if no project — name).
+   * Phase 2 reads this directly for its Customer Information display/PDF
+   * instead of a second independently-editable free-text field, so the ID
+   * picked in Step 1 and whatever name ends up on the PDF can never drift
+   * apart. */
+  customerName?: string;
 }
 
 const SOFA_TYPES = [
@@ -320,6 +339,16 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     supplierName: '', supplierContact: '', category: '', currency: 'AED',
     quoteDate: new Date().toISOString().split('T')[0], validUntil: '',
   });
+  // Quotation Center master-data unification (2026-09-15) — real
+  // suppliers/crm_customers/crm_projects picks for Supplier Quote Step 1,
+  // replacing the old hand-typed supplierMeta.supplierName/supplierContact
+  // and quoteInfo.customerProjectName free-text fields. Supplier is
+  // required (search-and-pick only, no free text); customer/project stay
+  // an optional relation per spec. supplierMeta.supplierName/
+  // supplierContact are still written at save time as the display
+  // snapshot — never the primary relation anymore.
+  const [sqSupplierSelection, setSqSupplierSelection] = useState<SupplierSelection>(emptySupplierSelection());
+  const [sqCpSelection, setSqCpSelection] = useState<CustomerProjectSelection>(emptyCustomerProjectSelection());
   // Read URL params injected by DEAL (client, project, salesperson, businessId, returnUrl, quoteType, phone)
   const _urlParams = new URLSearchParams(window.location.search);
   const _clientParam = _urlParams.get('client') || '';
@@ -410,6 +439,14 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   const [pqParseError, setPqParseError] = useState<string>('');
   const [pqExpanded, setPqExpanded] = useState<Set<string>>(new Set());
   const [pqMeta, setPqMeta] = useState({ projectName: '', supplierName: '', currency: 'CNY' });
+  // Quotation Center master-data unification (2026-09-15) — real
+  // crm_customers/crm_projects/suppliers picks for Package Quote Step 1,
+  // replacing pqMeta.projectName/supplierName free text. Package Quote has
+  // no Supabase persistence at all (see PkgQuoteProject comment) — these
+  // selections just replace the old hand-typed strings as the source for
+  // pqProject.projectName/supplierName, never a second free-text path.
+  const [pqCpSelection, setPqCpSelection] = useState<CustomerProjectSelection>(emptyCustomerProjectSelection());
+  const [pqSupplierSelection, setPqSupplierSelection] = useState<SupplierSelection>(emptySupplierSelection());
   // Phase 2: GCI Package Quote Preview
   const [pqPhase, setPqPhase] = useState<'upload' | 'preview'>('upload');
   const [pqQuoteCurrency, setPqQuoteCurrency] = useState<'AED' | 'USD'>('AED');
@@ -422,8 +459,14 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   const updateItemEN = (id: string, field: keyof PqItemEN, val: string) =>
     setPqItemsEN(prev => ({ ...prev, [id]: { ...prev[id], [field]: val } }));
   const [pqSelectedPkgs, setPqSelectedPkgs] = useState<Set<string>>(new Set());
-  const [pqCustomer, setPqCustomer] = useState('');
-  const [pqProjectName, setPqProjectName] = useState('');
+  // Quotation Center master-data unification (2026-09-15, second revision)
+  // — pqCustomer/pqProjectName used to be independently-editable free text
+  // in Phase 2, seeded once from pqProject but then driftable away from
+  // the real customer_id/project_id picked in Step 1 (pqCustomer wasn't
+  // even seeded at all — always started blank). Removed: Phase 2 now reads
+  // pqProject.customerName/projectName directly (see renderPackageQuote),
+  // which are themselves only ever set from pqCpSelection at parse time —
+  // one source of truth, no second name a user could type over it with.
   const [pqQuoteNo, setPqQuoteNo] = useState(() => {
     const d = new Date();
     return `GCI-PQ-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}-${Math.floor(100+Math.random()*900)}`;
@@ -1275,11 +1318,15 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       console.log(`[parsePackageExcel] Parsed ${packages.length} packages`);
 
       setPqProject({
-        projectName: pqMeta.projectName || file.name.replace(/\.[^.]+$/, ''),
-        supplierName: pqMeta.supplierName,
+        projectName: (pqCpSelection.projectId ? pqCpSelection.projectName : pqCpSelection.customerName) || file.name.replace(/\.[^.]+$/, ''),
+        supplierName: pqSupplierSelection.supplierName,
         sourceFileName: file.name,
         currency: pqMeta.currency || 'CNY',
         packages,
+        customerId: pqCpSelection.customerId || undefined,
+        projectId: pqCpSelection.projectId || undefined,
+        supplierId: pqSupplierSelection.supplierId || undefined,
+        customerName: pqCpSelection.customerName || '',
       });
       setPqParseStatus('done');
     } catch (err) {
@@ -2214,13 +2261,13 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Project')}</label>
-                <input
-                  type="text"
-                  value={pqProjectName}
-                  onChange={e => setPqProjectName(e.target.value)}
-                  placeholder={t('Enter project name (English)')}
-                  className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-bold text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors placeholder:text-[#0C1B3A]/20"
-                />
+                {/* Quotation Center master-data unification (2026-09-15,
+                    second revision) — read-only, inherited from the real
+                    project/customer picked in Step 1. No longer a second
+                    free-text field a user could drift away from the ID. */}
+                <div className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-bold text-[#0C1B3A]/70 bg-[#0C1B3A]/3">
+                  {pqProject.projectName}
+                </div>
                 <p className="text-[11px] text-[#0C1B3A]/40 mt-1">{pqProject.supplierName}</p>
               </div>
               <div className="space-y-1">
@@ -2269,9 +2316,14 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Customer Name')}</label>
-                  <input type="text" value={pqCustomer} onChange={e => setPqCustomer(e.target.value)}
-                    placeholder="e.g. Al Futtaim Group"
-                    className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-bold text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors placeholder:text-[#0C1B3A]/20" />
+                  {/* Quotation Center master-data unification (2026-09-15,
+                      second revision) — read-only, inherited from the real
+                      customer picked in Step 1 (was never seeded before
+                      this fix — always started blank, disconnected from
+                      customer_id entirely). */}
+                  <div className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-bold text-[#0C1B3A]/70 bg-[#0C1B3A]/3">
+                    {pqProject.customerName || '—'}
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Quote Date')}</label>
@@ -2475,8 +2527,13 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             <button
               onClick={() => {
                 const selectedPkgs = pqProject.packages.filter(p => pqSelectedPkgs.has(p.id));
-                const safeProjectName = pqProjectName && !hasChinese(pqProjectName) ? pqProjectName : (pqProjectName ? 'Package Project' : 'Package Project');
-                generatePkgCustomerPdf({ ...pqProject, projectName: safeProjectName, packages: selectedPkgs }, pqMarkups, pqExchangeRate, pqQuoteCurrency, { customer: pqCustomer, quoteNo: pqQuoteNo, quoteDate: pqQuoteDate, validUntil: pqValidUntil, paymentTerms: pqPaymentTerms, deliveryTerms: pqDeliveryTerms });
+                // Quotation Center master-data unification (2026-09-15,
+                // second revision) — projectName/customerName now come
+                // straight off pqProject (the Step 1 snapshot), never a
+                // second independently-typed field. Same Chinese-in-PDF
+                // fallback as before, just sourced from the real snapshot.
+                const safeProjectName = pqProject.projectName && !hasChinese(pqProject.projectName) ? pqProject.projectName : 'Package Project';
+                generatePkgCustomerPdf({ ...pqProject, projectName: safeProjectName, packages: selectedPkgs }, pqMarkups, pqExchangeRate, pqQuoteCurrency, { customer: pqProject.customerName || '', quoteNo: pqQuoteNo, quoteDate: pqQuoteDate, validUntil: pqValidUntil, paymentTerms: pqPaymentTerms, deliveryTerms: pqDeliveryTerms });
               }}
               className="flex items-center gap-2 bg-[#0C1B3A] hover:bg-[#162a52] text-[#C9A84C] font-black text-[12px] uppercase tracking-widest px-6 py-3 rounded-2xl transition-all shadow-lg hover:shadow-xl active:scale-95"
             >
@@ -2517,29 +2574,20 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#C9A84C]">{t('Project · Package · Items')}</p>
           </div>
 
-          {/* Meta fields */}
-          <div className="bg-[#0C1B3A]/3 rounded-[24px] p-6 space-y-4">
+          {/* Meta fields — Quotation Center master-data unification
+              (2026-09-15): Customer/Project and Supplier are now real
+              crm_customers/crm_projects/suppliers picks, never hand-typed
+              names. Base Currency is unaffected. */}
+          <div className="bg-[#0C1B3A]/3 rounded-[24px] p-6 space-y-6">
             <h3 className="text-[11px] font-black uppercase tracking-[0.25em] text-[#0C1B3A]/50">{t('Project Info')}</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Project Name')}</label>
-                <input value={pqMeta.projectName} onChange={e => setPqMeta(p => ({ ...p, projectName: e.target.value }))}
-                  placeholder="e.g. Morocco Apartment"
-                  className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-medium text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Supplier Name')}</label>
-                <input value={pqMeta.supplierName} onChange={e => setPqMeta(p => ({ ...p, supplierName: e.target.value }))}
-                  placeholder="e.g. COOL HOME"
-                  className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-medium text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Base Currency')}</label>
-                <select value={pqMeta.currency} onChange={e => setPqMeta(p => ({ ...p, currency: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-medium text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors">
-                  {['CNY','AED','USD','EUR','GBP'].map(c => <option key={c}>{c}</option>)}
-                </select>
-              </div>
+            <CustomerProjectSelector value={pqCpSelection} onChange={setPqCpSelection} requireProject />
+            <SupplierSelector value={pqSupplierSelection} onChange={setPqSupplierSelection} />
+            <div className="max-w-xs space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Base Currency')}</label>
+              <select value={pqMeta.currency} onChange={e => setPqMeta(p => ({ ...p, currency: e.target.value }))}
+                className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-medium text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors">
+                {['CNY','AED','USD','EUR','GBP'].map(c => <option key={c}>{c}</option>)}
+              </select>
             </div>
           </div>
 
@@ -2737,7 +2785,6 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                 setPqPreviewExpanded(new Set());
                 // Default: all packages selected
                 setPqSelectedPkgs(new Set(pqProject?.packages.map(p => p.id) ?? []));
-                setPqProjectName(pqProject?.projectName ?? '');
                 // Auto-populate EN fields as initial suggestions (user can override)
                 const initEN: Record<string, PqItemEN> = {};
                 pqProject?.packages.forEach(pkg => {
@@ -2778,7 +2825,10 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
         <span className="text-[#C9A84C]">{t('Save Supplier Quote')}</span>
       </div>
 
-      {/* Supplier Metadata Form */}
+      {/* Supplier Metadata Form — Quotation Center master-data unification
+          (2026-09-15): Supplier is now a required search-and-pick against
+          real `suppliers`, never hand-typed. Selecting one auto-fills the
+          contact/WhatsApp/Email snapshot below from supplier_contacts. */}
       <div className="bg-white rounded-[28px] border border-[#0C1B3A]/8 p-8 shadow-sm">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#0C1B3A' }}>
@@ -2790,22 +2840,29 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {[
-            { key: 'supplierName', label: t('Supplier Name'), placeholder: t('e.g. ABC Trading Co.') },
-            { key: 'supplierContact', label: t('Contact'), placeholder: t('Name / WhatsApp / Email') },
-            { key: 'category', label: t('Category (business)'), placeholder: t('Furniture / Tissue / Building...') },
-          ].map(f => (
-            <div key={f.key}>
-              <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{f.label}</label>
-              <input
-                type="text"
-                value={(supplierMeta as any)[f.key]}
-                placeholder={f.placeholder}
-                onChange={e => setSupplierMeta(prev => ({ ...prev, [f.key]: e.target.value }))}
-                className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-4 py-2.5 text-[14px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C] transition-colors"
-              />
-            </div>
-          ))}
+          <div className="sm:col-span-2 lg:col-span-1">
+            <SupplierSelector
+              value={sqSupplierSelection}
+              onChange={next => {
+                setSqSupplierSelection(next);
+                setSupplierMeta(prev => ({
+                  ...prev,
+                  supplierName: next.supplierName,
+                  supplierContact: [next.contactName, next.whatsapp || next.phone, next.email].filter(Boolean).join(' / '),
+                }));
+              }}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{t('Category (business)')}</label>
+            <input
+              type="text"
+              value={supplierMeta.category}
+              placeholder={t('Furniture / Tissue / Building...')}
+              onChange={e => setSupplierMeta(prev => ({ ...prev, category: e.target.value }))}
+              className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-4 py-2.5 text-[14px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C] transition-colors"
+            />
+          </div>
           <div>
             <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{t('Currency')}</label>
             <select
@@ -2848,9 +2905,23 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             <p className="text-[11px] text-[#0C1B3A]/40">{t('GCI Quote Info Subtitle')}</p>
           </div>
         </div>
+        {/* Customer/Project — Quotation Center master-data unification
+            (2026-09-15): optional relation for a Supplier Quote (per spec —
+            not every supplier quote is tied to one specific deal yet), but
+            when set it's a real crm_customers/crm_projects pick, never a
+            hand-typed "Customer / Project" string. */}
+        <div className="mb-5">
+          <CustomerProjectSelector
+            value={sqCpSelection}
+            onChange={next => {
+              setSqCpSelection(next);
+              const combinedName = next.projectName ? `${next.customerName} / ${next.projectName}` : next.customerName;
+              setQuoteInfo(prev => ({ ...prev, customerProjectName: combinedName }));
+            }}
+          />
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {[
-            { key: 'customerProjectName', label: t('Customer / Project'), placeholder: 'e.g. Al Nahyan Villa FF&E' },
             { key: 'salesperson', label: t('Salesperson'), placeholder: 'e.g. Chris' },
             { key: 'phoneWhatsApp', label: t('Phone / WA'), placeholder: '+971 50 000 0000' },
           ].map(f => (
@@ -3315,6 +3386,12 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       const totalCost = draftItems.reduce((s, it) => s + it.targetUnitPrice * it.quantity, 0);
       const header: SupplierQuote = {
         supplier_quote_no: generateSupplierQuoteNo(),
+        // Quotation Center master-data unification (2026-09-15) — real FKs
+        // are the primary relation now; supplier_name/supplier_contact stay
+        // as the display snapshot (never re-derived by guessing a name).
+        supplier_id: sqSupplierSelection.supplierId || undefined,
+        customer_id: sqCpSelection.customerId || undefined,
+        project_id: sqCpSelection.projectId || undefined,
         supplier_name: supplierMeta.supplierName || '',
         supplier_contact: supplierMeta.supplierContact || '',
         category: supplierMeta.category || '',

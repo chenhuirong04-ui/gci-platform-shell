@@ -12,6 +12,16 @@ const SUPA_KEY =
 export interface SupplierQuote {
   id?: string;
   supplier_quote_no: string;
+  /** Quotation Center master-data unification (2026-09-15) — real FK to
+   * suppliers.id (column already existed on the table, added by
+   * 20260718_supplier_quotes_fk.sql — this interface just hadn't caught up
+   * yet). supplier_name/supplier_contact below stay as display snapshots,
+   * never the primary relation anymore. */
+  supplier_id?: string;
+  /** Optional relation — a Supplier Quote isn't always tied to one
+   * specific deal yet. See 20260915_supplier_quotes_customer_project.sql. */
+  customer_id?: string;
+  project_id?: string;
   supplier_name?: string;
   supplier_contact?: string;
   category?: string;
