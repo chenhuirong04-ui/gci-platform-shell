@@ -34,7 +34,10 @@ interface SidebarProps {
   /** WORKSPACE is always rendered as the first section, with its single
    * item styled as the permanent highlighted anchor (legacy navTop look). */
   navTop: NavTopItem;
-  workspaceLabel: string;
+  /** @deprecated Nav visual collapse (2026-09) — the "WORKSPACE" section
+   * header is no longer rendered. Kept optional so existing callers don't
+   * need to change; ignored if passed. */
+  workspaceLabel?: string;
   /** Remaining sections, rendered in order below WORKSPACE — SALES, SUPPLY
    * CHAIN, OPERATIONS, FINANCE, PLATFORM, etc. */
   sections: NavSection[];
@@ -120,7 +123,7 @@ function NavRow({ item }: { item: NavModItem }) {
   );
 }
 
-export function Sidebar({ navTop, workspaceLabel, sections, userName, userRole, visibleModules, onSignOut, footer, className, forceVisible }: SidebarProps) {
+export function Sidebar({ navTop, sections, userName, userRole, visibleModules, onSignOut, footer, className, forceVisible }: SidebarProps) {
   // When visibleModules is provided, filter nav items by module path prefix.
   // Items without a path (e.g. AI, Settings) are always shown.
   // Section headers are hidden when all their items are filtered out.
@@ -199,9 +202,6 @@ export function Sidebar({ navTop, workspaceLabel, sections, userName, userRole, 
         </div>
       </div>
 
-      <div className="font-mono-label" style={{ fontSize: 8.5, letterSpacing: '0.2em', color: '#4A5268', padding: '0 8px 8px' }}>
-        {workspaceLabel}
-      </div>
       <div
         className="nv flex items-center"
         onClick={navTop.onClick}
@@ -209,6 +209,7 @@ export function Sidebar({ navTop, workspaceLabel, sections, userName, userRole, 
           gap: 11,
           padding: '10px 11px',
           borderRadius: 10,
+          marginTop: 4,
           marginBottom: 3,
           ...(navTop.active !== false
             ? { background: 'rgba(203,168,92,0.10)', border: '1px solid rgba(203,168,92,0.28)' }
@@ -235,20 +236,26 @@ export function Sidebar({ navTop, workspaceLabel, sections, userName, userRole, 
         </span>
       </div>
 
-      {sections.map((section) => {
+      {/* Nav visual collapse (2026-09) — flat single-tier menu, no section
+          header text (WORKSPACE/SALES/SUPPLY/etc removed per instruction).
+          Grouping still comes from the same `sections` data (routes/order/
+          permission filter untouched) — only a bit of top spacing marks
+          where one group ends and the next begins, instead of a label.
+          The LAST section (设置/历史 AI 工具 in navigation.ts) gets
+          marginTop:'auto' so it — and the user card below it, which
+          already uses the same trick — sit pinned toward the bottom of
+          the sidebar rather than immediately following whatever group
+          happens to precede it. */}
+      {sections.map((section, idx) => {
         const visibleItems = section.items.filter(itemVisible);
         if (visibleItems.length === 0) return null;
+        const isLast = idx === sections.length - 1;
         return (
-          <div key={section.label}>
-            <div className="font-mono-label" style={{ fontSize: 8.5, letterSpacing: '0.2em', color: '#4A5268', padding: '16px 8px 8px' }}>
-              {section.label}
-            </div>
-            <nav>
-              {visibleItems.map((n) => (
-                <NavRow key={n.code} item={n} />
-              ))}
-            </nav>
-          </div>
+          <nav key={section.label} style={{ marginTop: isLast ? 'auto' : idx === 0 ? 0 : 14 }}>
+            {visibleItems.map((n) => (
+              <NavRow key={n.code} item={n} />
+            ))}
+          </nav>
         );
       })}
 
