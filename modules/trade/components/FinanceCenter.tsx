@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutGrid, Landmark, ArrowLeftRight, Building2, Wallet } from 'lucide-react';
+import { LayoutGrid, Landmark, ArrowLeftRight, Building2, Wallet, FileStack, Receipt } from 'lucide-react';
 import { colors } from '@gci/design-system';
 import FinanceTracker from './FinanceTracker';
 import CashFlowDashboard from './CashFlowDashboard';
+import AccountsPayable from './AccountsPayable';
+import { InvoicePage } from '../../../apps/shell/src/pages/InvoicePage';
 import { bankAccountsService } from '../services/bankAccountsService';
 import type { BankAccount } from '../types';
 
@@ -15,7 +17,7 @@ import type { BankAccount } from '../types';
  * and /trade?tab=cashflow deep links still resolve here.
  */
 
-export type FinanceSubTab = 'overview' | 'accounts' | 'cashflow';
+export type FinanceSubTab = 'overview' | 'accounts' | 'cashflow' | 'ap' | 'invoice';
 
 interface FinanceCenterProps {
   initialSubTab?: FinanceSubTab;
@@ -30,6 +32,8 @@ const SUB_TABS: { id: FinanceSubTab; label: string; icon: React.ElementType }[] 
   { id: 'overview', label: '财务总览', icon: LayoutGrid },
   { id: 'accounts', label: '银行账户', icon: Landmark },
   { id: 'cashflow', label: '资金流水', icon: ArrowLeftRight },
+  { id: 'ap', label: '应付账款', icon: FileStack },
+  { id: 'invoice', label: '发票管理', icon: Receipt },
 ];
 
 function FinanceOverview({ onNavigate }: { onNavigate: (tab: FinanceSubTab) => void }) {
@@ -121,6 +125,8 @@ export default function FinanceCenter({ initialSubTab }: FinanceCenterProps) {
       {activeSubTab === 'overview' && <FinanceOverview onNavigate={setActiveSubTab} />}
       {activeSubTab === 'accounts' && <FinanceTracker onCancel={() => setActiveSubTab('overview')} />}
       {activeSubTab === 'cashflow' && <CashFlowDashboard />}
+      {activeSubTab === 'ap' && <AccountsPayable />}
+      {activeSubTab === 'invoice' && <InvoicePage />}
     </div>
   );
 }

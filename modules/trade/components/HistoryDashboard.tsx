@@ -1033,6 +1033,11 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
       ref_type: 'CONSIGNMENT_SETTLEMENT',
       ref_id: newSettlement.id,
       customer: selectedOrder.customerName,
+      // Customer/Project Linking V1 (2026-09-15) — same inheritance as
+      // recordPayment() above, applied to the other order-linked payment
+      // entry point so the two don't drift into different formats again.
+      customer_id: selectedOrder.crmCustomerId,
+      project_id: selectedOrder.crmProjectId,
       note: finalMemo,
       userId: currentUserId,
       ...settlementPaymentFields,
@@ -1125,6 +1130,10 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
         createdAt: new Date().toISOString(),
         customerId: quote.customerId,
         customerName: quote.customerName,
+        // Customer/Project Linking V1 (2026-09-15) — inherited verbatim
+        // from the quote, never re-derived/guessed here.
+        crmCustomerId: quote.crmCustomerId,
+        crmProjectId: quote.crmProjectId,
         subtotal: roundTo2(quote.subtotal),
         vat: roundTo2(quote.vat),
         grandTotal: roundTo2(quote.grandTotal),
@@ -1286,6 +1295,12 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
       ref_type: 'ORDER_PAYMENT',
       ref_id: newPayment.id,
       customer: targetOrder.customerName,
+      // Customer/Project Linking V1 (2026-09-15) — inherited from the
+      // order, never guessed from the customer name. Undefined on orders
+      // that predate this round (targetOrder.crmCustomerId not set) —
+      // stays undefined here too, on purpose.
+      customer_id: targetOrder.crmCustomerId,
+      project_id: targetOrder.crmProjectId,
       note: newPayment.note || 'Payment received',
       userId: currentUserId,
       ...paymentFields,

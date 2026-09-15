@@ -22,8 +22,18 @@ export interface QuoteRecord {
   createdAt: string;
   userId: string;
   operatorName: string;
+  /** Legacy field — historically either a real-ish id or the literal
+   * constant "INTERNAL_ID" written by every PI save regardless of which
+   * customer was actually picked (see Customer/Project Linking V1 audit,
+   * 2026-09). Kept for backward compatibility, no longer written by new
+   * code (new saves leave it '') — crmCustomerId is the real relation now. */
   customerId: string;
   customerName: string;
+  /** Customer/Project Linking V1 (2026-09-15) — real FK to
+   * crm_customers.id / crm_projects.id. Undefined on any record created
+   * before this round (never backfilled by guessing). */
+  crmCustomerId?: string;
+  crmProjectId?: string;
   subtotal: number;
   vat: number;
   grandTotal: number;
@@ -50,8 +60,17 @@ export interface OrderRecord {
   id: string;
   quoteId: string;
   createdAt: string;
+  /** Legacy field — see QuoteRecord.customerId's doc comment; same
+   * history, same "stop writing INTERNAL_ID, crmCustomerId is real now"
+   * status. Orders inherit whatever their source quote had here. */
   customerId: string;
   customerName: string;
+  /** Customer/Project Linking V1 (2026-09-15) — inherited verbatim from
+   * the quote this order was converted from (convertQuoteToOrder). Real FK
+   * to crm_customers.id / crm_projects.id; undefined on pre-existing
+   * orders and never backfilled by guessing. */
+  crmCustomerId?: string;
+  crmProjectId?: string;
   subtotal: number;
   vat: number;
   grandTotal: number;
@@ -143,11 +162,17 @@ export interface TransactionRecord {
   amount: number;
   bank_account_id?: string;
   account?: 'Corporate' | 'Personal' | 'Cash' | 'Other'; // legacy label — display fallback only
-  ref_type?: 'MANUAL' | 'ORDER_PAYMENT' | 'SERVICE_PAYMENT' | 'ADJUSTMENT' | 'CONSIGNMENT_SETTLEMENT';
+  ref_type?: 'MANUAL' | 'ORDER_PAYMENT' | 'SERVICE_PAYMENT' | 'ADJUSTMENT' | 'CONSIGNMENT_SETTLEMENT' | 'SUPPLIER_PAYMENT';
   ref_id?: string;
   customer?: string;
   supplier?: string;
   userId?: string;
+  /** Customer/Project Linking V1 (2026-09-15) — real FK, inherited from
+   * order.crmCustomerId/order.crmProjectId at payment time (never guessed
+   * from `customer`, which stays a display-only snapshot). Undefined for
+   * payments against orders that predate this round. */
+  customer_id?: string;
+  project_id?: string;
   // Finance V1 payment method fields (2026-09) — see PaymentMethod above.
   payment_method?: PaymentMethod;
   cheque_number?: string;
@@ -186,6 +211,57 @@ export interface BankAccount {
   swift_bic?: string;
   bank_address?: string;
   branch_name?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Supplier AP V1 (2026-09) — real Postgres columns + RLS, same pattern as
+ * BankAccount (not the legacy {id,payload} wrapper tables). `status` is
+ * maintained by a DB trigger on supplier_payables (paid_amount vs amount)
+ * — never write it directly from the frontend, it will be overwritten.
+ * `outstanding_amount` is a GENERATED column, same reasoning.
+ */
+export interface SupplierPayable {
+  id: string;
+  supplier_id: string;
+  supplier_name: string;
+  source_type: 'MANUAL' | 'SUPPLIER_QUOTE';
+  source_id?: string;
+  reference_no?: string;
+  invoice_no?: string;
+  amount: number;
+  paid_amount: number;
+  outstanding_amount: number;
+  due_date?: string;
+  status: 'UNPAID' | 'PARTIAL' | 'PAID' | 'CANCELLED';
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * A real payment against a supplier (direction is always 'out' — see
+ * PaymentMethodFields). payable_id is optional: a payment doesn't have to
+ * be linked to a tracked payable.
+ */
+export interface SupplierPayment {
+  id: string;
+  supplier_id: string;
+  supplier_name: string;
+  payable_id?: string;
+  amount: number;
+  payment_date: string;
+  payment_method: PaymentMethod;
+  bank_account_id?: string;
+  issued_from_bank_account_id?: string;
+  cheque_number?: string;
+  cheque_date?: string;
+  cheque_bank?: string;
+  cheque_amount?: number;
+  cheque_status?: ChequeStatus;
+  reference_no?: string;
+  notes?: string;
   created_at?: string;
   updated_at?: string;
 }

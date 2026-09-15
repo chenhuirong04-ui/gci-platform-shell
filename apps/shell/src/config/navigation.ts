@@ -28,7 +28,8 @@ export interface ModuleDef {
     | 'invoiceManager'
     | 'aiAssistant'
     | 'settings'
-    | 'supplierLibrary';
+    | 'supplierLibrary'
+    | 'accessVault';
   count?: string;
   badgeColor?: string;
   badgeBg?: string;
@@ -38,24 +39,53 @@ export interface ModuleDef {
 
 export interface SectionDef {
   /** Key into dict.nav for the section header label. */
-  labelKey: 'salesSection' | 'supplyChainSection' | 'operationsSection' | 'financeSection' | 'platformSection';
+  labelKey: 'salesSection' | 'supplyChainSection' | 'businessServicesSection' | 'financeSection' | 'internalSection' | 'platformSection';
   items: ModuleDef[];
 }
 
-/** GCI Platform V2 information architecture — reorganized by business
- * function (SALES / SUPPLY CHAIN / OPERATIONS / FINANCE / PLATFORM) instead
- * of by legacy app (CRM / Trade / Quotation). Underlying data/APIs are
- * unchanged — items route into the same three modules via `?tab=`/`?mode=`
- * params the modules already read for deep-linking; this is a navigation
- * and grouping change only.
+/**
+ * GCI Platform IA — Nav consolidation V3 (2026-09-15): regrouped by
+ * business domain (SALES / SUPPLY / BUSINESS SERVICES / FINANCE / INTERNAL
+ * / SYSTEM) instead of by legacy app names. This round's change is
+ * INFORMATION ARCHITECTURE ONLY — no business component was touched,
+ * copied, or had its route removed. Every path below already existed
+ * before this round; only which section a row sits under, and the section
+ * header text, changed.
  *
- * Nav consolidation V1 (2026-09): Trade's own PI Quote / Quote History /
- * Inventory / Consignment / Stock Ledger rows were collapsed into a single
- * "Trade" entry (see the supplyChainSection comment below) — TradeModule's
- * own top tab strip is now the one place those live, instead of duplicating
- * them as flat sidebar rows too. "Stock Ledger" still has no real list view
- * of its own anywhere in Trade (pre-existing product gap, not a nav bug) —
- * its tab still just points at the closest existing screen (Inventory). */
+ * The previous grouping (V1/V2, comments preserved below on each item)
+ * had a "supplyChainSection" header literally labelled "TRADE · 贸易运营"
+ * that lumped Trade (TR), Supplier Library (VL), Quotation Center (QC) and
+ * Business Solutions (BS) together under one legacy-app-shaped title, even
+ * though QC is a Sales tool and BS is its own business line — exactly the
+ * "multiple old apps taped together" symptom this round removes. Fixed by:
+ *   - QC (报价中心) moved into SALES, next to CRM's own Sales rows.
+ *   - BS (企业解决方案) promoted to its own BUSINESS SERVICES section.
+ *   - supplyChainSection now holds only VL (供应商库) — matches its new
+ *     "SUPPLY" header; a future Purchase Order module goes here later,
+ *     per explicit instruction not to add that entry yet.
+ *   - TR (贸易运营 — Trade's own quoting/orders/inventory/consignment/
+ *     sales-history tabs) is placed in SALES: it IS the sales execution
+ *     tool (PI issuance, order fulfillment, sales dashboard), even though
+ *     it also touches inventory/consignment internally — those stay
+ *     reachable via Trade's own tab strip exactly as before, this only
+ *     decides which top-level section its ONE sidebar row lives under.
+ *     Flag this placement for review if a different bucket was intended;
+ *     it wasn't named explicitly in the requested section item lists.
+ *   - operationsSection renamed internalSection ("INTERNAL") — unchanged
+ *     contents (内部事项/公司文件), just the header text and key name.
+ *   - platformSection kept its key name, header text now "SYSTEM"
+ *     (设置 first, 历史 AI 工具/Legacy second — reordered to match).
+ *   - IV (发票管理) DROPPED from the sidebar — Invoice is now a FinanceCenter
+ *     internal tab (see modules/trade/components/FinanceCenter.tsx) instead
+ *     of its own top-level entry. The /invoice ROUTE itself is untouched
+ *     and still resolves (App.tsx keeps the <Route path="/invoice">), so
+ *     any existing bookmark/deep link to /invoice keeps working — it's
+ *     only no longer reachable via a dedicated sidebar row.
+ *
+ * WORKSPACE (每日工作台) is not a row in `sections` — it's the sidebar's
+ * separate `navTop` item (see apps/shell/src/App.tsx's `sidebarProps`),
+ * unchanged by this round.
+ */
 export const sections: SectionDef[] = [
   {
     labelKey: 'salesSection',
@@ -70,73 +100,94 @@ export const sections: SectionDef[] = [
       // internal tasks remain reachable via 业务总览 (BO, still /crm) —
       // this entry is customer-only now, matching what it's actually for.
       { code: 'CP', nameKey: 'customersAndProjects', path: '/crm-customers' },
+      // Nav consolidation V2 (2026-09) — Engineering/BOQ Quote, Supplier
+      // Quote, and Package Quote used to be three separate rows, all pointing
+      // into QuotationModule via ?mode= -- same "same page reachable several
+      // different ways" duplication Trade below also had. Collapsed into one
+      // "报价中心 / Quotation Center" entry; QuotationModule has a small
+      // always-visible tab strip (customer-quote/supplier-quote/package-quote
+      // only — not landing/service-quote) so users can move between the
+      // three without leaving the module. Defaults to customer-quote
+      // (工程/BOQ报价, the most-used one) rather than the existing 4-card
+      // `landing` picker, per explicit instruction — landing itself is
+      // untouched and still reachable from inside the module. All three old
+      // ?mode= deep links keep working unchanged.
+      { code: 'QC', nameKey: 'quotationCenter', count: '4', badgeColor: '#A89878', badgeBg: 'rgba(255,255,255,0.07)', path: '/quotation?mode=customer-quote' },
+      // Nav consolidation V1 (2026-09) — PI Quote / Quote History / Inventory
+      // / Consignment / Stock Ledger used to each get their own flat sidebar
+      // row, all five pointing into TradeModule via ?tab= — duplicating the
+      // tab strip TradeModule already has internally. Collapsed into one
+      // "Trade" entry (lands on TradeModule's own home dashboard); those
+      // five pages are still fully reachable via Trade's own top tab strip
+      // (see TradeModule.tsx) — unchanged by this round, only moved from
+      // the old mixed "TRADE · 贸易运营" section into SALES (see file header
+      // comment for why).
+      { code: 'TR', nameKey: 'tradeOps', path: '/trade' },
     ],
   },
   {
-    // Nav consolidation V1 (2026-09) — PI Quote / Quote History / Inventory /
-    // Consignment / Stock Ledger used to each get their own flat sidebar row,
-    // all five pointing into TradeModule via ?tab= -- duplicating the tab
-    // strip TradeModule already has internally. Collapsed into one "Trade"
-    // entry (lands on TradeModule's own home dashboard, not a specific tab);
-    // those five pages are still fully reachable, now via Trade's own top
-    // tab strip (see TradeModule.tsx). VL/BS are genuinely separate modules
-    // with no TradeModule equivalent, so they keep their own rows.
-    //
-    // Nav consolidation V2 (2026-09) — Engineering/BOQ Quote, Supplier
-    // Quote, and Package Quote used to be three separate rows, all pointing
-    // into QuotationModule via ?mode= -- same "same page reachable several
-    // different ways" duplication as Trade above, except here the three
-    // ?mode= values were already just one component's own internal appMode
-    // switch (QuotationModule.tsx), not three separate components. Collapsed
-    // into one "报价中心 / Quotation Center" entry; QuotationModule gained a
-    // small always-visible tab strip (customer-quote/supplier-quote/
-    // package-quote only — not landing/service-quote) so users can move
-    // between the three without leaving the module. Defaults to
-    // customer-quote (工程/BOQ报价, the most-used one) rather than the
-    // existing 4-card `landing` picker, per explicit instruction — landing
-    // itself is untouched and still reachable from inside the module.
-    // All three old ?mode= deep links keep working unchanged.
+    // SUPPLY — Nav consolidation V3 (2026-09-15): now holds only Supplier
+    // Library. A future Purchase Order / procurement module goes here
+    // later, per explicit instruction not to add that entry in this round.
     labelKey: 'supplyChainSection',
     items: [
-      { code: 'TR', nameKey: 'tradeOps', path: '/trade' },
       { code: 'VL', nameKey: 'supplierLibrary', path: '/suppliers' },
-      { code: 'QC', nameKey: 'quotationCenter', count: '4', badgeColor: '#A89878', badgeBg: 'rgba(255,255,255,0.07)', path: '/quotation?mode=customer-quote' },
-      { code: 'BS', nameKey: 'businessSolutions', path: '/business-solutions' },
     ],
   },
   {
-    // Inventory/Consignment/Stock Ledger moved here from OPERATIONS (Chris's
-    // call: they're one supply-chain flow, not internal execution). OPERATIONS
-    // now holds only internally-executed work -- Internal Tasks today,
-    // Delivery/Installation/Execution-type items later.
-    labelKey: 'operationsSection',
+    // BUSINESS SERVICES — split out of the old mixed "TRADE · 贸易运营"
+    // section (2026-09-15); Business Solutions was never actually a Trade
+    // sub-function, it's its own business line with no TradeModule
+    // equivalent, hence its own top-level section now.
+    labelKey: 'businessServicesSection',
     items: [
-      { code: 'IT', nameKey: 'internalTasks', path: '/crm?tab=internal' },
-      { code: 'CD', nameKey: 'companyDocuments', path: '/company-documents' },
+      { code: 'BS', nameKey: 'businessSolutions', path: '/business-solutions' },
     ],
   },
   {
     // Nav consolidation V2 (2026-09): 资金流水 (CH) and 财务账 (FL) used to
     // be two separate sidebar rows pointing at two separate TradeModule
-    // tabs. Collapsed into one "财务中心 / Finance" entry landing on a new
+    // tabs. Collapsed into one "财务中心 / Finance" entry landing on a
     // FinanceCenter hub (see modules/trade/components/FinanceCenter.tsx)
-    // with its own internal tab strip (总览/银行账户/资金流水) — same
-    // consolidation pattern already used for the "Trade" entry above.
-    // /trade?tab=cashflow and /trade?tab=finance keep working as deep
-    // links (TradeModule still resolves both, landing on the matching
-    // FinanceCenter sub-tab) — nothing that already links to either old
-    // path (AI capability map, action center, etc.) needed to change.
+    // with its own internal tab strip (总览/银行账户/资金流水/应付账款/
+    // 发票管理) — same consolidation pattern already used for the "Trade"
+    // entry above. /trade?tab=cashflow and /trade?tab=finance keep working
+    // as deep links (TradeModule still resolves both, landing on the
+    // matching FinanceCenter sub-tab) — nothing that already links to
+    // either old path needed to change.
+    //
+    // Nav consolidation V3 (2026-09-15): Invoice Manager's own sidebar row
+    // (IV) is gone — 发票管理 is now a FinanceCenter internal tab instead of
+    // a separate top-level entry (see FinanceCenter.tsx). The /invoice
+    // route itself is untouched and still resolves for any existing
+    // bookmark/deep link.
     labelKey: 'financeSection',
     items: [
       { code: 'FC', nameKey: 'financeCenter', path: '/trade?tab=finance-center' },
-      { code: 'IV', nameKey: 'invoiceManager', path: '/invoice' },
+    ],
+  },
+  {
+    // Renamed from operationsSection (2026-09-15) — contents unchanged
+    // (内部事项/公司文件), Inventory/Consignment/Stock Ledger were already
+    // moved out of here in an earlier round (see TR above, reachable via
+    // Trade's own tab strip). INTERNAL now holds only internally-executed
+    // company work, not supply-chain flow.
+    labelKey: 'internalSection',
+    items: [
+      { code: 'IT', nameKey: 'internalTasks', path: '/crm?tab=internal' },
+      { code: 'CD', nameKey: 'companyDocuments', path: '/company-documents' },
+      // Reserved (2026-09-15) — IA placeholder only, per explicit
+      // instruction: no page behind this yet, no path set (falls back to
+      // the sidebar's existing "coming soon" toast for path-less items).
+      // Do not build Access Vault itself this round.
+      { code: 'AV', nameKey: 'accessVault' },
     ],
   },
   {
     labelKey: 'platformSection',
     items: [
-      { code: 'AI', nameKey: 'aiAssistant', path: '/ai' },
       { code: 'ST', nameKey: 'settings' },
+      { code: 'AI', nameKey: 'aiAssistant', path: '/ai' },
     ],
   },
 ];

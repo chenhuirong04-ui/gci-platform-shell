@@ -18,6 +18,11 @@ export interface QuotationRecord {
   quote_no: string;
   customer_name?: string;
   project_name?: string;
+  /** Customer/Project Linking V1 (2026-09-15) — real FK to
+   * crm_customers.id / crm_projects.id. Undefined on records saved before
+   * this round; never backfilled by name-matching. */
+  customer_id?: string;
+  project_id?: string;
   deal_id?: string;
   salesperson?: string;
   phone_wa?: string;

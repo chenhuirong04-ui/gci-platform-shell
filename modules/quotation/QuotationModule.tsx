@@ -79,6 +79,7 @@ import { translations, Language } from './translations';
 import { useI18n } from '@gci/i18n';
 import { StepIndicator } from './components/StepIndicator';
 import { TypeSelection, QuoteType } from './components/TypeSelection';
+import { CustomerProjectSelector, emptyCustomerProjectSelection, type CustomerProjectSelection } from '../../apps/shell/src/components/CustomerProjectSelector';
 import { saveQuotation, updateQuotation, loadByQuoteNo, listQuotations, markSentToTrade, deleteQuotation, QuotationItem, QuotationRecord } from './lib/quotationCloud';
 import {
   saveSupplierQuote, listSupplierQuotes, loadSupplierQuote, markSupplierQuoteConverted,
@@ -479,8 +480,20 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     phoneWhatsApp: _phoneParam,        // pre-filled from DEAL ?phone= param
     salesperson: _salespersonParam,
     quoteNumber: '',
-    date: new Date().toISOString().split('T')[0]
+    date: new Date().toISOString().split('T')[0],
+    // Customer / Project Linking V1 (2026-09-15) — the real relational ids
+    // behind customerProjectName's display snapshot. customerProjectName/
+    // phoneWhatsApp stay as-is (every existing PDF/save/history usage keeps
+    // reading them unchanged) — these two are purely additive.
+    customerId: null as string | null,
+    projectId: null as string | null,
   });
+  // Drives <CustomerProjectSelector> — richer than quoteInfo needs (also
+  // carries contact name/email, and the customer/project display names
+  // separately) so the selector's own search/contact/project state has
+  // somewhere to live; every change here also mirrors the id/display
+  // fields back into quoteInfo via the selector's onChange below.
+  const [cpSelection, setCpSelection] = useState<CustomerProjectSelection>(emptyCustomerProjectSelection());
   const [quoteHistory, setQuoteHistory] = useState<QuoteRecord[]>([]);
   
   const STEPS = useMemo(() => {
@@ -707,8 +720,11 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       phoneWhatsApp: '',
       salesperson: prev.salesperson, // Keep salesperson
       quoteNumber: generateQuoteNumber(quoteHistory),
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split('T')[0],
+      customerId: null,
+      projectId: null,
     }));
+    setCpSelection(emptyCustomerProjectSelection());
   };
 
   const addToPackage = () => {
@@ -743,8 +759,14 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       phoneWhatsApp: quote.phoneWhatsApp || '',
       quoteNumber: quote.quoteNumber,
       salesperson: quote.salesperson,
-      date: quote.date
+      date: quote.date,
+      // Restored quotes predate Customer/Project Linking V1 — they never
+      // had a real customer_id/project_id, so these stay null rather than
+      // fabricating a link that was never actually selected.
+      customerId: null,
+      projectId: null,
     });
+    setCpSelection(emptyCustomerProjectSelection());
     setProjectInfoSubmitted(true);
     
     if (quote.category === FurnitureCategory.BED) setConfig(quote.config as BedConfiguration);
@@ -808,6 +830,12 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       quote_no: quoteNo,
       customer_name: quoteInfo.customerProjectName || '',
       project_name: quoteInfo.customerProjectName || '',
+      // Customer/Project Linking V1 (2026-09-15) — real FK into
+      // crm_customers/crm_projects, alongside the existing name snapshots
+      // above (kept, not replaced). Undefined when Step 1 wasn't completed
+      // through CustomerProjectSelector (e.g. old drafts) — never guessed.
+      customer_id: quoteInfo.customerId || undefined,
+      project_id: quoteInfo.projectId || undefined,
       deal_id: _businessIdParam || undefined,
       salesperson: quoteInfo.salesperson || '',
       phone_wa: quoteInfo.phoneWhatsApp || '',
@@ -892,14 +920,29 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
       const { record, items } = result;
 
-      // Restore quoteInfo
+      // Restore quoteInfo — quotation_records now carries real customer_id/
+      // project_id (Customer/Project Linking V1, 2026-09-15) for anything
+      // saved after this round; older records simply have them NULL, which
+      // restores to null here too (never guessed from the name snapshot).
       setQuoteInfo({
         customerProjectName: record.customer_name || '',
         phoneWhatsApp: record.phone_wa || '',
         salesperson: record.salesperson || '',
         quoteNumber: record.quote_no,
         date: record.quote_date || new Date().toISOString().split('T')[0],
+        customerId: record.customer_id || null,
+        projectId: record.project_id || null,
       });
+      setCpSelection(record.customer_id ? {
+        customerId: record.customer_id,
+        customerName: record.customer_name || '',
+        projectId: record.project_id || null,
+        projectName: record.project_name && record.project_id ? record.project_name : '',
+        contactName: '',
+        phone: record.phone_wa || '',
+        whatsapp: '',
+        email: '',
+      } : emptyCustomerProjectSelection());
 
       // Restore draftItems from saved items
       const restoredDraftItems = items.map(it => ({
@@ -3390,7 +3433,24 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   };
 
   // Handle 3-path type selection (Step 2)
+  //
+  // Customer/Project Linking V1 (2026-09-15): BOQ specifically ("BOQ 与
+  // AI 分析" — the literal BOQ/engineering-project path, distinct from
+  // 'trade'/'custom') requires a real project_id, per the confirmed rule
+  // (工程/BOQ 报价必须选择项目; 普通 Trade 报价允许为空). This is the
+  // deferred follow-up from the first BOQ integration round — Step 1 itself
+  // stays customer-required/project-optional for all three paths (it can't
+  // tell which path is coming yet), so the hard project gate has to live
+  // here, once the user has actually picked 'boq'.
   const handleTypeSelect = (type: QuoteType) => {
+    if (type === 'boq' && !quoteInfo.projectId) {
+      alert('⚠️ 工程 / BOQ 报价必须选择项目 / BOQ quotes require a project to be selected.');
+      // Send back to Step 1 — CustomerProjectSelector is right there to
+      // pick an existing project or Quick Create one; quoteType is never
+      // set, so nothing below this block runs for this click.
+      setProjectInfoSubmitted(false);
+      return;
+    }
     setQuoteType(type);
     if (type === 'trade') {
       // Trade & Sourcing: go directly to upload/AI parsing tab
@@ -3458,6 +3518,11 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       items: tradeItems,
       sourceApp: 'gci-living-engineering-studio',
       piType: 'PROJECT',
+      // Customer/Project Linking V1 (2026-09-15) — real ids alongside the
+      // existing name snapshots, so QuoteManager.tsx's inbound parser can
+      // save the actual relation instead of leaving it undefined.
+      crmCustomerId: quoteInfo.customerId || undefined,
+      crmProjectId: quoteInfo.projectId || undefined,
     };
 
     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
@@ -6002,28 +6067,54 @@ Leave a field as empty string if not present. Never fabricate values.`;
           <div className="absolute top-0 right-0 w-32 h-32 bg-brand-beige/20 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-1000" />
           <div className="absolute bottom-0 left-0 w-24 h-24 bg-brand-gold/5 rounded-full -ml-12 -mb-12" />
 
+          {/* Customer / Project Linking V1 (2026-09-15) — replaces the old
+              hand-typed "Customer / Project Name" free-text field. Search
+              and pick a real crm_customers row (Quick Create only once a
+              search genuinely finds nothing); project pick is available
+              here but not hard-required at this shared screen — it
+              precedes the BOQ-vs-Trade type choice below, so a hard
+              "project required" gate belongs one step later, on the BOQ
+              branch specifically (flagged as follow-up in the chat
+              report, not implemented in this round). */}
+          <div className="relative mb-12">
+            <CustomerProjectSelector
+              value={cpSelection}
+              onChange={(next) => {
+                setCpSelection(next);
+                const combinedName = next.projectName ? `${next.customerName} / ${next.projectName}` : next.customerName;
+                setQuoteInfo(prev => ({
+                  ...prev,
+                  customerProjectName: combinedName,
+                  phoneWhatsApp: next.whatsapp || next.phone || prev.phoneWhatsApp,
+                  customerId: next.customerId,
+                  projectId: next.projectId,
+                  // Auto-generate once a customer is first picked — never
+                  // overwrites a number already loaded from a saved draft.
+                  quoteNumber: prev.quoteNumber || (next.customerId ? `GCI-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(100 + Math.random()*900)}` : prev.quoteNumber),
+                }));
+                if (validationError) setValidationError('');
+              }}
+            />
+          </div>
+
           <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-x-16 gap-y-12">
-            {[
-              { key: 'customerProjectName', label: t('Customer / Project Name'), required: true, placeholder: t('Customer / Project Name') },
-              { key: 'phoneWhatsApp', label: t('Phone / WhatsApp'), placeholder: '+971 ...' },
+            {([
               { key: 'salesperson', label: t('Salesperson'), placeholder: t('Salesperson') },
               { key: 'quoteNumber', label: t('Quotation No.'), placeholder: 'Auto-generated' },
               { key: 'date', label: t('Date'), type: 'date' },
-            ].map(field => (
+            ] as const).map(field => (
               <div key={field.key} className="space-y-4 group/input">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-bold text-brand-brown-muted uppercase tracking-[0.2em] flex items-center gap-1.5 transition-colors group-focus-within/input:text-brand-gold">
                     {field.label}
-                    {field.required && <span className="text-brand-gold font-serif italic text-lg leading-none">*</span>}
                   </label>
                 </div>
                 <input
-                  type={field.type || 'text'}
-                  value={quoteInfo[field.key as keyof typeof quoteInfo]}
-                  placeholder={field.placeholder}
+                  type={('type' in field && field.type) || 'text'}
+                  value={quoteInfo[field.key]}
+                  placeholder={'placeholder' in field ? field.placeholder : undefined}
                   onChange={e => {
                     setQuoteInfo({...quoteInfo, [field.key]: e.target.value});
-                    if (field.required && validationError) setValidationError('');
                   }}
                   className="w-full bg-transparent border-b-2 border-brand-beige text-2xl font-serif italic text-brand-brown focus:border-brand-gold outline-none pb-4 transition-all duration-300 placeholder:text-brand-brown/10 selection:bg-brand-gold/20"
                 />
@@ -6050,7 +6141,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
           <div className="mt-20 flex justify-center">
             <button
               onClick={() => {
-                if (!quoteInfo.customerProjectName) {
+                if (!quoteInfo.customerId) {
                   setValidationError(t('Project name required'));
                   return;
                 }
@@ -6117,6 +6208,9 @@ Leave a field as empty string if not present. Never fabricate values.`;
         sourceApp: 'gci-living-engineering-studio',
         piType: 'PROJECT',
         notes: tradeTerms || undefined,
+        // Customer/Project Linking V1 (2026-09-15) — see sendToTrade() above.
+        crmCustomerId: quoteInfo.customerId || undefined,
+        crmProjectId: quoteInfo.projectId || undefined,
       };
       const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
       window.open(`https://trade.globalcareinfo.com/?inbound=${encoded}&tab=quote`, '_blank');
@@ -7744,7 +7838,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     <label className="text-[9px] font-bold text-brand-brown-muted uppercase tracking-[0.1em]">{field.label}</label>
                     <input 
                       type={field.type || 'text'}
-                      value={quoteInfo[field.key as keyof typeof quoteInfo]} 
+                      value={quoteInfo[field.key as keyof typeof quoteInfo] as string}
                       onChange={e => setQuoteInfo({...quoteInfo, [field.key]: e.target.value})}
                       className="w-full bg-transparent border-b border-brand-brown/10 py-1 text-sm font-medium focus:border-brand-gold outline-none"
                     />

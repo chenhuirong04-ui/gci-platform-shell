@@ -17,6 +17,11 @@ import { roundTo2, calculateTradeTotals } from '../services/currencyUtils';
 import { persistence } from '../services/persistenceService';
 import { exportElementToPdf } from '../services/pdfExport';
 import { colors } from '@gci/design-system';
+// Customer/Project Linking V1 (2026-09-15) — PI's customer picker now reads
+// crm_customers (the confirmed Source of Truth) instead of querying Notion
+// directly. getAllCustomerNames() already filters to is_active=true and
+// returns exactly the {id, customer_name} shape this dropdown needs.
+import { getAllCustomerNames } from '../../../apps/shell/src/lib/crmSupabase';
 
 // V2 baseline colors — used only in the editable workbench (dropdowns,
 // left input panel, Review & Edit Line Items modal). The live invoice
@@ -58,7 +63,12 @@ interface QuoteItem {
 const CustomerDropdown: React.FC<{
   options: { name: string; id: string }[];
   value: string;
-  onChange: (name: string) => void;
+  /** Customer/Project Linking V1 (2026-09-15): now passes the real
+   * crm_customers.id alongside the display name — this used to only pass
+   * the name, which is exactly how the real id got silently discarded on
+   * every PI save (see chat audit). id is '' when the typed text doesn't
+   * match any option (free-typed / not yet selected from the list). */
+  onChange: (name: string, id: string) => void;
 }> = ({ options, value, onChange }) => {
   const { dict } = useI18n();
   const t = dict.trade.pi;
@@ -81,13 +91,13 @@ const CustomerDropdown: React.FC<{
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const select = (name: string) => { onChange(name); setQ(name); setOpen(false); setHi(-1); };
+  const select = (opt: { name: string; id: string }) => { onChange(opt.name, opt.id); setQ(opt.name); setOpen(false); setHi(-1); };
 
   const handleKey = (e: React.KeyboardEvent) => {
     if (!open) { if (e.key === 'ArrowDown' || e.key === 'Enter') setOpen(true); return; }
     if (e.key === 'ArrowDown')     { e.preventDefault(); setHi(h => Math.min(h + 1, filtered.length - 1)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setHi(h => Math.max(h - 1, 0)); }
-    else if (e.key === 'Enter')   { if (hi >= 0 && filtered[hi]) select(filtered[hi].name); }
+    else if (e.key === 'Enter')   { if (hi >= 0 && filtered[hi]) select(filtered[hi]); }
     else if (e.key === 'Escape')  { setOpen(false); setQ(value); }
   };
 
@@ -108,7 +118,7 @@ const CustomerDropdown: React.FC<{
             <li
               key={o.id}
               className={`px-4 py-3 cursor-pointer text-sm font-bold uppercase ${i === hi ? 'bg-[#CBA85C]/15 text-[#8A6D2F]' : 'text-gray-700 hover:bg-gray-50'}`}
-              onMouseDown={() => select(o.name)}
+              onMouseDown={() => select(o)}
               onMouseEnter={() => setHi(i)}
             >{o.name}</li>
           ))}
@@ -213,6 +223,10 @@ const QuoteManager: React.FC = () => {
   const [inventoryData, setInventoryData] = useState<any[]>([]);
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [customerName, setCustomerName] = useState('');
+  // Customer/Project Linking V1 (2026-09-15) — the real crm_customers.id
+  // behind customerName's display snapshot. Empty until a real option is
+  // picked from CustomerDropdown (free-typed text never sets this).
+  const [crmCustomerId, setCrmCustomerId] = useState('');
   const [searchProduct, setSearchProduct] = useState('');
 
   // 付款条件与账期
@@ -254,6 +268,10 @@ const QuoteManager: React.FC = () => {
     sourceApp: string;
     piType: 'PROJECT' | 'NON_STOCK';
     notes?: string;
+    // Customer/Project Linking V1 (2026-09-15) — carried through from
+    // BOQ's ?inbound= payload alongside the existing name snapshots.
+    crmCustomerId?: string;
+    crmProjectId?: string;
   } | null>(null);
 
   const calculatedDueDate = useMemo(() => {
@@ -311,20 +329,25 @@ const QuoteManager: React.FC = () => {
         // Promise.allSettled: one failure never kills the others.
         // fetchWithTimeout (15 s) ensures no fetch hangs forever.
         const [custSettled, invSettled, masterSettled] = await Promise.allSettled([
-          callNotionPaged(CONFIG.DB.CUSTOMER),
+          // Customer/Project Linking V1 (2026-09-15): crm_customers is now
+          // the confirmed Source of Truth for the customer dropdown, not
+          // Notion's CONFIG.DB.CUSTOMER (see chat audit — the Notion page
+          // id fetched from there was never actually saved onto the quote
+          // anyway, only the display name was). getAllCustomerNames()
+          // already filters to is_active=true.
+          getAllCustomerNames(),
           callNotionPaged(CONFIG.DB.INVENTORY),
           callNotionPaged(CONFIG.DB.PRODUCT_MASTER),
         ]);
 
         // ── CUSTOMER dropdown ────────────────────────────────────────────────
-        if (custSettled.status === 'fulfilled') {
-          setCustomerOptions(custSettled.value.map((r: any) => ({
-            name: r.properties["Customer Name"]?.title?.[0]?.plain_text ||
-              r.properties["Customer Name"]?.rich_text?.[0]?.plain_text || "Unknown",
-            id: r.id
-          })));
+        if (custSettled.status === 'fulfilled' && custSettled.value.ok) {
+          setCustomerOptions(custSettled.value.rows.map(r => ({ name: r.customer_name, id: r.id })));
         } else {
-          console.error('[QuoteManager] CUSTOMER fetch failed:', custSettled.reason);
+          const reason = custSettled.status === 'rejected'
+            ? custSettled.reason
+            : (custSettled.value as { ok: false; error: string }).error;
+          console.error('[QuoteManager] crm_customers fetch failed:', reason);
           setCustError(true);
         }
 
@@ -393,6 +416,11 @@ const QuoteManager: React.FC = () => {
         sourceApp: data.sourceApp || 'gci-living-engineering-studio',
         piType: data.piType || 'PROJECT',
         notes: data.notes || undefined,
+        // Customer/Project Linking V1 (2026-09-15) — real ids, when the
+        // sending app included them (BOQ does as of this round; older
+        // senders like gci-living-engineering-studio may not yet).
+        crmCustomerId: data.crmCustomerId || undefined,
+        crmProjectId: data.crmProjectId || undefined,
       });
       setCustomerName(data.customerName || '');
       setDocDate(data.quoteDate || new Date().toISOString().split('T')[0]);
@@ -647,8 +675,15 @@ const QuoteManager: React.FC = () => {
         createdAt: new Date().toISOString(),
         userId: "Admin",
         operatorName: "Admin User",
-        customerId: "INTERNAL_ID",
+        // Customer/Project Linking V1 (2026-09-15): no longer the literal
+        // "INTERNAL_ID" constant — crmCustomerId below is the real relation.
+        // Left '' rather than removed, since the field itself is still
+        // required for backward compatibility with records that predate
+        // this round.
+        customerId: '',
         customerName: customerName || "Unknown Customer",
+        crmCustomerId: crmCustomerId || inboundPI?.crmCustomerId || undefined,
+        crmProjectId: inboundPI?.crmProjectId || undefined,
         subtotal,
         vat: vatAmount,
         grandTotal: total,
@@ -817,7 +852,7 @@ const QuoteManager: React.FC = () => {
           <CustomerDropdown
             options={customerOptions}
             value={customerName}
-            onChange={setCustomerName}
+            onChange={(name, id) => { setCustomerName(name); setCrmCustomerId(id); }}
           />
           {custError ? (
             <p className="mt-2 text-[13px] font-bold" style={{ color: colors.statusDanger }}>{t.custLoadFailed}</p>
