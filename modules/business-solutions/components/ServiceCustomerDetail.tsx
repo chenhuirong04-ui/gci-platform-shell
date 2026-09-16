@@ -14,6 +14,9 @@ interface Props {
   onNewQuote: () => void;
   onViewQuote: (q: ServiceQuote) => void;
   onClose: () => void;
+  onArchive: () => void;
+  onUnarchive: () => void;
+  onDelete: () => void;
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -37,10 +40,20 @@ type DetailTab = 'info' | 'service' | 'quotes' | 'documents' | 'compliance' | 'p
 
 export function ServiceCustomerDetail({
   lang, customer, quotes, onEdit, onNewQuote, onViewQuote, onClose,
+  onArchive, onUnarchive, onDelete,
 }: Props) {
   const t = useT(lang);
   const isZh = lang === 'zh';
   const [activeTab, setActiveTab] = useState<DetailTab>('info');
+  const isArchived = customer.is_active === false;
+
+  const handleDeleteClick = () => {
+    if (!window.confirm(isZh
+      ? `确定要永久删除客户「${customer.customer_name}」吗？此操作不可恢复，仅允许删除完全没有关联记录（报价/文件/合规/人员）的客户。`
+      : `Permanently delete "${customer.customer_name}"? This cannot be undone and is only allowed when the client has zero linked records (quotes/files/compliance/persons).`)) return;
+    if (!window.confirm(isZh ? '再次确认：真的要删除吗？' : 'Confirm again: really delete?')) return;
+    onDelete();
+  };
 
   // Bridge: compliance prefill from document upload (manual flow only)
   const [compliancePrefill, setCompliancePrefill] = useState<
@@ -84,12 +97,31 @@ export function ServiceCustomerDetail({
           <div className="text-white font-bold truncate">{customer.customer_name}</div>
           {customer.company_name && <div className="text-blue-200 text-xs truncate">{customer.company_name}</div>}
         </div>
+        {isArchived && (
+          <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0 bg-gray-500 text-white">
+            {isZh ? '已停用' : 'Archived'}
+          </span>
+        )}
         <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_COLOR[customer.status || ''] || 'bg-gray-100 text-gray-500'}`}>
           {customer.status ? (t.customerStatus[customer.status] || customer.status) : '—'}
         </span>
         <button onClick={onEdit} className="text-xs font-bold hover:underline flex-shrink-0" style={{ color: GOLD }}>
           {t.buttons.editCustomer}
         </button>
+        {isArchived ? (
+          <button onClick={onUnarchive} className="text-xs font-bold hover:underline flex-shrink-0 text-green-300">
+            {t.buttons.unarchiveCustomer}
+          </button>
+        ) : (
+          <button onClick={onArchive} className="text-xs font-bold hover:underline flex-shrink-0 text-gray-300">
+            {t.buttons.archiveCustomer}
+          </button>
+        )}
+        {isArchived && (
+          <button onClick={handleDeleteClick} className="text-xs font-bold hover:underline flex-shrink-0 text-red-300">
+            {t.buttons.deleteCustomer}
+          </button>
+        )}
         <button onClick={onClose} className="text-gray-300 hover:text-white text-xl leading-none flex-shrink-0">×</button>
       </div>
 
@@ -167,9 +199,15 @@ export function ServiceCustomerDetail({
               <div className="text-[10px] font-black uppercase tracking-widest" style={{ color: GOLD }}>
                 {t.labels.historyQuotes}
               </div>
-              <button onClick={onNewQuote} className="text-xs font-bold hover:underline" style={{ color: GOLD }}>
-                + {t.buttons.newQuoteForCustomer}
-              </button>
+              {isArchived ? (
+                <span className="text-xs text-gray-400">
+                  {isZh ? '客户已停用，请先恢复再新建报价' : 'Client archived — restore first to create a new quote'}
+                </span>
+              ) : (
+                <button onClick={onNewQuote} className="text-xs font-bold hover:underline" style={{ color: GOLD }}>
+                  + {t.buttons.newQuoteForCustomer}
+                </button>
+              )}
             </div>
             {quotes.length === 0 ? (
               <div className="text-xs text-gray-400 py-8 text-center">{t.empty.quotes}</div>

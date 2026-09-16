@@ -12,6 +12,9 @@ interface Props {
   onEdit: (c: ServiceCustomer) => void;
   onNewQuote: (c: ServiceCustomer) => void;
   onAddCustomer: () => void;
+  onArchive: (c: ServiceCustomer) => void;
+  onUnarchive: (c: ServiceCustomer) => void;
+  onDelete: (c: ServiceCustomer) => void;
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -39,6 +42,7 @@ const NAVY = '#0c1b3a';
 
 export function ServiceCustomerList({
   lang, customers, loading, onView, onEdit, onNewQuote, onAddCustomer,
+  onArchive, onUnarchive, onDelete,
 }: Props) {
   const t = useT(lang);
   const isZh = lang === 'zh';
@@ -48,23 +52,29 @@ export function ServiceCustomerList({
   const [filterType, setFilterType]   = useState('');
   const [filterOwner, setFilterOwner] = useState('');
   const [expiringItems, setExpiringItems] = useState<ComplianceItem[]>([]);
+  const [view, setView] = useState<'active' | 'archived'>('active');
 
   useEffect(() => {
     listExpiringCompliance(30).then(setExpiringItems).catch(() => {});
   }, []);
 
+  // ── Active/archived split ─────────────────────────────────────────────
+  const activeCustomers   = useMemo(() => customers.filter(c => c.is_active !== false), [customers]);
+  const archivedCustomers = useMemo(() => customers.filter(c => c.is_active === false), [customers]);
+  const baseList = view === 'archived' ? archivedCustomers : activeCustomers;
+
   // ── Stats ──────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
-    const total    = customers.length;
-    const active   = customers.filter(c => ['NEW_REQUIREMENT','REQUIREMENT_CONFIRMING','SOLUTION_PREPARING','SOLUTION_SENT'].includes(c.status || '')).length;
-    const quoted   = customers.filter(c => c.status === 'QUOTED' || c.status === 'CONTRACT_PENDING').length;
-    const ongoing  = customers.filter(c => c.status === 'IN_PROGRESS' || c.status === 'MONTHLY_SERVICE').length;
+    const total    = baseList.length;
+    const active   = baseList.filter(c => ['NEW_REQUIREMENT','REQUIREMENT_CONFIRMING','SOLUTION_PREPARING','SOLUTION_SENT'].includes(c.status || '')).length;
+    const quoted   = baseList.filter(c => c.status === 'QUOTED' || c.status === 'CONTRACT_PENDING').length;
+    const ongoing  = baseList.filter(c => c.status === 'IN_PROGRESS' || c.status === 'MONTHLY_SERVICE').length;
     return { total, active, quoted, ongoing };
-  }, [customers]);
+  }, [baseList]);
 
   // ── Filter ─────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
-    let list = customers;
+    let list = baseList;
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(c =>
@@ -78,11 +88,11 @@ export function ServiceCustomerList({
     if (filterType)   list = list.filter(c => c.primary_service_type === filterType);
     if (filterOwner)  list = list.filter(c => c.owner === filterOwner);
     return list;
-  }, [customers, search, filterStatus, filterType, filterOwner]);
+  }, [baseList, search, filterStatus, filterType, filterOwner]);
 
-  const statusList = useMemo(() => Array.from(new Set(customers.map(c => c.status).filter(Boolean))), [customers]);
-  const typeList   = useMemo(() => Array.from(new Set(customers.map(c => c.primary_service_type).filter(Boolean))), [customers]);
-  const ownerList  = useMemo(() => Array.from(new Set(customers.map(c => c.owner).filter(Boolean))), [customers]);
+  const statusList = useMemo(() => Array.from(new Set(baseList.map(c => c.status).filter(Boolean))), [baseList]);
+  const typeList   = useMemo(() => Array.from(new Set(baseList.map(c => c.primary_service_type).filter(Boolean))), [baseList]);
+  const ownerList  = useMemo(() => Array.from(new Set(baseList.map(c => c.owner).filter(Boolean))), [baseList]);
 
   if (loading) {
     return (
@@ -128,13 +138,31 @@ export function ServiceCustomerList({
           <h2 className="text-base font-black" style={{ color: NAVY }}>
             {isZh ? '服务客户库' : 'Service Client Base'}
           </h2>
-          <button
-            onClick={onAddCustomer}
-            className="flex-shrink-0 text-sm font-black px-4 py-2 rounded-xl text-white"
-            style={{ background: NAVY }}
-          >
-            + {t.buttons.addCustomer}
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-lg overflow-hidden border border-gray-200 text-xs font-bold">
+              <button
+                onClick={() => setView('active')}
+                className="px-3 py-1.5"
+                style={view === 'active' ? { background: NAVY, color: 'white' } : { background: 'white', color: '#64748b' }}
+              >
+                {t.buttons.activeCustomers} ({activeCustomers.length})
+              </button>
+              <button
+                onClick={() => setView('archived')}
+                className="px-3 py-1.5 border-l border-gray-200"
+                style={view === 'archived' ? { background: NAVY, color: 'white' } : { background: 'white', color: '#64748b' }}
+              >
+                {t.buttons.archivedCustomers} ({archivedCustomers.length})
+              </button>
+            </div>
+            <button
+              onClick={onAddCustomer}
+              className="flex-shrink-0 text-sm font-black px-4 py-2 rounded-xl text-white"
+              style={{ background: NAVY }}
+            >
+              + {t.buttons.addCustomer}
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-4 gap-3">
@@ -205,7 +233,7 @@ export function ServiceCustomerList({
           </button>
         )}
         <span className="text-xs text-gray-400 ml-auto">
-          {filtered.length} / {customers.length}
+          {filtered.length} / {baseList.length}
         </span>
       </div>
 
@@ -215,9 +243,9 @@ export function ServiceCustomerList({
           <p className="text-gray-400 text-sm">
             {search || filterStatus || filterType || filterOwner
               ? t.empty.searchEmpty
-              : t.empty.customers}
+              : (view === 'archived' ? t.empty.archivedCustomers : t.empty.customers)}
           </p>
-          {!search && !filterStatus && !filterType && !filterOwner && (
+          {view === 'active' && !search && !filterStatus && !filterType && !filterOwner && (
             <button
               onClick={onAddCustomer}
               className="text-white text-sm font-black px-5 py-2.5 rounded-xl"
@@ -241,7 +269,7 @@ export function ServiceCustomerList({
                 <th className="px-3 py-2.5 text-xs text-gray-500 font-bold">{t.fields.status}</th>
                 <th className="px-3 py-2.5 text-xs text-gray-500 font-bold">{t.fields.owner}</th>
                 <th className="px-3 py-2.5 text-xs text-gray-500 font-bold">{t.fields.followUpDate}</th>
-                <th className="px-3 py-2.5 text-xs text-gray-500 font-bold w-28"></th>
+                <th className="px-3 py-2.5 text-xs text-gray-500 font-bold w-44"></th>
               </tr>
             </thead>
             <tbody>
@@ -277,20 +305,52 @@ export function ServiceCustomerList({
                   <td className="px-3 py-2.5 text-xs text-gray-500">{c.owner || '—'}</td>
                   <td className="px-3 py-2.5 text-xs text-gray-500">{c.follow_up_date || '—'}</td>
                   <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 flex-wrap">
                       <button
                         onClick={() => onEdit(c)}
                         className="text-xs text-blue-600 hover:underline px-1"
                       >
                         {t.buttons.editCustomer}
                       </button>
-                      <button
-                        onClick={() => onNewQuote(c)}
-                        className="text-xs font-medium hover:underline px-1"
-                        style={{ color: GOLD }}
-                      >
-                        {t.buttons.newQuoteForCustomer}
-                      </button>
+                      {view === 'active' && (
+                        <>
+                          <button
+                            onClick={() => onNewQuote(c)}
+                            className="text-xs font-medium hover:underline px-1"
+                            style={{ color: GOLD }}
+                          >
+                            {t.buttons.newQuoteForCustomer}
+                          </button>
+                          <button
+                            onClick={() => onArchive(c)}
+                            className="text-xs text-gray-500 hover:underline px-1"
+                          >
+                            {t.buttons.archiveCustomer}
+                          </button>
+                        </>
+                      )}
+                      {view === 'archived' && (
+                        <>
+                          <button
+                            onClick={() => onUnarchive(c)}
+                            className="text-xs text-green-600 hover:underline px-1"
+                          >
+                            {t.buttons.unarchiveCustomer}
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (!window.confirm(isZh
+                                ? `确定要永久删除客户「${c.customer_name}」吗？此操作不可恢复，仅允许删除完全没有关联记录（报价/文件/合规/人员）的客户。`
+                                : `Permanently delete "${c.customer_name}"? This cannot be undone and is only allowed when the client has zero linked records (quotes/files/compliance/persons).`)) return;
+                              if (!window.confirm(isZh ? '再次确认：真的要删除吗？' : 'Confirm again: really delete?')) return;
+                              onDelete(c);
+                            }}
+                            className="text-xs text-red-600 hover:underline px-1"
+                          >
+                            {t.buttons.deleteCustomer}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

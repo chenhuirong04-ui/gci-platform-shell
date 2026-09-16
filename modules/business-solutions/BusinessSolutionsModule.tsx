@@ -14,6 +14,7 @@ import { ServiceQuotePreview } from './components/ServiceQuotePreview';
 import { BSFinancialDashboard } from './components/BSFinancialDashboard';
 import {
   listCustomers, saveCustomer, updateCustomer,
+  archiveCustomer, unarchiveCustomer, deleteCustomer, customerHasLinkedRecords,
   listCategories, saveCategory, updateCategory, deleteCategory,
   listCatalogItems, saveCatalogItem, updateCatalogItem, deleteCatalogItem,
   listQuotes, listQuotesByCustomer, loadQuote, saveQuote, updateQuote, deleteQuote,
@@ -35,6 +36,8 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
 
   // ── Data ───────────────────────────────────────────────────────────────
   const [customers, setCustomers]     = useState<ServiceCustomer[]>([]);
+  // Archived customers must not be selectable for new quotes — restore first.
+  const activeCustomers = React.useMemo(() => customers.filter(c => c.is_active !== false), [customers]);
   const [categories, setCategories]   = useState<ServiceCategory[]>([]);
   const [catalogItems, setCatalogItems] = useState<ServiceCatalogItem[]>([]);
   const [quotes, setQuotes]           = useState<ServiceQuote[]>([]);
@@ -123,7 +126,45 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
     setViewingCustomer(null);
   };
 
+  const handleArchiveCustomer = async (c: ServiceCustomer) => {
+    if (!c.id) return;
+    const ok = await archiveCustomer(c.id);
+    if (!ok) { showToast(t.toast.error, 'error'); return; }
+    const patch = { is_active: false, archived_at: new Date().toISOString() };
+    setCustomers(prev => prev.map(x => x.id === c.id ? { ...x, ...patch } : x));
+    setViewingCustomer(v => (v && v.id === c.id) ? { ...v, ...patch } : v);
+    showToast(t.toast.customerArchived);
+  };
+
+  const handleUnarchiveCustomer = async (c: ServiceCustomer) => {
+    if (!c.id) return;
+    const ok = await unarchiveCustomer(c.id);
+    if (!ok) { showToast(t.toast.error, 'error'); return; }
+    const patch = { is_active: true, archived_at: undefined };
+    setCustomers(prev => prev.map(x => x.id === c.id ? { ...x, ...patch } : x));
+    setViewingCustomer(v => (v && v.id === c.id) ? { ...v, ...patch } : v);
+    showToast(t.toast.customerRestored);
+  };
+
+  const handleDeleteCustomer = async (c: ServiceCustomer) => {
+    if (!c.id) return;
+    const hasLinked = await customerHasLinkedRecords(c.id);
+    if (hasLinked) {
+      showToast(t.toast.customerDeleteBlocked, 'error');
+      return;
+    }
+    const ok = await deleteCustomer(c.id);
+    if (!ok) { showToast(t.toast.error, 'error'); return; }
+    setCustomers(prev => prev.filter(x => x.id !== c.id));
+    if (viewingCustomer?.id === c.id) setViewingCustomer(null);
+    showToast(t.toast.customerDeleted);
+  };
+
   const handleNewQuoteForCustomer = (c: ServiceCustomer) => {
+    if (c.is_active === false) {
+      showToast(t.toast.customerArchivedQuoteBlocked, 'error');
+      return;
+    }
     setQuoteBuilderCustomer(c);
     setTab('new-quote');
     setViewingCustomer(null);
@@ -285,7 +326,7 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
       {tab === 'new-quote' && (
         <BSNewQuotePage
           lang={lang}
-          customers={customers}
+          customers={activeCustomers}
           categories={categories}
           catalogItems={catalogItems}
           onCustomerSaved={handleCustomerSavedFromQuote}
@@ -325,6 +366,9 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
                 onEdit={handleEditCustomer}
                 onNewQuote={handleNewQuoteForCustomer}
                 onAddCustomer={() => { setCustomerFormMode('add'); setEditingCustomer(null); setViewingCustomer(null); }}
+                onArchive={handleArchiveCustomer}
+                onUnarchive={handleUnarchiveCustomer}
+                onDelete={handleDeleteCustomer}
               />
             )}
           </div>
@@ -340,6 +384,9 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
                 onNewQuote={() => handleNewQuoteForCustomer(viewingCustomer)}
                 onViewQuote={handleViewQuote}
                 onClose={() => setViewingCustomer(null)}
+                onArchive={() => handleArchiveCustomer(viewingCustomer)}
+                onUnarchive={() => handleUnarchiveCustomer(viewingCustomer)}
+                onDelete={() => handleDeleteCustomer(viewingCustomer)}
               />
             </div>
           )}

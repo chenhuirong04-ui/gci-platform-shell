@@ -48,6 +48,9 @@ export interface ServiceCustomer {
   follow_up_date?: string;
   last_follow_up_at?: string;
   notes?: string;
+  is_active?: boolean;
+  archived_at?: string;
+  archived_reason?: string;
   created_at?: string;
   updated_at?: string;
 }

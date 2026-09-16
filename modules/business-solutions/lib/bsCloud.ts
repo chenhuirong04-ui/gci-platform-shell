@@ -100,6 +100,55 @@ export async function deleteCustomer(id: string): Promise<boolean> {
   return res !== null;
 }
 
+export async function archiveCustomer(id: string, reason?: string): Promise<boolean> {
+  const res = await sbFetch(`/rest/v1/service_customers?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      is_active: false,
+      archived_at: new Date().toISOString(),
+      archived_reason: reason || null,
+      updated_at: new Date().toISOString(),
+    }),
+  });
+  return res !== null;
+}
+
+export async function unarchiveCustomer(id: string): Promise<boolean> {
+  const res = await sbFetch(`/rest/v1/service_customers?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      is_active: true,
+      archived_at: null,
+      archived_reason: null,
+      updated_at: new Date().toISOString(),
+    }),
+  });
+  return res !== null;
+}
+
+async function countRows(path: string): Promise<number> {
+  const res = await sbFetch(path, { method: 'HEAD', headers: { Prefer: 'count=exact' } });
+  if (!res) return 0;
+  const cr = res.headers.get('content-range'); // e.g. "0-0/3"
+  if (!cr) return 0;
+  const total = cr.split('/')[1];
+  return total && total !== '*' ? (parseInt(total, 10) || 0) : 0;
+}
+
+/** True if this customer has any linked quote/document/compliance/person record — used to gate hard delete. */
+export async function customerHasLinkedRecords(customerId: string): Promise<boolean> {
+  const id = encodeURIComponent(customerId);
+  const [quotes, docs, persons, compliance] = await Promise.all([
+    countRows(`/rest/v1/service_quotes?customer_id=eq.${id}`),
+    countRows(`/rest/v1/service_customer_documents?customer_id=eq.${id}`),
+    countRows(`/rest/v1/service_customer_persons?customer_id=eq.${id}`),
+    countRows(`/rest/v1/service_customer_compliance_items?customer_id=eq.${id}`),
+  ]);
+  return quotes > 0 || docs > 0 || persons > 0 || compliance > 0;
+}
+
 export async function getCustomer(id: string): Promise<ServiceCustomer | null> {
   const res = await sbFetch(`/rest/v1/service_customers?id=eq.${encodeURIComponent(id)}&limit=1`, { method: 'GET' });
   if (!res) return null;
