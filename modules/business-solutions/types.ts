@@ -60,6 +60,7 @@ export interface ServiceCategory {
   name_cn: string;
   name_en: string;
   sort_order: number;
+  active?: boolean;
 }
 
 export interface ServiceCatalogItem {

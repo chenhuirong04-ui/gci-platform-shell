@@ -159,7 +159,8 @@ export function BSNewQuotePage({
   }, [customers, custSearch]);
 
   const filteredServices = useMemo(() => {
-    let list = catalogItems.filter(i => i.active);
+    const activeCategoryIds = new Set(categories.filter(c => c.active !== false).map(c => c.id));
+    let list = catalogItems.filter(i => i.active && activeCategoryIds.has(i.category_id));
     if (activeCatId) list = list.filter(i => i.category_id === activeCatId);
     if (svcSearch) {
       const q = svcSearch.toLowerCase();
@@ -169,7 +170,7 @@ export function BSNewQuotePage({
       );
     }
     return list;
-  }, [catalogItems, activeCatId, svcSearch, isZh]);
+  }, [catalogItems, categories, activeCatId, svcSearch, isZh]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -616,7 +617,7 @@ export function BSNewQuotePage({
             >
               {isZh ? '全部' : 'All'}
             </button>
-            {categories.map(cat => (
+            {categories.filter(cat => cat.active !== false).map(cat => (
               <button
                 key={cat.id}
                 onClick={() => setActiveCatId(activeCatId === cat.id ? '' : (cat.id || ''))}
