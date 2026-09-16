@@ -258,6 +258,47 @@ export async function getRecentlyUpdatedCustomers(
   return { ok: true, rows: (data ?? []) as CrmRecentlyUpdatedRow[] };
 }
 
+// Business Overview data-source cleanup (2026-09-16) — "最近30天活跃"
+// replacement for the legacy ICARE_HISTORY_V1-derived count. Count-only
+// query (head:true) since the tile only needs a number, not rows.
+export async function getActiveCustomerCount(days = 30): Promise<
+  { ok: true; count: number } | { ok: false; error: string }
+> {
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  since.setHours(0, 0, 0, 0);
+
+  const { count, error } = await supabase
+    .from('crm_customers')
+    .select('id', { count: 'exact', head: true })
+    .gte('updated_at', since.toISOString())
+    .eq('is_active', true);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, count: count ?? 0 };
+}
+
+// Business Overview data-source cleanup (2026-09-16, third revision) —
+// "高优先客户" replacement for the legacy ICARE_HISTORY_V1-derived
+// highPriorityCount. Reuses the EXACT same "isFocus" rule
+// getBossDecisions() already applies (priority contains 重点, or is exactly
+// 'A') — not a new business rule, the one already established for real
+// crm_customers.priority.
+export async function getHighPriorityCustomerCount(): Promise<
+  { ok: true; count: number } | { ok: false; error: string }
+> {
+  const { data, error } = await supabase
+    .from('crm_customers')
+    .select('priority')
+    .eq('is_active', true)
+    .limit(2000);
+  if (error) return { ok: false, error: error.message };
+  const count = (data ?? []).filter((c) => {
+    const priority = (c.priority || '').trim();
+    return priority.includes('重点') || priority.toUpperCase() === 'A';
+  }).length;
+  return { ok: true, count };
+}
+
 export async function getRecentNewCustomers(
   days = 7
 ): Promise<{ ok: true; rows: CrmNewCustomerRow[] } | { ok: false; error: string }> {

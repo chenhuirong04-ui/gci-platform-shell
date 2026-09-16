@@ -9,7 +9,6 @@ import { useI18n } from '@gci/i18n';
 import { FollowUpTask, Project } from '../types';
 
 import { getTaskBusinessId, getProjectBusinessId } from '../utils/businessId';
-import { buildDashboardStats } from '../utils/dashboardStats';
 // CRM Legacy cleanup (2026-09) — "最近更新的业务/最近新增客户/最近新增沟通" now
 // read the real Supabase CRM (crm_customers/crm_followups) instead of the
 // legacy Notion-sourced FollowUpTask[] used everywhere else on this page.
@@ -17,8 +16,22 @@ import { buildDashboardStats } from '../utils/dashboardStats';
 // modules/suppliers/components/QuoteHistory.tsx).
 import {
   getRecentlyUpdatedCustomers, getRecentNewCustomers, getRecentFollowupsWithNotes,
+  getAllCustomerNames, getActiveCustomerCount, getTodaysFollowups, getOverdueFollowups,
+  getHighPriorityCustomerCount,
   type CrmRecentlyUpdatedRow, type CrmNewCustomerRow, type CrmFollowupWithCustomer,
 } from '../../../apps/shell/src/lib/crmSupabase';
+// Business Overview data-source cleanup (2026-09-16) — "项目总数" now reads
+// the real crm_projects table instead of the legacy ICARE_HISTORY_V1-derived
+// businessType='PROJECT' count. Same cross-module import convention as the
+// crmSupabase import above.
+import { listAllProjects } from '../../../apps/shell/src/lib/crmProjects';
+
+// A raw migration-bookkeeping marker (crm_customers.source, set once by the
+// 2026-09-15 Notion migration script) is not customer-facing information —
+// never render it as if it were a business_type/source label.
+function isMigrationMarker(v: string | null | undefined): boolean {
+  return !!v && /^notion_migration/i.test(v);
+}
 
 interface Props {
   tasks: FollowUpTask[];
@@ -160,18 +173,52 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
   const [recentUpdated, setRecentUpdated] = useState<CrmRecentlyUpdatedRow[] | null>(null);
   const [recentNewCustomers, setRecentNewCustomers] = useState<CrmNewCustomerRow[] | null>(null);
   const [recentFollowups, setRecentFollowups] = useState<CrmFollowupWithCustomer[] | null>(null);
+
+  // Business Overview data-source cleanup (2026-09-16) — real crm_customers/
+  // crm_projects counts, replacing the legacy ICARE_HISTORY_V1-derived
+  // `overview` block below (which counted contactKey groups out of the old
+  // Notion-sourced Follow-up Log, not the real CRM table at all — the
+  // "28 vs actual 9" bug). null = not loaded yet, never coerced to 0.
+  const [customerTotal, setCustomerTotal] = useState<number | null>(null);
+  const [newCustomers7d, setNewCustomers7d] = useState<number | null>(null);
+  const [activeCustomers30d, setActiveCustomers30d] = useState<number | null>(null);
+  const [projectTotal, setProjectTotal] = useState<number | null>(null);
+
+  // Business Overview data-source cleanup (2026-09-16, third revision) — the
+  // bottom 4 task-oriented KPIs, same treatment: real crm_customers/
+  // crm_followups/crm_projects queries, replacing buildDashboardStats()'s
+  // ICARE_HISTORY_V1-derived numbers (which this file no longer computes at
+  // all — see the removed `dashboardStats` useMemo below). 高优先客户 reuses
+  // the exact "isFocus" rule already established in getBossDecisions()
+  // (priority contains 重点, or is exactly 'A') via
+  // getHighPriorityCustomerCount() — not a new business rule.
+  const [todayFollowupsReal, setTodayFollowupsReal] = useState<number | null>(null);
+  const [highPriorityReal, setHighPriorityReal] = useState<number | null>(null);
+  const [activeProjectsReal, setActiveProjectsReal] = useState<number | null>(null);
+  const [overdueReal, setOverdueReal] = useState<number | null>(null);
+
   useEffect(() => {
     getRecentlyUpdatedCustomers(4).then(res => { if (res.ok) setRecentUpdated(res.rows); });
-    getRecentNewCustomers(7).then(res => { if (res.ok) setRecentNewCustomers(res.rows.slice(0, 4)); });
+    getRecentNewCustomers(7).then(res => {
+      if (res.ok) { setRecentNewCustomers(res.rows.slice(0, 4)); setNewCustomers7d(res.rows.length); }
+    });
     getRecentFollowupsWithNotes(30).then(res => { if (res.ok) setRecentFollowups(res.rows.slice(0, 4)); });
+    getAllCustomerNames().then(res => { if (res.ok) setCustomerTotal(res.rows.length); });
+    getActiveCustomerCount(30).then(res => { if (res.ok) setActiveCustomers30d(res.count); });
+    listAllProjects().then(rows => {
+      setProjectTotal(rows.length);
+      setActiveProjectsReal(rows.filter(p => p.status === 'active').length);
+    });
+    getTodaysFollowups().then(res => { if (res.ok) setTodayFollowupsReal(res.rows.length); });
+    getHighPriorityCustomerCount().then(res => { if (res.ok) setHighPriorityReal(res.count); });
+    getOverdueFollowups().then(res => { if (res.ok) setOverdueReal(res.rows.length); });
   }, []);
   const goToCustomer = (name: string) => navigate(`/business-assistant?customer=${encodeURIComponent(name)}`);
 
-  // ── Single source of truth for all dashboard numbers ────────────────────────
-  const dashboardStats = useMemo(
-    () => buildDashboardStats(tasks, todayFollowupCount),
-    [tasks, todayFollowupCount],
-  );
+  // Legacy `dashboardStats` (buildDashboardStats(tasks, todayFollowupCount))
+  // removed in the 2026-09-16 (third revision) cleanup — every number it
+  // produced has now been replaced by a real query above; nothing in this
+  // file reads it anymore, so it's gone rather than left computed-but-unused.
 
   // activeTasks: used only for 成交漏斗 (analytics pipeline funnel).
   // Uses notionSource filter to exclude orphan records.
@@ -182,35 +229,12 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
     (t as any).notionSource !== 'contact_only'
   );
 
-  // ── Business Overview stats (V1) — reuses the same non-deleted task set;
-  // "客户总数" groups by contactKey (falling back to clientName), matching
-  // the exact identity logic CustomerDirectory.tsx uses, so the two numbers
-  // stay consistent with each other.
-  const overview = useMemo(() => {
-    const nonDeleted = tasks.filter(t => t.status !== 'deleted');
-    const daysAgo = (iso: string) => {
-      if (!iso) return Infinity;
-      const d = new Date(iso);
-      if (isNaN(d.getTime())) return Infinity;
-      return Math.round((Date.now() - d.getTime()) / 86400000);
-    };
-    const customerGroups = new Map<string, string>();
-    for (const t of nonDeleted) {
-      const key = (t.contactKey || '').trim().toLowerCase() || (t.clientName || '').trim().toLowerCase() || t.id;
-      if (!customerGroups.has(key)) customerGroups.set(key, key);
-    }
-    return {
-      customers: customerGroups.size,
-      new7: nonDeleted.filter(t => daysAgo(t.createdAt) <= 7).length,
-      active30: nonDeleted.filter(t => daysAgo(t.updatedAt || t.createdAt) <= 30 && t.status !== 'archived').length,
-      quoting: nonDeleted.filter(t => t.tradeStatus === '待报价' && t.status !== 'archived').length,
-      archived: nonDeleted.filter(t => t.status === 'archived').length,
-      // recentBusinesses/recentCustomers/recentComms (legacy-derived) removed
-      // (CRM Legacy cleanup, 2026-09) — the three "recent activity" blocks
-      // below now read real crm_customers/crm_followups via recentUpdated/
-      // recentNewCustomers/recentFollowups state instead.
-    };
-  }, [tasks]);
+  // Legacy `overview` block (ICARE_HISTORY_V1-derived customer/new7/active30
+  // counts) removed in the 2026-09-16 data-source cleanup — see
+  // customerTotal/newCustomers7d/activeCustomers30d state above, all real
+  // crm_customers queries now. `quoting`/`archived` were computed here but
+  // never actually rendered anywhere on this page — dead code, dropped
+  // along with the rest of this block rather than carried forward unused.
 
   const nowLabel = new Date().toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US', {
     year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
@@ -223,36 +247,32 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
       <PageHeader title={ct.pageTitle} eyebrow={nowLabel} />
 
       {/* Business Overview stats (V1) — asset-first framing: how many
-          customers/businesses exist and what changed recently, ahead of the
-          task-oriented KPIs below. */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+          customers/projects exist and what changed recently.
+          Data-source cleanup (2026-09-16, second revision): 项目型/贸易型/
+          执行中 REMOVED — crm_projects has no businessType/tradeStatus-style
+          classification field yet (only `status`:
+          active/completed/on_hold/cancelled, no 项目型-vs-贸易型 concept at
+          all), and Production's real crm_projects is currently empty (0
+          rows) — showing the old legacy-tasks-derived numbers here would
+          silently keep mixing a real table with legacy data, exactly what
+          this cleanup removes. Hidden, not zeroed, until crm_projects (or a
+          successor field) actually has a real classification to show. */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
           <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewCustomers}</div>
-          <div className="text-2xl font-black mt-1" style={{ color: T1 }}>{overview.customers}</div>
+          <div className="text-2xl font-black mt-1" style={{ color: T1 }}>{customerTotal === null ? '—' : customerTotal}</div>
         </div>
         <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
           <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewBusinesses}</div>
-          <div className="text-2xl font-black mt-1" style={{ color: T1 }}>{dashboardStats.totalBusinesses}</div>
+          <div className="text-2xl font-black mt-1" style={{ color: T1 }}>{projectTotal === null ? '—' : projectTotal}</div>
         </div>
         <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
           <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewNew7}</div>
-          <div className="text-2xl font-black mt-1" style={{ color: GOLD }}>{overview.new7}</div>
+          <div className="text-2xl font-black mt-1" style={{ color: GOLD }}>{newCustomers7d === null ? '—' : newCustomers7d}</div>
         </div>
         <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
           <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewActive30}</div>
-          <div className="text-2xl font-black mt-1" style={{ color: GOLD }}>{overview.active30}</div>
-        </div>
-        <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
-          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.projectBased}</div>
-          <div className="text-2xl font-black mt-1" style={{ color: '#8FA6D4' }}>{dashboardStats.totalProjects}</div>
-        </div>
-        <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
-          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.trading}</div>
-          <div className="text-2xl font-black mt-1" style={{ color: GOLD }}>{dashboardStats.totalTrades}</div>
-        </div>
-        <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
-          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewExecuting}</div>
-          <div className="text-2xl font-black mt-1" style={{ color: '#6FBF8E' }}>{dashboardStats.executingBusinessesCount}</div>
+          <div className="text-2xl font-black mt-1" style={{ color: GOLD }}>{activeCustomers30d === null ? '—' : activeCustomers30d}</div>
         </div>
       </div>
 
@@ -285,7 +305,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
                   <RealCrmRow
                     key={c.id}
                     name={c.customer_name}
-                    sub={c.business_type || c.source}
+                    sub={c.business_type || (isMigrationMarker(c.source) ? null : c.source)}
                     dateLabel={c.created_at?.slice(0, 10) || null}
                     onClick={() => goToCustomer(c.customer_name)}
                   />
@@ -313,10 +333,10 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
 
       {/* Task-oriented KPIs — kept, but now secondary to the overview above */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={<Calendar className="w-5 h-5" />}      label={ct.kpiFollowupsToday} value={todayFollowupCount === null ? null : dashboardStats.todayFollowupCount} color="#8FA6D4" />
-        <StatCard icon={<TrendingUp className="w-5 h-5" />}    label={ct.kpiHighPriority}   value={dashboardStats.highPriorityCount}       color={GOLD} />
-        <StatCard icon={<Briefcase className="w-5 h-5" />}     label={ct.kpiActiveProjects} value={dashboardStats.executingProjectsCount}  color="#6FBF8E" />
-        <StatCard icon={<AlertTriangle className="w-5 h-5" />} label={ct.kpiOverdueRisk}    value={dashboardStats.overdueCount}            color="#E0846A" />
+        <StatCard icon={<Calendar className="w-5 h-5" />}      label={ct.kpiFollowupsToday} value={todayFollowupsReal} color="#8FA6D4" />
+        <StatCard icon={<TrendingUp className="w-5 h-5" />}    label={ct.kpiHighPriority}   value={highPriorityReal}   color={GOLD} />
+        <StatCard icon={<Briefcase className="w-5 h-5" />}     label={ct.kpiActiveProjects} value={activeProjectsReal} color="#6FBF8E" />
+        <StatCard icon={<AlertTriangle className="w-5 h-5" />} label={ct.kpiOverdueRisk}    value={overdueReal}        color="#E0846A" />
       </div>
 
       {/* 优先级分布 / 项目类型占比 / 客户阶段大图表 / AI Action Center — removed
