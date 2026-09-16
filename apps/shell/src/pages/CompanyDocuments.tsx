@@ -104,6 +104,13 @@ export function CompanyDocuments() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<Record<string, string>>({});
 
+  // Nav final collapse (2026-09-16) — 账号与权限/Access Vault moved off the
+  // sidebar into a tab here. It never had a real page (was a path-less
+  // "coming soon" placeholder before this round), so its tab below is the
+  // same placeholder content, just reachable a different way — not new
+  // business functionality.
+  const [outerTab, setOuterTab] = useState<'documents' | 'accessVault'>('documents');
+
   function load() {
     Promise.all([fetchCompanyDocuments(), fetchUserDisplayNames()]).then(([rows, names]) => {
       setDocs(rows);
@@ -212,13 +219,41 @@ export function CompanyDocuments() {
         <h1 style={{ fontSize: 22, fontWeight: 700, color: colors.textPrimary, margin: 0, fontFamily: "'Space Grotesk',sans-serif", flex: 1 }}>
           {isZh ? '公司文件' : 'Company Documents'}
         </h1>
-        {canUpload && (
+        {canUpload && outerTab === 'documents' && (
           <button onClick={openUpload} style={{ padding: '9px 18px', borderRadius: 10, fontSize: 13.5, fontWeight: 600, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#B8935A)`, color: '#1A1206', border: 'none' }}>
             {isZh ? '上传文件' : 'Upload File'}
           </button>
         )}
       </div>
 
+      <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+        {([
+          { key: 'documents' as const, label: isZh ? '公司文件' : 'Documents' },
+          { key: 'accessVault' as const, label: isZh ? '账号与权限' : 'Access Vault' },
+        ]).map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setOuterTab(t.key)}
+            style={{
+              padding: '8px 16px', borderRadius: 9, fontSize: 12.5, cursor: 'pointer',
+              background: outerTab === t.key ? `linear-gradient(135deg,${GOLD},#E2C988)` : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${outerTab === t.key ? 'transparent' : BORD}`,
+              color: outerTab === t.key ? '#080D1E' : MUTED,
+              fontWeight: outerTab === t.key ? 700 : 400,
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {outerTab === 'accessVault' && (
+        <div style={{ padding: '18px 20px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, fontSize: 13, color: MUTED }}>
+          {isZh ? '账号与权限即将上线。' : 'Access Vault coming soon.'}
+        </div>
+      )}
+
+      {outerTab === 'documents' && (<>
       {/* Filters */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
         <select className="gci-cd-select" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={inputSt}>
@@ -368,6 +403,7 @@ export function CompanyDocuments() {
           </table>
         </div>
       )}
+      </>)}
     </div>
   );
 }

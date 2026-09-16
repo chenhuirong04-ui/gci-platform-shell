@@ -85,6 +85,20 @@ export interface SectionDef {
  * WORKSPACE (每日工作台) is not a row in `sections` — it's the sidebar's
  * separate `navTop` item (see apps/shell/src/App.tsx's `sidebarProps`),
  * unchanged by this round.
+ *
+ * Nav final collapse (2026-09-16) — sidebar down to 11 top-level rows.
+ * Two items removed from `sections` entirely (both consolidated into an
+ * existing entry's internal tabs, not deleted):
+ *   - AV (账号与权限/Access Vault) — was already path-less (never had a
+ *     route). Now a tab inside 公司文件/CompanyDocuments.tsx.
+ *   - AI (历史 AI 工具/Legacy) — had a real route, /ai, which is UNCHANGED
+ *     and still resolves directly. Now also reachable as a "历史工具" tab
+ *     inside 设置/Settings.tsx (ST gained its first real path, /settings).
+ * customersAndProjects (CP)'s own page also changed this round —
+ * CrmCustomers.tsx now opens on an outer "客户档案" tab (its existing
+ * directory/today/overdue/archived sub-tabs are unchanged beneath it) —
+ * but CP's path/position here is untouched, that change lives entirely
+ * inside the page component.
  */
 export const sections: SectionDef[] = [
   {
@@ -175,19 +189,26 @@ export const sections: SectionDef[] = [
     labelKey: 'internalSection',
     items: [
       { code: 'IT', nameKey: 'internalTasks', path: '/crm?tab=internal' },
+      // Nav final collapse (2026-09-16) — 账号与权限/Access Vault moved OFF
+      // the sidebar entirely, into an internal tab of 公司文件/Company
+      // Documents (see CompanyDocuments.tsx) — it never had its own route
+      // to begin with (was a path-less "coming soon" placeholder), so
+      // there's no old link to preserve. Sidebar CD row now lands on the
+      // same /company-documents page, which itself defaults to the
+      // documents tab.
       { code: 'CD', nameKey: 'companyDocuments', path: '/company-documents' },
-      // Reserved (2026-09-15) — IA placeholder only, per explicit
-      // instruction: no page behind this yet, no path set (falls back to
-      // the sidebar's existing "coming soon" toast for path-less items).
-      // Do not build Access Vault itself this round.
-      { code: 'AV', nameKey: 'accessVault' },
     ],
   },
   {
     labelKey: 'platformSection',
     items: [
-      { code: 'ST', nameKey: 'settings' },
-      { code: 'AI', nameKey: 'aiAssistant', path: '/ai' },
+      // Nav final collapse (2026-09-16) — 设置 gains its first real route:
+      // a small tab container (see pages/Settings.tsx) whose second tab is
+      // 历史工具 (renamed from 历史 AI 工具/Legacy), embedding the existing
+      // <AIPage/> unchanged. The old /ai route is untouched and still
+      // resolves directly for any existing bookmark/deep link — it's only
+      // no longer reachable via its own dedicated sidebar row.
+      { code: 'ST', nameKey: 'settings', path: '/settings' },
     ],
   },
 ];
