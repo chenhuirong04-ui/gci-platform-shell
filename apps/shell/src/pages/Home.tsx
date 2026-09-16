@@ -1,42 +1,56 @@
 import { useEffect, useState } from 'react';
-import { StatCard, colors } from '@gci/design-system';
+import { useNavigate } from 'react-router-dom';
+import { colors } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
-import { statCardSpecs } from '../data/mock';
+import { useAuth } from '../contexts/AuthContext';
 import { InventoryAlertDrawer } from '../components/InventoryAlertDrawer';
 import { BusinessAssistantEntry } from '../components/BusinessAssistantEntry';
-import { BusinessLinesOverview } from '../components/BusinessLinesOverview';
-import { HomeKpiRow } from '../components/HomeKpiRow';
-import { HomeDashboardCharts } from '../components/HomeDashboardCharts';
-import { getAllCustomerNames } from '../lib/crmSupabase';
+import {
+  loadTodoToday, loadMoneyToday, loadBusinessToday, loadAnomalies,
+  type TodoTodayStats, type MoneyTodayStats, type BusinessTodayStats, type AnomalyStats,
+} from '../lib/dailyWorkspaceStats';
 
-// ─── localStorage helpers (Trade module only — Task 17.1 removed the ────────
-// legacy ICARE_HISTORY_V1 read here: it was computed but never rendered
-// (see statCards below), and crm_customers/Supabase is now the one CRM
-// source of truth for anything actually shown on Home).
-function safeLocalGet<T = any>(key: string): T[] {
-  try { return JSON.parse(localStorage.getItem(key) || '[]') || []; }
-  catch { return []; }
-}
+// ─── Daily Workspace rebuild (2026-09-16) ───────────────────────────────────
+// Every tile below reads from dailyWorkspaceStats.ts, which only ever
+// touches real, already-live tables/services — no Mock, no new API. A tile
+// whose source has nothing to report (or whose fetch failed) shows "暂无
+// 数据", never a fake 0 (see chat report for the full data-source audit).
+// Removed from Home entirely this round (per explicit instruction, not
+// deleted — still reachable elsewhere):
+//   - BusinessLinesOverview (25H/AI, Trade, Workforce, Ecommerce, Other,
+//     UNKNOWN cards) — already reachable at /crm?tab=dashboard, its own
+//     onClick target; not re-added anywhere else since that would touch
+//     the CRM module, out of this round's scope ("不改其他模块").
+//   - HomeKpiRow — its 4 tiles are superseded by section 1 below (which
+//     adds 逾期事项/今日客户跟进 using the same real sources, and drops the
+//     two fields that used to be a hardcoded 0: 重要消息 had no data source
+//     at all — dropped rather than faked; 新业务机会 moved into section 3
+//     as a real query instead of a static placeholder).
+//   - HomeDashboardCharts (7-day activity trend) — not part of the 5-section
+//     structure this round's instruction defines; not deleted.
+//
+// Permission-aware rebuild (2026-09-16, second revision) — reuses the SAME
+// module system every other page already gates on (AuthContext.can(),
+// user_profiles.modules[] — see ProtectedRoute.tsx), no second permission
+// system. Each tile below optionally names the module it needs; a tile
+// whose module the user doesn't have is REMOVED from its array entirely
+// (never rendered as a disabled/greyed/"无权限查看" placeholder, and never
+// shown as a misleading 0 — see the isZh/hasValue Tile logic). Tiles with
+// no `module` (tasks/decisions/company documents/GIA — already unrestricted
+// platform-level pages per Sidebar.tsx's own MODULE_PATH_MAP convention)
+// stay visible to everyone. "Chris 和 LILI 是 full-access" is a DATA fact
+// (their user_profiles.modules already lists every module), not something
+// this component special-cases by name — can() already returns true for
+// every check once a profile has every module key, so full access for them
+// falls out of the existing system for free.
+const GOLD = '#CBA85C';
+const RED = '#E0846A';
+const GREEN = '#6FBF8E';
+const BLUE = '#8FA6D4';
+const MUTED = '#7A8494';
+const CARD = 'rgba(255,255,255,0.025)';
+const BORD = 'rgba(255,255,255,0.07)';
 
-// ─── Derived counts from real data ─────────────────────────────────────────
-function loadHomeStats() {
-  // Trade: non-terminal quotes
-  const quotes: any[] = safeLocalGet('quotes');
-  const pendingQuotes = quotes.filter(q =>
-    q?.status && q.status !== 'CONVERTED' && q.status !== 'LOST'
-  ).length;
-
-  // Trade: non-terminal orders
-  const orders: any[] = safeLocalGet('orders');
-  const activeOrders = orders.filter(o =>
-    o?.status && o.status !== 'PAID' && o.status !== 'VOIDED'
-  ).length;
-
-  // Inventory: returned separately via API fetch (see useEffect below)
-  return { pendingQuotes, activeOrders, inventoryAlerts: null };
-}
-
-// ─── Helper components ──────────────────────────────────────────────────────
 function getGreetingKey(hour: number) {
   if (hour < 5) return 'night' as const;
   if (hour < 11) return 'morning' as const;
@@ -45,94 +59,128 @@ function getGreetingKey(hour: number) {
   return 'evening' as const;
 }
 
-function SectionHeader({ label, trailing }: { label: string; trailing?: string }) {
+function SectionHeader({ label }: { label: string }) {
   return (
-    <div className="flex items-center" style={{ gap: 14, marginBottom: 20 }}>
+    <div className="flex items-center" style={{ gap: 14, marginBottom: 16 }}>
       <span className="font-mono-label" style={{ fontSize: 10.5, letterSpacing: '0.22em', color: colors.goldBase }}>
         {label}
       </span>
       <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,rgba(203,168,92,0.36),rgba(203,168,92,0))' }} />
-      {trailing && (
-        <span className="font-mono-label" style={{ fontSize: 10.5, color: '#505A70' }}>
-          {trailing}
-        </span>
-      )}
     </div>
   );
 }
 
-// ─── Main component ─────────────────────────────────────────────────────────
-// GCI Home scope (corrected round) — kept: GIA entry, the 4-KPI row, the
-// real 7-day trend chart, the Daily Business Brief (business-only content),
-// and Business Overview (real operating metrics: CRM customer count,
-// pending quotes, active orders, inventory alerts, plus the business-lines
-// breakdown) — this section was wrongly removed alongside External Agents
-// last round; it's real经营数据, not technical Agent status, so it belongs
-// on Home. Still NOT restored: the "EXTERNAL AGENTS · 外部 AI 员工" section
-// (AgentsStatusCompact — MIA/Chanya/Growth Agent technical status), which
-// stays off Home per this round's explicit instruction.
-export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
+type TileValue = number | null;
+
+interface TileSpec {
+  key: string;
+  label: string;
+  value: TileValue;
+  color?: string;
+  money?: boolean;
+  onClick?: () => void;
+  /** Module key required to see this tile (AuthContext.can()) — omit for
+   * platform-level tiles unrestricted to any authenticated user. */
+  module?: string;
+}
+
+/** loading=true shows "…"; loading=false + value=null shows "暂无数据" — the
+ * two are never conflated, so a genuinely-empty real answer (e.g. 0
+ * unreconciled bank lines) is never confused with "hasn't loaded yet". */
+function Tile({ t, loading, isZh }: { t: TileSpec; loading: boolean; isZh: boolean }) {
+  const hasValue = t.value !== null;
+  const display = loading ? '…' : !hasValue ? (isZh ? '暂无数据' : 'No data') : t.money ? `${t.value!.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : String(t.value);
+  const clickable = !!t.onClick && hasValue;
+  return (
+    <div
+      onClick={clickable ? t.onClick : undefined}
+      style={{
+        padding: '16px 16px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12,
+        cursor: clickable ? 'pointer' : 'default', textAlign: 'center',
+      }}
+    >
+      <div style={{ fontSize: !hasValue || loading ? 14 : t.money ? 18 : 24, fontWeight: 700, color: hasValue && !loading ? (t.color || colors.textPrimary) : MUTED, fontFamily: "'Space Grotesk',sans-serif" }}>
+        {display}
+      </div>
+      <div style={{ fontSize: 10.5, color: MUTED, marginTop: 4 }}>{t.label}</div>
+    </div>
+  );
+}
+
+function TileGrid({ tiles, loading, isZh }: { tiles: TileSpec[]; loading: boolean; isZh: boolean }) {
+  return (
+    <div className="grid" style={{ gridTemplateColumns: `repeat(${tiles.length},1fr)`, gap: 12, marginBottom: 44 }}>
+      {tiles.map((t) => <Tile key={t.key} t={t} loading={loading} isZh={isZh} />)}
+    </div>
+  );
+}
+
+export function Home({ onFlash: _onFlash }: { onFlash: (msg: string) => void }) {
+  const navigate = useNavigate();
   const { dict, lang } = useI18n();
+  const { can, profileLoading } = useAuth();
+  const isZh = lang === 'zh';
+  // Permission is either not-yet-determined (profileLoading) or determined
+  // — never filter tiles on a stale/default `can()` result, which would
+  // flash-hide a tile the user actually has access to. While not yet
+  // determined, every section's own data-loading state (below) is also
+  // still true anyway, so this never causes an extra visible delay.
+  const permReady = !profileLoading;
+  const visible = (module?: string) => !module || !permReady || can(module);
   const greeting = dict.greeting[getGreetingKey(new Date().getHours())];
-  const greetingLine = lang === 'zh' ? `${greeting}，Chris` : `${greeting}, Chris`;
+  const greetingLine = isZh ? `${greeting}，Chris` : `${greeting}, Chris`;
+  const summaryLine = isZh ? '以下是今日经营状况总览。' : "Here's today's business overview.";
 
-  const [stats, setStats] = useState<{
-    pendingQuotes: number | null;
-    activeOrders: number | null;
-    inventoryAlerts: number | null;
-  }>({ pendingQuotes: null, activeOrders: null, inventoryAlerts: null });
-
+  const [todo, setTodo] = useState<TodoTodayStats | null>(null);
+  const [money, setMoney] = useState<MoneyTodayStats | null>(null);
+  const [business, setBusiness] = useState<BusinessTodayStats | null>(null);
+  const [anomalies, setAnomalies] = useState<AnomalyStats | null>(null);
   const [inventoryDrawerOpen, setInventoryDrawerOpen] = useState(false);
-  const [crmTotal, setCrmTotal] = useState<number | null>(null);
 
   useEffect(() => {
-    const s = loadHomeStats();
-    setStats(s);
-    getAllCustomerNames().then((res) => { if (res.ok) setCrmTotal(res.rows.length); });
-
-    // Fetch combined inventory alert count: warehouse (Notion) + consignment (Supabase)
-    const base = typeof window !== 'undefined' ? window.location.origin : '';
-    Promise.allSettled([
-      fetch(`${base}/api/ai/inventory-table-alerts`).then(r => r.json()),
-      fetch(`${base}/api/trade/check-inventory`).then(r => r.json()),
-    ]).then(([whResult, csResult]) => {
-      const whCount = whResult.status === 'fulfilled' && whResult.value.ok ? (whResult.value.alertCount ?? 0) : 0;
-      const csCount = csResult.status === 'fulfilled' && csResult.value.ok ? (csResult.value.alertCount ?? 0) : 0;
-      setStats(prev => ({ ...prev, inventoryAlerts: whCount + csCount }));
-    }).catch(() => {
-      // Silent fail — card shows '--' if APIs unavailable
-    });
+    loadTodoToday().then(setTodo);
+    loadMoneyToday().then(setMoney);
+    loadBusinessToday().then(setBusiness);
+    loadAnomalies().then(setAnomalies);
   }, []);
 
-  // Task 13: KPI row below already covers 今日客户跟进/逾期事项/等你决定/待执行
-  // with the live Supabase numbers. dict.workspace.summary is a static
-  // placeholder string from the original design mock ("今天有 2 件逾期事项、1
-  // 份报价待发送...") — real-looking numbers that are NOT live data, so it
-  // must never be rendered. This line stays a plain, number-free greeting.
-  const summaryLine = lang === 'zh' ? '以下是今日经营状况总览。' : "Here's today's business overview.";
+  const todoTiles: TileSpec[] = [
+    { key: 'myTasks', label: isZh ? '我的事项' : 'My Tasks', value: todo?.myTasks ?? null, color: GOLD, onClick: () => navigate('/tasks') },
+    { key: 'needsDecision', label: isZh ? '需要我决定' : 'Needs My Decision', value: todo?.needsDecision ?? null, color: RED, onClick: () => navigate('/decisions') },
+    { key: 'overdueTasks', label: isZh ? '逾期事项' : 'Overdue Tasks', value: todo?.overdueTasks ?? null, color: RED, onClick: () => navigate('/tasks') },
+    { key: 'todayFollowups', label: isZh ? '今日客户跟进' : "Today's Follow-ups", value: todo?.todayFollowups ?? null, color: BLUE, onClick: () => navigate('/crm-customers'), module: 'crm' },
+  ].filter((t) => visible(t.module));
 
-  // Overlay real counts on the statCardSpecs visual configs (报价/订单/库存
-  // only — index 0 of statCardSpecs is the old "followUpsToday" slot,
-  // dropped here since it duplicates the KPI row's "今日客户跟进" (and, as
-  // of Task 17.1, its legacy ICARE_HISTORY_V1 data source is gone entirely).
-  const statCards = [
-    { ...statCardSpecs[1], val: stats.pendingQuotes  !== null ? String(stats.pendingQuotes)  : '--', mod: dict.workspace.modQuotation },
-    { ...statCardSpecs[2], val: stats.activeOrders   !== null ? String(stats.activeOrders)   : '--', mod: dict.workspace.modTrade },
-    { ...statCardSpecs[3], val: stats.inventoryAlerts !== null ? String(stats.inventoryAlerts) : '--', mod: dict.workspace.modInventory },
-  ];
+  const moneyTiles: TileSpec[] = [
+    { key: 'bankBalance', label: isZh ? '当前银行余额' : 'Bank Balance', value: money?.bankBalance ?? null, money: true, onClick: () => navigate('/trade?tab=finance-center'), module: 'finance' },
+    { key: 'monthInflow', label: isZh ? '本月经营现金流入' : 'Operating Inflow (MTD)', value: money?.monthInflow ?? null, color: GREEN, money: true, onClick: () => navigate('/trade?tab=finance-center'), module: 'finance' },
+    { key: 'monthOutflow', label: isZh ? '本月经营现金流出' : 'Operating Outflow (MTD)', value: money?.monthOutflow ?? null, color: RED, money: true, onClick: () => navigate('/trade?tab=finance-center'), module: 'finance' },
+    { key: 'ar', label: isZh ? 'AR / 应收' : 'AR / Receivable', value: money?.ar ?? null, money: true, onClick: () => navigate('/trade?tab=finance-center'), module: 'finance' },
+    { key: 'ap', label: isZh ? 'AP / 应付' : 'AP / Payable', value: money?.ap ?? null, money: true, onClick: () => navigate('/trade?tab=finance-center'), module: 'finance' },
+  ].filter((t) => visible(t.module));
+
+  const businessTiles: TileSpec[] = [
+    { key: 'followUpBacklog', label: isZh ? '待跟进客户' : 'Follow-up Backlog', value: business?.followUpBacklog ?? null, color: GOLD, onClick: () => navigate('/crm-customers'), module: 'crm' },
+    { key: 'pendingQuotes', label: isZh ? '待完成报价' : 'Pending Quotes', value: business?.pendingQuotes ?? null, color: BLUE, onClick: () => navigate('/quotation'), module: 'quotation' },
+    { key: 'activeOrders', label: isZh ? '执行中订单' : 'Active Orders', value: business?.activeOrders ?? null, color: GREEN, onClick: () => navigate('/trade'), module: 'trade' },
+    { key: 'newOpportunities', label: isZh ? '新业务机会' : 'New Opportunities', value: business?.newOpportunities ?? null, color: GOLD, onClick: () => navigate('/mia-leads') },
+  ].filter((t) => visible(t.module));
+
+  const anomalyTiles: TileSpec[] = [
+    { key: 'inventoryAlerts', label: isZh ? '库存预警' : 'Inventory Alerts', value: anomalies?.inventoryAlerts ?? null, color: RED, onClick: () => setInventoryDrawerOpen(true), module: 'warehouse' },
+    { key: 'unreconciledBankLines', label: isZh ? '未对账银行流水' : 'Unreconciled Bank Lines', value: anomalies?.unreconciledBankLines ?? null, color: RED, onClick: () => navigate('/trade?tab=finance-center'), module: 'finance' },
+    { key: 'missingVouchers', label: isZh ? '缺凭证' : 'Missing Vouchers', value: anomalies?.missingVouchers ?? null, color: RED, onClick: () => navigate('/trade?tab=finance-center'), module: 'finance' },
+    { key: 'overdueAR', label: isZh ? '逾期应收' : 'Overdue AR', value: anomalies?.overdueAR ?? null, color: RED, onClick: () => navigate('/trade?tab=finance-center'), module: 'finance' },
+    { key: 'overdueAP', label: isZh ? '逾期应付' : 'Overdue AP', value: anomalies?.overdueAP ?? null, color: RED, onClick: () => navigate('/trade?tab=finance-center'), module: 'finance' },
+  ].filter((t) => visible(t.module));
 
   return (
     <div style={{ maxWidth: 'var(--content-max-w)', margin: '0 auto', padding: '48px 48px 60px' }}>
       <div style={{ marginBottom: 50 }}>
         <h1
           style={{
-            fontFamily: "'Space Grotesk',sans-serif",
-            fontSize: 34,
-            fontWeight: 600,
-            letterSpacing: '-0.01em',
-            lineHeight: 1.1,
-            color: colors.textPrimary,
-            margin: 0,
+            fontFamily: "'Space Grotesk',sans-serif", fontSize: 34, fontWeight: 600,
+            letterSpacing: '-0.01em', lineHeight: 1.1, color: colors.textPrimary, margin: 0,
           }}
         >
           {greetingLine}
@@ -142,42 +190,36 @@ export function Home({ onFlash }: { onFlash: (msg: string) => void }) {
         </p>
       </div>
 
-      {/* A — Business Assistant: the one primary chat entry point on Home (Task 12/13) */}
+      {/* Each section is dropped entirely (header included) when permission
+          filtering leaves zero tiles — never an empty header over nothing,
+          and never a "no permission" placeholder in its place. */}
+      {todoTiles.length > 0 && (<>
+        <SectionHeader label={isZh ? '今天要处理' : "TODAY'S TO-DO"} />
+        <TileGrid tiles={todoTiles} loading={!todo} isZh={isZh} />
+      </>)}
+
+      {moneyTiles.length > 0 && (<>
+        <SectionHeader label={isZh ? '今天的钱' : "TODAY'S MONEY"} />
+        <TileGrid tiles={moneyTiles} loading={!money} isZh={isZh} />
+      </>)}
+
+      {businessTiles.length > 0 && (<>
+        <SectionHeader label={isZh ? '今天的业务' : "TODAY'S BUSINESS"} />
+        <TileGrid tiles={businessTiles} loading={!business} isZh={isZh} />
+      </>)}
+
+      {anomalyTiles.length > 0 && (<>
+        <SectionHeader label={isZh ? '异常提醒' : 'ALERTS'} />
+        <TileGrid tiles={anomalyTiles} loading={!anomalies} isZh={isZh} />
+      </>)}
+
+      {/* Ask GCI — the one search/assistant entry point, listed last per the
+          final structure. Its own shortcut chips were trimmed to only
+          real, working actions (查客户/查报价/查文件/查财务/记录跟进) — see
+          BusinessAssistantEntry.tsx. */}
+      <SectionHeader label="ASK GCI" />
       <BusinessAssistantEntry />
 
-      {/* B — Executive KPI: 我的事项 / 需要我决定 / 重要消息 / 新业务机会 */}
-      <HomeKpiRow />
-
-      {/* C — Business Overview: real operating metrics only (business lines + CRM/quotation/order/inventory counts), moved directly below the KPI row. External Agents technical status intentionally NOT restored here. */}
-      <SectionHeader label="经营概览 · BUSINESS OVERVIEW" />
-      <div style={{ marginBottom: 16 }}>
-        <BusinessLinesOverview />
-      </div>
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 44 }}>
-        <div
-          onClick={() => onFlash(dict.toast.enterModule(dict.workspace.modCrm))}
-          style={{ padding: '14px 16px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, cursor: 'pointer', textAlign: 'center' }}
-        >
-          <div style={{ fontSize: 22, fontWeight: 700, color: colors.textPrimary, fontFamily: "'Space Grotesk',sans-serif" }}>{crmTotal === null ? '—' : crmTotal}</div>
-          <div style={{ fontSize: 10.5, color: '#7A8494', marginTop: 4 }}>CRM 客户</div>
-        </div>
-        {statCards.map((f, i) => (
-          <StatCard
-            key={i}
-            data={{ ...f, label: dict.facts[f.labelKey] }}
-            onClick={
-              f.labelKey === 'inventoryAlerts'
-                ? () => setInventoryDrawerOpen(true)
-                : () => onFlash(dict.toast.enterModule(f.mod))
-            }
-          />
-        ))}
-      </div>
-
-      {/* D — real 7-day business ACTIVITY trend: 新询盘/报价/合同/成交/跟进 (business-structure chart removed — no reliable real-business data source, see HomeDashboardCharts.tsx). Daily Business Brief removed from Home per this round's instruction (getDailyBrief() itself untouched — still used by Ask GCI). */}
-      <HomeDashboardCharts />
-
-      {/* Inventory alert drawer */}
       {inventoryDrawerOpen && (
         <InventoryAlertDrawer onClose={() => setInventoryDrawerOpen(false)} />
       )}

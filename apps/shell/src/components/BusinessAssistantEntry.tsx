@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
+import { useAuth } from '../contexts/AuthContext';
 import { runGiaTopRouter, type GiaRouterState, type PendingDriveFolderCreate } from '../lib/giaRouter';
 import { confirmCaptureItem, completeOrCancelTask, rescheduleTask, type ResolvedCaptureItem } from '../lib/businessCapture';
 import { BUSINESS_AREA_LABEL, BUSINESS_AREA_LABEL_ZH, ALL_BUSINESS_AREAS, type ExecutiveTask, type TaskBusinessArea } from '../lib/executiveTasks';
@@ -43,14 +44,28 @@ const CARD = 'rgba(255,255,255,0.025)';
 const BORD = 'rgba(203,168,92,0.18)';
 const TEXT = colors.textPrimary;
 
-// "写邮件"/"Write email" removed — email is fully retired from GCI/GIA.
-// "上传文件"/"Upload file" takes the same slot, wired to a real local-file
-// -> Drive intake flow below (the other shortcuts remain decorative,
-// unchanged — they all just navigate to /business-assistant).
-const SHORTCUTS_ZH = ['查客户', '查报价', '找文件', '记录沟通', '上传文件'];
-const SHORTCUTS_EN = ['Search clients', 'Search quotes', 'Find file', 'Log communication', 'Upload file'];
-const UPLOAD_SHORTCUT_ZH = '上传文件';
-const UPLOAD_SHORTCUT_EN = 'Upload file';
+// Daily Workspace rebuild (2026-09-16) — trimmed to exactly the 5 real,
+// working actions the instruction specifies (查客户/查报价/查文件/查财务/
+// 记录跟进). "上传文件"/Upload file dropped from this set — its real local-
+// file -> Drive intake flow (handleFilePicked/fileInputRef below) is
+// unchanged and still reachable via drag-and-drop onto this same card, just
+// no longer has its own shortcut chip. Each remaining chip now navigates to
+// the real page that action means, instead of always bouncing to the
+// generic /business-assistant chat (查客户→客户与项目, 查报价→报价中心,
+// 查文件→公司文件, 查财务→财务中心); 记录跟进 still opens
+// /business-assistant, where this component's own pendingNotionFollowup
+// flow (see "准备记录跟进" card below) is what actually handles it.
+// `module` gates a chip the same way Home's stat tiles do (AuthContext.can()
+// — see Home.tsx's permission-aware rebuild comment) — undefined means
+// unrestricted, matching /company-documents and /business-assistant having
+// no ProtectedRoute wrapper.
+const SHORTCUT_ROUTES: { zh: string; en: string; path: string; module?: string }[] = [
+  { zh: '查客户', en: 'Search clients', path: '/crm-customers', module: 'crm' },
+  { zh: '查报价', en: 'Search quotes', path: '/quotation', module: 'quotation' },
+  { zh: '查文件', en: 'Search files', path: '/company-documents' },
+  { zh: '查财务', en: 'Search finance', path: '/trade?tab=finance-center', module: 'finance' },
+  { zh: '记录跟进', en: 'Log follow-up', path: '/business-assistant' },
+];
 
 const UPLOAD_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png';
 
@@ -81,7 +96,11 @@ function extractFileRoutingKeywords(description: string, fileName: string): stri
 export function BusinessAssistantEntry() {
   const navigate = useNavigate();
   const { lang } = useI18n();
-  const SHORTCUTS = lang === 'zh' ? SHORTCUTS_ZH : SHORTCUTS_EN;
+  const { can, profileLoading } = useAuth();
+  // Same not-yet-determined guard as Home.tsx's tile filtering — never
+  // flash-hide a chip the user actually has access to while the profile
+  // fetch is still in flight.
+  const visibleShortcuts = SHORTCUT_ROUTES.filter((s) => !s.module || profileLoading || can(s.module));
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
   const [fileSearchReply, setFileSearchReply] = useState<string | null>(null);
@@ -1222,10 +1241,21 @@ export function BusinessAssistantEntry() {
                   ? (lang === 'zh' ? '文件夹叫什么名字？例如：HIGHWAYGLOBAL' : 'What should the folder be named? e.g. HIGHWAYGLOBAL')
                   : '问我：MAG现在什么情况？上次报价多少？今天先跟谁？'
             }
-            style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, padding: '13px 48px 13px 16px', fontSize: 14.5, color: colors.textPrimary, outline: 'none', boxSizing: 'border-box', fontFamily: "'Space Grotesk',sans-serif" }}
+            style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, padding: '13px 88px 13px 16px', fontSize: 14.5, color: colors.textPrimary, outline: 'none', boxSizing: 'border-box', fontFamily: "'Space Grotesk',sans-serif" }}
             onFocus={(e) => (e.target.style.borderColor = 'rgba(203,168,92,0.45)')}
             onBlur={(e) => (e.target.style.borderColor = 'rgba(255,255,255,0.09)')}
           />
+          {/* Daily Workspace rebuild (2026-09-16) — click-to-browse still
+              works (drag-and-drop alone was left as the only way in once
+              "上传文件" was dropped from the shortcut chip row below, which
+              isn't in the 5-action target set but shouldn't silently kill a
+              working feature) — a small dedicated button here instead of a
+              shortcut chip. */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            title={lang === 'zh' ? '上传文件' : 'Upload file'}
+            style={{ position: 'absolute', right: 50, top: '50%', transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: 'none', cursor: 'pointer', fontSize: 15, color: MUTED }}
+          >⇧</button>
           <button
             onClick={go}
             disabled={busy}
@@ -1240,16 +1270,13 @@ export function BusinessAssistantEntry() {
           style={{ display: 'none' }}
         />
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {SHORTCUTS.map((s) => (
+          {visibleShortcuts.map((s) => (
             <span
-              key={s}
-              onClick={() => {
-                if (s === UPLOAD_SHORTCUT_ZH || s === UPLOAD_SHORTCUT_EN) fileInputRef.current?.click();
-                else navigate('/business-assistant');
-              }}
+              key={s.zh}
+              onClick={() => navigate(s.path)}
               style={{ fontSize: 11.5, color: MUTED, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '5px 12px', cursor: 'pointer' }}
             >
-              {s}
+              {lang === 'zh' ? s.zh : s.en}
             </span>
           ))}
         </div>
