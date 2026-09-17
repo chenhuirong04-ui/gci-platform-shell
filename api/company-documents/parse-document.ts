@@ -13,7 +13,7 @@ export const config = { runtime: 'edge' };
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
@@ -24,12 +24,11 @@ function json(body: unknown, status = 200) {
   });
 }
 
-// Temporary diagnostic step (2026-09-17): GET this endpoint to see which
-// models this GEMINI_API_KEY can actually call generateContent on, straight
-// from Google's own ListModels — server-side only, key never leaves this
-// function. Used once to confirm real model names before finalizing the
-// POST path's model-selection logic; safe to keep (read-only, no cost beyond
-// the ListModels call itself).
+// Internal-only helper — checks which models this GEMINI_API_KEY can
+// actually call generateContent on, straight from Google's own ListModels.
+// Called from inside the POST handler only; there is no external route that
+// exposes this (the temporary GET diagnostic route used to confirm real
+// model names during rollout has been removed — see PRIORITY_MODELS below).
 async function listAvailableModels(apiKey: string): Promise<{ ok: true; models: string[] } | { ok: false; error: string }> {
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
@@ -89,10 +88,6 @@ export default async function handler(request: Request): Promise<Response> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return json({ ok: false, error: 'GEMINI_API_KEY not configured' }, 500);
 
-  if (request.method === 'GET') {
-    const result = await listAvailableModels(apiKey);
-    return json(result, result.ok ? 200 : 502);
-  }
   if (request.method !== 'POST') return json({ ok: false, error: 'Method not allowed' }, 405);
 
   let body: any;
