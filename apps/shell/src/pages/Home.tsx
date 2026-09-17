@@ -6,8 +6,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { InventoryAlertDrawer } from '../components/InventoryAlertDrawer';
 import { BusinessAssistantEntry } from '../components/BusinessAssistantEntry';
 import {
-  loadTodoToday, loadMoneyToday, loadBusinessToday, loadAnomalies,
+  loadTodoToday, loadMoneyToday, loadBusinessToday, loadAnomalies, loadDocumentExpiryAlerts,
   type TodoTodayStats, type MoneyTodayStats, type BusinessTodayStats, type AnomalyStats,
+  type DocumentExpiryAlert,
 } from '../lib/dailyWorkspaceStats';
 
 // ─── Daily Workspace rebuild (2026-09-16) ───────────────────────────────────
@@ -135,6 +136,7 @@ export function Home({ onFlash: _onFlash }: { onFlash: (msg: string) => void }) 
   const [money, setMoney] = useState<MoneyTodayStats | null>(null);
   const [business, setBusiness] = useState<BusinessTodayStats | null>(null);
   const [anomalies, setAnomalies] = useState<AnomalyStats | null>(null);
+  const [docExpiry, setDocExpiry] = useState<{ count: number; items: DocumentExpiryAlert[] } | null>(null);
   const [inventoryDrawerOpen, setInventoryDrawerOpen] = useState(false);
 
   useEffect(() => {
@@ -142,6 +144,7 @@ export function Home({ onFlash: _onFlash }: { onFlash: (msg: string) => void }) 
     loadMoneyToday().then(setMoney);
     loadBusinessToday().then(setBusiness);
     loadAnomalies().then(setAnomalies);
+    loadDocumentExpiryAlerts().then(setDocExpiry);
   }, []);
 
   const todoTiles: TileSpec[] = [
@@ -172,7 +175,20 @@ export function Home({ onFlash: _onFlash }: { onFlash: (msg: string) => void }) 
     { key: 'missingVouchers', label: isZh ? '缺凭证' : 'Missing Vouchers', value: anomalies?.missingVouchers ?? null, color: RED, onClick: () => navigate('/trade?tab=finance-center'), module: 'finance' },
     { key: 'overdueAR', label: isZh ? '逾期应收' : 'Overdue AR', value: anomalies?.overdueAR ?? null, color: RED, onClick: () => navigate('/trade?tab=finance-center'), module: 'finance' },
     { key: 'overdueAP', label: isZh ? '逾期应付' : 'Overdue AP', value: anomalies?.overdueAP ?? null, color: RED, onClick: () => navigate('/trade?tab=finance-center'), module: 'finance' },
+    { key: 'documentExpiry', label: isZh ? '证件到期提醒' : 'Document Expiry', value: docExpiry?.count ?? null, color: RED, onClick: () => navigate('/company-documents') },
   ].filter((t) => visible(t.module));
+
+  const DOC_RISK_LABEL: Record<DocumentExpiryAlert['risk'], string> = {
+    expired: isZh ? '已过期' : 'Expired',
+    urgent: isZh ? '紧急' : 'Urgent',
+    high: isZh ? '高' : 'High',
+    reminder: isZh ? '提醒' : 'Reminder',
+    early: isZh ? '提前提醒' : 'Early Reminder',
+    warning: isZh ? '预警' : 'Watch',
+  };
+  const DOC_RISK_COLOR: Record<DocumentExpiryAlert['risk'], string> = {
+    expired: RED, urgent: RED, high: RED, reminder: GOLD, early: GOLD, warning: BLUE,
+  };
 
   return (
     <div style={{ maxWidth: 'var(--content-max-w)', margin: '0 auto', padding: '48px 48px 60px' }}>
@@ -212,6 +228,38 @@ export function Home({ onFlash: _onFlash }: { onFlash: (msg: string) => void }) 
         <SectionHeader label={isZh ? '异常提醒' : 'ALERTS'} />
         <TileGrid tiles={anomalyTiles} loading={!anomalies} isZh={isZh} />
       </>)}
+
+      {docExpiry && docExpiry.items.length > 0 && (
+        <div style={{ marginTop: -12, marginBottom: 32 }}>
+          {docExpiry.items.slice(0, 5).map((item) => (
+            <div
+              key={item.id}
+              onClick={() => navigate('/company-documents')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', marginTop: 6,
+                borderRadius: 10, cursor: 'pointer', fontSize: 12.5, color: colors.textPrimary,
+                background: 'rgba(255,255,255,0.025)', border: `1px solid rgba(255,255,255,0.07)`,
+              }}
+            >
+              <span style={{ fontSize: 10, fontWeight: 700, color: DOC_RISK_COLOR[item.risk], padding: '2px 8px', borderRadius: 20, background: `${DOC_RISK_COLOR[item.risk]}1A`, flexShrink: 0 }}>
+                {DOC_RISK_LABEL[item.risk]}
+              </span>
+              <span style={{ flex: 1 }}>
+                {item.companyName ? `${item.companyName} ` : ''}{item.documentType}
+                {isZh ? ' 将于 ' : ' expires '}{item.expiryDate}{isZh ? ' 到期' : ''}
+                {isZh
+                  ? `，${item.daysRemaining >= 0 ? `剩余 ${item.daysRemaining} 天` : `已过期 ${Math.abs(item.daysRemaining)} 天`}`
+                  : ` (${item.daysRemaining >= 0 ? `${item.daysRemaining} days left` : `${Math.abs(item.daysRemaining)} days overdue`})`}
+              </span>
+            </div>
+          ))}
+          {docExpiry.items.length > 5 && (
+            <div style={{ fontSize: 11.5, color: MUTED, marginTop: 8, paddingLeft: 4 }}>
+              {isZh ? `还有 ${docExpiry.items.length - 5} 项，前往公司文件查看全部` : `${docExpiry.items.length - 5} more — view all in Company Documents`}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Ask GCI — the one search/assistant entry point, listed last per the
           final structure. Its own shortcut chips were trimmed to only

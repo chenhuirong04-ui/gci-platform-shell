@@ -195,3 +195,59 @@ export async function loadAnomalies(): Promise<AnomalyStats> {
 
   return stats;
 }
+
+// ── 5. 证件到期提醒 (Company Documents Intelligence V2 Phase 1) ────────────────
+// Reads company_documents directly (reminder_enabled=true, expiry_date within
+// 90 days including already-expired) — no new table, this just surfaces what
+// Company Documents already has. Only company_documents.reminder_enabled/
+// expiry_date/document_type/company_name are read; nothing here writes.
+
+export type DocumentExpiryRisk = 'expired' | 'urgent' | 'high' | 'reminder' | 'early' | 'warning';
+
+export interface DocumentExpiryAlert {
+  id: string;
+  documentType: string; // document_type if AI/user set it, else falls back to category
+  companyName: string | null;
+  expiryDate: string;
+  daysRemaining: number; // negative once expired
+  risk: DocumentExpiryRisk;
+}
+
+function documentExpiryRisk(daysRemaining: number): DocumentExpiryRisk {
+  if (daysRemaining <= 0) return 'expired';
+  if (daysRemaining <= 7) return 'urgent';
+  if (daysRemaining <= 14) return 'high';
+  if (daysRemaining <= 30) return 'reminder';
+  if (daysRemaining <= 60) return 'early';
+  return 'warning'; // <= 90
+}
+
+export async function loadDocumentExpiryAlerts(): Promise<{ count: number; items: DocumentExpiryAlert[] } | null> {
+  try {
+    const in90Days = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
+    const { data, error } = await supabase
+      .from('company_documents')
+      .select('id, category, document_type, company_name, expiry_date')
+      .eq('reminder_enabled', true)
+      .not('expiry_date', 'is', null)
+      .lte('expiry_date', in90Days)
+      .order('expiry_date', { ascending: true });
+    if (error || !data) return null;
+
+    const todayMs = new Date(todayStr()).getTime();
+    const items: DocumentExpiryAlert[] = data.map((row: any) => {
+      const daysRemaining = Math.round((new Date(row.expiry_date).getTime() - todayMs) / 86400000);
+      return {
+        id: row.id,
+        documentType: row.document_type || row.category || '—',
+        companyName: row.company_name || null,
+        expiryDate: row.expiry_date,
+        daysRemaining,
+        risk: documentExpiryRisk(daysRemaining),
+      };
+    });
+    return { count: items.length, items };
+  } catch {
+    return null;
+  }
+}

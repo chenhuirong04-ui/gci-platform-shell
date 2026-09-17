@@ -11,10 +11,36 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   fetchCompanyDocuments, uploadCompanyDocument, deleteCompanyDocument, getCompanyDocumentSignedUrl,
   fetchUserDisplayNames, fetchDocumentCategories, createDocumentCategory,
-  type CompanyDocument, type CompanyDocumentCategory,
+  createPendingCompanyDocument, runDocumentAIRecognition, matchSuggestedCategory, fetchStoredFileForAI,
+  confirmAIDocument,
+  type CompanyDocument, type CompanyDocumentCategory, type AIDocumentFields,
 } from '../lib/companyDocumentsService';
 
 const ADD_CATEGORY_VALUE = '__add_new__';
+
+// Company Documents Intelligence V2 Phase 1 — only these 4 MIME types go
+// through AI recognition; anything else falls straight to the existing
+// manual upload form unchanged (never blocked).
+const AI_SUPPORTED_MIME = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+
+type AiStage = 'idle' | 'recognizing' | 'review' | 'manual';
+
+interface ReviewFormState {
+  category: string;
+  document_name: string;
+  document_type: string;
+  company_name: string;
+  document_number: string;
+  issue_date: string;
+  expiry_date: string;
+  issuing_authority: string;
+  ai_summary: string;
+  notes: string;
+}
+const EMPTY_REVIEW: ReviewFormState = {
+  category: '', document_name: '', document_type: '', company_name: '', document_number: '',
+  issue_date: '', expiry_date: '', issuing_authority: '', ai_summary: '', notes: '',
+};
 
 const GOLD = '#CBA85C';
 const RED = '#E0846A';
@@ -111,6 +137,16 @@ export function CompanyDocuments() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<Record<string, string>>({});
 
+  // Company Documents Intelligence V2 Phase 1 — AI recognition flow
+  const [aiStage, setAiStage] = useState<AiStage>('idle');
+  const [aiDocument, setAiDocument] = useState<CompanyDocument | null>(null);
+  const [aiFile, setAiFile] = useState<File | null>(null);
+  const [aiFields, setAiFields] = useState<AIDocumentFields | null>(null);
+  const [aiError, setAiError] = useState('');
+  const [reviewForm, setReviewForm] = useState<ReviewFormState>(EMPTY_REVIEW);
+  const [savingReview, setSavingReview] = useState(false);
+  const [rowAiBusy, setRowAiBusy] = useState<string | null>(null);
+
   // Nav final collapse (2026-09-16) — 账号与权限/Access Vault moved off the
   // sidebar into a tab here. It never had a real page (was a path-less
   // "coming soon" placeholder before this round), so its tab below is the
@@ -129,6 +165,10 @@ export function CompanyDocuments() {
   }
   useEffect(() => { load(); loadCategories(); }, []);
 
+  // Shared "+ Add Category" widget between the plain manual form (uploadForm)
+  // and the AI review/manual-fallback panel (reviewForm) — only one of the two
+  // panels is ever visible at once (aiStage === 'idle' vs not), so which
+  // target to write into is just aiStage.
   const handleCategorySelect = (value: string) => {
     if (value === ADD_CATEGORY_VALUE) {
       setAddingCategory(true);
@@ -136,7 +176,8 @@ export function CompanyDocuments() {
       setNewCategoryError('');
       return;
     }
-    setUploadForm(f => ({ ...f, category: value }));
+    if (aiStage === 'idle') setUploadForm(f => ({ ...f, category: value }));
+    else setReviewForm(f => ({ ...f, category: value }));
   };
 
   const saveNewCategory = async () => {
@@ -155,7 +196,8 @@ export function CompanyDocuments() {
       return;
     }
     setCategories(prev => [...prev, res.category].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)));
-    setUploadForm(f => ({ ...f, category: res.category.name }));
+    if (aiStage === 'idle') setUploadForm(f => ({ ...f, category: res.category.name }));
+    else setReviewForm(f => ({ ...f, category: res.category.name }));
     setAddingCategory(false);
     setNewCategoryName('');
   };
@@ -176,12 +218,68 @@ export function CompanyDocuments() {
   }, [docs, categoryFilter, search, expiryFilter]);
 
   const openUpload = () => { setUploadForm(EMPTY_UPLOAD); setUploadError(''); setShowUpload(true); };
-  const closeUpload = () => { setShowUpload(false); setUploadForm(EMPTY_UPLOAD); setUploadError(''); };
+  const closeUpload = () => {
+    setShowUpload(false);
+    setUploadForm(EMPTY_UPLOAD);
+    setUploadError('');
+    setAiStage('idle');
+    setAiDocument(null);
+    setAiFile(null);
+    setAiFields(null);
+    setAiError('');
+    setReviewForm(EMPTY_REVIEW);
+  };
 
-  const acceptFile = (file: File | undefined) => {
+  // Populates the review form from a set of AI-extracted fields, matching
+  // suggested_category against the live category list (never auto-creates
+  // one — see matchSuggestedCategory's own doc comment).
+  const applyAIFields = (fields: AIDocumentFields, fallbackName: string) => {
+    const matched = matchSuggestedCategory(fields.suggested_category, categories);
+    setAiFields(fields);
+    setReviewForm({
+      category: matched?.name || '',
+      document_name: fields.document_type
+        ? `${fields.document_type}${fields.company_name ? ' - ' + fields.company_name : ''}`
+        : fallbackName,
+      document_type: fields.document_type || '',
+      company_name: fields.company_name || '',
+      document_number: fields.document_number || '',
+      issue_date: fields.issue_date || '',
+      expiry_date: fields.expiry_date || '',
+      issuing_authority: fields.issuing_authority || '',
+      ai_summary: fields.summary || '',
+      notes: '',
+    });
+  };
+
+  const acceptFile = async (file: File | undefined) => {
     if (!file) return;
-    setUploadForm(f => ({ ...f, file, document_name: f.document_name || file.name }));
     setShowUpload(true);
+    setUploadError('');
+    if (!AI_SUPPORTED_MIME.includes(file.type)) {
+      // Unsupported type for AI (not PDF/JPG/PNG) — straight to the existing manual form, unblocked.
+      setUploadForm(f => ({ ...f, file, document_name: f.document_name || file.name }));
+      return;
+    }
+    setAiStage('recognizing');
+    setAiFile(file);
+    setAiError('');
+    const created = await createPendingCompanyDocument(file);
+    if (!created.ok) {
+      setAiStage('idle');
+      setUploadError(created.error);
+      return;
+    }
+    setAiDocument(created.document);
+    const result = await runDocumentAIRecognition(created.document.id, file);
+    if (!result.ok) {
+      setAiError(result.error);
+      setReviewForm({ ...EMPTY_REVIEW, document_name: file.name });
+      setAiStage('manual');
+      return;
+    }
+    applyAIFields(result.fields, file.name);
+    setAiStage('review');
   };
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); if (canUpload) setIsDraggingOver(true); };
   const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDraggingOver(false); };
@@ -207,6 +305,116 @@ export function CompanyDocuments() {
     });
     setUploading(false);
     if (uploadErr) { setUploadError(uploadErr); return; }
+    closeUpload();
+    load();
+  };
+
+  // "重新识别" — works whether aiFile is already in memory (just-uploaded case)
+  // or not (reopened an existing row via the list's "AI 识别" button; lazily
+  // re-downloads the file from Storage first).
+  const handleReRecognize = async () => {
+    if (!aiDocument) return;
+    setAiStage('recognizing');
+    setAiError('');
+    let file = aiFile;
+    if (!file) {
+      file = await fetchStoredFileForAI(aiDocument);
+      if (!file) {
+        setAiError(isZh ? '无法读取原文件' : 'Could not read the original file');
+        setAiStage('manual');
+        return;
+      }
+      setAiFile(file);
+    }
+    const result = await runDocumentAIRecognition(aiDocument.id, file);
+    if (!result.ok) {
+      setAiError(result.error);
+      setAiStage('manual');
+      return;
+    }
+    applyAIFields(result.fields, file.name);
+    setAiStage('review');
+  };
+
+  // "AI 识别" button on an existing row. If it already has a completed/needs_review
+  // result, reopen the review panel pre-filled from what's stored (no AI call, no
+  // extra cost) — "重新识别" inside the panel re-runs it on demand. Otherwise
+  // (never processed, or a previous attempt failed) run it fresh now.
+  const openReviewForExistingDoc = async (doc: CompanyDocument) => {
+    setRowAiBusy(doc.id);
+    setAiDocument(doc);
+    setAiFile(null);
+    setAiError('');
+    setShowUpload(true);
+
+    if (doc.ai_status === 'completed' || doc.ai_status === 'needs_review') {
+      setAiFields((doc.ai_extracted as unknown as AIDocumentFields) || null);
+      setReviewForm({
+        category: doc.category,
+        document_name: doc.document_name,
+        document_type: doc.document_type || '',
+        company_name: doc.company_name || '',
+        document_number: doc.document_number || '',
+        issue_date: doc.issue_date || '',
+        expiry_date: doc.expiry_date || '',
+        issuing_authority: doc.issuing_authority || '',
+        ai_summary: doc.ai_summary || '',
+        notes: doc.notes || '',
+      });
+      setAiStage('review');
+      setRowAiBusy(null);
+      return;
+    }
+
+    setAiStage('recognizing');
+    const file = await fetchStoredFileForAI(doc);
+    setRowAiBusy(null);
+    if (!file) {
+      setAiError(isZh ? '无法读取原文件' : 'Could not read the original file');
+      setReviewForm({
+        category: doc.category, document_name: doc.document_name, document_type: '', company_name: '',
+        document_number: '', issue_date: '', expiry_date: doc.expiry_date || '', issuing_authority: '',
+        ai_summary: '', notes: doc.notes || '',
+      });
+      setAiStage('manual');
+      return;
+    }
+    setAiFile(file);
+    const result = await runDocumentAIRecognition(doc.id, file);
+    if (!result.ok) {
+      setAiError(result.error);
+      setReviewForm({
+        category: doc.category, document_name: doc.document_name, document_type: '', company_name: '',
+        document_number: '', issue_date: '', expiry_date: doc.expiry_date || '', issuing_authority: '',
+        ai_summary: '', notes: doc.notes || '',
+      });
+      setAiStage('manual');
+      return;
+    }
+    applyAIFields(result.fields, doc.document_name);
+    setAiStage('review');
+  };
+
+  const handleConfirmSave = async () => {
+    if (!aiDocument) return;
+    if (!reviewForm.category) { setAiError(isZh ? '请选择分类' : 'Please choose a category'); return; }
+    if (!reviewForm.document_name.trim()) { setAiError(isZh ? '请填写文件名称' : 'Document name is required'); return; }
+    setSavingReview(true);
+    setAiError('');
+    const { error } = await confirmAIDocument(aiDocument.id, {
+      category: reviewForm.category,
+      document_name: reviewForm.document_name.trim(),
+      document_type: reviewForm.document_type.trim() || null,
+      company_name: reviewForm.company_name.trim() || null,
+      document_number: reviewForm.document_number.trim() || null,
+      issue_date: reviewForm.issue_date || null,
+      expiry_date: reviewForm.expiry_date || null,
+      issuing_authority: reviewForm.issuing_authority.trim() || null,
+      ai_summary: reviewForm.ai_summary.trim() || null,
+      notes: reviewForm.notes.trim(),
+    });
+    setSavingReview(false);
+    if (error) { setAiError(error); return; }
     closeUpload();
     load();
   };
@@ -330,8 +538,8 @@ export function CompanyDocuments() {
         </div>
       </div>
 
-      {/* Upload panel */}
-      {canUpload && showUpload && (
+      {/* Upload panel — manual form (aiStage 'idle', unsupported file types) */}
+      {canUpload && showUpload && aiStage === 'idle' && (
         <div style={{ padding: 16, marginBottom: 16, background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, display: 'grid', gap: 10 }}>
           <div
             onDragOver={handleDragOver}
@@ -344,7 +552,7 @@ export function CompanyDocuments() {
               background: isDraggingOver ? 'rgba(203,168,92,0.08)' : 'transparent',
             }}
           >
-            {uploadForm.file ? uploadForm.file.name : (isZh ? '点击选择文件，或拖拽文件到此处上传' : 'Click to choose a file, or drag & drop it here')}
+            {uploadForm.file ? uploadForm.file.name : (isZh ? '点击选择文件，或拖拽文件到此处上传（PDF/JPG/PNG 自动识别）' : 'Click to choose a file, or drag & drop it here (PDF/JPG/PNG auto-recognized)')}
             <input
               ref={fileInputRef} type="file" style={{ display: 'none' }}
               onChange={e => acceptFile(e.target.files?.[0])}
@@ -416,6 +624,144 @@ export function CompanyDocuments() {
         </div>
       )}
 
+      {/* AI recognizing */}
+      {canUpload && showUpload && aiStage === 'recognizing' && (
+        <div style={{ padding: 28, marginBottom: 16, background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, textAlign: 'center' }}>
+          <div style={{ fontSize: 13, color: GOLD, fontWeight: 600 }}>{isZh ? '正在识别文件…' : 'Recognizing file…'}</div>
+          <div style={{ fontSize: 11.5, color: MUTED, marginTop: 6 }}>{isZh ? 'AI 正在读取文件内容，通常几秒钟' : 'AI is reading the file — usually a few seconds'}</div>
+        </div>
+      )}
+
+      {/* AI review / manual fallback */}
+      {canUpload && showUpload && (aiStage === 'review' || aiStage === 'manual') && (
+        <div style={{ padding: 16, marginBottom: 16, background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, display: 'grid', gap: 10 }}>
+          {aiStage === 'review' ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: GOLD }}>{isZh ? 'AI 识别结果' : 'AI Recognition Result'}</span>
+              {aiFields?.confidence !== null && aiFields?.confidence !== undefined && (
+                <span style={{ fontSize: 10.5, color: aiFields.confidence < 0.5 ? AMBER : MUTED }}>
+                  {isZh ? '置信度' : 'Confidence'}: {Math.round(aiFields.confidence * 100)}%
+                  {aiFields.confidence < 0.5 ? (isZh ? '（建议人工核对）' : ' (please double-check)') : ''}
+                </span>
+              )}
+            </div>
+          ) : (
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: AMBER }}>
+              {isZh ? 'AI 识别失败，请手动填写' : 'AI recognition failed — please fill in manually'}
+              {aiError && <span style={{ fontSize: 11, color: MUTED, fontWeight: 400, marginLeft: 8 }}>({aiError})</span>}
+            </div>
+          )}
+
+          {aiFields?.summary && (
+            <div style={{ fontSize: 12, color: colors.textSecondary, background: 'rgba(203,168,92,0.06)', borderRadius: 8, padding: '8px 12px' }}>
+              {aiFields.summary}
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '文件类型' : 'Document Type'}</label>
+              <input
+                placeholder={isZh ? '文件类型' : 'Document Type'}
+                value={reviewForm.document_type}
+                onChange={e => setReviewForm(f => ({ ...f, document_type: e.target.value }))}
+                style={{ ...inputSt, width: '100%' }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '建议分类' : 'Suggested Category'}</label>
+              <select className="gci-cd-select" value={reviewForm.category} onChange={e => handleCategorySelect(e.target.value)} style={{ ...inputSt, width: '100%' }}>
+                <option value="">{isZh ? '— 选择分类 —' : '— Select Category —'}</option>
+                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                <option value={ADD_CATEGORY_VALUE}>{isZh ? '+ 新建分类' : '+ Add Category'}</option>
+              </select>
+              {aiFields?.suggested_category && !categories.some(c => c.name.toLowerCase() === (aiFields.suggested_category || '').toLowerCase()) && (
+                <div style={{ fontSize: 10.5, color: AMBER, marginTop: 4 }}>
+                  {isZh ? `AI 建议：${aiFields.suggested_category}（当前分类库中没有，可新建或手动选择）` : `AI suggests: ${aiFields.suggested_category} (not in the category list yet — add it or pick manually)`}
+                </div>
+              )}
+              {addingCategory && (
+                <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
+                  <input
+                    autoFocus
+                    placeholder={isZh ? '新分类名称' : 'New category name'}
+                    value={newCategoryName}
+                    onChange={e => setNewCategoryName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') saveNewCategory(); }}
+                    style={{ ...inputSt, flex: 1 }}
+                  />
+                  <button
+                    disabled={savingCategory}
+                    onClick={saveNewCategory}
+                    style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#B8935A)`, color: '#1A1206', border: 'none' }}
+                  >
+                    {savingCategory ? (isZh ? '保存中…' : 'Saving…') : (isZh ? '保存' : 'Save')}
+                  </button>
+                  <button
+                    onClick={() => { setAddingCategory(false); setNewCategoryName(''); setNewCategoryError(''); }}
+                    style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}
+                  >
+                    {isZh ? '取消' : 'Cancel'}
+                  </button>
+                </div>
+              )}
+              {newCategoryError && <div style={{ fontSize: 11, color: RED, marginTop: 4 }}>{newCategoryError}</div>}
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '公司名称' : 'Company Name'}</label>
+              <input value={reviewForm.company_name} onChange={e => setReviewForm(f => ({ ...f, company_name: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '证件号' : 'Document No.'}</label>
+              <input value={reviewForm.document_number} onChange={e => setReviewForm(f => ({ ...f, document_number: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '签发日期' : 'Issue Date'}</label>
+              <input type="date" value={reviewForm.issue_date} onChange={e => setReviewForm(f => ({ ...f, issue_date: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '到期日期' : 'Expiry Date'}</label>
+              <input type="date" value={reviewForm.expiry_date} onChange={e => setReviewForm(f => ({ ...f, expiry_date: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '签发机构' : 'Issuing Authority'}</label>
+              <input value={reviewForm.issuing_authority} onChange={e => setReviewForm(f => ({ ...f, issuing_authority: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '文件名称' : 'Document Name'}</label>
+              <input value={reviewForm.document_name} onChange={e => setReviewForm(f => ({ ...f, document_name: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '摘要' : 'Summary'}</label>
+              <input value={reviewForm.ai_summary} onChange={e => setReviewForm(f => ({ ...f, ai_summary: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '说明 / 备注' : 'Notes'}</label>
+              <input value={reviewForm.notes} onChange={e => setReviewForm(f => ({ ...f, notes: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              disabled={savingReview} onClick={handleConfirmSave}
+              style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#B8935A)`, color: '#1A1206', border: 'none' }}
+            >
+              {savingReview ? (isZh ? '保存中…' : 'Saving…') : (isZh ? '确认并保存' : 'Confirm & Save')}
+            </button>
+            <button
+              onClick={handleReRecognize}
+              style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}
+            >
+              {isZh ? '重新识别' : 'Re-recognize'}
+            </button>
+            <button onClick={closeUpload} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+              {isZh ? '取消' : 'Cancel'}
+            </button>
+            {aiStage === 'review' && aiError && <span style={{ fontSize: 12, color: RED }}>{aiError}</span>}
+          </div>
+        </div>
+      )}
+
       {error && <div style={{ padding: '12px 16px', background: 'rgba(224,132,106,0.08)', border: `1px solid ${RED}40`, borderRadius: 10, color: RED, fontSize: 13, marginBottom: 16 }}>{error}</div>}
       {!docs && !error && <div style={{ color: MUTED, fontSize: 13 }}>{isZh ? '加载中…' : 'Loading…'}</div>}
       {docs && filtered.length === 0 && (
@@ -459,6 +805,16 @@ export function CompanyDocuments() {
                       <button disabled={busyId === doc.id} onClick={() => handleDownload(doc)} title={isZh ? '下载' : 'Download'} style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
                         {isZh ? '下载' : 'Download'}
                       </button>
+                      {canUpload && AI_SUPPORTED_MIME.includes(doc.mime_type || '') && (isAdmin || doc.uploaded_by === profile?.id) && (
+                        <button
+                          disabled={rowAiBusy === doc.id}
+                          onClick={() => openReviewForExistingDoc(doc)}
+                          title={isZh ? 'AI 识别' : 'AI Recognize'}
+                          style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(203,168,92,0.1)', border: `1px solid ${GOLD}40`, color: GOLD }}
+                        >
+                          {rowAiBusy === doc.id ? (isZh ? '识别中…' : '…') : (isZh ? 'AI 识别' : 'AI Recognize')}
+                        </button>
+                      )}
                       {isAdmin && (
                         <button disabled={busyId === doc.id} onClick={() => handleDelete(doc)} title={isZh ? '删除' : 'Delete'} style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(224,132,106,0.1)', border: `1px solid ${RED}40`, color: RED }}>
                           {isZh ? '删除' : 'Delete'}

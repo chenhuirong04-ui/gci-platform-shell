@@ -74,6 +74,8 @@ function safeExtension(fileName: string): string {
   return `.${match[1].toLowerCase()}`;
 }
 
+export type AiStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'needs_review';
+
 export interface CompanyDocument {
   id: string;
   category: string;
@@ -88,6 +90,19 @@ export interface CompanyDocument {
   uploaded_by: string | null;
   updated_at: string;
   updated_by: string | null;
+  // Company Documents Intelligence V2 Phase 1 — all nullable, never backfilled
+  // for historical rows (see supabase/migrations/20260917c_company_documents_ai_fields.sql).
+  document_type: string | null;
+  company_name: string | null;
+  document_number: string | null;
+  issue_date: string | null;
+  issuing_authority: string | null;
+  ai_summary: string | null;
+  ai_extracted: Record<string, unknown> | null;
+  ai_status: AiStatus | null;
+  ai_confidence: number | null;
+  reminder_enabled: boolean;
+  last_ai_processed_at: string | null;
 }
 
 export async function fetchCompanyDocuments(category?: string): Promise<CompanyDocument[]> {
@@ -163,6 +178,168 @@ export async function getCompanyDocumentSignedUrl(storagePath: string): Promise<
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(storagePath, 60 * 60); // 1 hour
   if (error) return null;
   return data?.signedUrl ?? null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Company Documents Intelligence V2 Phase 1 — AI recognition
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface AIDocumentFields {
+  document_type: string | null;
+  suggested_category: string | null;
+  company_name: string | null;
+  document_number: string | null;
+  issue_date: string | null;
+  expiry_date: string | null;
+  issuing_authority: string | null;
+  summary: string | null;
+  confidence: number | null;
+}
+
+// Below this, the AI's own guess is flagged for human review rather than
+// auto-trusted — the row still saves (never blocks the upload), just with
+// ai_status='needs_review' instead of 'completed'.
+const AI_NEEDS_REVIEW_THRESHOLD = 0.5;
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+// Uploads to Storage and creates the row immediately (ai_status='pending') — same
+// Storage path scheme as uploadCompanyDocument(), filed under the 'other' slug
+// since the real category isn't known yet (the Storage path is an internal
+// object key only, never shown to the user, so this is cosmetic — the row's
+// actual `category` gets corrected to the confirmed value by confirmAIDocument()
+// before the user ever sees it). document_name defaults to the raw filename,
+// same convention the existing upload form already used.
+export async function createPendingCompanyDocument(file: File): Promise<
+  { ok: true; document: CompanyDocument } | { ok: false; error: string }
+> {
+  const storagePath = `company/other/${crypto.randomUUID()}${safeExtension(file.name)}`;
+  const { error: uploadError } = await supabase.storage.from(BUCKET).upload(storagePath, file);
+  if (uploadError) return { ok: false, error: `Storage: ${uploadError.message}` };
+
+  const { data, error: dbError } = await supabase.from('company_documents').insert({
+    category: 'Other',
+    document_name: file.name,
+    file_name: file.name,
+    storage_path: storagePath,
+    file_size: file.size,
+    mime_type: file.type || null,
+    notes: '',
+    ai_status: 'pending',
+  }).select().single();
+  if (dbError) {
+    await supabase.storage.from(BUCKET).remove([storagePath]);
+    return { ok: false, error: `DB: ${dbError.message}` };
+  }
+  return { ok: true, document: data as CompanyDocument };
+}
+
+// Calls the server-side Gemini endpoint (api/company-documents/parse-document —
+// GEMINI_API_KEY never reaches the client) and stamps ai_status + the extracted
+// fields onto the row either way. Never throws — a failure resolves ok:false so
+// the caller can fall back to the manual form without losing the upload itself.
+export async function runDocumentAIRecognition(documentId: string, file: File): Promise<
+  { ok: true; fields: AIDocumentFields; model: string } | { ok: false; error: string }
+> {
+  await supabase.from('company_documents').update({ ai_status: 'processing' as AiStatus }).eq('id', documentId);
+  try {
+    const dataUrl = await fileToDataUrl(file);
+    const res = await fetch('/api/company-documents/parse-document', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mimeType: file.type, data: dataUrl }),
+    });
+    const payload = await res.json();
+    if (!payload?.ok) {
+      await supabase.from('company_documents')
+        .update({ ai_status: 'failed' as AiStatus, last_ai_processed_at: new Date().toISOString() })
+        .eq('id', documentId);
+      return { ok: false, error: payload?.error || 'AI recognition failed' };
+    }
+    const fields = payload.fields as AIDocumentFields;
+    const confidence = typeof fields.confidence === 'number' ? fields.confidence : null;
+    const status: AiStatus = confidence !== null && confidence < AI_NEEDS_REVIEW_THRESHOLD ? 'needs_review' : 'completed';
+    await supabase.from('company_documents').update({
+      document_type: fields.document_type || null,
+      company_name: fields.company_name || null,
+      document_number: fields.document_number || null,
+      issue_date: fields.issue_date || null,
+      expiry_date: fields.expiry_date || null,
+      issuing_authority: fields.issuing_authority || null,
+      ai_summary: fields.summary || null,
+      ai_extracted: fields,
+      ai_status: status,
+      ai_confidence: confidence,
+      last_ai_processed_at: new Date().toISOString(),
+    }).eq('id', documentId);
+    return { ok: true, fields, model: payload.model };
+  } catch (e: any) {
+    await supabase.from('company_documents')
+      .update({ ai_status: 'failed' as AiStatus, last_ai_processed_at: new Date().toISOString() })
+      .eq('id', documentId);
+    return { ok: false, error: String(e?.message ?? e) };
+  }
+}
+
+// Only matches an EXISTING active category (case/whitespace-insensitive) —
+// never creates one. Category creation stays a deliberate user action via
+// "+ Add Category", per spec.
+export function matchSuggestedCategory(
+  suggested: string | null, categories: CompanyDocumentCategory[],
+): CompanyDocumentCategory | null {
+  if (!suggested) return null;
+  const norm = suggested.trim().toLowerCase();
+  return categories.find(c => c.name.trim().toLowerCase() === norm) || null;
+}
+
+// Re-downloads an already-uploaded file from Storage so the "AI 识别" button on
+// an existing row can re-run recognition without the browser still holding the
+// original File object (it never does, after the initial upload completes).
+export async function fetchStoredFileForAI(doc: CompanyDocument): Promise<File | null> {
+  const { data, error } = await supabase.storage.from(BUCKET).download(doc.storage_path);
+  if (error || !data) return null;
+  return new File([data], doc.file_name, { type: doc.mime_type || data.type });
+}
+
+export interface ConfirmAIDocumentInput {
+  category: string;
+  document_name: string;
+  document_type: string | null;
+  company_name: string | null;
+  document_number: string | null;
+  issue_date: string | null;
+  expiry_date: string | null;
+  issuing_authority: string | null;
+  ai_summary: string | null;
+  notes: string;
+}
+
+// The "确认并保存" step — writes the (possibly user-corrected) reviewed fields,
+// including whichever category/document_name the user settled on. Also used
+// for the AI-failure manual-fallback path (same row, AI fields just stay null).
+// reminder_enabled follows whether an expiry_date ended up set at all.
+export async function confirmAIDocument(id: string, input: ConfirmAIDocumentInput): Promise<{ error: string | null }> {
+  const { error } = await supabase.from('company_documents').update({
+    category: input.category,
+    document_name: input.document_name,
+    document_type: input.document_type,
+    company_name: input.company_name,
+    document_number: input.document_number,
+    issue_date: input.issue_date,
+    expiry_date: input.expiry_date,
+    issuing_authority: input.issuing_authority,
+    ai_summary: input.ai_summary,
+    notes: input.notes,
+    reminder_enabled: !!input.expiry_date,
+  }).eq('id', id);
+  return { error: error ? error.message : null };
 }
 
 // user_profiles' own RLS only lets a user read their own row, so "上传人" (uploaded_by) can't be
