@@ -76,9 +76,12 @@ Return ONLY valid JSON — no markdown, no explanation. Use exactly this schema:
 }
 Rules: confidence is a plain number from 0.0 to 1.0 reflecting how sure you are about document_type and the extracted fields overall — low if the image is blurry, cropped, or a field was genuinely unreadable. All dates must be YYYY-MM-DD. Never guess a document number or a date that isn't legible — null is always correct over a guess.`;
 
-// 2026-09-17: gemini-2.0-flash / gemini-1.5-flash were failing in Production
-// (404 — no longer available). Replaced per confirmed-working model names.
-const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-2.5-flash-lite'];
+// 2026-09-17: hardcoded model names kept going stale (gemini-2.0-flash /
+// gemini-1.5-flash 404'd; the next hardcoded guess also partly failed for
+// this specific API key). Priority order is still a fixed preference, but
+// each request now checks it against a live ListModels call before ever
+// trying generateContent — see listAvailableModels() above and its use below.
+const PRIORITY_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.5-flash'];
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
@@ -109,6 +112,23 @@ export default async function handler(request: Request): Promise<Response> {
 
   const base64 = typeof data === 'string' && data.includes(',') ? data.split(',')[1] : data;
 
+  // Check the priority list against what this API key can actually reach
+  // right now, instead of trusting a hardcoded name — see PRIORITY_MODELS'
+  // own comment for why.
+  const availability = await listAvailableModels(apiKey);
+  if (!availability.ok) {
+    console.error(`[company-documents/parse-document] ListModels failed: ${availability.error}`);
+    return json({ ok: false, error: 'Could not verify available AI models. Please try again shortly.' }, 502);
+  }
+  const candidateModels = PRIORITY_MODELS.filter((m) => availability.models.includes(m));
+  if (candidateModels.length === 0) {
+    console.error(
+      `[company-documents/parse-document] None of the priority models are available for this API key. `
+      + `Priority: ${PRIORITY_MODELS.join(', ')}. Available (generateContent): ${availability.models.join(', ')}`,
+    );
+    return json({ ok: false, error: 'No supported Gemini generateContent model is available for this API key.' }, 502);
+  }
+
   const geminiBody = {
     contents: [{
       parts: [
@@ -119,8 +139,8 @@ export default async function handler(request: Request): Promise<Response> {
     generationConfig: { temperature: 0.1, maxOutputTokens: 1024, responseMimeType: 'application/json' },
   };
 
-  let lastError = '';
-  for (const model of GEMINI_MODELS) {
+  const triedModels: string[] = [];
+  for (const model of candidateModels) {
     try {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       const res = await fetch(endpoint, {
@@ -130,7 +150,10 @@ export default async function handler(request: Request): Promise<Response> {
       });
       if (!res.ok) {
         const errBody = await res.text().catch(() => '');
-        lastError = `Gemini ${model} HTTP ${res.status}: ${errBody.slice(0, 300)}`;
+        // Full detail (model, HTTP status, Google's own message) goes to the
+        // server log only — the client only ever sees a short generic error.
+        console.error(`[company-documents/parse-document] model=${model} HTTP ${res.status} message=${errBody.slice(0, 800)}`);
+        triedModels.push(model);
         continue;
       }
       const geminiData: any = await res.json();
@@ -146,13 +169,16 @@ export default async function handler(request: Request): Promise<Response> {
       try {
         fields = JSON.parse(cleaned);
       } catch {
-        return json({ ok: false, error: 'AI returned non-JSON response', rawPreview: rawText.slice(0, 500) });
+        console.error(`[company-documents/parse-document] model=${model} returned non-JSON: ${rawText.slice(0, 500)}`);
+        return json({ ok: false, error: 'AI returned an unreadable response. Please try again or fill in manually.' }, 502);
       }
       return json({ ok: true, fields, model });
     } catch (e: any) {
-      lastError = e?.message || String(e);
+      console.error(`[company-documents/parse-document] model=${model} threw: ${e?.message || e}`);
+      triedModels.push(model);
     }
   }
 
-  return json({ ok: false, error: `All Gemini models failed. Last error: ${lastError}` }, 502);
+  console.error(`[company-documents/parse-document] All candidate models failed. Tried: ${triedModels.join(', ')}`);
+  return json({ ok: false, error: 'AI recognition is temporarily unavailable. Please try again or fill in manually.' }, 502);
 }
