@@ -4,37 +4,65 @@ import { supabase } from './supabase';
 // companyDocumentsService.ts. File bytes live in the private `company-documents` Storage bucket,
 // never in the database — only metadata + storage_path are stored here. View/Download always go
 // through a time-limited signed URL, never a public bucket link.
-export const COMPANY_DOCUMENT_CATEGORIES = [
-  'Trade License', 'MOA/AOA', 'POA', 'VAT', 'Corporate Tax', 'Bank', 'Contracts',
-  'Government Documents', 'Insurance', 'Vehicles', 'HR/Employee', 'Projects', 'Other',
-] as const;
-export type CompanyDocumentCategory = typeof COMPANY_DOCUMENT_CATEGORIES[number];
-
+//
+// Task (2026-09-17): categories moved from a hardcoded array to
+// company_document_categories (see supabase/migrations/20260917b_company_document_categories.sql)
+// so a newly-added category is remembered — no more editing this file every time a new document
+// type shows up. company_documents.category stays a plain text column (unchanged, no FK, no
+// migration of historical rows) — it just now gets its value from fetchDocumentCategories()
+// instead of a local const array.
 const BUCKET = 'company-documents';
 
-// Fixed-map Storage-key slug per category — avoids feeding spaces/Chinese/slashes (MOA/AOA would
-// otherwise create a nested "AOA" folder) straight into an object key. Covers every entry in
-// COMPANY_DOCUMENT_CATEGORIES above; slugifyCategory() below is the fallback for anything not
-// listed here (defensive only — the frontend dropdown only ever sends one of those categories).
-const CATEGORY_SLUGS: Record<string, string> = {
-  'Trade License': 'trade-license',
-  'MOA/AOA': 'moa-aoa',
-  'POA': 'poa',
-  'VAT': 'vat',
-  'Corporate Tax': 'corporate-tax',
-  'Bank': 'bank',
-  'Contracts': 'contracts',
-  'Government Documents': 'government-documents',
-  'Insurance': 'insurance',
-  'Vehicles': 'vehicles',
-  'HR/Employee': 'hr-employee',
-  'Projects': 'projects',
-  'Other': 'other',
-};
-
+// Storage-key slug, derived from the category name — avoids feeding spaces/Chinese/slashes
+// (MOA/AOA would otherwise create a nested "AOA" folder) straight into an object key. Every
+// existing category's DB-stored slug (see the migration's seed) matches what this produces, so
+// switching from the old fixed CATEGORY_SLUGS map to this dynamic version changes no existing
+// Storage paths.
 function slugifyCategory(category: string): string {
   const slug = category.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   return slug || 'other';
+}
+
+export interface CompanyDocumentCategory {
+  id: string;
+  name: string;
+  slug: string;
+  is_system: boolean;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export async function fetchDocumentCategories(): Promise<CompanyDocumentCategory[]> {
+  const { data, error } = await supabase
+    .from('company_document_categories')
+    .select('*')
+    .eq('active', true)
+    .order('sort_order', { ascending: true })
+    .order('name', { ascending: true });
+  if (error || !data) return [];
+  return data as CompanyDocumentCategory[];
+}
+
+// Adds one new category — always a single explicit user action from the upload form's
+// "+ Add Category", never batch/automatic. Trims, rejects empty, and relies on the DB's
+// case/whitespace-insensitive unique index (idx_company_document_categories_name_norm) to reject
+// a duplicate — this just turns that constraint violation into a friendly message.
+export async function createDocumentCategory(name: string): Promise<
+  { ok: true; category: CompanyDocumentCategory } | { ok: false; error: string }
+> {
+  const trimmed = name.trim();
+  if (!trimmed) return { ok: false, error: 'empty' };
+  const { data, error } = await supabase
+    .from('company_document_categories')
+    .insert({ name: trimmed, slug: slugifyCategory(trimmed), is_system: false })
+    .select()
+    .single();
+  if (error) {
+    if (error.code === '23505') return { ok: false, error: 'duplicate' };
+    return { ok: false, error: error.message };
+  }
+  return { ok: true, category: data as CompanyDocumentCategory };
 }
 
 // Keeps only a plain alphanumeric extension (max 10 chars, guards against a pathological
@@ -85,7 +113,7 @@ export interface UploadCompanyDocumentInput {
 // after a successful upload, the orphaned Storage object is cleaned up so a failed attempt never
 // leaves an untracked file behind.
 export async function uploadCompanyDocument(input: UploadCompanyDocumentInput): Promise<{ error: string | null }> {
-  const categorySlug = CATEGORY_SLUGS[input.category] || slugifyCategory(input.category);
+  const categorySlug = slugifyCategory(input.category);
   const storagePath = `company/${categorySlug}/${crypto.randomUUID()}${safeExtension(input.file.name)}`;
   const { error: uploadError } = await supabase.storage.from(BUCKET).upload(storagePath, input.file);
   if (uploadError) return { error: `Storage: ${uploadError.message}` };

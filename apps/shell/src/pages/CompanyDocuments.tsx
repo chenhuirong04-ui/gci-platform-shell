@@ -10,9 +10,11 @@ import { colors } from '@gci/design-system';
 import { useAuth } from '../contexts/AuthContext';
 import {
   fetchCompanyDocuments, uploadCompanyDocument, deleteCompanyDocument, getCompanyDocumentSignedUrl,
-  fetchUserDisplayNames, COMPANY_DOCUMENT_CATEGORIES,
-  type CompanyDocument,
+  fetchUserDisplayNames, fetchDocumentCategories, createDocumentCategory,
+  type CompanyDocument, type CompanyDocumentCategory,
 } from '../lib/companyDocumentsService';
+
+const ADD_CATEGORY_VALUE = '__add_new__';
 
 const GOLD = '#CBA85C';
 const RED = '#E0846A';
@@ -89,6 +91,11 @@ export function CompanyDocuments() {
   const [docs, setDocs] = useState<CompanyDocument[] | null>(null);
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<CompanyDocumentCategory[]>([]);
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryError, setNewCategoryError] = useState('');
+  const [savingCategory, setSavingCategory] = useState(false);
 
   const [categoryFilter, setCategoryFilter] = useState('');
   const [search, setSearch] = useState('');
@@ -117,7 +124,41 @@ export function CompanyDocuments() {
       setUserNames(names);
     });
   }
-  useEffect(() => { load(); }, []);
+  function loadCategories() {
+    fetchDocumentCategories().then(setCategories);
+  }
+  useEffect(() => { load(); loadCategories(); }, []);
+
+  const handleCategorySelect = (value: string) => {
+    if (value === ADD_CATEGORY_VALUE) {
+      setAddingCategory(true);
+      setNewCategoryName('');
+      setNewCategoryError('');
+      return;
+    }
+    setUploadForm(f => ({ ...f, category: value }));
+  };
+
+  const saveNewCategory = async () => {
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) { setNewCategoryError(isZh ? '请输入分类名称' : 'Category name is required'); return; }
+    setSavingCategory(true);
+    setNewCategoryError('');
+    const res = await createDocumentCategory(trimmed);
+    setSavingCategory(false);
+    if (!res.ok) {
+      setNewCategoryError(
+        res.error === 'duplicate'
+          ? (isZh ? '该分类已存在' : 'This category already exists')
+          : (isZh ? '保存失败，请重试' : 'Failed to save, please retry'),
+      );
+      return;
+    }
+    setCategories(prev => [...prev, res.category].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)));
+    setUploadForm(f => ({ ...f, category: res.category.name }));
+    setAddingCategory(false);
+    setNewCategoryName('');
+  };
 
   const filtered = useMemo(() => {
     if (!docs) return [];
@@ -258,7 +299,7 @@ export function CompanyDocuments() {
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
         <select className="gci-cd-select" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={inputSt}>
           <option value="">{isZh ? '全部分类' : 'All Categories'}</option>
-          {COMPANY_DOCUMENT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
         </select>
         <input
           placeholder={isZh ? '搜索文件名…' : 'Search file name…'}
@@ -310,10 +351,39 @@ export function CompanyDocuments() {
             />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}>
-            <select className="gci-cd-select" value={uploadForm.category} onChange={e => setUploadForm(f => ({ ...f, category: e.target.value }))} style={inputSt}>
-              <option value="">{isZh ? '— 选择分类 —' : '— Select Category —'}</option>
-              {COMPANY_DOCUMENT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <div>
+              <select className="gci-cd-select" value={uploadForm.category} onChange={e => handleCategorySelect(e.target.value)} style={{ ...inputSt, width: '100%' }}>
+                <option value="">{isZh ? '— 选择分类 —' : '— Select Category —'}</option>
+                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                <option value={ADD_CATEGORY_VALUE}>{isZh ? '+ 新建分类' : '+ Add Category'}</option>
+              </select>
+              {addingCategory && (
+                <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
+                  <input
+                    autoFocus
+                    placeholder={isZh ? '新分类名称' : 'New category name'}
+                    value={newCategoryName}
+                    onChange={e => setNewCategoryName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') saveNewCategory(); }}
+                    style={{ ...inputSt, flex: 1 }}
+                  />
+                  <button
+                    disabled={savingCategory}
+                    onClick={saveNewCategory}
+                    style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#B8935A)`, color: '#1A1206', border: 'none' }}
+                  >
+                    {savingCategory ? (isZh ? '保存中…' : 'Saving…') : (isZh ? '保存' : 'Save')}
+                  </button>
+                  <button
+                    onClick={() => { setAddingCategory(false); setNewCategoryName(''); setNewCategoryError(''); }}
+                    style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}
+                  >
+                    {isZh ? '取消' : 'Cancel'}
+                  </button>
+                </div>
+              )}
+              {newCategoryError && <div style={{ fontSize: 11, color: RED, marginTop: 4 }}>{newCategoryError}</div>}
+            </div>
             <input
               placeholder={isZh ? '文件名称' : 'Document Name'}
               value={uploadForm.document_name}
