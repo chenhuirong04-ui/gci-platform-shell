@@ -17,6 +17,29 @@ function json(body: unknown, status = 200) {
   });
 }
 
+// Internal-only helper — checks which models this GEMINI_API_KEY can actually
+// call generateContent on, straight from Google's own ListModels, instead of
+// trusting a hardcoded name (see PRIORITY_MODELS below). Called from inside
+// the POST handler only — no GET route exposes this or returns a model list
+// to the client. Same pattern as api/company-documents/parse-document.ts.
+async function listAvailableModels(apiKey: string): Promise<{ ok: true; models: string[] } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '');
+      return { ok: false, error: `ListModels HTTP ${res.status}: ${errBody.slice(0, 500)}` };
+    }
+    const data: any = await res.json();
+    const models: string[] = (data?.models || [])
+      .filter((m: any) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+      .map((m: any) => String(m.name || '').replace(/^models\//, ''))
+      .filter(Boolean);
+    return { ok: true, models };
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message ?? e) };
+  }
+}
+
 // -- Per-document-type prompts -----------------------------------------------
 
 const PROMPTS: Record<string, string> = {
@@ -198,7 +221,11 @@ Return ONLY valid JSON - no markdown, no explanation. Use this schema:
 Rules: Convert all dates to YYYY-MM-DD format. For CE mark: market_scope = EU. For SASO: market_scope = Saudi Arabia. Pick the MOST SPECIFIC certification_type that matches; use Other only if none match. Never guess missing fields - use null.`,
 };
 
-const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+// 2026-09-17: aligned with api/company-documents/parse-document.ts — a fixed
+// priority order, but checked against a live ListModels call for this
+// GEMINI_API_KEY before ever calling generateContent, instead of trusting a
+// hardcoded name (gemini-2.0-flash / gemini-1.5-flash had gone stale here).
+const PRIORITY_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.5-flash'];
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
@@ -244,8 +271,24 @@ export default async function handler(request: Request): Promise<Response> {
     },
   };
 
-  let lastError = '';
-  for (const model of GEMINI_MODELS) {
+  // Check the priority list against what this API key can actually reach
+  // right now, instead of trusting a hardcoded name.
+  const availability = await listAvailableModels(apiKey);
+  if (!availability.ok) {
+    console.error(`[bs/parse-document] ListModels failed: ${availability.error}`);
+    return json({ ok: false, error: 'Could not verify available AI models. Please try again shortly.' }, 502);
+  }
+  const candidateModels = PRIORITY_MODELS.filter((m) => availability.models.includes(m));
+  if (candidateModels.length === 0) {
+    console.error(
+      `[bs/parse-document] None of the priority models are available for this API key. `
+      + `Priority: ${PRIORITY_MODELS.join(', ')}. Available (generateContent): ${availability.models.join(', ')}`,
+    );
+    return json({ ok: false, error: 'No supported Gemini generateContent model is available for this API key.' }, 502);
+  }
+
+  const triedModels: string[] = [];
+  for (const model of candidateModels) {
     let geminiStatus = 0;
     let rawText = '';
     try {
@@ -258,7 +301,8 @@ export default async function handler(request: Request): Promise<Response> {
       geminiStatus = res.status;
       if (!res.ok) {
         const errBody = await res.text().catch(() => '');
-        lastError = `Gemini ${model} HTTP ${res.status}: ${errBody.slice(0, 300)}`;
+        console.error(`[bs/parse-document] model=${model} HTTP ${res.status} message=${errBody.slice(0, 800)}`);
+        triedModels.push(model);
         continue;
       }
       const geminiData: any = await res.json();
@@ -276,6 +320,7 @@ export default async function handler(request: Request): Promise<Response> {
       try {
         fields = JSON.parse(cleaned);
       } catch {
+        console.error(`[bs/parse-document] model=${model} returned non-JSON: ${rawText.slice(0, 500)}`);
         return json({
           ok: false,
           error: 'AI returned non-JSON response',
@@ -287,9 +332,11 @@ export default async function handler(request: Request): Promise<Response> {
       }
       return json({ ok: true, fields, model });
     } catch (e: any) {
-      lastError = e?.message || String(e);
+      console.error(`[bs/parse-document] model=${model} threw: ${e?.message || e}`);
+      triedModels.push(model);
     }
   }
 
-  return json({ ok: false, error: `All Gemini models failed. Last error: ${lastError}` }, 502);
+  console.error(`[bs/parse-document] All candidate models failed. Tried: ${triedModels.join(', ')}`);
+  return json({ ok: false, error: 'AI recognition is temporarily unavailable. Please try again or fill in manually.' }, 502);
 }

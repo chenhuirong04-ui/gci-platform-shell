@@ -50,6 +50,11 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
   const [customerFormMode, setCustomerFormMode] = useState<'add' | 'edit' | null>(null);
   const [editingCustomer, setEditingCustomer]   = useState<ServiceCustomer | null>(null);
   const [viewingCustomer, setViewingCustomer]   = useState<ServiceCustomer | null>(null);
+  // Only set when opening the detail panel via BSNewQuotePage's "客户文件"
+  // button — makes ServiceCustomerDetail land straight on its documents tab
+  // instead of the default 'info'. Every other entry point resets it to
+  // undefined so it never bleeds into a later view.
+  const [viewingCustomerInitialTab, setViewingCustomerInitialTab] = useState<'documents' | undefined>(undefined);
   const [customerQuotes, setCustomerQuotes]     = useState<ServiceQuote[]>([]);
 
   // Quotes tab state
@@ -114,6 +119,7 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
 
   const handleViewCustomer = async (c: ServiceCustomer) => {
     setViewingCustomer(c);
+    setViewingCustomerInitialTab(undefined);
     if (c.id) {
       const cq = await listQuotesByCustomer(c.id);
       setCustomerQuotes(cq);
@@ -334,11 +340,13 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
           initialCustomer={quoteBuilderCustomer}
           onGoToCustomerFiles={(c) => {
             setViewingCustomer(c);
+            setViewingCustomerInitialTab('documents');
             setTab('customers');
             if (c.id) listQuotesByCustomer(c.id).then(setCustomerQuotes);
           }}
           onGoToCustomerProfile={(c) => {
             setViewingCustomer(c);
+            setViewingCustomerInitialTab(undefined);
             setTab('customers');
             if (c.id) listQuotesByCustomer(c.id).then(setCustomerQuotes);
           }}
@@ -380,6 +388,7 @@ export function BusinessSolutionsModule({ lang: langProp }: Props) {
                 lang={lang}
                 customer={viewingCustomer}
                 quotes={customerQuotes}
+                initialTab={viewingCustomerInitialTab}
                 onEdit={() => handleEditCustomer(viewingCustomer)}
                 onNewQuote={() => handleNewQuoteForCustomer(viewingCustomer)}
                 onViewQuote={handleViewQuote}

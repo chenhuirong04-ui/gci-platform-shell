@@ -17,6 +17,10 @@ interface Props {
   onArchive: () => void;
   onUnarchive: () => void;
   onDelete: () => void;
+  // Which tab to open on. Defaults to 'info' — only the "客户文件" entry
+  // point from BSNewQuotePage passes 'documents' so it lands straight on
+  // CustomerDocumentManager instead of requiring an extra click.
+  initialTab?: DetailTab;
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -40,11 +44,11 @@ type DetailTab = 'info' | 'service' | 'quotes' | 'documents' | 'compliance' | 'p
 
 export function ServiceCustomerDetail({
   lang, customer, quotes, onEdit, onNewQuote, onViewQuote, onClose,
-  onArchive, onUnarchive, onDelete,
+  onArchive, onUnarchive, onDelete, initialTab,
 }: Props) {
   const t = useT(lang);
   const isZh = lang === 'zh';
-  const [activeTab, setActiveTab] = useState<DetailTab>('info');
+  const [activeTab, setActiveTab] = useState<DetailTab>(initialTab || 'info');
   const isArchived = customer.is_active === false;
 
   const handleDeleteClick = () => {
