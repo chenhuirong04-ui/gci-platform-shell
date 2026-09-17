@@ -13,7 +13,7 @@ export const config = { runtime: 'edge' };
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
@@ -22,6 +22,30 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...CORS, 'Content-Type': 'application/json' },
   });
+}
+
+// Temporary diagnostic step (2026-09-17): GET this endpoint to see which
+// models this GEMINI_API_KEY can actually call generateContent on, straight
+// from Google's own ListModels — server-side only, key never leaves this
+// function. Used once to confirm real model names before finalizing the
+// POST path's model-selection logic; safe to keep (read-only, no cost beyond
+// the ListModels call itself).
+async function listAvailableModels(apiKey: string): Promise<{ ok: true; models: string[] } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '');
+      return { ok: false, error: `ListModels HTTP ${res.status}: ${errBody.slice(0, 500)}` };
+    }
+    const data: any = await res.json();
+    const models: string[] = (data?.models || [])
+      .filter((m: any) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+      .map((m: any) => String(m.name || '').replace(/^models\//, ''))
+      .filter(Boolean);
+    return { ok: true, models };
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message ?? e) };
+  }
 }
 
 // Phase 1's 8 supported types (Company Documents Intelligence V2 spec). Any
@@ -58,10 +82,15 @@ const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-2.5-flash
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
-  if (request.method !== 'POST') return json({ ok: false, error: 'Method not allowed' }, 405);
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return json({ ok: false, error: 'GEMINI_API_KEY not configured' }, 500);
+
+  if (request.method === 'GET') {
+    const result = await listAvailableModels(apiKey);
+    return json(result, result.ok ? 200 : 502);
+  }
+  if (request.method !== 'POST') return json({ ok: false, error: 'Method not allowed' }, 405);
 
   let body: any;
   try { body = await request.json(); }
