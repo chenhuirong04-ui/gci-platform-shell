@@ -52,7 +52,9 @@ Return ONLY valid JSON — no markdown, no explanation. Use exactly this schema:
 }
 Rules: confidence is a plain number from 0.0 to 1.0 reflecting how sure you are about document_type and the extracted fields overall — low if the image is blurry, cropped, or a field was genuinely unreadable. All dates must be YYYY-MM-DD. Never guess a document number or a date that isn't legible — null is always correct over a guess.`;
 
-const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+// 2026-09-17: gemini-2.0-flash / gemini-1.5-flash were failing in Production
+// (404 — no longer available). Replaced per confirmed-working model names.
+const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-2.5-flash-lite'];
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
