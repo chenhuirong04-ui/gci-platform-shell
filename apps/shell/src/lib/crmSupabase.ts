@@ -4,11 +4,18 @@
 // Does NOT touch Notion or localStorage — those remain the old (retired) CRM path.
 import { supabase } from './supabase';
 
+export type CustomerPrimaryType = 'project' | 'trade' | 'services';
+
 export interface CrmCustomer {
   id: string;
   customer_name: string;
   customer_type: string | null;
   business_type: string | null;
+  // Task: CRM customer classification — 项目客户/批发·小贸易/服务类. Separate
+  // from customer_type (free-text Notion-migrated industry description) and
+  // business_type (GCI internal business-line routing) — neither of those is
+  // reused, to avoid mixing incompatible meanings into one column.
+  customer_primary_type: CustomerPrimaryType | null;
   country: string | null;
   city: string | null;
   owner: string | null;
@@ -474,6 +481,8 @@ export async function getRecentFollowupsWithNotes(
 }
 
 // ── Action 4: create customer (+ optional primary contact) ─────────────────────
+const CUSTOMER_PRIMARY_TYPES = new Set<CustomerPrimaryType>(['project', 'trade', 'services']);
+
 export async function createCustomerWithContact(input: {
   customerName: string;
   contactName?: string;
@@ -481,16 +490,25 @@ export async function createCustomerWithContact(input: {
   whatsapp?: string;
   email?: string;
   owner?: string;
+  // Left undefined/null when not explicitly stated — never guessed by the
+  // caller (GIA capture flow or otherwise). Anything outside the 3 allowed
+  // values is dropped rather than sent, so a bad extraction can't fail the
+  // insert against the DB check constraint.
+  customerPrimaryType?: CustomerPrimaryType | null;
 }): Promise<
   | { ok: true; customer: CrmCustomer; contact: CrmContact | null }
   | { ok: false; error: string }
 > {
+  const primaryType = input.customerPrimaryType && CUSTOMER_PRIMARY_TYPES.has(input.customerPrimaryType)
+    ? input.customerPrimaryType
+    : null;
   const { data: customer, error: cErr } = await supabase
     .from('crm_customers')
     .insert({
       customer_name: input.customerName,
       owner: input.owner || null,
       source: 'ask_gci',
+      customer_primary_type: primaryType,
     })
     .select()
     .single();
@@ -536,6 +554,23 @@ export async function setCustomerActive(
       archived_at: isActive ? null : new Date().toISOString(),
       archive_reason: isActive ? null : (reason || null),
     })
+    .eq('id', customerId)
+    .select()
+    .single();
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, customer: data as CrmCustomer };
+}
+
+// ── CRM customer classification (Task: 项目客户/批发·小贸易/服务类) — a
+// manual, explicit set only. Never called in a batch/auto-guess path; always
+// one row at a time from a human's dropdown pick in the customer directory. ──
+export async function setCustomerPrimaryType(
+  customerId: string,
+  type: CustomerPrimaryType | null,
+): Promise<{ ok: true; customer: CrmCustomer } | { ok: false; error: string }> {
+  const { data, error } = await supabase
+    .from('crm_customers')
+    .update({ customer_primary_type: type })
     .eq('id', customerId)
     .select()
     .single();

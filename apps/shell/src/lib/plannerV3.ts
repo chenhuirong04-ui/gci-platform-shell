@@ -93,7 +93,7 @@ const HONEST_GAP_ACTIONS = new Set(['STORE_DOCUMENT']);
 function emptyRawIntent(rawFragment: string): RawCaptureIntent {
   return {
     type: 'UNKNOWN', customer_name: null, contact_name: null, contact_phone: null, country: null,
-    business_type: null, needs_summary: null, followup_notes: null, next_action: null,
+    business_type: null, customer_primary_type: null, needs_summary: null, followup_notes: null, next_action: null,
     next_follow_up_at: null, commitment_direction: null, commitment_text: null, commitment_due_at: null,
     decision_title: null, decision_note: null, todo_title: null, todo_business_area: null, todo_due_at: null,
     memory_category: null, memory_title: null, memory_content: null, memory_company: null,

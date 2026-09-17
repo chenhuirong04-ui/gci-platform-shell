@@ -50,6 +50,7 @@ For each intent, extract only the fields that are actually stated. Never fabrica
       "contact_phone": string | null, // only for NEW_CUSTOMER — a phone/WhatsApp number stated for the contact, digits as given, never invented
       "country": string | null,
       "business_type": string | null,
+      "customer_primary_type": "project" | "trade" | "services" | null, // only for NEW_CUSTOMER — CRM classification of the customer relationship itself: "project" (a specific project/deal), "trade" (wholesale/small trade, buys goods on an ongoing basis), "services" (a services client). Set this ONLY when Chris explicitly says or clearly implies which one it is (e.g. "这是个批发客户"/"项目型客户"/"服务类客户"/"wholesale customer"/"project client") — otherwise leave null. NEVER infer this from the company name, industry, or any other guess — an unstated type must stay null.
       "needs_summary": string | null,
       "followup_notes": string | null,
       "next_action": string | null,

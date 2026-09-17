@@ -8,7 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
 import {
   getCustomerDirectory, getTodaysFollowups, getOverdueFollowups, setCustomerActive,
-  type CrmCustomerWithContact, type CrmOverdueCustomer,
+  setCustomerPrimaryType,
+  type CrmCustomerWithContact, type CrmOverdueCustomer, type CustomerPrimaryType,
 } from '../lib/crmSupabase';
 
 const GOLD = '#CBA85C';
@@ -38,6 +39,25 @@ const VIEWS: { key: ViewKey; label: string }[] = [
   { key: 'archived', label: '已停用客户' },
 ];
 
+// Task: CRM customer classification — 主要客户类型（单选，非多标签）。
+// Separate from business_type ("业务线") and the legacy free-text
+// customer_type column — see setCustomerPrimaryType in crmSupabase.ts.
+type TypeFilterKey = 'all' | CustomerPrimaryType;
+
+const TYPE_FILTERS: { key: TypeFilterKey; label: string }[] = [
+  { key: 'all', label: '全部客户' },
+  { key: 'project', label: '项目客户' },
+  { key: 'trade', label: '批发 / 小贸易' },
+  { key: 'services', label: '服务类' },
+];
+
+const PRIMARY_TYPE_LABEL: Record<CustomerPrimaryType, string> = {
+  project: '项目客户 (Project)',
+  trade: '批发 / 小贸易 (Wholesale & Small Trade)',
+  services: '服务类 (Services)',
+};
+const UNCLASSIFIED_LABEL = '未分类 (Unclassified)';
+
 function primaryContact(row: CrmCustomerWithContact): string {
   const contacts = row.crm_contacts || [];
   const primary = contacts.find((c) => c.is_primary) || contacts[0];
@@ -56,6 +76,8 @@ export function CrmCustomers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [restoreBusy, setRestoreBusy] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState<TypeFilterKey>('all');
+  const [typeBusy, setTypeBusy] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -86,6 +108,20 @@ export function CrmCustomers() {
     setRestoreBusy(null);
     if (res.ok) load();
   }
+
+  async function handleTypeChange(id: string, value: string) {
+    const next = (value || null) as CustomerPrimaryType | null;
+    setTypeBusy(id);
+    const res = await setCustomerPrimaryType(id, next);
+    setTypeBusy(null);
+    if (res.ok) {
+      setRows((prev) => prev.map((r: any) => (r.id === id ? { ...r, customer_primary_type: next } : r)));
+    }
+  }
+
+  const filteredRows = typeFilter === 'all'
+    ? rows
+    : (rows as any[]).filter((r) => r.customer_primary_type === typeFilter);
 
   function goToCustomer(name: string) {
     navigate(`/business-assistant?customer=${encodeURIComponent(name)}`);
@@ -145,27 +181,45 @@ export function CrmCustomers() {
         ))}
       </div>
 
+      <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+        {TYPE_FILTERS.map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setTypeFilter(f.key)}
+            style={{
+              padding: '6px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
+              background: typeFilter === f.key ? 'rgba(203,168,92,0.18)' : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${typeFilter === f.key ? GOLD : BORD}`,
+              color: typeFilter === f.key ? GOLD : MUTED,
+              fontWeight: typeFilter === f.key ? 700 : 400,
+            }}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       {loading && <div style={{ fontSize: 13, color: MUTED }}>加载中…</div>}
       {error && <div style={{ fontSize: 13, color: RED }}>读取失败:{error}</div>}
 
-      {!loading && !error && rows.length === 0 && (
+      {!loading && !error && filteredRows.length === 0 && (
         <div style={{ padding: '18px 20px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, fontSize: 13, color: MUTED }}>
-          {view === 'archived' ? '没有已停用的客户。' : '暂无记录。'}
+          {rows.length > 0 ? '没有匹配该客户类型的记录。' : (view === 'archived' ? '没有已停用的客户。' : '暂无记录。')}
         </div>
       )}
 
-      {!loading && !error && rows.length > 0 && (
+      {!loading && !error && filteredRows.length > 0 && (
         <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
-                {['客户/公司', '联系人', '国家', '业务线', '状态', '最近沟通', '下次跟进', 'Next Action', '负责人', ''].map((h) => (
+                {['客户/公司', '联系人', '国家', '业务线', '客户类型', '状态', '最近沟通', '下次跟进', 'Next Action', '负责人', ''].map((h) => (
                   <th key={h} style={{ textAlign: 'left', padding: '10px 14px', color: GOLD, fontWeight: 700, fontSize: 10.5, letterSpacing: '0.04em', borderBottom: `1px solid ${BORD}` }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {rows.map((r: any) => (
+              {filteredRows.map((r: any) => (
                 <tr
                   key={r.id}
                   onClick={() => goToCustomer(r.customer_name)}
@@ -177,6 +231,24 @@ export function CrmCustomers() {
                   <td style={{ padding: '10px 14px', color: MUTED }}>{view === 'today' || view === 'overdue' ? (primaryContact(r) ?? '—') : primaryContact(r)}</td>
                   <td style={{ padding: '10px 14px', color: MUTED }}>{r.country || '—'}</td>
                   <td style={{ padding: '10px 14px', color: MUTED }}>{r.business_type || '—'}</td>
+                  <td style={{ padding: '10px 14px' }} onClick={(e) => e.stopPropagation()}>
+                    <select
+                      value={r.customer_primary_type || ''}
+                      disabled={typeBusy === r.id}
+                      onChange={(e) => handleTypeChange(r.id, e.target.value)}
+                      style={{
+                        padding: '4px 8px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer',
+                        background: r.customer_primary_type ? 'rgba(203,168,92,0.1)' : 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${r.customer_primary_type ? GOLD : BORD}`,
+                        color: r.customer_primary_type ? GOLD : MUTED,
+                      }}
+                    >
+                      <option value="">{UNCLASSIFIED_LABEL}</option>
+                      <option value="project">{PRIMARY_TYPE_LABEL.project}</option>
+                      <option value="trade">{PRIMARY_TYPE_LABEL.trade}</option>
+                      <option value="services">{PRIMARY_TYPE_LABEL.services}</option>
+                    </select>
+                  </td>
                   <td style={{ padding: '10px 14px', color: MUTED }}>{r.status || '—'}</td>
                   <td style={{ padding: '10px 14px', color: MUTED }}>{fmtDate(r.last_follow_up_at)}</td>
                   <td style={{ padding: '10px 14px', color: view === 'overdue' ? RED : MUTED }}>

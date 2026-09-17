@@ -6,7 +6,7 @@
 // confirm call from the UI.
 import {
   findCustomerByName, createCustomerWithContact, logFollowup,
-  type CrmCustomer,
+  type CrmCustomer, type CustomerPrimaryType,
 } from './crmSupabase';
 import { parseRelativeDateZh } from '../ai/crmAskGciParsers';
 import { confirmCommitmentCandidate, type CommitmentCandidate, type CommitmentType } from './commitments';
@@ -35,6 +35,11 @@ export interface RawCaptureIntent {
   contact_phone: string | null;
   country: string | null;
   business_type: string | null;
+  // Task: CRM customer classification — only for NEW_CUSTOMER, only when
+  // Chris explicitly says which of the 3 it is; the classifier is told never
+  // to guess this, so it's usually null (see createCustomerWithContact's own
+  // sanitization for the belt-and-suspenders check on the way into the DB).
+  customer_primary_type: CustomerPrimaryType | null;
   needs_summary: string | null;
   followup_notes: string | null;
   next_action: string | null;
@@ -362,7 +367,7 @@ export function detectExplicitDestination(text: string): {
 function emptyRawIntent(rawFragment: string): RawCaptureIntent {
   return {
     type: 'UNKNOWN', customer_name: null, contact_name: null, contact_phone: null, country: null,
-    business_type: null, needs_summary: null, followup_notes: null, next_action: null,
+    business_type: null, customer_primary_type: null, needs_summary: null, followup_notes: null, next_action: null,
     next_follow_up_at: null, commitment_direction: null, commitment_text: null, commitment_due_at: null,
     decision_title: null, decision_note: null, todo_title: null, todo_business_area: null, todo_due_at: null,
     memory_category: null, memory_title: null, memory_content: null, memory_company: null,
@@ -541,6 +546,7 @@ export async function confirmCaptureItem(item: ResolvedCaptureItem): Promise<{ o
         customerName: raw.customer_name,
         contactName: raw.contact_name || undefined,
         phone: raw.contact_phone || undefined,
+        customerPrimaryType: raw.customer_primary_type || undefined,
       });
       if (!created.ok) return created;
       const notesParts = [raw.needs_summary, raw.followup_notes].filter(Boolean);
