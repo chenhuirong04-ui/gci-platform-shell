@@ -106,6 +106,11 @@ export function CompanyDocuments() {
   // loadProfile() already filters .eq('is_active', true), so any loaded profile is guaranteed
   // active; this is a UX convenience only, RLS is the real boundary.
   const isAdmin = profile?.role_label === 'Admin';
+  // Mirrors the company_documents UPDATE RLS policy's second exception (see
+  // 20260917c_company_documents_ai_fields.sql) — Lili can update/re-run AI on
+  // any document, not just her own uploads, same as an Admin. Reuses the
+  // profile's own display_name, no hardcoded user id.
+  const isLili = profile?.display_name === 'Lili';
   // Upload permission (2026-09): any authenticated user, not just Admin — matches the
   // authenticated-can-INSERT RLS policy (see the migration). loadProfile() only ever returns a
   // row for an active user, so a loaded profile is sufficient here.
@@ -805,7 +810,7 @@ export function CompanyDocuments() {
                       <button disabled={busyId === doc.id} onClick={() => handleDownload(doc)} title={isZh ? '下载' : 'Download'} style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
                         {isZh ? '下载' : 'Download'}
                       </button>
-                      {canUpload && AI_SUPPORTED_MIME.includes(doc.mime_type || '') && (isAdmin || doc.uploaded_by === profile?.id) && (
+                      {canUpload && AI_SUPPORTED_MIME.includes(doc.mime_type || '') && (isAdmin || isLili || doc.uploaded_by === profile?.id) && (
                         <button
                           disabled={rowAiBusy === doc.id}
                           onClick={() => openReviewForExistingDoc(doc)}
