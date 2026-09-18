@@ -515,6 +515,20 @@ export async function listComplianceItems(customerId: string): Promise<Complianc
   return res.json().catch(() => []);
 }
 
+// Task: Create Customer from Trade License — dedup check. license_number is
+// only ever stored per-compliance-item (not on service_customers itself), so
+// this is the one lookup that can't be done against an already-loaded
+// customers list and needs its own query.
+export async function findCustomerIdByLicenseNumber(licenseNumber: string): Promise<string | null> {
+  const res = await sbFetch(
+    `/rest/v1/service_customer_compliance_items?license_number=eq.${encodeURIComponent(licenseNumber)}&select=customer_id&limit=1`,
+    { method: 'GET' },
+  );
+  if (!res) return null;
+  const rows = await res.json().catch(() => []);
+  return Array.isArray(rows) && rows.length > 0 ? rows[0].customer_id : null;
+}
+
 export async function saveComplianceItem(item: ComplianceItem): Promise<ComplianceItem | null> {
   // Dedup: if document_id is provided, update existing record instead of inserting a duplicate
   if (item.document_id) {

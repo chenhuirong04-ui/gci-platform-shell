@@ -5,7 +5,10 @@ import type {
 } from '../types';
 import { useT } from '../translations';
 import { calcQuoteTotals, calcLineTotal, fmt } from '../lib/bsCalculations';
-import { saveCustomer, generateCustomerNumber, generateFwQuoteNo, saveQuote } from '../lib/bsCloud';
+import {
+  saveCustomer, generateCustomerNumber, generateFwQuoteNo, saveQuote,
+  uploadDocumentFile, saveCustomerDocument, saveComplianceItem, findCustomerIdByLicenseNumber,
+} from '../lib/bsCloud';
 import { syncCustomerToNotion, syncQuoteToNotion } from '../lib/bsNotionSync';
 
 const GOLD = '#C9A84C';
@@ -28,6 +31,67 @@ const BS_TA: React.CSSProperties = {
   ...BS_INP, resize: 'none' as const, lineHeight: 1.6,
 };
 const BS_SEL: React.CSSProperties = { ...BS_INP };
+
+// ── Create Customer from Trade License ──────────────────────────────────────
+// Reuses the existing POST /api/bs/parse-document (documentType=TRADE_LICENSE)
+// — same endpoint CustomerDocumentManager.tsx already calls for an existing
+// customer's document tab. No new AI endpoint here.
+const TL_SUPPORTED_MIME = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+
+// Recognized UAE licensing authorities the TRADE_LICENSE prompt itself already
+// names as examples (DED, DMCC, IFZA, DIFC) plus the other major free zones —
+// used only to decide whether "UAE" can be auto-filled without guessing any
+// other country. If issuing_authority doesn't match one of these, country is
+// left blank rather than guessed.
+const UAE_AUTHORITY_KEYWORDS = [
+  'ded', 'dmcc', 'ifza', 'difc', 'adgm', 'jafza', 'rakez', 'shams', 'meydan',
+  'dubai', 'abu dhabi', 'sharjah', 'ajman', 'fujairah', 'ras al khaimah', 'umm al quwain',
+  'uae', 'u.a.e', 'emirates',
+];
+function inferUAEFromAuthority(issuingAuthority?: string): string {
+  if (!issuingAuthority) return '';
+  const norm = issuingAuthority.toLowerCase();
+  return UAE_AUTHORITY_KEYWORDS.some(k => norm.includes(k)) ? 'UAE' : '';
+}
+
+interface TLFields {
+  license_number?: string;
+  licensee_name?: string;
+  trade_name?: string;
+  legal_status?: string;
+  issuing_authority?: string;
+  manager_name?: string;
+  issue_date?: string;
+  expiry_date?: string;
+  premises_number?: string;
+  building_name?: string;
+  area_name?: string;
+  activities?: string[];
+  confidence?: string;
+}
+
+interface TLReviewForm {
+  customer_name: string;
+  company_name: string;
+  contact_name: string;
+  country: string;
+  license_number: string;
+  expiry_date: string;
+  issuing_authority: string;
+}
+const EMPTY_TL_REVIEW: TLReviewForm = {
+  customer_name: '', company_name: '', contact_name: '', country: '',
+  license_number: '', expiry_date: '', issuing_authority: '',
+};
+
+function tlFileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve((reader.result as string).split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 interface Props {
   lang: BSLang;
@@ -111,6 +175,18 @@ export function BSNewQuotePage({
   const [custNameError, setCustNameError] = useState(false);
   const [custSaveError, setCustSaveError] = useState('');
   const custRef = useRef<HTMLDivElement>(null);
+
+  // ── Create Customer from Trade License ───────────────────────────────────
+  type TLStage = 'idle' | 'recognizing' | 'review' | 'dedupe';
+  const [tlStage, setTlStage] = useState<TLStage>('idle');
+  const [tlFile, setTlFile] = useState<File | null>(null);
+  const [tlFields, setTlFields] = useState<TLFields | null>(null);
+  const [tlModel, setTlModel] = useState('');
+  const [tlError, setTlError] = useState('');
+  const [tlReview, setTlReview] = useState<TLReviewForm>(EMPTY_TL_REVIEW);
+  const [tlDupCandidate, setTlDupCandidate] = useState<ServiceCustomer | null>(null);
+  const [tlSaving, setTlSaving] = useState(false);
+  const tlFileRef = useRef<HTMLInputElement>(null);
 
   // ── Service picker ────────────────────────────────────────────────────────
   const [activeCatId, setActiveCatId] = useState('');
@@ -241,6 +317,185 @@ export function BSNewQuotePage({
     }
   };
 
+  // ── Create Customer from Trade License ───────────────────────────────────
+  const resetTL = () => {
+    setTlStage('idle'); setTlFile(null); setTlFields(null); setTlModel('');
+    setTlError(''); setTlReview(EMPTY_TL_REVIEW); setTlDupCandidate(null); setTlSaving(false);
+  };
+
+  const acceptTLFile = async (file: File | undefined) => {
+    if (!file) return;
+    if (!TL_SUPPORTED_MIME.includes(file.type)) {
+      setTlError(isZh
+        ? '不支持的格式，请上传 PDF、JPG 或 PNG'
+        : 'Unsupported format. Please upload a PDF, JPG or PNG.');
+      return;
+    }
+    setTlError('');
+    setTlFile(file);
+    setTlStage('recognizing');
+    try {
+      const base64 = await tlFileToBase64(file);
+      const res = await fetch('/api/bs/parse-document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mimeType: file.type, data: base64, documentType: 'TRADE_LICENSE' }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || !payload?.ok) {
+        throw new Error(payload?.error || `HTTP ${res.status}`);
+      }
+      const fields: TLFields = payload.fields || {};
+      setTlFields(fields);
+      setTlModel(payload.model || '');
+
+      const customerName = fields.trade_name || fields.licensee_name || '';
+      const companyName = fields.licensee_name || fields.trade_name || '';
+      setTlReview({
+        customer_name: customerName,
+        company_name: companyName,
+        contact_name: fields.manager_name || '',
+        country: inferUAEFromAuthority(fields.issuing_authority),
+        license_number: fields.license_number || '',
+        expiry_date: fields.expiry_date || '',
+        issuing_authority: fields.issuing_authority || '',
+      });
+
+      // Dedup check before showing the review form — license number first
+      // (exact match, highest confidence), then company/customer name.
+      let dup: ServiceCustomer | null = null;
+      if (fields.license_number) {
+        const dupId = await findCustomerIdByLicenseNumber(fields.license_number);
+        if (dupId) dup = customers.find(c => c.id === dupId) || null;
+      }
+      if (!dup) {
+        const candidateNames = [fields.trade_name, fields.licensee_name]
+          .filter((s): s is string => !!s && s.trim().length > 0)
+          .map(s => s.trim().toLowerCase());
+        if (candidateNames.length > 0) {
+          dup = customers.find(c =>
+            candidateNames.includes((c.customer_name || '').trim().toLowerCase())
+            || candidateNames.includes((c.company_name || '').trim().toLowerCase()),
+          ) || null;
+        }
+      }
+
+      if (dup) {
+        setTlDupCandidate(dup);
+        setTlStage('dedupe');
+      } else {
+        setTlStage('review');
+      }
+    } catch (e: any) {
+      setTlError(e?.message || (isZh ? '识别失败' : 'Recognition failed'));
+      // Manual fallback — reveal the existing quick-add form, prefilling
+      // whatever the classic flow already supports from any AI fields that
+      // did come back (usually none on a hard failure). The file itself
+      // stays in tlFile so "重新识别" can retry without re-uploading.
+      setNewCust(prev => ({
+        ...prev,
+        customer_name: tlFields?.trade_name || tlFields?.licensee_name || prev.customer_name,
+        company_name: tlFields?.licensee_name || tlFields?.trade_name || prev.company_name,
+        contact_name: tlFields?.manager_name || prev.contact_name,
+      }));
+      setTlStage('idle');
+    }
+  };
+
+  const handleUseDuplicateCustomer = () => {
+    if (!tlDupCandidate) return;
+    setSelectedCustomer(tlDupCandidate);
+    setCustSearch(tlDupCandidate.customer_name);
+    setShowNewCustForm(false);
+    resetTL();
+  };
+
+  const handleCreateAnywayFromDedupe = () => {
+    setTlDupCandidate(null);
+    setTlStage('review');
+  };
+
+  const handleReRecognizeTL = () => {
+    if (tlFile) acceptTLFile(tlFile);
+  };
+
+  const handleConfirmCreateFromTL = async () => {
+    if (!tlReview.customer_name.trim()) {
+      setTlError(isZh ? '请填写客户名称' : 'Client name is required');
+      return;
+    }
+    setTlSaving(true);
+    setTlError('');
+    const c: ServiceCustomer = {
+      customer_name: tlReview.customer_name.trim(),
+      company_name: tlReview.company_name.trim() || undefined,
+      contact_name: tlReview.contact_name.trim() || undefined,
+      country: tlReview.country || undefined,
+      customer_number: generateCustomerNumber(),
+      status: 'NEW_REQUIREMENT',
+      priority: 'B',
+      created_at: new Date().toISOString(),
+    };
+    const savedCustomer = await saveCustomer(c);
+    if (!savedCustomer || !savedCustomer.id) {
+      setTlSaving(false);
+      setTlError(isZh ? '客户创建失败，请重试' : 'Failed to create client, please retry');
+      return;
+    }
+
+    // Customer is created — from here on, failures are surfaced but never
+    // roll back the customer or discard the file; worst case the user
+    // re-attaches the Trade License later from the customer's Documents tab.
+    if (tlFile) {
+      const up = await uploadDocumentFile(savedCustomer.id, tlFile);
+      if (up) {
+        const savedDoc = await saveCustomerDocument({
+          customer_id: savedCustomer.id,
+          document_type: 'TRADE_LICENSE',
+          document_name: tlFile.name.replace(/\.[^.]+$/, ''),
+          file_url: up.url,
+          storage_path: up.path,
+          issue_date: tlFields?.issue_date || undefined,
+          expiry_date: tlReview.expiry_date || undefined,
+          reminder_days: 30,
+          notes: '',
+        });
+        await saveComplianceItem({
+          customer_id: savedCustomer.id,
+          document_id: savedDoc?.id,
+          compliance_type: 'TRADE_LICENSE',
+          title: tlReview.company_name || tlReview.customer_name,
+          license_number: tlReview.license_number || undefined,
+          licensee_name: tlFields?.licensee_name || undefined,
+          trade_name: tlFields?.trade_name || undefined,
+          legal_status: tlFields?.legal_status || undefined,
+          issuing_authority: tlReview.issuing_authority || undefined,
+          manager_name: tlFields?.manager_name || undefined,
+          premises_number: tlFields?.premises_number || undefined,
+          building_name: tlFields?.building_name || undefined,
+          area_name: tlFields?.area_name || undefined,
+          activities: tlFields?.activities,
+          issue_date: tlFields?.issue_date || undefined,
+          expiry_date: tlReview.expiry_date || undefined,
+          reminder_days: 30,
+          status: 'ACTIVE',
+        });
+      } else {
+        setTlError(isZh
+          ? '客户已创建，但营业执照文件上传失败，请稍后在客户文件里手动补传'
+          : 'Client created, but the Trade License file failed to upload — please re-attach it from the client\'s Documents tab later.');
+      }
+    }
+
+    onCustomerSaved(savedCustomer);
+    setSelectedCustomer(savedCustomer);
+    setCustSearch(savedCustomer.customer_name);
+    setShowNewCustForm(false);
+    syncCustomerToNotion(savedCustomer).catch(console.error);
+    setTlSaving(false);
+    resetTL();
+  };
+
   const handleSaveQuote = async (status: 'DRAFT' | 'FINAL') => {
     if (!selectedCustomer) {
       alert(isZh ? '请先选择或新增服务客户' : 'Please select or add a service client first');
@@ -330,6 +585,142 @@ export function BSNewQuotePage({
                 </p>
               </div>
 
+              {/* ── AI: Create Customer from Trade License ──────────────── */}
+              {tlStage === 'idle' && (
+                <div className="px-5 pt-4">
+                  <div
+                    onClick={() => tlFileRef.current?.click()}
+                    className="cursor-pointer rounded-xl text-center"
+                    style={{ padding: '16px 14px', border: `2px dashed ${GOLD}88`, background: `${GOLD}0d` }}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 900, color: NAVY }}>
+                      📄 {isZh ? '上传营业执照快速建档' : 'Create Customer from Trade License'}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#8a9ab0', marginTop: 4 }}>
+                      PDF · JPG · JPEG · PNG — {isZh ? '自动识别客户名称、执照号、到期日' : 'auto-extracts client name, license no., expiry date'}
+                    </div>
+                  </div>
+                  <input
+                    ref={tlFileRef} type="file" className="hidden"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={e => { acceptTLFile(e.target.files?.[0]); e.target.value = ''; }}
+                  />
+                  {tlError && (
+                    <p style={{ fontSize: 12, color: '#e53e3e', marginTop: 8, fontWeight: 600 }}>{tlError}</p>
+                  )}
+                  <div className="flex items-center gap-3 my-4">
+                    <div style={{ flex: 1, height: 1, background: '#e8e0d0' }} />
+                    <span style={{ fontSize: 11, color: '#8a9ab0' }}>{isZh ? '或手动填写' : 'or fill in manually'}</span>
+                    <div style={{ flex: 1, height: 1, background: '#e8e0d0' }} />
+                  </div>
+                </div>
+              )}
+
+              {/* ── AI: recognizing ─────────────────────────────────────── */}
+              {tlStage === 'recognizing' && (
+                <div className="px-5 py-8 text-center">
+                  <div className="w-12 h-12 rounded-full border-4 border-t-transparent animate-spin mx-auto mb-3" style={{ borderColor: GOLD, borderTopColor: 'transparent' }} />
+                  <div style={{ fontSize: 13, fontWeight: 900, color: NAVY }}>
+                    {isZh ? 'AI 正在识别营业执照…' : 'AI is reading the trade license…'}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#8a9ab0', marginTop: 4 }}>{isZh ? '通常 3–10 秒' : 'Usually 3–10 seconds'}</div>
+                </div>
+              )}
+
+              {/* ── AI: possible duplicate ──────────────────────────────── */}
+              {tlStage === 'dedupe' && tlDupCandidate && (
+                <div className="px-5 py-4 space-y-3">
+                  <div style={{ background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 10, padding: '12px 14px' }}>
+                    <p style={{ fontSize: 13, fontWeight: 900, color: '#92400E' }}>
+                      {isZh ? `可能已存在客户：${tlDupCandidate.customer_name}` : `Possibly already exists: ${tlDupCandidate.customer_name}`}
+                    </p>
+                    {tlDupCandidate.company_name && (
+                      <p style={{ fontSize: 12, color: '#92400E', marginTop: 2 }}>{tlDupCandidate.company_name}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleUseDuplicateCustomer}
+                      className="flex-1 font-black text-sm py-3 rounded-xl text-white"
+                      style={{ background: NAVY }}
+                    >
+                      {isZh ? '使用已有客户' : 'Use Existing Client'}
+                    </button>
+                    <button
+                      onClick={handleCreateAnywayFromDedupe}
+                      className="flex-1 font-bold text-sm py-3 rounded-xl"
+                      style={{ background: `${GOLD}20`, color: '#8a6d1c', border: `1px solid ${GOLD}55` }}
+                    >
+                      {isZh ? '仍然新建' : 'Create New Anyway'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── AI: review & confirm ────────────────────────────────── */}
+              {tlStage === 'review' && (
+                <div className="px-5 py-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p style={{ fontSize: 12, fontWeight: 900, color: GOLD, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                      ✦ {isZh ? 'AI 识别结果 — 请确认' : 'AI Recognition Result — Please Confirm'}
+                    </p>
+                    {tlModel && <span style={{ fontSize: 10.5, color: '#8a9ab0' }}>{tlModel}</span>}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <label style={BS_LBL}>{isZh ? '客户名称' : 'Client Name'}<span style={{ color: '#e53e3e', marginLeft: 4 }}>*</span></label>
+                      <input style={BS_INP} value={tlReview.customer_name} onChange={e => setTlReview(v => ({ ...v, customer_name: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label style={BS_LBL}>{isZh ? '公司名称' : 'Company'}</label>
+                      <input style={BS_INP} value={tlReview.company_name} onChange={e => setTlReview(v => ({ ...v, company_name: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label style={BS_LBL}>{isZh ? '联系人' : 'Contact'}</label>
+                      <input style={BS_INP} value={tlReview.contact_name} onChange={e => setTlReview(v => ({ ...v, contact_name: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label style={BS_LBL}>{isZh ? '国家' : 'Country'}</label>
+                      <input style={BS_INP} value={tlReview.country} onChange={e => setTlReview(v => ({ ...v, country: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label style={BS_LBL}>License No.</label>
+                      <input style={BS_INP} value={tlReview.license_number} onChange={e => setTlReview(v => ({ ...v, license_number: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label style={BS_LBL}>{isZh ? '到期日期' : 'Expiry Date'}</label>
+                      <input type="date" style={BS_INP} value={tlReview.expiry_date} onChange={e => setTlReview(v => ({ ...v, expiry_date: e.target.value }))} />
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={BS_LBL}>{isZh ? '签发机构' : 'Issuing Authority'}</label>
+                      <input style={BS_INP} value={tlReview.issuing_authority} onChange={e => setTlReview(v => ({ ...v, issuing_authority: e.target.value }))} />
+                    </div>
+                  </div>
+                  {tlError && <p style={{ fontSize: 12, color: '#e53e3e', fontWeight: 600 }}>{tlError}</p>}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleConfirmCreateFromTL}
+                      disabled={tlSaving}
+                      className="font-black text-sm py-3 rounded-xl text-white"
+                      style={{ flex: 2, background: NAVY, cursor: tlSaving ? 'not-allowed' : 'pointer' }}
+                    >
+                      {tlSaving ? (isZh ? '创建中…' : 'Creating…') : (isZh ? '确认并创建客户' : 'Confirm & Create Client')}
+                    </button>
+                    <button
+                      onClick={handleReRecognizeTL}
+                      className="font-bold text-sm py-3 rounded-xl"
+                      style={{ flex: 1, background: `${GOLD}20`, color: '#8a6d1c', border: `1px solid ${GOLD}55` }}
+                    >
+                      {isZh ? '重新识别' : 'Re-analyze'}
+                    </button>
+                    <button onClick={resetTL} className="font-bold text-sm py-3 px-4 rounded-xl" style={{ background: '#F3F4F6', color: '#6B7280' }}>
+                      {isZh ? '取消' : 'Cancel'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {tlStage === 'idle' && (
               <div className="px-5 py-4 space-y-4">
                 {/* Customer name — required */}
                 <div>
@@ -492,6 +883,7 @@ export function BSNewQuotePage({
                   )}
                 </div>
               </div>
+              )}
             </div>
           )}
 
