@@ -119,6 +119,10 @@ export interface UploadCompanyDocumentInput {
   document_name: string;
   expiry_date: string | null;
   notes: string;
+  // Task: processing-mode picker — "仅保存归档" passes false explicitly (the
+  // column defaults to true otherwise). Omitted preserves the prior default
+  // behavior for any other existing caller.
+  reminder_enabled?: boolean;
 }
 
 // Uploads the file to Storage first (path: company/{category-slug}/{uuid}{.ext}), then inserts
@@ -142,6 +146,7 @@ export async function uploadCompanyDocument(input: UploadCompanyDocumentInput): 
     mime_type: input.file.type || null,
     expiry_date: input.expiry_date,
     notes: input.notes,
+    ...(input.reminder_enabled !== undefined ? { reminder_enabled: input.reminder_enabled } : {}),
   });
   if (dbError) {
     await supabase.storage.from(BUCKET).remove([storagePath]);

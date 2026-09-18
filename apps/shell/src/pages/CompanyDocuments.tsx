@@ -24,6 +24,18 @@ const ADD_CATEGORY_VALUE = '__add_new__';
 // manual upload form unchanged (never blocked).
 const AI_SUPPORTED_MIME = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
 
+// Task: not every company file needs Gemini. User picks the processing mode
+// per upload; only 'smart' ever calls /api/company-documents/parse-document.
+type ProcessingMode = 'archive' | 'smart';
+// Category names that nudge the toggle to 'smart' when selected — still just
+// a suggestion, the user can switch it back. "Ejari / Lease" isn't a live
+// category yet (see prior audit), but matching is by name against whatever
+// company_document_categories actually returns, so this list just quietly
+// does nothing until/unless that category exists — no separate check needed.
+const SMART_SUGGESTED_CATEGORIES = [
+  'Trade License', 'CIC Card', 'Insurance', 'Vehicles', 'Government Documents', 'HR/Employee', 'Ejari / Lease',
+];
+
 type AiStage = 'idle' | 'recognizing' | 'review' | 'manual';
 
 interface ReviewFormState {
@@ -81,6 +93,20 @@ function formatBytes(n: number | null): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// Task: "仅保存归档" files stay ai_status=null forever unless someone later
+// clicks "AI 识别" — this badge is how the list distinguishes "never
+// touched by AI" (no badge) from an actual recognition outcome.
+function aiStatusBadge(status: string | null, isZh: boolean): { label: string; color: string } | null {
+  switch (status) {
+    case 'completed': return { label: isZh ? '✓ 已识别' : '✓ Recognized', color: '#6FBF8E' };
+    case 'needs_review': return { label: isZh ? '⚠ 待复核' : '⚠ Needs Review', color: '#D4A843' };
+    case 'failed': return { label: isZh ? '✕ 识别失败' : '✕ Failed', color: '#E0846A' };
+    case 'processing': return { label: isZh ? '识别中…' : 'Recognizing…', color: '#7A8494' };
+    case 'pending': return { label: isZh ? '待识别' : 'Pending', color: '#7A8494' };
+    default: return null;
+  }
 }
 
 function expiryStatus(expiry: string | null): 'expired' | 'soon' | 'none' | 'ok' {
@@ -143,6 +169,11 @@ export function CompanyDocuments() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<Record<string, string>>({});
 
+  // Processing mode picker — default "仅保存归档", never calls Gemini unless
+  // the user explicitly picks "智能识别并提醒" (or clicks the per-row "AI 识别"
+  // button later). Reset to the default each time the upload panel opens.
+  const [processingMode, setProcessingMode] = useState<ProcessingMode>('archive');
+
   // Company Documents Intelligence V2 Phase 1 — AI recognition flow
   const [aiStage, setAiStage] = useState<AiStage>('idle');
   const [aiDocument, setAiDocument] = useState<CompanyDocument | null>(null);
@@ -182,8 +213,13 @@ export function CompanyDocuments() {
       setNewCategoryError('');
       return;
     }
-    if (aiStage === 'idle') setUploadForm(f => ({ ...f, category: value }));
-    else setReviewForm(f => ({ ...f, category: value }));
+    if (aiStage === 'idle') {
+      setUploadForm(f => ({ ...f, category: value }));
+      // Nudge, not force — user can still flip the toggle back afterward.
+      if (SMART_SUGGESTED_CATEGORIES.includes(value)) setProcessingMode('smart');
+    } else {
+      setReviewForm(f => ({ ...f, category: value }));
+    }
   };
 
   const saveNewCategory = async () => {
@@ -223,11 +259,12 @@ export function CompanyDocuments() {
     });
   }, [docs, categoryFilter, search, expiryFilter]);
 
-  const openUpload = () => { setUploadForm(EMPTY_UPLOAD); setUploadError(''); setShowUpload(true); };
+  const openUpload = () => { setUploadForm(EMPTY_UPLOAD); setUploadError(''); setProcessingMode('archive'); setShowUpload(true); };
   const closeUpload = () => {
     setShowUpload(false);
     setUploadForm(EMPTY_UPLOAD);
     setUploadError('');
+    setProcessingMode('archive');
     setAiStage('idle');
     setAiDocument(null);
     setAiFile(null);
@@ -262,8 +299,11 @@ export function CompanyDocuments() {
     if (!file) return;
     setShowUpload(true);
     setUploadError('');
-    if (!AI_SUPPORTED_MIME.includes(file.type)) {
-      // Unsupported type for AI (not PDF/JPG/PNG) — straight to the existing manual form, unblocked.
+    // "仅保存归档" (the default) or a mime type Gemini can't read either way —
+    // straight to the manual form, no /api/company-documents/parse-document
+    // call at all. "智能识别并提醒" only fires when both the user picked it
+    // AND the file is actually a type AI can process.
+    if (processingMode === 'archive' || !AI_SUPPORTED_MIME.includes(file.type)) {
       setUploadForm(f => ({ ...f, file, document_name: f.document_name || file.name }));
       return;
     }
@@ -308,6 +348,12 @@ export function CompanyDocuments() {
       document_name: uploadForm.document_name.trim(),
       expiry_date: uploadForm.expiry_date || null,
       notes: uploadForm.notes.trim(),
+      // Save Only always disables reminders, even if an expiry date was
+      // typed in manually — pure archival, per spec. A file that landed
+      // here because AI couldn't read its mime type (user picked Smart
+      // anyway) still follows the normal "only if a date was actually
+      // entered" rule.
+      reminder_enabled: processingMode === 'archive' ? false : !!uploadForm.expiry_date,
     });
     setUploading(false);
     if (uploadErr) { setUploadError(uploadErr); return; }
@@ -545,6 +591,39 @@ export function CompanyDocuments() {
       {/* Upload panel — manual form (aiStage 'idle', unsupported file types) */}
       {canUpload && showUpload && aiStage === 'idle' && (
         <div style={{ padding: 16, marginBottom: 16, background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, display: 'grid', gap: 10 }}>
+          <div>
+            <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 6 }}>{isZh ? '处理方式' : 'Processing Mode'}</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setProcessingMode('smart')}
+                style={{
+                  flex: 1, padding: '9px 12px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', textAlign: 'left',
+                  background: processingMode === 'smart' ? 'rgba(203,168,92,0.14)' : 'rgba(255,255,255,0.03)',
+                  border: `1.5px solid ${processingMode === 'smart' ? GOLD : BORD}`,
+                  color: processingMode === 'smart' ? GOLD : MUTED,
+                }}
+              >
+                ✦ {isZh ? '智能识别并提醒' : 'Smart Extract & Remind'}
+                <div style={{ fontSize: 10.5, fontWeight: 400, marginTop: 2, color: MUTED }}>
+                  {isZh ? '证照类：营业执照、CIC、保险、车辆证件…' : 'Licenses, CIC, insurance, vehicle docs…'}
+                </div>
+              </button>
+              <button
+                onClick={() => setProcessingMode('archive')}
+                style={{
+                  flex: 1, padding: '9px 12px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', textAlign: 'left',
+                  background: processingMode === 'archive' ? 'rgba(203,168,92,0.14)' : 'rgba(255,255,255,0.03)',
+                  border: `1.5px solid ${processingMode === 'archive' ? GOLD : BORD}`,
+                  color: processingMode === 'archive' ? GOLD : MUTED,
+                }}
+              >
+                {isZh ? '仅保存归档' : 'Save Only'}
+                <div style={{ fontSize: 10.5, fontWeight: 400, marginTop: 2, color: MUTED }}>
+                  {isZh ? '合同、内部文件、留底资料…（默认）' : 'Contracts, internal files, references… (default)'}
+                </div>
+              </button>
+            </div>
+          </div>
           <div
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -556,7 +635,9 @@ export function CompanyDocuments() {
               background: isDraggingOver ? 'rgba(203,168,92,0.08)' : 'transparent',
             }}
           >
-            {uploadForm.file ? uploadForm.file.name : (isZh ? '点击选择文件，或拖拽文件到此处上传（PDF/JPG/PNG 自动识别）' : 'Click to choose a file, or drag & drop it here (PDF/JPG/PNG auto-recognized)')}
+            {uploadForm.file ? uploadForm.file.name : processingMode === 'smart'
+              ? (isZh ? '点击选择文件，或拖拽文件到此处上传（PDF/JPG/PNG 自动识别）' : 'Click to choose a file, or drag & drop it here (PDF/JPG/PNG auto-recognized)')
+              : (isZh ? '点击选择文件，或拖拽文件到此处上传' : 'Click to choose a file, or drag & drop it here')}
             <input
               ref={fileInputRef} type="file" style={{ display: 'none' }}
               onChange={e => acceptFile(e.target.files?.[0])}
@@ -793,6 +874,11 @@ export function CompanyDocuments() {
                   <td style={{ fontSize: 13, fontWeight: 600, color: colors.textPrimary, padding: '12px 16px', borderBottom: `1px solid ${BORD}` }}>
                     {doc.document_name}
                     <div style={{ fontSize: 10.5, color: MUTED, fontWeight: 400, marginTop: 2 }}>{doc.file_name} · {formatBytes(doc.file_size)}</div>
+                    {aiStatusBadge(doc.ai_status, isZh) && (
+                      <div style={{ fontSize: 10.5, fontWeight: 700, marginTop: 3, color: aiStatusBadge(doc.ai_status, isZh)!.color }}>
+                        {aiStatusBadge(doc.ai_status, isZh)!.label}
+                      </div>
+                    )}
                   </td>
                   <td style={{ fontSize: 12, color: colors.textSecondary, padding: '12px 16px', borderBottom: `1px solid ${BORD}` }}>{doc.category}</td>
                   <td style={{ fontSize: 12, color: colors.textSecondary, padding: '12px 16px', borderBottom: `1px solid ${BORD}`, maxWidth: 220 }}>{doc.notes || '—'}</td>
