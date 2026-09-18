@@ -141,12 +141,93 @@ function toRow(input: AccountLoginInput) {
   return row;
 }
 
-export async function createAccountLogin(input: AccountLoginInput): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('company_account_logins').insert(toRow(input));
-  return { error: error ? error.message : null };
+export async function createAccountLogin(input: AccountLoginInput): Promise<
+  { ok: true; id: string } | { ok: false; error: string }
+> {
+  const { data, error } = await supabase.from('company_account_logins').insert(toRow(input)).select('id').single();
+  if (error || !data) return { ok: false, error: error?.message || 'Insert failed' };
+  return { ok: true, id: data.id };
 }
 
 export async function updateAccountLogin(id: string, input: AccountLoginInput): Promise<{ error: string | null }> {
   const { error } = await supabase.from('company_account_logins').update(toRow(input)).eq('id', id);
   return { error: error ? error.message : null };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Attachments / screenshots — see
+// supabase/migrations/20260918b_company_account_login_attachments.sql.
+// File bytes live in the private 'account-vault-attachments' Storage bucket,
+// never as base64 in the database — only metadata + storage_path here.
+// Same Admin-only RLS boundary as company_account_logins itself.
+// ─────────────────────────────────────────────────────────────────────────
+
+const ATTACHMENT_BUCKET = 'account-vault-attachments';
+export const ATTACHMENT_ACCEPT = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+
+export interface AccountLoginAttachment {
+  id: string;
+  account_login_id: string;
+  file_name: string;
+  storage_path: string;
+  mime_type: string | null;
+  file_size: number | null;
+  created_at: string;
+}
+
+export async function listAttachments(accountLoginId: string): Promise<AccountLoginAttachment[]> {
+  const { data, error } = await supabase
+    .from('company_account_login_attachments')
+    .select('id,account_login_id,file_name,storage_path,mime_type,file_size,created_at')
+    .eq('account_login_id', accountLoginId)
+    .order('created_at', { ascending: false });
+  if (error || !data) return [];
+  return data as AccountLoginAttachment[];
+}
+
+function safeAttachmentExt(fileName: string): string {
+  const match = /\.([a-zA-Z0-9]{1,10})$/.exec(fileName);
+  return match ? `.${match[1].toLowerCase()}` : '';
+}
+
+// Uploads to Storage first, then inserts the metadata row. If the DB insert
+// fails after a successful upload, the orphaned Storage object is removed so
+// a failed attempt never leaves an untracked file behind (same convention as
+// companyDocumentsService.ts's uploadCompanyDocument).
+export async function uploadAttachment(accountLoginId: string, file: File): Promise<
+  { ok: true; attachment: AccountLoginAttachment } | { ok: false; error: string }
+> {
+  const storagePath = `account-logins/${accountLoginId}/${crypto.randomUUID()}${safeAttachmentExt(file.name)}`;
+  const { error: uploadError } = await supabase.storage.from(ATTACHMENT_BUCKET).upload(storagePath, file);
+  if (uploadError) return { ok: false, error: `Storage: ${uploadError.message}` };
+
+  const { data, error: dbError } = await supabase
+    .from('company_account_login_attachments')
+    .insert({
+      account_login_id: accountLoginId,
+      file_name: file.name,
+      storage_path: storagePath,
+      mime_type: file.type || null,
+      file_size: file.size,
+    })
+    .select('id,account_login_id,file_name,storage_path,mime_type,file_size,created_at')
+    .single();
+  if (dbError) {
+    await supabase.storage.from(ATTACHMENT_BUCKET).remove([storagePath]);
+    return { ok: false, error: `DB: ${dbError.message}` };
+  }
+  return { ok: true, attachment: data as AccountLoginAttachment };
+}
+
+export async function deleteAttachment(id: string, storagePath: string): Promise<{ error: string | null }> {
+  const { error: storageError } = await supabase.storage.from(ATTACHMENT_BUCKET).remove([storagePath]);
+  if (storageError) return { error: `Storage: ${storageError.message}` };
+  const { error: dbError } = await supabase.from('company_account_login_attachments').delete().eq('id', id);
+  return { error: dbError ? `DB: ${dbError.message}` : null };
+}
+
+export async function getAttachmentSignedUrl(storagePath: string): Promise<string | null> {
+  const { data, error } = await supabase.storage.from(ATTACHMENT_BUCKET).createSignedUrl(storagePath, 60 * 60);
+  if (error) return null;
+  return data?.signedUrl ?? null;
 }

@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { colors } from '@gci/design-system';
 import { useAuth } from '../contexts/AuthContext';
 import {
   fetchAccountLogins, createAccountLogin, updateAccountLogin, revealPassword, encryptPassword,
-  type AccountLogin, type AccountLoginInput, type MfaMethod, type AccountLoginStatus,
+  listAttachments, uploadAttachment, deleteAttachment, getAttachmentSignedUrl, ATTACHMENT_ACCEPT,
+  type AccountLogin, type AccountLoginInput, type MfaMethod, type AccountLoginStatus, type AccountLoginAttachment,
 } from '../lib/accountVaultService';
 
 // GCI Company Documents — Accounts & Logins (账号与登录). Credentials for the
@@ -69,6 +70,16 @@ export function AccountVault() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
+  // Attachments/screenshots — for an existing record they upload immediately
+  // (real account_login_id already exists); for a brand-new record, picked
+  // files are held locally and only actually uploaded once "保存" creates
+  // the row (see handleSave).
+  const [attachments, setAttachments] = useState<AccountLoginAttachment[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [attachmentBusy, setAttachmentBusy] = useState(false);
+  const [attachmentError, setAttachmentError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   function load() {
     fetchAccountLogins().then(setRows);
   }
@@ -92,7 +103,11 @@ export function AccountVault() {
     });
   }, [rows, search, companyFilter, statusFilter]);
 
-  const openNew = () => { setEditing(null); setForm(EMPTY_FORM); setNewPassword(''); setFormError(''); setShowForm(true); };
+  const openNew = () => {
+    setEditing(null); setForm(EMPTY_FORM); setNewPassword(''); setFormError('');
+    setAttachments([]); setPendingFiles([]); setAttachmentError('');
+    setShowForm(true);
+  };
   const openEdit = (r: AccountLogin) => {
     setEditing(r);
     setForm({
@@ -103,9 +118,66 @@ export function AccountVault() {
     });
     setNewPassword('');
     setFormError('');
+    setPendingFiles([]);
+    setAttachmentError('');
+    setAttachments([]);
+    listAttachments(r.id).then(setAttachments);
     setShowForm(true);
   };
-  const closeForm = () => { setShowForm(false); setEditing(null); setForm(EMPTY_FORM); setNewPassword(''); setFormError(''); };
+  const closeForm = () => {
+    setShowForm(false); setEditing(null); setForm(EMPTY_FORM); setNewPassword(''); setFormError('');
+    setAttachments([]); setPendingFiles([]); setAttachmentError('');
+  };
+
+  const handleFileSelect = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const picked = Array.from(files).filter(f => ATTACHMENT_ACCEPT.includes(f.type));
+    if (picked.length === 0) {
+      setAttachmentError(isZh ? '只支持 JPG、PNG、PDF' : 'Only JPG, PNG, PDF are supported');
+      return;
+    }
+    setAttachmentError('');
+    if (editing) {
+      setAttachmentBusy(true);
+      for (const f of picked) {
+        const res = await uploadAttachment(editing.id, f);
+        if (!res.ok) setAttachmentError(res.error);
+        else setAttachments(prev => [res.attachment, ...prev]);
+      }
+      setAttachmentBusy(false);
+    } else {
+      setPendingFiles(prev => [...prev, ...picked]);
+    }
+  };
+
+  const handleRemovePendingFile = (idx: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleDeleteAttachment = async (a: AccountLoginAttachment) => {
+    if (!window.confirm(isZh ? `确认删除「${a.file_name}」？` : `Delete "${a.file_name}"?`)) return;
+    setAttachmentBusy(true);
+    const { error } = await deleteAttachment(a.id, a.storage_path);
+    setAttachmentBusy(false);
+    if (error) { setAttachmentError(error); return; }
+    setAttachments(prev => prev.filter(x => x.id !== a.id));
+  };
+
+  const handleViewAttachment = async (a: AccountLoginAttachment) => {
+    const url = await getAttachmentSignedUrl(a.storage_path);
+    if (url) window.open(url, '_blank');
+  };
+
+  const handleDownloadAttachment = async (a: AccountLoginAttachment) => {
+    const url = await getAttachmentSignedUrl(a.storage_path);
+    if (!url) return;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = a.file_name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
 
   const handleReveal = async (r: AccountLogin) => {
     if (revealed[r.id] !== undefined) {
@@ -120,9 +192,21 @@ export function AccountVault() {
     setRevealed(prev => ({ ...prev, [r.id]: res.password }));
   };
 
+  // Minimum to save: platform + company are always required; beyond that,
+  // either some login detail OR at least one attachment is enough — a
+  // screenshot with nothing else typed in yet is a valid, complete save.
+  const hasLoginInfo = !!(form.username.trim() || form.login_email.trim() || newPassword.trim());
+  const hasAttachments = editing ? attachments.length > 0 : pendingFiles.length > 0;
+
   const handleSave = async () => {
     if (!form.platform_name.trim()) { setFormError(isZh ? '请填写系统/平台名称' : 'Platform name is required'); return; }
     if (!form.company_name.trim()) { setFormError(isZh ? '请填写所属公司' : 'Company is required'); return; }
+    if (!hasLoginInfo && !hasAttachments) {
+      setFormError(isZh
+        ? '请至少填写一项登录信息，或上传至少一张截图/附件'
+        : 'Please fill in at least one login detail, or upload at least one attachment');
+      return;
+    }
     setSaving(true);
     setFormError('');
 
@@ -133,11 +217,38 @@ export function AccountVault() {
       payload = { ...payload, newPasswordCiphertext: enc.ciphertext, newPasswordIv: enc.iv };
     }
 
-    const { error } = editing
-      ? await updateAccountLogin(editing.id, payload)
-      : await createAccountLogin(payload);
+    if (editing) {
+      const { error } = await updateAccountLogin(editing.id, payload);
+      setSaving(false);
+      if (error) { setFormError(error); return; }
+      closeForm();
+      load();
+      return;
+    }
+
+    const created = await createAccountLogin(payload);
+    if (!created.ok) { setSaving(false); setFormError(created.error); return; }
+
+    if (pendingFiles.length > 0) {
+      const failed: string[] = [];
+      for (const f of pendingFiles) {
+        const res = await uploadAttachment(created.id, f);
+        if (!res.ok) failed.push(f.name);
+      }
+      setSaving(false);
+      if (failed.length > 0) {
+        // Account itself is saved — switch into edit mode for it so a retry
+        // doesn't create a second row, and show what still needs re-upload.
+        setPendingFiles([]);
+        setAttachmentError(isZh
+          ? `账号已保存，但以下附件上传失败，请重新上传：${failed.join('、')}`
+          : `Account saved, but these attachments failed — please re-upload: ${failed.join(', ')}`);
+        openEdit({ ...form, id: created.id, has_password: !!newPassword } as unknown as AccountLogin);
+        load();
+        return;
+      }
+    }
     setSaving(false);
-    if (error) { setFormError(error); return; }
     closeForm();
     load();
   };
@@ -211,6 +322,65 @@ export function AccountVault() {
               <input placeholder={isZh ? '备注' : 'Notes'} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
             </div>
           </div>
+
+          {/* ── Attachments / Screenshots ───────────────────────────────── */}
+          <div style={{ borderTop: `1px solid ${BORD}`, paddingTop: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <label style={{ fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                {isZh ? '截图 / 附件' : 'Attachments / Screenshots'}
+              </label>
+              <button
+                disabled title={isZh ? '暂未实现，敬请期待' : 'Not implemented yet'}
+                style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10.5, cursor: 'not-allowed', background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORD}`, color: MUTED, opacity: 0.6 }}
+              >
+                ✦ {isZh ? 'AI 识别' : 'AI Recognize'}
+              </button>
+            </div>
+
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              style={{ padding: '8px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px dashed ${BORD}`, color: GOLD }}
+            >
+              + {isZh ? '上传截图/附件' : 'Add Attachment'}
+            </button>
+            <input
+              ref={fileInputRef} type="file" multiple className="hidden" style={{ display: 'none' }}
+              accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+              onChange={e => { handleFileSelect(e.target.files); e.target.value = ''; }}
+            />
+            {attachmentBusy && <span style={{ marginLeft: 10, fontSize: 11.5, color: MUTED }}>{isZh ? '处理中…' : 'Working…'}</span>}
+            {attachmentError && <div style={{ fontSize: 11.5, color: RED, marginTop: 6 }}>{attachmentError}</div>}
+
+            {/* Already-uploaded (existing record) */}
+            {attachments.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                {attachments.map(a => (
+                  <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORD}` }}>
+                    <span style={{ fontSize: 15 }}>{a.mime_type === 'application/pdf' ? '📄' : '🖼️'}</span>
+                    <span style={{ fontSize: 11.5, color: colors.textPrimary, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.file_name}</span>
+                    <button onClick={() => handleViewAttachment(a)} style={{ fontSize: 10.5, color: MUTED, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>{isZh ? '查看' : 'View'}</button>
+                    <button onClick={() => handleDownloadAttachment(a)} style={{ fontSize: 10.5, color: MUTED, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>{isZh ? '下载' : 'Download'}</button>
+                    <button onClick={() => handleDeleteAttachment(a)} style={{ fontSize: 10.5, color: RED, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>{isZh ? '删除' : 'Delete'}</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Picked but not-yet-uploaded (brand-new record, uploads on Save) */}
+            {pendingFiles.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                {pendingFiles.map((f, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 8, background: 'rgba(203,168,92,0.08)', border: `1px solid ${GOLD}40` }}>
+                    <span style={{ fontSize: 15 }}>{f.type === 'application/pdf' ? '📄' : '🖼️'}</span>
+                    <span style={{ fontSize: 11.5, color: colors.textPrimary, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                    <span style={{ fontSize: 10, color: GOLD }}>{isZh ? '待保存' : 'Pending'}</span>
+                    <button onClick={() => handleRemovePendingFile(i)} style={{ fontSize: 10.5, color: RED, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>{isZh ? '移除' : 'Remove'}</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
               disabled={saving} onClick={handleSave}
