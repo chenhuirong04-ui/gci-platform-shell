@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
 import { useAuth } from '../contexts/AuthContext';
+import { AccountVault } from '../components/AccountVault';
 import {
   fetchCompanyDocuments, uploadCompanyDocument, deleteCompanyDocument, getCompanyDocumentSignedUrl,
   fetchUserDisplayNames, fetchDocumentCategories, createDocumentCategory,
@@ -483,7 +484,7 @@ export function CompanyDocuments() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
         {([
           { key: 'documents' as const, label: isZh ? '公司文件' : 'Documents' },
-          { key: 'accessVault' as const, label: isZh ? '账号与权限' : 'Access Vault' },
+          { key: 'accessVault' as const, label: isZh ? '账号与登录' : 'Accounts & Logins' },
         ]).map((t) => (
           <button
             key={t.key}
@@ -502,9 +503,7 @@ export function CompanyDocuments() {
       </div>
 
       {outerTab === 'accessVault' && (
-        <div style={{ padding: '18px 20px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, fontSize: 13, color: MUTED }}>
-          {isZh ? '账号与权限即将上线。' : 'Access Vault coming soon.'}
-        </div>
+        <AccountVault />
       )}
 
       {outerTab === 'documents' && (<>
