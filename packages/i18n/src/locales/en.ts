@@ -412,6 +412,17 @@ export const en = {
       viewDetails: 'View Details',
       prevPage: 'Prev', nextPage: 'Next',
       perPage: 'Per page', jumpTo: 'Go to page',
+      legacyDatabase: (n: number) => `Legacy Supplier Database (${n})`,
+      backToCurrent: '← Back to Current Suppliers',
+      legacyBadge: 'Legacy Supplier Database',
+      legacyEmpty: 'No legacy suppliers found',
+      foundInLegacyHint: (name: string) => `No match for "${name}" — it may be in the Legacy Supplier Database`,
+      viewInLegacyDatabase: 'View Legacy Supplier Database',
+      noCurrentSuppliers: (n: number) => [
+        'No current suppliers yet.',
+        'Suppliers created through "+ Add Supplier" will appear here.',
+        `Legacy suppliers are available in "Legacy Supplier Database (${n})".`,
+      ],
     },
     module: {
       docsTitle: 'Global Files & Certificates',

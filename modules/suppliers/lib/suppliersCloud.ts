@@ -90,6 +90,14 @@ export async function listSuppliersPage(opts: {
   is_preferred?: boolean;
   page?: number;
   pageSize?: number;
+  // Task: Legacy Supplier Database split. Undefined (default) = no filter,
+  // preserves exact prior behavior for every existing caller (AI supplier
+  // search, SupplierSelector, etc.) that doesn't pass this. Only
+  // SupplierList.tsx's own main/legacy tabs pass it explicitly.
+  // import_source='manual' is set only by the app's own "+ New Supplier"
+  // form (SupplierForm.tsx) — anything else (the 'notion'/'notion_test'
+  // migration batches) is legacy.
+  legacy?: boolean;
 } = {}): Promise<PagedSuppliers> {
   const pageSize = opts.pageSize ?? 100;
   const page = Math.max(1, opts.page ?? 1);
@@ -105,6 +113,8 @@ export async function listSuppliersPage(opts: {
   if (opts.rating) params.set('current_rating', `eq.${opts.rating}`);
   if (opts.is_preferred !== undefined) params.set('is_preferred', `eq.${opts.is_preferred}`);
   if (opts.category) params.set('product_categories', `cs.{"${opts.category}"}`);
+  if (opts.legacy === true) params.set('import_source', 'neq.manual');
+  else if (opts.legacy === false) params.set('import_source', 'eq.manual');
 
   const res = await sb(`/rest/v1/suppliers?${params}`, {
     method: 'GET',
@@ -126,6 +136,9 @@ export async function listSuppliersPage(opts: {
 export async function searchSuppliersPage(q: string, opts: {
   page?: number;
   pageSize?: number;
+  // Same semantics as listSuppliersPage's legacy param — undefined (default)
+  // preserves exact prior behavior for every existing caller.
+  legacy?: boolean;
 } = {}): Promise<PagedSuppliers> {
   if (q.length < 2) return { items: [], total: 0, page: 1, pageSize: opts.pageSize ?? 100 };
   const pageSize = opts.pageSize ?? 100;
@@ -133,8 +146,9 @@ export async function searchSuppliersPage(q: string, opts: {
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const encoded = encodeURIComponent(q);
+  const legacyParam = opts.legacy === true ? '&import_source=neq.manual' : opts.legacy === false ? '&import_source=eq.manual' : '';
   const res = await sb(
-    `/rest/v1/suppliers?or=(supplier_name_display.ilike.*${encoded}*,name_cn.ilike.*${encoded}*,name_en.ilike.*${encoded}*,short_code.ilike.*${encoded}*)&order=is_preferred.desc,supplier_name_display.asc`,
+    `/rest/v1/suppliers?or=(supplier_name_display.ilike.*${encoded}*,name_cn.ilike.*${encoded}*,name_en.ilike.*${encoded}*,short_code.ilike.*${encoded}*)${legacyParam}&order=is_preferred.desc,supplier_name_display.asc`,
     {
       method: 'GET',
       headers: {
@@ -149,6 +163,18 @@ export async function searchSuppliersPage(q: string, opts: {
   const total = parseInt(contentRange.split('/')[1] ?? '0', 10) || 0;
   const items: Supplier[] = await res.json().catch(() => []);
   return { items, total, page, pageSize };
+}
+
+// Task: Legacy Supplier Database — count only, for the sidebar entry's
+// "({count})" label. Cheap HEAD request, no rows transferred.
+export async function countLegacySuppliers(): Promise<number> {
+  const res = await sb('/rest/v1/suppliers?select=id&import_source=neq.manual', {
+    method: 'HEAD',
+    headers: { Prefer: 'count=exact' },
+  });
+  if (!res) return 0;
+  const contentRange = res.headers.get('Content-Range') ?? '';
+  return parseInt(contentRange.split('/')[1] ?? '0', 10) || 0;
 }
 
 export async function listFilterOptions(): Promise<{ countries: string[]; categories: string[] }> {

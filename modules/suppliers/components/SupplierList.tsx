@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '@gci/i18n';
 import type { Supplier } from '../types';
 import {
-  listSuppliersPage, searchSuppliersPage, listFilterOptions,
+  listSuppliersPage, searchSuppliersPage, listFilterOptions, countLegacySuppliers,
   type PagedSuppliers,
 } from '../lib/suppliersCloud';
 import { getCountryLabel, getCategoryLabel, getStatusLabel, getSupplierTypeLabel } from '../lib/labelMaps';
@@ -40,6 +40,12 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
   const [searchQ, setSearchQ] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(100);
+  // Task: Legacy Supplier Database split. 'current' = import_source='manual'
+  // (created via + New Supplier), 'legacy' = anything else (the Notion
+  // migration batches). Main page defaults to 'current'.
+  const [view, setView] = useState<'current' | 'legacy'>('current');
+  const [legacyCount, setLegacyCount] = useState<number | null>(null);
+  const [legacyHintCount, setLegacyHintCount] = useState<number | null>(null);
   const [filters, setFilters] = useState({
     country: initialFilters?.country ?? '',
     supplier_type: '',
@@ -58,12 +64,27 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
     listFilterOptions().then(setFilterOptions);
   }, []);
 
+  // Legacy Supplier Database count — loaded once for the entry button's
+  // "({count})" label, refreshed whenever we leave the legacy view (covers
+  // the rare case a legacy record got edited/reclassified elsewhere).
+  useEffect(() => {
+    countLegacySuppliers().then(setLegacyCount);
+  }, [view]);
+
   const load = useCallback(async (q: string, pg: number, pgSize: number) => {
     setLoading(true);
+    setLegacyHintCount(null);
     try {
       let result: PagedSuppliers;
       if (q && q.length >= 2) {
-        result = await searchSuppliersPage(q, { page: pg, pageSize: pgSize });
+        result = await searchSuppliersPage(q, { page: pg, pageSize: pgSize, legacy: view === 'legacy' });
+        // Main page, zero hits — check whether it's sitting in the legacy
+        // database instead, so we can point the user there rather than
+        // just showing "no results".
+        if (view === 'current' && result.total === 0) {
+          const legacyMatch = await searchSuppliersPage(q, { page: 1, pageSize: 1, legacy: true });
+          setLegacyHintCount(legacyMatch.total);
+        }
       } else {
         result = await listSuppliersPage({
           country: filters.country || undefined,
@@ -74,13 +95,14 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
           is_preferred: filters.is_preferred === 'true' ? true : undefined,
           page: pg,
           pageSize: pgSize,
+          legacy: view === 'legacy',
         });
       }
       setPaged(result);
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, view]);
 
   useEffect(() => { load(searchQ, page, pageSize); }, [load, page, pageSize]);
 
@@ -93,6 +115,11 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
 
   const filt = (key: string, val: string) => {
     setFilters(f => ({ ...f, [key]: val }));
+    setPage(1);
+  };
+
+  const switchView = (v: 'current' | 'legacy') => {
+    setView(v);
     setPage(1);
   };
 
@@ -143,6 +170,21 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
         >
           {t.dashboard}
         </button>
+        {view === 'current' ? (
+          <button
+            onClick={() => switchView('legacy')}
+            style={{ padding: '9px 16px', borderRadius: 10, background: '#f5f3ef', color: '#64748b', border: `1.5px solid ${CARD_BORDER}`, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            📁 {t.legacyDatabase(legacyCount ?? 0)}
+          </button>
+        ) : (
+          <button
+            onClick={() => switchView('current')}
+            style={{ padding: '9px 16px', borderRadius: 10, background: '#fff', color: NAVY, border: `1.5px solid ${GOLD}`, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            {t.backToCurrent}
+          </button>
+        )}
         <button
           onClick={onNew}
           style={{ padding: '9px 20px', borderRadius: 10, background: NAVY, color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
@@ -150,6 +192,13 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
           {t.addSupplier}
         </button>
       </div>
+
+      {/* Legacy mode banner */}
+      {view === 'legacy' && (
+        <div style={{ padding: '8px 24px', background: '#FEF3C7', borderBottom: '1px solid #FDE68A', fontSize: 12, fontWeight: 700, color: '#92400E' }}>
+          📁 {t.legacyBadge}
+        </div>
+      )}
 
       {/* Count info */}
       <div style={{ padding: '12px 24px', fontSize: 12, color: '#94a3b8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -170,7 +219,25 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
         {!loading && items.length === 0 ? (
           <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${CARD_BORDER}`, textAlign: 'center', padding: '80px 0', color: '#94a3b8', fontSize: 14 }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🏭</div>
-            {t.empty}
+            {view === 'current' && !searchQ && total === 0 ? (
+              <div>
+                {t.noCurrentSuppliers(legacyCount ?? 0).map((line: string, i: number) => (
+                  <div key={i} style={{ marginTop: i > 0 ? 6 : 0, fontSize: i === 0 ? 15 : 13, fontWeight: i === 0 ? 700 : 400, color: i === 0 ? '#475569' : '#94a3b8' }}>
+                    {line}
+                  </div>
+                ))}
+              </div>
+            ) : view === 'current' && legacyHintCount ? (
+              <>
+                <div>{t.foundInLegacyHint(searchQ)}</div>
+                <button
+                  onClick={() => switchView('legacy')}
+                  style={{ marginTop: 14, padding: '9px 18px', borderRadius: 10, background: NAVY, color: '#fff', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  {t.viewInLegacyDatabase}
+                </button>
+              </>
+            ) : view === 'legacy' ? t.legacyEmpty : t.empty}
           </div>
         ) : (
           <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${CARD_BORDER}`, overflow: 'hidden', boxShadow: '0 1px 4px rgba(12,27,58,0.06)' }}>

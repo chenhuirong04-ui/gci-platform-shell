@@ -413,6 +413,17 @@ export const zh: typeof en = {
       viewDetails: '查看详情',
       prevPage: '上一页', nextPage: '下一页',
       perPage: '每页', jumpTo: '跳至第',
+      legacyDatabase: (n: number) => `历史供应商库（${n}）`,
+      backToCurrent: '← 返回当前供应商',
+      legacyBadge: '历史供应商库',
+      legacyEmpty: '历史供应商库暂无数据',
+      foundInLegacyHint: (name: string) => `未找到 "${name}"，但该供应商可能位于历史供应商库`,
+      viewInLegacyDatabase: '查看历史供应商库',
+      noCurrentSuppliers: (n: number) => [
+        '暂无当前供应商',
+        '通过"+ 新增供应商"创建的新供应商会显示在这里。',
+        `历史供应商已移至"历史供应商库（${n}）"。`,
+      ],
     },
     module: {
       docsTitle: '全局文件与证照',
