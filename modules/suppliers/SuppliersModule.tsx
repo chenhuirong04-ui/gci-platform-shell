@@ -86,12 +86,15 @@ export default function SuppliersModule() {
         <SupplierList
           onNew={() => setTopTab('new')}
           onSelect={s => goDetail(s.id!)}
-          onNotionImport={() => setSub({ kind: 'notion-import' })}
           onCleanup={() => { setListInitFilters({}); setSub({ kind: 'cleanup' }); }}
           initialFilters={listInitFilters}
         />
       )}
 
+      {/* UI entry point removed from SupplierList's toolbar (Notion import
+          button) — this sub-view/component itself is left in place
+          (unreachable via UI now) per explicit instruction not to clean up
+          the underlying Notion import page/service this round. */}
       {topTab === 'list' && sub.kind === 'notion-import' && (
         <NotionImportPage onBack={() => setSub({ kind: 'list' })} />
       )}

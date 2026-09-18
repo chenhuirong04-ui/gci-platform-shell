@@ -27,12 +27,11 @@ const PAGE_SIZES = [50, 100, 200];
 interface Props {
   onSelect: (s: Supplier) => void;
   onNew: () => void;
-  onNotionImport: () => void;
   onCleanup: () => void;
   initialFilters?: { country?: string; category?: string };
 }
 
-export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanup, initialFilters }: Props) {
+export default function SupplierList({ onSelect, onNew, onCleanup, initialFilters }: Props) {
   const { lang, dict } = useI18n();
   const t = dict.suppliers.list;
   const [paged, setPaged] = useState<PagedSuppliers>({ items: [], total: 0, page: 1, pageSize: 100 });
@@ -156,14 +155,6 @@ export default function SupplierList({ onSelect, onNew, onNotionImport, onCleanu
         <Sel value={filters.is_preferred} onChange={v => filt('is_preferred', v)} placeholder={t.usedBefore}>
           <option value="true">{t.usedOnly}</option>
         </Sel>
-        <button
-          translate="no"
-          className="notranslate"
-          onClick={onNotionImport}
-          style={{ padding: '9px 16px', borderRadius: 10, background: '#fff', color: NAVY, border: `1.5px solid ${GOLD}`, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
-        >
-          {t.notionImport}
-        </button>
         <button
           onClick={onCleanup}
           style={{ padding: '9px 16px', borderRadius: 10, background: '#fff', color: NAVY, border: `1.5px solid ${GOLD}`, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
