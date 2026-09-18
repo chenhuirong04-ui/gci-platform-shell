@@ -35,9 +35,13 @@ async function requireAdmin(request: Request): Promise<{ ok: true } | { ok: fals
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
   if (!token) return { ok: false, status: 401, error: 'Missing Authorization header' };
 
-  const SUPA_URL = process.env.SUPABASE_URL;
+  // Not secret — same project URL already baked into the client bundle as
+  // VITE_SUPABASE_URL (see apps/shell/src/lib/supabase.ts, bsCloud.ts,
+  // suppliersCloud.ts, etc.). Hardcoded rather than read from a plain
+  // SUPABASE_URL env var, which isn't set in this Vercel project.
+  const SUPA_URL = 'https://efrkvwhzpgahjgfukjth.supabase.co';
   const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!SUPA_URL || !SERVICE_KEY) return { ok: false, status: 500, error: 'server_config_missing' };
+  if (!SERVICE_KEY) return { ok: false, status: 500, error: 'server_config_missing' };
 
   const userRes = await fetch(`${SUPA_URL}/auth/v1/user`, {
     headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${token}` },
