@@ -69,6 +69,13 @@ export function AccountVault() {
   const [newPassword, setNewPassword] = useState('');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  // Task: minimal-entry form. One unified "登录账号 / Login ID" input in the
+  // default view — maps to username or login_email at save time depending on
+  // whether it looks like an email. The separate 登录邮箱 field still exists
+  // independently under "更多信息" for the (rarer) case of a username-based
+  // login that also has its own distinct recorded email.
+  const [loginId, setLoginId] = useState('');
+  const [showMore, setShowMore] = useState(false);
 
   // Attachments/screenshots — for an existing record they upload immediately
   // (real account_login_id already exists); for a brand-new record, picked
@@ -106,6 +113,7 @@ export function AccountVault() {
   const openNew = () => {
     setEditing(null); setForm(EMPTY_FORM); setNewPassword(''); setFormError('');
     setAttachments([]); setPendingFiles([]); setAttachmentError('');
+    setLoginId(''); setShowMore(false);
     setShowForm(true);
   };
   const openEdit = (r: AccountLogin) => {
@@ -116,6 +124,9 @@ export function AccountVault() {
       recovery_email: r.recovery_email || '', mfa_method: r.mfa_method, owner: r.owner || '',
       status: r.status, last_verified_at: r.last_verified_at || '', notes: r.notes || '',
     });
+    // Display priority: username first, else login_email (per spec).
+    setLoginId(r.username || r.login_email || '');
+    setShowMore(false);
     setNewPassword('');
     setFormError('');
     setPendingFiles([]);
@@ -127,6 +138,7 @@ export function AccountVault() {
   const closeForm = () => {
     setShowForm(false); setEditing(null); setForm(EMPTY_FORM); setNewPassword(''); setFormError('');
     setAttachments([]); setPendingFiles([]); setAttachmentError('');
+    setLoginId(''); setShowMore(false);
   };
 
   const handleFileSelect = async (files: FileList | null) => {
@@ -195,7 +207,7 @@ export function AccountVault() {
   // Minimum to save: platform + company are always required; beyond that,
   // either some login detail OR at least one attachment is enough — a
   // screenshot with nothing else typed in yet is a valid, complete save.
-  const hasLoginInfo = !!(form.username.trim() || form.login_email.trim() || newPassword.trim());
+  const hasLoginInfo = !!(loginId.trim() || form.login_email.trim() || newPassword.trim());
   const hasAttachments = editing ? attachments.length > 0 : pendingFiles.length > 0;
 
   const handleSave = async () => {
@@ -210,7 +222,18 @@ export function AccountVault() {
     setSaving(true);
     setFormError('');
 
-    let payload: AccountLoginInput = { ...form };
+    // Map the unified Login ID field to the underlying username/login_email
+    // columns: an "@" means it's an email, otherwise treat it as a username.
+    // The advanced "更多信息" login_email field (if separately filled in) is
+    // preserved unless the Login ID itself is an email, in which case it
+    // takes over that slot.
+    const trimmedLoginId = loginId.trim();
+    const idLooksLikeEmail = trimmedLoginId.includes('@');
+    let payload: AccountLoginInput = {
+      ...form,
+      username: idLooksLikeEmail ? '' : trimmedLoginId,
+      login_email: idLooksLikeEmail ? trimmedLoginId : form.login_email,
+    };
     if (newPassword) {
       const enc = await encryptPassword(newPassword);
       if (!enc.ok) { setSaving(false); setFormError(enc.error); return; }
@@ -243,7 +266,7 @@ export function AccountVault() {
         setAttachmentError(isZh
           ? `账号已保存，但以下附件上传失败，请重新上传：${failed.join('、')}`
           : `Account saved, but these attachments failed — please re-upload: ${failed.join(', ')}`);
-        openEdit({ ...form, id: created.id, has_password: !!newPassword } as unknown as AccountLogin);
+        openEdit({ ...payload, id: created.id, has_password: !!newPassword } as unknown as AccountLogin);
         load();
         return;
       }
@@ -291,12 +314,11 @@ export function AccountVault() {
           <div style={{ fontSize: 12, fontWeight: 700, color: GOLD, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             {editing ? (isZh ? '编辑账号' : 'Edit Account') : (isZh ? '新增账号' : 'New Account')}
           </div>
+          {/* ── Default view: minimal-entry core fields ─────────────────── */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}>
             <input placeholder={isZh ? '系统/平台名称 *' : 'Platform Name *'} value={form.platform_name} onChange={e => setForm(f => ({ ...f, platform_name: e.target.value }))} style={inputSt} />
             <input placeholder={isZh ? '所属公司 *' : 'Company *'} value={form.company_name} onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))} style={inputSt} />
-            <input placeholder={isZh ? '登录网址' : 'Login URL'} value={form.login_url} onChange={e => setForm(f => ({ ...f, login_url: e.target.value }))} style={inputSt} />
-            <input placeholder={isZh ? '登录账号' : 'Username'} value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} style={inputSt} />
-            <input placeholder={isZh ? '登录邮箱' : 'Login Email'} value={form.login_email} onChange={e => setForm(f => ({ ...f, login_email: e.target.value }))} style={inputSt} />
+            <input placeholder={isZh ? '登录账号（用户名或邮箱）' : 'Login ID (username or email)'} value={loginId} onChange={e => setLoginId(e.target.value)} style={inputSt} />
             <input
               type="password"
               placeholder={editing ? (isZh ? '新密码（留空则不修改）' : 'New password (leave blank to keep)') : (isZh ? '密码' : 'Password')}
@@ -305,22 +327,39 @@ export function AccountVault() {
               style={inputSt}
               autoComplete="new-password"
             />
-            <input placeholder={isZh ? '手机号' : 'Phone'} value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} style={inputSt} />
-            <input placeholder={isZh ? '找回邮箱' : 'Recovery Email'} value={form.recovery_email} onChange={e => setForm(f => ({ ...f, recovery_email: e.target.value }))} style={inputSt} />
-            <select value={form.mfa_method} onChange={e => setForm(f => ({ ...f, mfa_method: e.target.value as MfaMethod }))} style={inputSt}>
-              {MFA_OPTIONS.map(o => <option key={o.value} value={o.value}>{isZh ? o.zh : o.en}</option>)}
-            </select>
             <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as AccountLoginStatus }))} style={inputSt}>
               {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{isZh ? o.zh : o.en}</option>)}
             </select>
-            <input placeholder={isZh ? '负责人' : 'Owner'} value={form.owner} onChange={e => setForm(f => ({ ...f, owner: e.target.value }))} style={inputSt} />
-            <div>
-              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '最近验证日期' : 'Last Verified'}</label>
-              <input type="date" value={form.last_verified_at} onChange={e => setForm(f => ({ ...f, last_verified_at: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <input placeholder={isZh ? '备注' : 'Notes'} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
-            </div>
+          </div>
+
+          {/* ── More details (collapsed by default) ─────────────────────── */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowMore(v => !v)}
+              style={{ padding: '4px 0', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: GOLD }}
+            >
+              {isZh ? '更多信息' : 'More details'} {showMore ? '▴' : '▾'}
+            </button>
+            {showMore && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10, marginTop: 8 }}>
+                <input placeholder={isZh ? '登录网址' : 'Login URL'} value={form.login_url} onChange={e => setForm(f => ({ ...f, login_url: e.target.value }))} style={inputSt} />
+                <input placeholder={isZh ? '登录邮箱' : 'Login Email'} value={form.login_email} onChange={e => setForm(f => ({ ...f, login_email: e.target.value }))} style={inputSt} />
+                <input placeholder={isZh ? '手机号' : 'Phone'} value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} style={inputSt} />
+                <input placeholder={isZh ? '找回邮箱' : 'Recovery Email'} value={form.recovery_email} onChange={e => setForm(f => ({ ...f, recovery_email: e.target.value }))} style={inputSt} />
+                <select value={form.mfa_method} onChange={e => setForm(f => ({ ...f, mfa_method: e.target.value as MfaMethod }))} style={inputSt}>
+                  {MFA_OPTIONS.map(o => <option key={o.value} value={o.value}>{isZh ? o.zh : o.en}</option>)}
+                </select>
+                <input placeholder={isZh ? '负责人' : 'Owner'} value={form.owner} onChange={e => setForm(f => ({ ...f, owner: e.target.value }))} style={inputSt} />
+                <div>
+                  <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '最近验证日期' : 'Last Verified'}</label>
+                  <input type="date" value={form.last_verified_at} onChange={e => setForm(f => ({ ...f, last_verified_at: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <input placeholder={isZh ? '备注' : 'Notes'} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ── Attachments / Screenshots ───────────────────────────────── */}
