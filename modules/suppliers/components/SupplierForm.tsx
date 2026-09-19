@@ -32,9 +32,7 @@ const R2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr
 const R3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 18 };
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
-const SUPA_URL = 'https://efrkvwhzpgahjgfukjth.supabase.co';
-const SUPA_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmcmt2d2h6cGdhaGpnZnVranRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNTUwNDgsImV4cCI6MjA5NDkzMTA0OH0.i8TGQneIZHTWeJzuzVv-JBiBppaOjYkPbs4E5K73clU';
+import { SUPABASE_URL as SUPA_URL, sbAuthHeaders } from '../../../apps/shell/src/lib/supabaseRest';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type UploadStage = 'idle' | 'uploading' | 'parsing' | 'ready' | 'failed';
@@ -84,7 +82,7 @@ async function uploadTemp(file: File, bucket: string): Promise<{ path: string; t
     const res = await fetch(`${SUPA_URL}/storage/v1/object/${bucket}/${path}`, {
       method: 'POST',
       headers: {
-        apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}`,
+        ...(await sbAuthHeaders()),
         'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'true',
       },
       body: file,

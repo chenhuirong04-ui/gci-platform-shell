@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import type { ServiceCustomer, BSLang, ServiceCustomerStatus, ServiceCustomerType } from '../types';
 import { useT } from '../translations';
 import { listExpiringCompliance } from '../lib/bsCloud';
+import { useAuth } from '../../../apps/shell/src/contexts/AuthContext';
 import type { ComplianceItem } from '../lib/bsCloud';
 
 interface Props {
@@ -46,6 +47,9 @@ export function ServiceCustomerList({
 }: Props) {
   const t = useT(lang);
   const isZh = lang === 'zh';
+  // service_customers DELETE is Admin-only in the database (RLS); don't offer a button that would fail.
+  const { profile } = useAuth();
+  const canDeleteCustomer = profile?.role_label === 'Admin';
 
   const [search, setSearch]           = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -337,6 +341,7 @@ export function ServiceCustomerList({
                           >
                             {t.buttons.unarchiveCustomer}
                           </button>
+                          {canDeleteCustomer && (
                           <button
                             onClick={() => {
                               if (!window.confirm(isZh
@@ -349,6 +354,7 @@ export function ServiceCustomerList({
                           >
                             {t.buttons.deleteCustomer}
                           </button>
+                          )}
                         </>
                       )}
                     </div>

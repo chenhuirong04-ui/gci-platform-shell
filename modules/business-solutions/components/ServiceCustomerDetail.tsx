@@ -5,6 +5,7 @@ import { fmt } from '../lib/bsCalculations';
 import { CustomerDocumentManager } from './CustomerDocumentManager';
 import { ComplianceItemManager } from './ComplianceItemManager';
 import { PersonManager } from './PersonManager';
+import { useAuth } from '../../../apps/shell/src/contexts/AuthContext';
 
 interface Props {
   lang: BSLang;
@@ -48,6 +49,9 @@ export function ServiceCustomerDetail({
 }: Props) {
   const t = useT(lang);
   const isZh = lang === 'zh';
+  // service_customers DELETE is Admin-only in the database (RLS); don't offer a button that would fail.
+  const { profile } = useAuth();
+  const canDeleteCustomer = profile?.role_label === 'Admin';
   const [activeTab, setActiveTab] = useState<DetailTab>(initialTab || 'info');
   const isArchived = customer.is_active === false;
 
@@ -121,7 +125,7 @@ export function ServiceCustomerDetail({
             {t.buttons.archiveCustomer}
           </button>
         )}
-        {isArchived && (
+        {isArchived && canDeleteCustomer && (
           <button onClick={handleDeleteClick} className="text-xs font-bold hover:underline flex-shrink-0 text-red-300">
             {t.buttons.deleteCustomer}
           </button>

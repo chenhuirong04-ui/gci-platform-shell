@@ -4,15 +4,13 @@
  * Does NOT touch: CRM, PI quotes, BOQ, supplier quotes, trade module
  */
 
-const SUPA_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+import { SUPABASE_URL as SUPA_URL, sbAuthHeaders } from '../../../apps/shell/src/lib/supabaseRest';
 
 import type { ServiceCustomer, ServiceCatalogItem, ServiceCategory, ServiceQuote, ServiceQuoteLineItem } from '../types';
 
 async function sbFetch(path: string, init: RequestInit = {}): Promise<Response | null> {
   const headers: Record<string, string> = {
-    apikey: SUPA_KEY,
-    Authorization: `Bearer ${SUPA_KEY}`,
+    ...(await sbAuthHeaders()),
     'Content-Type': 'application/json',
     ...(init.headers as Record<string, string> || {}),
   };
@@ -414,8 +412,7 @@ export async function uploadDocumentFile(
     const res = await fetch(uploadUrl, {
       method: 'POST',
       headers: {
-        apikey: SUPA_KEY,
-        Authorization: `Bearer ${SUPA_KEY}`,
+        ...(await sbAuthHeaders()),
         'Content-Type': file.type || 'application/octet-stream',
         'x-upsert': 'true',
       },
@@ -441,8 +438,7 @@ export async function getSignedUrl(path: string): Promise<string | null> {
     const res = await fetch(`${SUPA_URL}/storage/v1/object/sign/${BUCKET}/${path}`, {
       method: 'POST',
       headers: {
-        apikey: SUPA_KEY,
-        Authorization: `Bearer ${SUPA_KEY}`,
+        ...(await sbAuthHeaders()),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ expiresIn: 31536000 }),
@@ -463,8 +459,7 @@ export async function deleteDocumentFile(path: string): Promise<boolean> {
     const res = await fetch(`${SUPA_URL}/storage/v1/object/${BUCKET}`, {
       method: 'DELETE',
       headers: {
-        apikey: SUPA_KEY,
-        Authorization: `Bearer ${SUPA_KEY}`,
+        ...(await sbAuthHeaders()),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ prefixes: [path] }),

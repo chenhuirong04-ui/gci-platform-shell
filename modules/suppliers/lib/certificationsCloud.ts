@@ -4,14 +4,11 @@
 
 import type { SupplierCertification, CertProductLink } from '../types';
 
-const SUPA_URL = 'https://efrkvwhzpgahjgfukjth.supabase.co';
-const SUPA_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmcmt2d2h6cGdhaGpnZnVranRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNTUwNDgsImV4cCI6MjA5NDkzMTA0OH0.i8TGQneIZHTWeJzuzVv-JBiBppaOjYkPbs4E5K73clU';
+import { SUPABASE_URL as SUPA_URL, sbAuthHeaders } from '../../../apps/shell/src/lib/supabaseRest';
 
 async function sb(path: string, init: RequestInit = {}): Promise<Response | null> {
   const headers: Record<string, string> = {
-    apikey: SUPA_KEY,
-    Authorization: `Bearer ${SUPA_KEY}`,
+    ...(await sbAuthHeaders()),
     'Content-Type': 'application/json',
     ...(init.headers as Record<string, string> || {}),
   };

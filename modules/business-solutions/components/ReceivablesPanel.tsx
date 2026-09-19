@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { BSLang, ServiceQuote } from '../types';
+import { SUPABASE_URL as SUPA_URL, sbAuthHeaders } from '../../../apps/shell/src/lib/supabaseRest';
 import { PaymentModal } from './PaymentModal';
 import type { ReceivableRecord } from './PaymentModal';
 import { BSReceivableRefPanel } from './BSReceivableRefPanel';
@@ -52,9 +53,6 @@ export function ReceivablesPanel({ lang, quote, onToast }: Props) {
   const [generating, setGenerating] = useState(false);
   const [payingRecv, setPayingRecv] = useState<ReceivableRecord | null>(null);
 
-  const SUPA_URL = (import.meta as any).env.VITE_SUPABASE_URL as string;
-  const SUPA_KEY = (import.meta as any).env.VITE_SUPABASE_ANON_KEY as string;
-  const sbHeaders = { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}`, 'Content-Type': 'application/json' };
 
   const fetchReceivables = useCallback(async () => {
     if (!quote.id) return;
@@ -62,7 +60,7 @@ export function ReceivablesPanel({ lang, quote, onToast }: Props) {
     try {
       const res = await fetch(
         `${SUPA_URL}/rest/v1/service_receivables?select=id,payload&state=eq.active&payload->>quote_id=eq.${encodeURIComponent(quote.id)}&order=created_at.asc`,
-        { headers: sbHeaders }
+        { headers: { ...(await sbAuthHeaders()), 'Content-Type': 'application/json' } }
       );
       if (!res.ok) return;
       const rows: { id: string; payload: ReceivableRecord }[] = await res.json();
@@ -75,7 +73,7 @@ export function ReceivablesPanel({ lang, quote, onToast }: Props) {
   const fetchPaymentsForReceivable = useCallback(async (receivableId: string) => {
     const res = await fetch(
       `${SUPA_URL}/rest/v1/service_payments?select=id,payload&state=eq.active&payload->>receivable_id=eq.${encodeURIComponent(receivableId)}&order=created_at.asc`,
-      { headers: sbHeaders }
+      { headers: { ...(await sbAuthHeaders()), 'Content-Type': 'application/json' } }
     );
     if (!res.ok) return;
     const rows: { id: string; payload: PaymentRecord }[] = await res.json();

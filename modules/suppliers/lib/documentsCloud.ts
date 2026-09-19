@@ -6,9 +6,7 @@
 
 import type { SupplierDocument, DocumentVerificationStatus } from '../types';
 
-const SUPA_URL = 'https://efrkvwhzpgahjgfukjth.supabase.co';
-const SUPA_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmcmt2d2h6cGdhaGpnZnVranRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNTUwNDgsImV4cCI6MjA5NDkzMTA0OH0.i8TGQneIZHTWeJzuzVv-JBiBppaOjYkPbs4E5K73clU';
+import { SUPABASE_URL as SUPA_URL, sbAuthHeaders } from '../../../apps/shell/src/lib/supabaseRest';
 
 // Document types that must always use the private bucket
 const PRIVATE_DOC_TYPES = new Set([
@@ -21,8 +19,7 @@ export function resolveStorageBucket(documentType: string): string {
 
 async function sb(path: string, init: RequestInit = {}): Promise<Response | null> {
   const headers: Record<string, string> = {
-    apikey: SUPA_KEY,
-    Authorization: `Bearer ${SUPA_KEY}`,
+    ...(await sbAuthHeaders()),
     'Content-Type': 'application/json',
     ...(init.headers as Record<string, string> || {}),
   };
@@ -78,7 +75,7 @@ export async function createDocument(data: Omit<SupplierDocument, 'id'>): Promis
   const res = await fetch(`${SUPA_URL}/rest/v1/supplier_documents`, {
     method: 'POST',
     headers: {
-      apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}`,
+      ...(await sbAuthHeaders()),
       'Content-Type': 'application/json', Prefer: 'return=representation',
     },
     body: JSON.stringify(payload),
@@ -95,7 +92,7 @@ export async function updateDocument(id: string, patch: Partial<SupplierDocument
   const res = await fetch(`${SUPA_URL}/rest/v1/supplier_documents?id=eq.${id}`, {
     method: 'PATCH',
     headers: {
-      apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}`,
+      ...(await sbAuthHeaders()),
       'Content-Type': 'application/json', Prefer: 'return=minimal',
     },
     body: JSON.stringify({ ...sanitizeDates(patch), updated_at: new Date().toISOString() }),
@@ -197,7 +194,7 @@ export async function uploadSupplierFile(
   form.append('', file);
   const putRes = await fetch(uploadUrl, {
     method: 'PUT',
-    headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}`, 'x-upsert': 'true' },
+    headers: { ...(await sbAuthHeaders()), 'x-upsert': 'true' },
     body: form,
   });
   if (!putRes.ok) {
@@ -238,8 +235,7 @@ export async function moveStorageFile(
   const copyRes = await fetch(`${SUPA_URL}/storage/v1/object/copy`, {
     method: 'POST',
     headers: {
-      apikey: SUPA_KEY,
-      Authorization: `Bearer ${SUPA_KEY}`,
+      ...(await sbAuthHeaders()),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -257,8 +253,7 @@ export async function moveStorageFile(
   await fetch(`${SUPA_URL}/storage/v1/object/${bucket}`, {
     method: 'DELETE',
     headers: {
-      apikey: SUPA_KEY,
-      Authorization: `Bearer ${SUPA_KEY}`,
+      ...(await sbAuthHeaders()),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ prefixes: [srcPath] }),

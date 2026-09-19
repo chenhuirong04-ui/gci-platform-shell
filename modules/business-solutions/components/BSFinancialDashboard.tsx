@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { BSLang } from '../types';
+import { SUPABASE_URL as SUPA_URL, sbAuthHeaders } from '../../../apps/shell/src/lib/supabaseRest';
 import {
   computeDisplayStatus, getDaysOverdue, getDaysUntilDue,
   computeReminderTrigger, REMINDER_LABEL, STATUS_DISPLAY,
@@ -81,14 +82,6 @@ interface Props {
 export function BSFinancialDashboard({ lang, onGoToQuotes }: Props) {
   const isZh = lang === 'zh';
 
-  const SUPA_URL = (import.meta as any).env.VITE_SUPABASE_URL as string;
-  const SUPA_KEY = (import.meta as any).env.VITE_SUPABASE_ANON_KEY as string;
-  const sbH = {
-    apikey: SUPA_KEY,
-    Authorization: `Bearer ${SUPA_KEY}`,
-    'Content-Type': 'application/json',
-    Prefer: 'return=representation',
-  };
 
   const [subView, setSubView] = useState<'dashboard' | 'summary'>('dashboard');
   const [loading, setLoading] = useState(true);
@@ -101,7 +94,7 @@ export function BSFinancialDashboard({ lang, onGoToQuotes }: Props) {
 
   const sbFetch = useCallback(async (path: string) => {
     try {
-      const res = await fetch(`${SUPA_URL}/rest/v1/${path}`, { headers: sbH });
+      const res = await fetch(`${SUPA_URL}/rest/v1/${path}`, { headers: { ...(await sbAuthHeaders()), 'Content-Type': 'application/json' } });
       if (!res.ok) return null;
       return await res.json();
     } catch {
