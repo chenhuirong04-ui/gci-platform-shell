@@ -7,8 +7,12 @@ function json(data: unknown, status = 200) {
   });
 }
 
+import { requireModule } from '../_lib/auth';
+
 export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405);
+  const gciAuth = await requireModule(req, ['quotation', 'crm']);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const SUPA_URL = process.env.SUPABASE_URL!;
   const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;

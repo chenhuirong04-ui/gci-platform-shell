@@ -320,9 +320,13 @@ interface PlanV3Request {
   openTaskTitle?: string | null;
 }
 
+import { requireUser } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'POST') return json({ ok: false, error: 'Method not allowed' }, 405);
+  const gciAuth = await requireUser(request);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return json({ ok: false, error: 'OPENAI_API_KEY not configured' }, 500);

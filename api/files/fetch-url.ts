@@ -32,8 +32,12 @@ function isBlockedHost(hostname: string): boolean {
   return PRIVATE_HOST_RE.test(hostname);
 }
 
+import { requireUser } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
+  const gciAuth = await requireUser(request);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const reqUrl = new URL(request.url);
   const target = reqUrl.searchParams.get('url');

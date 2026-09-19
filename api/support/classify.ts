@@ -61,9 +61,13 @@ Classify into:
 Respond with ONLY a JSON object of this exact shape, no other text:
 {"product": "...", "issue_type": "...", "priority": "P1"|"P2"|"P3", "summary_zh": "...", "why_important": "...", "suggested_action": "...", "needs_chris": true|false}`;
 
+import { requireUser } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'POST') return json({ ok: false, error: 'Method not allowed' }, 405);
+  const gciAuth = await requireUser(request);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return json({ ok: false, error: 'OPENAI_API_KEY not configured on server' }, 503);

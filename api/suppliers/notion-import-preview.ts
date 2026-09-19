@@ -248,8 +248,12 @@ function normalizeName(name: string): string {
 }
 
 // ── Main handler ─────────────────────────────────────────────────────────────
+import { requireAdmin } from '../_lib/auth';
+
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
+  const gciAuth = await requireAdmin(req);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const notionToken = process.env.NOTION_TOKEN;
   const notionDbId = process.env.NOTION_SUPPLIER_DB_ID;

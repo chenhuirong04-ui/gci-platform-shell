@@ -61,9 +61,13 @@ export interface UpdateFollowupPayload {
   followUpDate?: string;     // Follow-up Date (today), optional
 }
 
+import { requireModule } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+  const gciAuth = await requireModule(request, ['crm']);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const token = process.env.NOTION_TOKEN;
   if (!token) return json({ error: 'NOTION_TOKEN not configured' }, 500);

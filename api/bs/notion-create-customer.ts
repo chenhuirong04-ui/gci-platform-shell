@@ -29,9 +29,13 @@ const STATUS_ZH: Record<string, string> = {
   LOST: '未成交',
 };
 
+import { requireModule } from '../_lib/auth';
+
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+  const gciAuth = await requireModule(req, ['quotation', 'crm']);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const token = process.env.NOTION_TOKEN;
   const dbId  = process.env.NOTION_SERVICE_CUSTOMERS_DB_ID;

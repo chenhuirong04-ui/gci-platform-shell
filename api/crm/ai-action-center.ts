@@ -40,9 +40,13 @@ interface Stats {
   projCount: number;
 }
 
+import { requireModule } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+  const gciAuth = await requireModule(request, ['crm']);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return json({ error: 'OPENAI_API_KEY not configured on server' }, 503);

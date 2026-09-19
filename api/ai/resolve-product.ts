@@ -224,9 +224,13 @@ function regexFallback(query: string, catalog: CatalogItem[]): ResolveResult {
 }
 
 // ── Handler ─────────────────────────────────────────────────────────────────
+import { requireModule } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'GET') return json({ ok: false, error: 'method_not_allowed' }, 405);
+  const gciAuth = await requireModule(request, ['trade', 'quotation', 'crm']);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const q = new URL(request.url).searchParams.get('q')?.trim();
   if (!q) return json({ ok: false, error: 'Missing required parameter: q' }, 400);

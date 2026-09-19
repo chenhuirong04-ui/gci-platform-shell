@@ -60,9 +60,13 @@ function mapBusinessType(bt?: string): string {
   return '贸易型';
 }
 
+import { requireModule } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+  const gciAuth = await requireModule(request, ['crm']);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const token = process.env.NOTION_TOKEN;
   const followupDbId = process.env.NOTION_FOLLOWUP_DB_ID;

@@ -79,9 +79,13 @@ Rules:
 - Never output an intent with an empty/meaningless raw_fragment.
 - Respond with ONLY the JSON object, no other text.`;
 
+import { requireUser } from '../_lib/auth';
+
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (req.method !== 'POST') return json({ ok: false, error: 'Method not allowed' }, 405);
+  const gciAuth = await requireUser(req);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return json({ ok: false, error: 'OPENAI_API_KEY not configured' }, 500);

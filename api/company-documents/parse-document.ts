@@ -82,8 +82,12 @@ Rules: confidence is a plain number from 0.0 to 1.0 reflecting how sure you are 
 // trying generateContent — see listAvailableModels() above and its use below.
 const PRIORITY_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.5-flash'];
 
+import { requireUser } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
+  const gciAuth = await requireUser(request);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return json({ ok: false, error: 'GEMINI_API_KEY not configured' }, 500);

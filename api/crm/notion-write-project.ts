@@ -79,9 +79,13 @@ function mapTradeStatus(status?: string): string {
   return MAP[status] ?? '新询盘';
 }
 
+import { requireModule } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+  const gciAuth = await requireModule(request, ['crm']);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const token        = process.env.NOTION_TOKEN;
   const projectsDbId = process.env.NOTION_PROJECTS_DB_ID;

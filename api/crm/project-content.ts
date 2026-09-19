@@ -132,9 +132,13 @@ async function fetchBlockChildren(blockId: string, token: string): Promise<any[]
   return results;
 }
 
+import { requireModule } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'GET') return json({ ok: false, error: 'method_not_allowed' }, 405);
+  const gciAuth = await requireModule(request, ['crm']);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const url = new URL(request.url);
   const projectPageId = url.searchParams.get('projectPageId');

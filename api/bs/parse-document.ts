@@ -227,9 +227,13 @@ Rules: Convert all dates to YYYY-MM-DD format. For CE mark: market_scope = EU. F
 // hardcoded name (gemini-2.0-flash / gemini-1.5-flash had gone stale here).
 const PRIORITY_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.5-flash'];
 
+import { requireModule } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'POST') return json({ ok: false, error: 'Method not allowed' }, 405);
+  const gciAuth = await requireModule(request, ['trade', 'quotation', 'crm']);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return json({ ok: false, error: 'GEMINI_API_KEY not configured' }, 500);

@@ -311,8 +311,12 @@ function extractBusinessMasterFields(page: any): BusinessMasterFields {
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 
+import { requireModule } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
+  const gciAuth = await requireModule(request, ['crm']);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const token = process.env.NOTION_TOKEN;
   const followUpDbId = process.env.NOTION_FOLLOWUP_DB_ID;

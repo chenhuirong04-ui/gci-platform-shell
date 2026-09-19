@@ -1,10 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireModule } from '../_lib/auth.js';
 
 const INVENTORY_DB = "2c6d0b13b3b9806db227fc01f723bc40";
 const STOCK_LEDGER_DB = "2c6d0b13b3b9804f9ccff92be2566c30";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const gciAuth = await requireModule(req, ['trade', 'finance', 'warehouse']);
+  if (!gciAuth.ok) return res.status(gciAuth.status).json(gciAuth.body);
 
   const NOTION_TOKEN = process.env.NOTION_TOKEN;
   if (!NOTION_TOKEN) return res.status(500).json({ error: 'Server misconfigured: NOTION_TOKEN is not set' });

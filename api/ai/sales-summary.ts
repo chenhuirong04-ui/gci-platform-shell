@@ -63,9 +63,13 @@ function periodStart(period: string): number {
   return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 }
 
+import { requireModule } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
+  const gciAuth = await requireModule(request, ['trade', 'finance', 'crm']);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key         = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;

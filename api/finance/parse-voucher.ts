@@ -41,9 +41,13 @@ Rules: Convert dates to YYYY-MM-DD. amount and vat_amount must be plain numbers 
 
 const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
 
+import { requireModule } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'POST') return json({ ok: false, error: 'Method not allowed' }, 405);
+  const gciAuth = await requireModule(request, ['finance', 'trade']);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return json({ ok: false, error: 'GEMINI_API_KEY not configured' }, 500);

@@ -463,9 +463,13 @@ async function processOnePage(
 }
 
 // ── Main handler ─────────────────────────────────────────────────────────────
+import { requireAdmin } from '../_lib/auth';
+
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (req.method !== 'POST') return json({ ok: false, error: 'Method not allowed' }, 405);
+  const gciAuth = await requireAdmin(req);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const notionToken = process.env.NOTION_TOKEN;
   if (!notionToken) return json({ ok: false, error: 'NOTION_TOKEN not configured' }, 500);

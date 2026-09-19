@@ -38,7 +38,11 @@ function json(body: unknown, status = 200) {
   });
 }
 
-export default async function handler(): Promise<Response> {
+import { requireUser } from '../_lib/auth';
+
+export default async function handler(request: Request): Promise<Response> {
+  const gciAuth = await requireUser(request);
+  if (!gciAuth.ok) return gciAuth.response;
   const secret = process.env.CHANYA_EXECUTIVE_STATUS_SECRET;
   if (!secret) {
     return json({ ok: false, status: 'no_data', error: 'CHANYA_EXECUTIVE_STATUS_SECRET not configured' });

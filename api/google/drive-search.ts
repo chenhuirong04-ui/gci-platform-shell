@@ -5,8 +5,12 @@ export const config = { runtime: 'edge' };
 
 import { getGoogleAccessToken, json } from './_googleAuth';
 
+import { requireUser } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200 });
+  const gciAuth = await requireUser(request);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const url = new URL(request.url);
   const q = url.searchParams.get('q')?.trim();

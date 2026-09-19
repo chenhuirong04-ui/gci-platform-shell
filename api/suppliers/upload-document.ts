@@ -5,6 +5,16 @@
 // directly and never pass through this function (avoids Vercel body-size limits).
 export const config = { runtime: 'edge' };
 
+import { requireModule } from '../_lib/auth';
+
+// This endpoint signs/deletes with the service-role key, so it must never be
+// steerable at other buckets (company-documents, finance-documents, …) or
+// path-traversal into them — only the two supplier buckets are reachable.
+const ALLOWED_BUCKETS = new Set(['suppliers-private', 'suppliers-public']);
+function isAllowedTarget(bucket: string, path: string): boolean {
+  return ALLOWED_BUCKETS.has(bucket) && !path.includes('..') && !path.startsWith('/');
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -22,6 +32,8 @@ function resolveBucket(documentType: string): string {
 
 export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405);
+  const gciAuth = await requireModule(req, ['trade', 'quotation', 'crm']);
+  if (!gciAuth.ok) return gciAuth.response;
 
   const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -40,6 +52,7 @@ export default async function handler(req: Request): Promise<Response> {
   if (action === 'sign') {
     const { bucket, path, expiresIn } = body as { bucket?: string; path?: string; expiresIn?: number };
     if (!bucket || !path) return json({ ok: false, error: 'missing_fields' }, 400);
+    if (!isAllowedTarget(bucket, path)) return json({ ok: false, error: 'bucket_not_allowed' }, 403);
     const signRes = await fetch(`${SUPA_URL}/storage/v1/object/sign/${bucket}/${path}`, {
       method: 'POST',
       headers: { ...H, 'Content-Type': 'application/json' },
@@ -101,6 +114,7 @@ export default async function handler(req: Request): Promise<Response> {
   if (action === 'delete-object') {
     const { bucket, path } = body as { bucket?: string; path?: string };
     if (!bucket || !path) return json({ ok: false, error: 'missing_fields' }, 400);
+    if (!isAllowedTarget(bucket, path)) return json({ ok: false, error: 'bucket_not_allowed' }, 403);
     const delRes = await fetch(`${SUPA_URL}/storage/v1/object/${bucket}`, {
       method: 'DELETE',
       headers: { ...H, 'Content-Type': 'application/json' },

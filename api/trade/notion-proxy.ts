@@ -4,6 +4,7 @@
  * Frontend: POST /api/notion-proxy { path, method?, body? }
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireModule } from '../_lib/auth.js';
 
 const BASE = 'https://api.notion.com/v1';
 
@@ -14,6 +15,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST')   return res.status(405).json({ error: 'Only POST allowed' });
+
+  const gciAuth = await requireModule(req, ['trade', 'finance', 'warehouse']);
+  if (!gciAuth.ok) return res.status(gciAuth.status).json(gciAuth.body);
 
   const token = process.env.NOTION_TOKEN;
   if (!token) return res.status(500).json({ error: 'Server misconfigured: NOTION_TOKEN is not set' });
