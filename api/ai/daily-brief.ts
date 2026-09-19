@@ -29,18 +29,25 @@ function todayStart(): number {
   return new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime();
 }
 
-async function sbGet(supabaseUrl: string, key: string, path: string): Promise<any[]> {
+async function sbGet(supabaseUrl: string, tradeAnonHdr: Record<string, string>, path: string): Promise<any[]> {
   const res = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
-    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    headers: { ...tradeAnonHdr, 'Content-Type': 'application/json' },
   });
   if (!res.ok) return [];
   const data = await res.json();
   return Array.isArray(data) ? data : [];
 }
 
+import { requireModule, legacyTradeAnonHeaders } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
+  const gciAuth = await requireModule(request, ['trade', 'finance', 'crm']);
+  if (!gciAuth.ok) return gciAuth.response;
+  // Reads anon-only Trade tables (orders / consignment_stock) — must stay on the anon
+  // identity until Batch 3 (see legacyTradeAnonHeaders in _lib/auth.ts).
+  const tradeAnonHdr = legacyTradeAnonHeaders();
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key         = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
@@ -53,19 +60,19 @@ export default async function handler(request: Request): Promise<Response> {
   // ── Parallel queries ──────────────────────────────────────────────────────
   const [quotRows, orderRows, stockRows, invoiceRows] = await Promise.all([
     // 1. quotation_records — flat schema
-    sbGet(supabaseUrl, key,
+    sbGet(supabaseUrl, tradeAnonHdr,
       `quotation_records?select=id,quote_no,customer_name,grand_total,status,created_at,quote_date&order=created_at.desc&limit=200`),
 
     // 2. orders — payload wrapped, fetch all active
-    sbGet(supabaseUrl, key,
+    sbGet(supabaseUrl, tradeAnonHdr,
       `orders?select=id,created_at,state,payload&state=eq.active&order=created_at.desc&limit=1000`),
 
     // 3. consignment_stock — payload wrapped
-    sbGet(supabaseUrl, key,
+    sbGet(supabaseUrl, tradeAnonHdr,
       `consignment_stock?select=id,state,payload&state=eq.active&limit=500`),
 
     // 4. invoice_drafts — flat schema
-    sbGet(supabaseUrl, key,
+    sbGet(supabaseUrl, tradeAnonHdr,
       `invoice_drafts?select=id,invoice_no,customer_name,total,status,invoice_date,due_date&order=created_at.desc&limit=200`),
   ]);
 

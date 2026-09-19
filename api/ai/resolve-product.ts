@@ -59,10 +59,10 @@ async function fetchNotionCatalog(token: string): Promise<CatalogItem[]> {
 }
 
 // ── Supabase consignment catalog fetch ─────────────────────────────────────
-async function fetchConsignmentCatalog(supaUrl: string, supaKey: string): Promise<CatalogItem[]> {
+async function fetchConsignmentCatalog(supaUrl: string, tradeAnonHdr: Record<string, string>): Promise<CatalogItem[]> {
   const url = `${supaUrl}/rest/v1/consignment_stock?select=payload&state=eq.active&limit=300`;
   const res = await fetch(url, {
-    headers: { apikey: supaKey, Authorization: `Bearer ${supaKey}`, 'Content-Type': 'application/json' },
+    headers: { ...tradeAnonHdr, 'Content-Type': 'application/json' },
   });
   if (!res.ok) return [];
   const rows: { payload: { productName?: string } }[] = await res.json();
@@ -224,13 +224,16 @@ function regexFallback(query: string, catalog: CatalogItem[]): ResolveResult {
 }
 
 // ── Handler ─────────────────────────────────────────────────────────────────
-import { requireModule } from '../_lib/auth';
+import { requireModule, legacyTradeAnonHeaders } from '../_lib/auth';
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'GET') return json({ ok: false, error: 'method_not_allowed' }, 405);
   const gciAuth = await requireModule(request, ['trade', 'quotation', 'crm']);
   if (!gciAuth.ok) return gciAuth.response;
+  // Reads anon-only Trade tables (orders / consignment_stock) — must stay on the anon
+  // identity until Batch 3 (see legacyTradeAnonHeaders in _lib/auth.ts).
+  const tradeAnonHdr = legacyTradeAnonHeaders();
 
   const q = new URL(request.url).searchParams.get('q')?.trim();
   if (!q) return json({ ok: false, error: 'Missing required parameter: q' }, 400);
@@ -243,7 +246,7 @@ export default async function handler(request: Request): Promise<Response> {
   // Fetch compact catalog from both sources in parallel
   const [notionCatalog, supabaseCatalog] = await Promise.allSettled([
     notionToken ? fetchNotionCatalog(notionToken) : Promise.resolve([] as CatalogItem[]),
-    (supaUrl && supaKey) ? fetchConsignmentCatalog(supaUrl, supaKey) : Promise.resolve([] as CatalogItem[]),
+    (supaUrl && supaKey) ? fetchConsignmentCatalog(supaUrl, tradeAnonHdr) : Promise.resolve([] as CatalogItem[]),
   ]);
 
   const catalog = mergeCatalogs(

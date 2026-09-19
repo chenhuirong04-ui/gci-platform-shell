@@ -29,9 +29,9 @@ function json(body: unknown, status = 200) {
   });
 }
 
-function sbGet(url: string, key: string, path: string): Promise<any[]> {
+function sbGet(url: string, tradeAnonHdr: Record<string, string>, path: string): Promise<any[]> {
   return fetch(`${url}/rest/v1/${path}`, {
-    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    headers: { ...tradeAnonHdr, 'Content-Type': 'application/json' },
   }).then(r => r.ok ? r.json() : Promise.reject(new Error(`Supabase ${r.status}`)));
 }
 
@@ -202,9 +202,16 @@ function buildInvoiceReceivables(invoiceRows: any[], now: number) {
 
 // ── Handler ──────────────────────────────────────────────────────────────────
 
+import { requireModule, legacyTradeAnonHeaders } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
+  const gciAuth = await requireModule(request, ['trade', 'finance', 'crm']);
+  if (!gciAuth.ok) return gciAuth.response;
+  // Reads anon-only Trade tables (orders / consignment_stock) — must stay on the anon
+  // identity until Batch 3 (see legacyTradeAnonHeaders in _lib/auth.ts).
+  const tradeAnonHdr = legacyTradeAnonHeaders();
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key         = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
@@ -214,11 +221,11 @@ export default async function handler(request: Request): Promise<Response> {
 
   const [ordersRes, consignRes, invoiceRes] = await Promise.allSettled([
     // A: orders — all active, up to 1000 rows; filter in memory (JSONB payload)
-    sbGet(supabaseUrl, key, 'orders?select=id,state,payload&state=eq.active&order=created_at.desc&limit=1000'),
+    sbGet(supabaseUrl, tradeAnonHdr, 'orders?select=id,state,payload&state=eq.active&order=created_at.desc&limit=1000'),
     // B: consignment_stock — active rows
-    sbGet(supabaseUrl, key, 'consignment_stock?select=id,state,payload&state=eq.active&order=created_at.desc&limit=500'),
+    sbGet(supabaseUrl, tradeAnonHdr, 'consignment_stock?select=id,state,payload&state=eq.active&order=created_at.desc&limit=500'),
     // C: invoice_drafts — flat schema; only issued+approved+waiting_approval
-    sbGet(supabaseUrl, key,
+    sbGet(supabaseUrl, tradeAnonHdr,
       'invoice_drafts?select=id,invoice_no,customer_name,total,status,invoice_date,due_date'
       + '&or=(status.eq.issued,status.eq.approved,status.eq.waiting_approval)'
       + '&order=created_at.desc&limit=200'),

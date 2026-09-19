@@ -49,9 +49,14 @@ function completenessStatus(pct: number): CompletenessStatus {
   return 'very_incomplete';
 }
 
+import { requireAdmin, userRestHeaders } from '../_lib/auth';
+
 export default async function handler(req: Request) {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
   if (req.method !== 'GET') return json({ ok: false, error: 'Method not allowed' }, 405);
+  const gciAuth = await requireAdmin(req);
+  if (!gciAuth.ok) return gciAuth.response;
+  const userHdr = userRestHeaders(gciAuth.ctx);
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
@@ -63,8 +68,7 @@ export default async function handler(req: Request) {
   async function supaGet(path: string) {
     const res = await fetch(`${supabaseUrl}${path}`, {
       headers: {
-        apikey: supabaseKey,
-        Authorization: `Bearer ${supabaseKey}`,
+        ...userHdr,
       },
     });
     if (!res.ok) throw new Error(`Supabase error ${res.status}: ${await res.text()}`);

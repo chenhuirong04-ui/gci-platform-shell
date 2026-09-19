@@ -49,17 +49,24 @@ interface RegisterPayload {
   created_by?: string;
 }
 
+import { requireModule, userRestHeaders } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+  // Registering a payment also writes the `transactions` ledger, whose RLS
+  // requires the finance module — gate on it here so a payment can never be
+  // saved while its ledger entry is rejected.
+  const gciAuth = await requireModule(request, ['finance']);
+  if (!gciAuth.ok) return gciAuth.response;
+  const userHdr = userRestHeaders(gciAuth.ctx);
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !key) return json({ ok: false, error: 'Supabase not configured' }, 500);
 
   const sbHeaders = {
-    apikey: key,
-    Authorization: `Bearer ${key}`,
+    ...userHdr,
     'Content-Type': 'application/json',
   };
 

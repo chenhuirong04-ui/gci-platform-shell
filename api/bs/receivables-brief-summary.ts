@@ -71,9 +71,14 @@ function groupByCurrency(rows: { currency: string; outstanding_amount: number }[
   return Array.from(map.values());
 }
 
+import { requireModule, userRestHeaders } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
+  const gciAuth = await requireModule(request, ['quotation', 'crm']);
+  if (!gciAuth.ok) return gciAuth.response;
+  const userHdr = userRestHeaders(gciAuth.ctx);
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
@@ -81,7 +86,7 @@ export default async function handler(request: Request): Promise<Response> {
 
   const res = await fetch(
     `${supabaseUrl}/rest/v1/service_receivables?select=id,payload&state=eq.active&limit=500`,
-    { headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' } },
+    { headers: { ...userHdr, 'Content-Type': 'application/json' } },
   );
 
   if (!res.ok) {

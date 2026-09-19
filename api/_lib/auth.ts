@@ -136,6 +136,37 @@ async function authorize(req: any, rule: AuthRule): Promise<AuthResult> {
   return { ok: true, ctx };
 }
 
+/**
+ * Headers for a PostgREST / Storage call made AS the signed-in user, so RLS
+ * applies to the query. `apikey` is the public project key (Supabase needs
+ * it on every request to route it to the project; it grants no data access
+ * by itself) — the identity is the caller's own access token in
+ * Authorization. Never use the service-role key here.
+ *
+ * Only in API_AUTH_MODE=log (observe mode, no real token) does this fall
+ * back to the anon key as Bearer — i.e. exactly the pre-hardening behaviour.
+ */
+export function userRestHeaders(ctx: AuthContext): Record<string, string> {
+  const apikey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+  return { apikey, Authorization: `Bearer ${ctx.token || apikey}` };
+}
+
+/**
+ * TEMPORARY EXCEPTION — remove in Batch 3.
+ * quotes, quote_items, orders, order_items, payments, settlements and
+ * consignment_stock carry an `anon_all` policy scoped to role {anon} only
+ * (the standalone Trade app reads/writes them with the anon key and has no
+ * login). A signed-in user's token has role `authenticated`, which those
+ * policies do NOT cover, so endpoints that read them must keep using the
+ * anon key until Trade moves to login. Callers must already have passed a
+ * requireUser / requireModule / requireAdmin check — the endpoint stays
+ * authenticated; only its internal data access stays on the legacy identity.
+ */
+export function legacyTradeAnonHeaders(): Record<string, string> {
+  const apikey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+  return { apikey, Authorization: `Bearer ${apikey}` };
+}
+
 /** Any active user with a profile row. */
 export function requireUser(req: any): Promise<AuthResult> {
   return authorize(req, { kind: 'user' });

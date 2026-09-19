@@ -224,12 +224,11 @@ function getFiles(prop: any): Array<{ name: string; url: string }> {
 
 // ── Supabase helper ──────────────────────────────────────────────────────────
 const SUPA_URL = 'https://efrkvwhzpgahjgfukjth.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmcmt2d2h6cGdhaGpnZnVranRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNTUwNDgsImV4cCI6MjA5NDkzMTA0OH0.i8TGQneIZHTWeJzuzVv-JBiBppaOjYkPbs4E5K73clU';
 
-async function supaGet(path: string): Promise<any[] | null> {
+async function supaGet(path: string, hdr: Record<string, string>): Promise<any[] | null> {
   try {
     const res = await fetch(`${SUPA_URL}${path}`, {
-      headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` },
+      headers: hdr,
     });
     if (!res.ok) return null;
     return res.json();
@@ -248,12 +247,13 @@ function normalizeName(name: string): string {
 }
 
 // ── Main handler ─────────────────────────────────────────────────────────────
-import { requireAdmin } from '../_lib/auth';
+import { requireAdmin, userRestHeaders } from '../_lib/auth';
 
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   const gciAuth = await requireAdmin(req);
   if (!gciAuth.ok) return gciAuth.response;
+  const userHdr = userRestHeaders(gciAuth.ctx);
 
   const notionToken = process.env.NOTION_TOKEN;
   const notionDbId = process.env.NOTION_SUPPLIER_DB_ID;
@@ -262,7 +262,7 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   // ── 1. Fetch all existing suppliers from Supabase ─────────────────────────
-  const existingRaw = await supaGet('/rest/v1/suppliers?select=id,notion_page_id,supplier_name_display,legacy_short_code,website,country&limit=1000');
+  const existingRaw = await supaGet('/rest/v1/suppliers?select=id,notion_page_id,supplier_name_display,legacy_short_code,website,country&limit=1000', userHdr);
   if (!existingRaw) return json({ ok: false, error: 'Failed to fetch existing suppliers from Supabase' }, 500);
 
   const existingByPageId = new Map<string, any>();

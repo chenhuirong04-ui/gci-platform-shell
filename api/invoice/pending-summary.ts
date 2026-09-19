@@ -17,9 +17,14 @@ function json(body: unknown, status = 200) {
 
 const PENDING_STATUSES = ['draft', 'waiting_approval', 'approved'];
 
+import { requireModule, userRestHeaders } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
+  const gciAuth = await requireModule(request, ['finance', 'trade']);
+  if (!gciAuth.ok) return gciAuth.response;
+  const userHdr = userRestHeaders(gciAuth.ctx);
 
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
@@ -32,8 +37,7 @@ export default async function handler(request: Request): Promise<Response> {
     `${url}/rest/v1/invoice_drafts?select=id,status,customer_name,total,currency,created_at,invoice_no&or=(${statusFilter})&order=created_at.asc`,
     {
       headers: {
-        apikey: key,
-        Authorization: `Bearer ${key}`,
+        ...userHdr,
         'Content-Type': 'application/json',
       },
     }

@@ -93,13 +93,16 @@ async function queryNotion(
   return results;
 }
 
-import { requireModule } from '../_lib/auth';
+import { requireModule, legacyTradeAnonHeaders } from '../_lib/auth';
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'GET') return json({ ok: false, error: 'Method not allowed' }, 405);
   const gciAuth = await requireModule(request, ['trade', 'quotation', 'crm']);
   if (!gciAuth.ok) return gciAuth.response;
+  // Reads anon-only Trade tables (orders / consignment_stock) — must stay on the anon
+  // identity until Batch 3 (see legacyTradeAnonHeaders in _lib/auth.ts).
+  const tradeAnonHdr = legacyTradeAnonHeaders();
 
   const notionToken  = process.env.NOTION_TOKEN;
   const supabaseUrl  = process.env.SUPABASE_URL  || process.env.VITE_SUPABASE_URL;
@@ -123,8 +126,7 @@ export default async function handler(request: Request): Promise<Response> {
     'Content-Type':   'application/json',
   };
   const supaHeaders: Record<string, string> = {
-    apikey:        supabaseKey || '',
-    Authorization: `Bearer ${supabaseKey || ''}`,
+    ...tradeAnonHdr,
     'Content-Type': 'application/json',
   };
 

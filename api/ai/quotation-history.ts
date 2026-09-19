@@ -98,9 +98,14 @@ function isInvalidItem(ir: any): boolean {
   return false;
 }
 
+import { requireModule, userRestHeaders } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
+  const gciAuth = await requireModule(request, ['quotation', 'crm', 'trade']);
+  if (!gciAuth.ok) return gciAuth.response;
+  const userHdr = userRestHeaders(gciAuth.ctx);
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key         = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
@@ -130,7 +135,7 @@ export default async function handler(request: Request): Promise<Response> {
       + `&select=quotation_id`
       + `&limit=200`;
     const piRes = await fetch(piUrl, {
-      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      headers: { ...userHdr, 'Content-Type': 'application/json' },
     });
     if (piRes.ok) {
       const piRows: any[] = await piRes.json().catch(() => []);
@@ -179,8 +184,7 @@ export default async function handler(request: Request): Promise<Response> {
 
   const res = await fetch(queryUrl, {
     headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
+      ...userHdr,
       'Content-Type': 'application/json',
     },
   });
@@ -203,7 +207,7 @@ export default async function handler(request: Request): Promise<Response> {
       + `&select=quotation_id,item_name,description,qty,unit,selling_price,line_total,currency,item_notes,sort_order`
       + `&order=sort_order.asc`;
     const itemsRes = await fetch(itemsUrl, {
-      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      headers: { ...userHdr, 'Content-Type': 'application/json' },
     });
     if (itemsRes.ok) {
       const itemRows: any[] = await itemsRes.json().catch(() => []);

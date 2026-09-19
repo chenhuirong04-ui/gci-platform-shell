@@ -63,14 +63,19 @@ function groupByCurrency(rows: { currency: string; grand_total: number }[]): Cur
   return Array.from(map.values());
 }
 
+import { requireModule, userRestHeaders } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
+  const gciAuth = await requireModule(request, ['quotation', 'crm']);
+  if (!gciAuth.ok) return gciAuth.response;
+  const userHdr = userRestHeaders(gciAuth.ctx);
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !key) return json({ ok: false, error: 'Supabase not configured' }, 500);
-  const headers = { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' };
+  const headers = { ...userHdr, 'Content-Type': 'application/json' };
 
   const [quotesRes, customersRes] = await Promise.all([
     fetch(

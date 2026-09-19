@@ -21,8 +21,13 @@ function json(body: unknown, status = 200) {
   });
 }
 
+import { requireModule, userRestHeaders } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
+  const gciAuth = await requireModule(request, ['quotation', 'crm', 'trade']);
+  if (!gciAuth.ok) return gciAuth.response;
+  const userHdr = userRestHeaders(gciAuth.ctx);
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key         = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
@@ -49,7 +54,7 @@ export default async function handler(request: Request): Promise<Response> {
       + `&limit=10`;
 
     const res = await fetch(queryUrl, {
-      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      headers: { ...userHdr, 'Content-Type': 'application/json' },
     });
     if (!res.ok) return json({ ok: true, duplicates: [] }); // fail-open: don't block save on check error
 
@@ -139,8 +144,7 @@ export default async function handler(request: Request): Promise<Response> {
     const res = await fetch(`${supabaseUrl}/rest/v1/quotation_records`, {
       method: 'POST',
       headers: {
-        apikey: key,
-        Authorization: `Bearer ${key}`,
+        ...userHdr,
         'Content-Type': 'application/json',
         'Prefer': 'return=representation',
       },
@@ -188,8 +192,7 @@ export default async function handler(request: Request): Promise<Response> {
       const itemsRes = await fetch(`${supabaseUrl}/rest/v1/quotation_items`, {
         method: 'POST',
         headers: {
-          apikey: key,
-          Authorization: `Bearer ${key}`,
+          ...userHdr,
           'Content-Type': 'application/json',
           'Prefer': 'return=minimal',
         },

@@ -23,9 +23,9 @@ function json(body: unknown, status = 200) {
   });
 }
 
-async function sbGet(supabaseUrl: string, key: string, path: string): Promise<any[]> {
+async function sbGet(supabaseUrl: string, tradeAnonHdr: Record<string, string>, path: string): Promise<any[]> {
   const res = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
-    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    headers: { ...tradeAnonHdr, 'Content-Type': 'application/json' },
   });
   if (!res.ok) return [];
   const data = await res.json();
@@ -42,9 +42,16 @@ const INVOICE_STATUS_ZH: Record<string, string> = {
   draft: '草稿', waiting_approval: '待审批', approved: '已审批', issued: '已开出', cancelled: '已取消', paid: '已付款',
 };
 
+import { requireModule, legacyTradeAnonHeaders } from '../_lib/auth';
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
+  const gciAuth = await requireModule(request, ['crm', 'trade', 'quotation']);
+  if (!gciAuth.ok) return gciAuth.response;
+  // Reads anon-only Trade tables (orders / consignment_stock) — must stay on the anon
+  // identity until Batch 3 (see legacyTradeAnonHeaders in _lib/auth.ts).
+  const tradeAnonHdr = legacyTradeAnonHeaders();
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key         = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
@@ -76,18 +83,18 @@ export default async function handler(request: Request): Promise<Response> {
 
   // Parallel queries
   const [quotRows, orderRows, stockRows, invoiceRows] = await Promise.all([
-    sbGet(supabaseUrl, key,
+    sbGet(supabaseUrl, tradeAnonHdr,
       `quotation_records?select=id,quote_no,customer_name,project_name,grand_total,status,created_at,quote_date,salesperson,quote_type&${orQuot}&order=created_at.desc&limit=50`),
 
     // TECH DEBT: orders uses JSONB payload — cannot filter server-side, filtered in memory (≤500 rows)
-    sbGet(supabaseUrl, key,
+    sbGet(supabaseUrl, tradeAnonHdr,
       `orders?select=id,created_at,state,payload&state=eq.active&order=created_at.desc&limit=500`),
 
     // TECH DEBT: consignment_stock uses JSONB payload — filtered in memory (≤500 rows)
-    sbGet(supabaseUrl, key,
+    sbGet(supabaseUrl, tradeAnonHdr,
       `consignment_stock?select=id,state,payload&state=eq.active&limit=500`),
 
-    sbGet(supabaseUrl, key,
+    sbGet(supabaseUrl, tradeAnonHdr,
       `invoice_drafts?select=id,invoice_no,customer_name,total,status,invoice_date,due_date&${orInvoice}&order=created_at.desc&limit=50`),
   ]);
 

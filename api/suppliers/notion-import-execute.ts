@@ -141,15 +141,13 @@ function getFiles(prop: any): Array<{ name: string; url: string }> {
 
 // ── Supabase helpers ─────────────────────────────────────────────────────────
 const SUPA_URL = 'https://efrkvwhzpgahjgfukjth.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmcmt2d2h6cGdhaGpnZnVranRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNTUwNDgsImV4cCI6MjA5NDkzMTA0OH0.i8TGQneIZHTWeJzuzVv-JBiBppaOjYkPbs4E5K73clU';
 
-async function supaPost(path: string, body: any): Promise<any | null> {
+async function supaPost(path: string, body: any, hdr: Record<string, string>): Promise<any | null> {
   try {
     const res = await fetch(`${SUPA_URL}${path}`, {
       method: 'POST',
       headers: {
-        apikey: SUPA_KEY,
-        Authorization: `Bearer ${SUPA_KEY}`,
+        ...hdr,
         'Content-Type': 'application/json',
         Prefer: 'return=representation',
       },
@@ -168,10 +166,10 @@ async function supaPost(path: string, body: any): Promise<any | null> {
   }
 }
 
-async function supaGet(path: string): Promise<any[] | null> {
+async function supaGet(path: string, hdr: Record<string, string>): Promise<any[] | null> {
   try {
     const res = await fetch(`${SUPA_URL}${path}`, {
-      headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` },
+      headers: hdr,
     });
     if (!res.ok) return null;
     return res.json();
@@ -181,10 +179,11 @@ async function supaGet(path: string): Promise<any[] | null> {
 }
 
 // ── short_code generator with retry on unique conflict ────────────────────────
-async function generateShortCode(): Promise<string | null> {
+async function generateShortCode(hdr: Record<string, string>): Promise<string | null> {
   // Find current max SUP-AUTO-XXXXXX
   const rows = await supaGet(
     `/rest/v1/suppliers?short_code=like.SUP-AUTO-*&select=short_code&order=short_code.desc&limit=1`,
+    hdr,
   );
   let seq = 1;
   if (rows && rows.length > 0) {
@@ -197,7 +196,7 @@ async function generateShortCode(): Promise<string | null> {
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = `SUP-AUTO-${String(seq + attempt).padStart(6, '0')}`;
     // Check if it already exists
-    const check = await supaGet(`/rest/v1/suppliers?short_code=eq.${encodeURIComponent(code)}&select=id&limit=1`);
+    const check = await supaGet(`/rest/v1/suppliers?short_code=eq.${encodeURIComponent(code)}&select=id&limit=1`, hdr);
     if (check && check.length === 0) return code;
   }
   return null;
@@ -253,6 +252,7 @@ interface ImportResult {
 async function processOnePage(
   item: ImportItemInput,
   token: string,
+  hdr: Record<string, string>,
 ): Promise<ImportResult> {
   const warnings: string[] = [];
   const result: ImportResult = {
@@ -284,6 +284,7 @@ async function processOnePage(
   // 2. Idempotency check (server-side)
   const existCheck = await supaGet(
     `/rest/v1/suppliers?notion_page_id=eq.${encodeURIComponent(item.pageId)}&select=id&limit=1`,
+    hdr,
   );
   if (existCheck && existCheck.length > 0) {
     result.result = 'skipped';
@@ -317,7 +318,7 @@ async function processOnePage(
   const websiteRaw = getRichText(props['Website'] ?? props['网站']);
 
   // 4. Generate short_code
-  const shortCode = await generateShortCode();
+  const shortCode = await generateShortCode(hdr);
   if (!shortCode) {
     result.error = 'Failed to generate unique short_code';
     return result;
@@ -345,7 +346,7 @@ async function processOnePage(
     updated_at: new Date().toISOString(),
   };
 
-  const supplier = await supaPost('/rest/v1/suppliers', supplierPayload);
+  const supplier = await supaPost('/rest/v1/suppliers', supplierPayload, hdr);
   if (!supplier?.id) {
     result.error = 'Failed to insert supplier record';
     return result;
@@ -366,7 +367,7 @@ async function processOnePage(
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    const contact = await supaPost('/rest/v1/supplier_contacts', contactPayload);
+    const contact = await supaPost('/rest/v1/supplier_contacts', contactPayload, hdr);
     if (contact?.id) result.contactsCreated++;
     else warnings.push('联系人记录创建失败');
   }
@@ -381,7 +382,7 @@ async function processOnePage(
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    const cert = await supaPost('/rest/v1/supplier_certifications', certPayload);
+    const cert = await supaPost('/rest/v1/supplier_certifications', certPayload, hdr);
     if (cert?.id) result.certsCreated++;
     else warnings.push(`认证记录创建失败：${certName}`);
   }
@@ -417,8 +418,7 @@ async function processOnePage(
             {
               method: 'POST',
               headers: {
-                apikey: SUPA_KEY,
-                Authorization: `Bearer ${SUPA_KEY}`,
+                ...hdr,
                 'Content-Type': dlRes.headers.get('Content-Type') || 'application/octet-stream',
                 'x-upsert': 'true',
               },
@@ -453,7 +453,7 @@ async function processOnePage(
       result.docsFailedDownload++;
     }
 
-    const doc = await supaPost('/rest/v1/supplier_documents', docPayload);
+    const doc = await supaPost('/rest/v1/supplier_documents', docPayload, hdr);
     if (doc?.id) result.docsCreated++;
     else warnings.push(`文件记录创建失败：${att.name}`);
   }
@@ -463,13 +463,14 @@ async function processOnePage(
 }
 
 // ── Main handler ─────────────────────────────────────────────────────────────
-import { requireAdmin } from '../_lib/auth';
+import { requireAdmin, userRestHeaders } from '../_lib/auth';
 
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
   if (req.method !== 'POST') return json({ ok: false, error: 'Method not allowed' }, 405);
   const gciAuth = await requireAdmin(req);
   if (!gciAuth.ok) return gciAuth.response;
+  const userHdr = userRestHeaders(gciAuth.ctx);
 
   const notionToken = process.env.NOTION_TOKEN;
   if (!notionToken) return json({ ok: false, error: 'NOTION_TOKEN not configured' }, 500);
@@ -501,7 +502,7 @@ export default async function handler(req: Request): Promise<Response> {
       });
       continue;
     }
-    const r = await processOnePage(item, notionToken);
+    const r = await processOnePage(item, notionToken, userHdr);
     results.push(r);
   }
 
