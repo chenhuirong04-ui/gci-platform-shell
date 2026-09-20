@@ -256,28 +256,6 @@ export interface CMOResponse {
   aiInsights?: AIInsights;
 }
 
-export type InternalTaskStatus = "待处理" | "进行中" | "等待他人" | "已完成";
-export type InternalTaskCategory = "财务" | "采购" | "销售" | "行政" | "系统";
-
-export interface InternalTaskProgressLog {
-  timestamp: string;
-  content: string;
-  author: string;
-}
-
-export interface InternalTask {
-  id: string;
-  title: string;
-  category: InternalTaskCategory;
-  owner: string;
-  dueDate: string;
-  status: InternalTaskStatus;
-  description?: string;
-  blocker?: string;
-  logs: InternalTaskProgressLog[];
-  createdAt: string;
-}
-
 export interface StrategyInsight {
   painPoints: { cn: string; en: string };
   differentiation: { cn: string; en: string };

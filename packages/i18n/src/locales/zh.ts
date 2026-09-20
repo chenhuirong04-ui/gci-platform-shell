@@ -1113,6 +1113,11 @@ export const zh: typeof en = {
       saveChanges: '保存更改',
       taskCreatedToast: '事项已录入',
       taskUpdatedToast: '事项已更新',
+      blockerFieldLabel: '等待谁 / 阻塞原因',
+      blockerPlaceholder: '例如：等房东确认退押金时间',
+      loadingTasks: '加载中…',
+      loadFailed: '加载失败',
+      saveFailed: '保存失败',
     },
   },
   trade: {

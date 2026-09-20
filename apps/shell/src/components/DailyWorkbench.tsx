@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { buildDashboardStats } from '../../../../modules/crm/utils/dashboardStats';
-import type { FollowUpTask } from '../../../../modules/crm/types';
+import { getTodaysFollowups, getOverdueFollowups } from '../lib/crmSupabase';
+import type { CrmCustomer } from '../lib/crmSupabase';
+import { dubaiToday, daysBetween, priorityTier } from '../ai/CrmResultSections';
 
 // ── Design tokens (matching AIPage / CRM dark premium) ────────────────────────
 const BG    = '#0A1628';
@@ -117,25 +118,75 @@ function Tag({ label, color }: { label: string; color: string }) {
   );
 }
 
+// Follow-up numbers for the workbench, derived from the formal CRM lists (crm_customers): due today + overdue.
+// Urgent rule (unchanged): 需求整理中 and due; 已报价待确认 and 3+ days late; or a top-priority customer that is due.
+const QUOTE_ESCALATE_DAYS = 3;
+export interface WorkbenchFollowItem {
+  id: string;
+  clientName: string;
+  tradeStatus: string;
+  priority: string;
+  owner: string;
+  nextFollowUpAt: string;
+}
+export interface WorkbenchCrmStats {
+  todayFollowups: WorkbenchFollowItem[];
+  urgent: WorkbenchFollowItem[];
+  overdueCount: number;
+}
+export function buildWorkbenchCrmStats(today: CrmCustomer[], overdue: CrmCustomer[]): WorkbenchCrmStats {
+  const t = dubaiToday();
+  const seen = new Set<string>();
+  const items: Array<WorkbenchFollowItem & { od: number }> = [];
+  for (const c of [...overdue, ...today]) {
+    if (seen.has(c.id)) continue;
+    seen.add(c.id);
+    const next = (c.next_follow_up_at || '').slice(0, 10);
+    items.push({
+      id: c.id,
+      clientName: c.customer_name || '—',
+      tradeStatus: c.status || '',
+      priority: priorityTier(c.priority),
+      owner: c.owner || '',
+      nextFollowUpAt: next,
+      od: next ? Math.max(0, daysBetween(next, t)) : 0,
+    });
+  }
+  const strip = ({ od: _od, ...rest }: WorkbenchFollowItem & { od: number }): WorkbenchFollowItem => rest;
+  const urgent = items.filter((i) =>
+    i.tradeStatus === '需求整理中' ||
+    (i.tradeStatus === '已报价待确认' && i.od >= QUOTE_ESCALATE_DAYS) ||
+    i.priority === 'A',
+  ).map(strip);
+  return {
+    todayFollowups: items.map(strip),
+    urgent,
+    overdueCount: items.filter((i) => i.od > 3).length,
+  };
+}
+
 export function DailyWorkbench() {
   const navigate = useNavigate();
 
-  // CRM data from localStorage
-  const [stats, setStats] = useState<ReturnType<typeof buildDashboardStats> | null>(null);
+  // CRM follow-ups from the formal Supabase CRM (crm_customers)
+  const [stats, setStats] = useState<WorkbenchCrmStats | null>(null);
   const [quotation, setQuotation] = useState<QuotationData | null>(null);
   const [invoice, setInvoice] = useState<InvoiceData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Load CRM from localStorage (same key as CrmModule)
-    try {
-      const raw = localStorage.getItem('ICARE_HISTORY_V1');
-      const tasks: FollowUpTask[] = raw ? JSON.parse(raw) : [];
-      setStats(buildDashboardStats(tasks));
-    } catch (e) {
-      console.warn('[DailyWorkbench] localStorage read failed', e);
-      setStats(buildDashboardStats([]));
-    }
+    // 1. CRM follow-ups: formal Supabase CRM. A failed read degrades to "no follow-ups", never a blank page.
+    let alive = true;
+    Promise.all([getTodaysFollowups(), getOverdueFollowups()])
+      .then(([tRes, oRes]) => {
+        if (!alive) return;
+        if (!tRes.ok || !oRes.ok) console.warn('[DailyWorkbench] CRM read failed', !tRes.ok ? tRes.error : !oRes.ok ? oRes.error : '');
+        setStats(buildWorkbenchCrmStats(tRes.ok ? tRes.rows : [], oRes.ok ? oRes.rows : []));
+      })
+      .catch((e) => {
+        console.warn('[DailyWorkbench] CRM read failed', e);
+        if (alive) setStats(buildWorkbenchCrmStats([], []));
+      });
 
     // 2. Fetch quotation data + invoice data in parallel
     const base = window.location.origin;
@@ -147,6 +198,7 @@ export function DailyWorkbench() {
       if (iRes.status === 'fulfilled' && iRes.value?.ok) setInvoice(iRes.value);
       setLoading(false);
     });
+    return () => { alive = false; };
   }, []);
 
   // ── Build AI priority suggestions ─────────────────────────────────────────
@@ -154,7 +206,7 @@ export function DailyWorkbench() {
 
   if (stats) {
     // Urgent CRM items (already prioritised by dashboardStats)
-    for (const task of stats.actionCenterGroups.urgent.slice(0, 3)) {
+    for (const task of stats.urgent.slice(0, 3)) {
       const daysOverdue = task.nextFollowUpAt
         ? Math.floor((Date.now() - new Date(task.nextFollowUpAt).getTime()) / 86400000)
         : 0;
@@ -170,7 +222,7 @@ export function DailyWorkbench() {
           : task.tradeStatus === '已报价待确认' ? '跟进报价确认'
           : '电话/WhatsApp 确认需求',
         type: 'CRM',
-        route: '/crm?tab=followup',
+        route: '/crm-customers',
       });
     }
   }
@@ -209,7 +261,7 @@ export function DailyWorkbench() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 4 }}>
         <StatCard
           label="今日必须推进"
-          value={loading ? '…' : (stats?.actionCenterGroups.urgent.length ?? 0)}
+          value={loading ? '…' : (stats?.urgent.length ?? 0)}
           color={RED}
           sub="URGENT"
         />
@@ -270,7 +322,7 @@ export function DailyWorkbench() {
       )}
 
       {stats?.todayFollowups.map(task => {
-        const isUrgent = stats.actionCenterGroups.urgent.some(u => u.id === task.id);
+        const isUrgent = stats.urgent.some(u => u.id === task.id);
         const daysOverdue = task.nextFollowUpAt
           ? Math.floor((Date.now() - new Date(task.nextFollowUpAt).getTime()) / 86400000)
           : 0;
@@ -295,7 +347,7 @@ export function DailyWorkbench() {
               </div>
             )}
             <button
-              onClick={() => navigate('/crm?tab=followup')}
+              onClick={() => navigate('/crm-customers')}
               style={{ padding: '6px 14px', borderRadius: 7, background: `${BLUE}18`, border: `1px solid ${BLUE}40`, color: BLUE, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
             >
               查看

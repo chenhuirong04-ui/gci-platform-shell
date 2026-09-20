@@ -3,7 +3,6 @@ import type { BSLang, ServiceQuote } from '../types';
 import { SUPABASE_URL as SUPA_URL, sbAuthHeaders } from '../../../apps/shell/src/lib/supabaseRest';
 import { PaymentModal } from './PaymentModal';
 import type { ReceivableRecord } from './PaymentModal';
-import { BSReceivableRefPanel } from './BSReceivableRefPanel';
 import { computeDisplayStatus, getDaysOverdue, STATUS_DISPLAY } from '../lib/overdueUtils';
 
 interface PaymentRecord {
@@ -370,14 +369,6 @@ export function ReceivablesPanel({ lang, quote, onToast }: Props) {
                         </table>
                       )}
                     </div>
-                    <BSReceivableRefPanel
-                      lang={lang}
-                      receivableId={recv.id}
-                      quoteId={recv.quote_id}
-                      customerId={recv.customer_id}
-                      customerName={recv.customer_name}
-                      onToast={onToast}
-                    />
                   </div>
                 )}
               </div>

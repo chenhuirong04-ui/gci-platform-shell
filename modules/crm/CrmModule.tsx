@@ -1,9 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useI18n } from '@gci/i18n';
 import { generateTaskContent } from './services/geminiService';
 import { FollowUpTask, CMOResponse, Project, ProjectType, ProjectStatus, ProjectLogEntry } from './types';
-import { PersistenceService } from './services/persistenceService';
 import { getCustomerCode } from './utils/customerCode';
 import { supabase } from '../../apps/shell/src/lib/supabase';
 
@@ -11,7 +10,6 @@ import LeadMasterDetail from './components/LeadMasterDetail';
 import CustomerWorkspacePage from './pages/CustomerWorkspacePage';
 import BusinessDetailPage from './pages/BusinessDetailPage';
 import FollowUpQueue from './components/FollowUpQueue';
-import HistoryView from './components/HistoryView';
 import ProjectProgress from './components/ProjectProgress';
 import CustomerDirectory from './components/CustomerDirectory';
 import BusinessRegister from './components/BusinessRegister';
@@ -29,13 +27,6 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-
-/* =========================
-   Keys
-   ========================= */
-const ICARE_HISTORY_V1 = 'ICARE_HISTORY_V1';
-const ICARE_PROJECTS_V1 = 'ICARE_PROJECTS_V1';
-const ICARE_INTERNAL_TASKS_V1 = 'ICARE_INTERNAL_TASKS_V1';
 
 /* =========================
    ErrorBoundary（避免白屏）
@@ -82,108 +73,14 @@ class ErrorBoundary extends React.Component<
 }
 
 /* =========================
-   Password Gate（最终可用：用 pull_snapshot 做验证）
-   ========================= */
-async function verifyPagePassword(password: string) {
-  localStorage.setItem('ICARE_GATE_PASSWORD', password || 'bypass');
-  return true;
-}
-function PasswordGate({ onPass }: { onPass: () => void }) {
-  const [pwd, setPwd] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState('');
-
-  const submit = async () => {
-  setErr('');
-  setLoading(true);
-  try {
-    await verifyPagePassword(pwd);  // 把密码存入 localStorage，激活云同步
-    onPass();
-  } catch (e: any) {
-    console.error('[Gate] bypass failed:', e);
-    setErr('进入失败，请重试');
-  } finally {
-    setLoading(false);
-  }
-};
-
-  return (
-    <div className="min-h-screen flex items-center justify-center px-6 relative overflow-hidden"
-      style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%)' }}>
-
-      {/* Decorative gold rings */}
-      <div className="absolute top-[-80px] right-[-80px] w-[360px] h-[360px] rounded-full opacity-[0.06]"
-        style={{ border: '60px solid #B8960C' }} />
-      <div className="absolute bottom-[-120px] left-[-60px] w-[280px] h-[280px] rounded-full opacity-[0.04]"
-        style={{ border: '50px solid #B8960C' }} />
-      <div className="absolute top-[40%] left-[-30px] w-[120px] h-[120px] rounded-full opacity-[0.05]"
-        style={{ border: '24px solid #B8960C' }} />
-
-      {/* Card */}
-      <div className="relative z-10 w-full max-w-sm">
-
-        {/* Brand header — above card */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4 shadow-lg"
-            style={{ background: 'linear-gradient(135deg, #B8960C, #D4AF37)' }}>
-            <span className="text-xl font-black text-white tracking-tight">GCI</span>
-          </div>
-          <div className="text-white text-xl font-black tracking-wide">业务控制中心</div>
-          <div className="text-xs font-bold mt-1" style={{ color: '#B8960C' }}>
-            Global Care Info · Middle East Platform
-          </div>
-        </div>
-
-        {/* Login card */}
-        <div className="bg-white/[0.06] backdrop-blur-sm rounded-3xl border border-white/10 p-8 shadow-2xl">
-          <div className="text-xs font-black uppercase tracking-widest text-white/40 mb-5 flex items-center gap-2">
-            <Lock className="w-3 h-3" />
-            访问验证
-          </div>
-
-          <input
-            type="password"
-            value={pwd}
-            onChange={e => setPwd(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && submit()}
-            placeholder="输入访问密码"
-            className="w-full px-4 py-3.5 rounded-2xl text-sm font-bold text-white placeholder-white/30 outline-none focus:ring-2 transition-all"
-            style={{
-              backgroundColor: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.12)',
-            }}
-            onFocus={e => (e.target.style.borderColor = '#B8960C')}
-            onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.12)')}
-          />
-
-          <button
-            onClick={submit}
-            disabled={!pwd || loading}
-            className="w-full mt-4 py-3.5 rounded-2xl text-sm font-black tracking-wide shadow-lg transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-30"
-            style={{ background: 'linear-gradient(135deg, #B8960C, #D4AF37)', color: '#0F172A' }}
-          >
-            {loading ? '验证中…' : '进入系统 →'}
-          </button>
-
-          {err && (
-            <div className="mt-3 text-xs font-bold text-red-400 text-center">{err}</div>
-          )}
-        </div>
-
-        <div className="text-center mt-6 text-[10px] font-bold text-white/20">
-          每次刷新 / 关闭后需重新验证
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =========================
    CRM Module — 迁移自 AppInner（不再渲染 AppShell/Sidebar/Header，
    GCI Platform 壳全局提供）。Day 4-5 monorepo 合并计划。
    ========================= */
 type CrmTab = 'control' | 'dashboard' | 'history' | 'project' | 'internal' | 'comms';
 const _crmValidTabs = ['control', 'dashboard', 'history', 'project', 'internal', 'comms'] as const;
+// Tabs that showed the old iCare cache. That cache and the cloud KV chain behind it are gone, so outside the
+// demo build these tabs (and the /crm/customer/* pages built on them) redirect to the formal Supabase-backed customer page.
+const LEGACY_CRM_TABS: readonly CrmTab[] = ['dashboard', 'comms', 'history', 'project'];
 
 function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoMode?: boolean }) {
   const { dict, lang } = useI18n();
@@ -284,8 +181,8 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
   const [isGenerating, setIsGenerating] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  const [hydrated, setHydrated] = useState(false);
-  const firstHydrateRef = useRef(true);
+  // Nothing is loaded from a cloud/local KV any more, so there is nothing to wait for.
+  const [hydrated] = useState(true);
 
   // 明确排除名单（不进入业务跟进中心）
   const BIZ_EXCLUDE = new Set([
@@ -442,53 +339,12 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
     setTimeout(() => setToast(null), 2500);
   };
 
+  // Demo build only: synthetic in-memory data. Outside demo there is NO cloud/local KV for tasks/projects any more.
   useEffect(() => {
-    if (demoMode) {
-      setTasks(createDemoLeads());
-      setProjects([]);
-      setHydrated(true);
-      firstHydrateRef.current = false;
-      return;
-    }
-    let alive = true;
-    (async () => {
-      try {
-        const [t, p] = await Promise.all([
-          PersistenceService.load(ICARE_HISTORY_V1),
-          PersistenceService.load(ICARE_PROJECTS_V1),
-          PersistenceService.load(ICARE_INTERNAL_TASKS_V1)
-        ]);
-
-        if (!alive) return;
-        setTasks(Array.isArray(t) ? (t as any) : []);
-        setProjects(Array.isArray(p) ? (p as any) : []);
-      } catch (e) {
-        console.warn('Init load failed', e);
-      } finally {
-        if (!alive) return;
-        setHydrated(true);
-        firstHydrateRef.current = false;
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!demoMode) return;
+    setTasks(createDemoLeads());
+    setProjects([]);
   }, [demoMode]);
-
-  useEffect(() => {
-    if (demoMode) return;
-    if (!hydrated) return;
-    if (firstHydrateRef.current) return;
-    PersistenceService.save(ICARE_HISTORY_V1, tasks);
-  }, [tasks, hydrated, demoMode]);
-
-  useEffect(() => {
-    if (demoMode) return;
-    if (!hydrated) return;
-    if (firstHydrateRef.current) return;
-    PersistenceService.save(ICARE_PROJECTS_V1, projects);
-  }, [projects, hydrated, demoMode]);
 
   const handleAddTask = async (formData: Partial<FollowUpTask>) => {
     setIsGenerating(true);
@@ -1088,6 +944,11 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
     { id: 'dashboard' as const, label: dict.crm.nav.subNavCustomers },
   ];
 
+  // Outside the demo build the legacy iCare-cache tabs and /crm/customer/* pages no longer exist: send them to the formal customer page.
+  if (!demoMode && (LEGACY_CRM_TABS.includes(activeTab) || isOnStandaloneRoute)) {
+    return <Navigate to="/crm-customers" replace />;
+  }
+
   return (
     <div className="min-h-screen font-sans pb-36" style={{ background: '#0A1628', color: '#E8F0FF' }}>
       {/* Existing tabbed UI stays mounted (just hidden) while on the
@@ -1190,14 +1051,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
         )}
 
         {activeTab === 'control' && !demoMode && (
-          <ControlCenter
-            tasks={normalizedTasks}
-            projects={combinedProjectsForView.filter(p => !p.deleted && !p.archivedAt)}
-            todayFollowupCount={todayFollowupCount}
-            onTabSwitch={(tab) => setActiveTab(tab)}
-            onSelectTask={(task) => goToCustomer(task)}
-            onSelectBusiness={(task) => goToBusiness(getCustomerCode(task), task, 'project')}
-          />
+          <ControlCenter />
         )}
 
         {activeTab === 'dashboard' && (
@@ -1292,17 +1146,6 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
           </div>
         )}
 
-        {activeTab === 'history' && (
-          <HistoryView
-            tasks={normalizedTasks}
-            projects={projects}
-            lang={'zh'}
-            onUpdateTask={(u: any) => setTasks(v => v.map(t => t.id === u.id ? u : t))}
-            onArchiveTask={archiveTask}
-            onRestoreTask={restoreTask}
-            onDeleteTask={deleteTask}
-          />
-        )}
       </main>
       </div>
 

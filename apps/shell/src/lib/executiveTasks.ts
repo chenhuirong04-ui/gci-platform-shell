@@ -21,6 +21,11 @@ export interface ExecutiveTask {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  // Added by 20260921000200_icare_tasks_schema.sql. Optional so rows read before that
+  // migration (or built elsewhere) stay valid; `select('*')` returns them once present.
+  owner?: string | null;
+  blocker?: string | null;
+  logs?: unknown[] | null;
 }
 
 export const BUSINESS_AREA_LABEL: Record<TaskBusinessArea, string> = {
@@ -61,19 +66,31 @@ export async function createExecutiveTask(input: {
   reminderAt?: string | null;
   relatedCustomerId?: string | null;
   priority?: TaskPriority;
+  // Internal Tasks tab (CRM module). All optional: existing callers are unaffected and
+  // keep source 'business_assistant', status 'open' and no owner/blocker.
+  status?: TaskStatus;
+  owner?: string | null;
+  blocker?: string | null;
+  source?: string;
 }): Promise<{ ok: true; task: ExecutiveTask } | { ok: false; error: string }> {
+  const row: Record<string, unknown> = {
+    title: input.title,
+    description: input.description ?? null,
+    business_area: input.businessArea,
+    due_at: input.dueAt ?? null,
+    reminder_at: input.reminderAt ?? null,
+    related_customer_id: input.relatedCustomerId ?? null,
+    priority: input.priority ?? (input.dueAt ? 'P2' : 'P3'),
+    source: input.source ?? 'business_assistant',
+  };
+  // Only sent when given, so a database without the tasks-schema migration keeps working for every existing caller.
+  if (input.status) row.status = input.status;
+  if (input.owner !== undefined) row.owner = input.owner;
+  if (input.blocker !== undefined) row.blocker = input.blocker;
+  if (input.status === 'completed') row.completed_at = new Date().toISOString();
   const { data, error } = await supabase
     .from('executive_tasks')
-    .insert({
-      title: input.title,
-      description: input.description ?? null,
-      business_area: input.businessArea,
-      due_at: input.dueAt ?? null,
-      reminder_at: input.reminderAt ?? null,
-      related_customer_id: input.relatedCustomerId ?? null,
-      priority: input.priority ?? (input.dueAt ? 'P2' : 'P3'),
-      source: 'business_assistant',
-    })
+    .insert(row)
     .select('*')
     .single();
   if (error) return { ok: false, error: error.message };
@@ -101,6 +118,68 @@ export async function updateExecutiveTaskStatus(
   const { error } = await supabase.from('executive_tasks').update(update).eq('id', id);
   if (error) return { ok: false, error: error.message };
   return { ok: true };
+}
+
+// General edit used by the CRM "Internal Tasks" tab. Only the fields present in `patch` are written, so a
+// caller that changes just the title never touches status or completed_at. completed_at is set to "now" only
+// when status is CHANGED to completed here (a real completion), and cleared when it is moved back out of
+// completed; tasks migrated from iCare keep completed_at NULL until someone completes them in the app.
+export async function updateExecutiveTask(
+  id: string,
+  patch: {
+    title?: string;
+    description?: string | null;
+    businessArea?: TaskBusinessArea;
+    status?: TaskStatus;
+    owner?: string | null;
+    blocker?: string | null;
+    dueAt?: string | null;
+  },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (patch.title !== undefined) update.title = patch.title;
+  if (patch.description !== undefined) update.description = patch.description;
+  if (patch.businessArea !== undefined) update.business_area = patch.businessArea;
+  if (patch.owner !== undefined) update.owner = patch.owner;
+  if (patch.blocker !== undefined) update.blocker = patch.blocker;
+  if (patch.dueAt !== undefined) update.due_at = patch.dueAt;
+  if (patch.status !== undefined) {
+    update.status = patch.status;
+    update.completed_at = patch.status === 'completed' ? new Date().toISOString() : null;
+  }
+  const { error } = await supabase.from('executive_tasks').update(update).eq('id', id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+// ── Internal Tasks board: columns are derived, there is no extra status value ──
+// 待处理 = open · 进行中 = in_progress without a blocker · 等待他人 = in_progress WITH a blocker · 已完成 = completed / cancelled.
+export type InternalTaskColumn = 'pending' | 'in_progress' | 'waiting' | 'done';
+
+export function internalTaskColumn(t: Pick<ExecutiveTask, 'status' | 'blocker'>): InternalTaskColumn {
+  if (t.status === 'completed' || t.status === 'cancelled') return 'done';
+  if (t.status === 'in_progress') return (t.blocker ?? '').trim() ? 'waiting' : 'in_progress';
+  return 'pending';
+}
+
+/** status + blocker to store for a column. `blocker` is only kept for the waiting column. */
+export function internalColumnToFields(col: InternalTaskColumn, blocker: string): { status: TaskStatus; blocker: string | null } {
+  switch (col) {
+    case 'done': return { status: 'completed', blocker: null };
+    case 'waiting': return { status: 'in_progress', blocker: blocker.trim() || null };
+    case 'in_progress': return { status: 'in_progress', blocker: null };
+    default: return { status: 'open', blocker: null };
+  }
+}
+
+// Due dates are stored as a real instant at 09:00 Asia/Dubai (same convention as the iCare migration and /tasks).
+export function dueAtToDateInput(dueAt: string | null | undefined): string {
+  if (!dueAt) return '';
+  const d = new Date(new Date(dueAt).getTime() + 4 * 3600 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+export function dateInputToDueAt(date: string): string | null {
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date}T09:00:00+04:00` : null;
 }
 
 // /tasks "已完成" tab only — a real hard delete, called only after the

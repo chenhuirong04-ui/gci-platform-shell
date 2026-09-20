@@ -245,7 +245,7 @@ const ProjectProgress: React.FC<ProjectProgressProps> = ({
             </div>
 
             {/* "手动建档" hidden: it only wrote to the local `projects` array
-                (ICARE_PROJECTS_V1), which this view never reads back — saved
+                (the old local project cache), which this view never reads back — saved
                 records were invisible to the user. Not deleting the modal or
                 onAddProject wiring (no data migration/deletion this batch);
                 re-enable once the unified intake (batch 8) replaces it with a

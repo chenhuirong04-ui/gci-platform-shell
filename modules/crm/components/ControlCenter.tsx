@@ -6,9 +6,6 @@ import {
 } from 'lucide-react';
 import { PageHeader, StatCard } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
-import { FollowUpTask, Project } from '../types';
-
-import { getTaskBusinessId, getProjectBusinessId } from '../utils/businessId';
 // CRM Legacy cleanup (2026-09) — "最近更新的业务/最近新增客户/最近新增沟通" now
 // read the real Supabase CRM (crm_customers/crm_followups) instead of the
 // legacy Notion-sourced FollowUpTask[] used everywhere else on this page.
@@ -21,7 +18,7 @@ import {
   type CrmRecentlyUpdatedRow, type CrmNewCustomerRow, type CrmFollowupWithCustomer,
 } from '../../../apps/shell/src/lib/crmSupabase';
 // Business Overview data-source cleanup (2026-09-16) — "项目总数" now reads
-// the real crm_projects table instead of the legacy ICARE_HISTORY_V1-derived
+// the real crm_projects table instead of the legacy old-cache-derived
 // businessType='PROJECT' count. Same cross-module import convention as the
 // crmSupabase import above.
 import { listAllProjects } from '../../../apps/shell/src/lib/crmProjects';
@@ -31,19 +28,6 @@ import { listAllProjects } from '../../../apps/shell/src/lib/crmProjects';
 // never render it as if it were a business_type/source label.
 function isMigrationMarker(v: string | null | undefined): boolean {
   return !!v && /^notion_migration/i.test(v);
-}
-
-interface Props {
-  tasks: FollowUpTask[];
-  projects: Project[];
-  // Authoritative today-follow-up count from API (computed before orphan merge).
-  // When non-null, stat card 1 uses this directly. null = sync not yet run.
-  todayFollowupCount?: number | null;
-  onTabSwitch: (tab: 'dashboard' | 'project' | 'internal' | 'history') => void;
-  // 最近新增客户 → 客户工作台
-  onSelectTask: (task: FollowUpTask) => void;
-  // 最近更新的业务 → 独立业务详情页
-  onSelectBusiness: (task: FollowUpTask) => void;
 }
 
 const GOLD = '#B8960C';
@@ -65,72 +49,7 @@ function SectionHeader({ icon, title, color = T1 }: {
   );
 }
 
-function TaskRow({ task, onClick }: { task: FollowUpTask; onClick: () => void }) {
-  const isOverdue = task.nextFollowUpAt &&
-    task.nextFollowUpAt.slice(0, 10) < new Date().toISOString().slice(0, 10);
-  const bizId = (task as any).businessId || getTaskBusinessId(task.id);
-  return (
-    <button
-      onClick={onClick}
-      className="w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-colors mb-2"
-      style={{ background: CARD2, border: `1px solid ${BORDER}` }}
-      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(184,150,12,0.08)')}
-      onMouseLeave={e => (e.currentTarget.style.background = CARD2)}
-    >
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="w-2 h-2 rounded-full flex-shrink-0"
-          style={{ backgroundColor: isOverdue ? '#EF4444' : GOLD }} />
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 min-w-0">
-            {bizId && (
-              <span className="text-[9px] font-black px-1.5 py-0.5 rounded flex-shrink-0"
-                style={{ backgroundColor: `${GOLD}22`, color: GOLD }}>{bizId}</span>
-            )}
-            <div className="text-sm font-black truncate" style={{ color: T1 }}>{task.clientName}</div>
-          </div>
-          <div className="text-xs truncate mt-0.5" style={{ color: T2 }}>{task.goal}</div>
-        </div>
-      </div>
-      <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-        {isOverdue && (
-          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-900/40 text-red-400">逾期</span>
-        )}
-        <span className="text-[10px] font-bold" style={{ color: T2 }}>{task.nextFollowUpAt?.slice(0, 10)}</span>
-        <ChevronRight className="w-3.5 h-3.5" style={{ color: T2 }} />
-      </div>
-    </button>
-  );
-}
 
-function ProjectRow({ project }: { project: Project }) {
-  const typeColor = project.type === '项目型' ? '#8FA6D4' : GOLD;
-  const bizId = (project as any).businessId || getProjectBusinessId(project.id);
-  return (
-    <div className="flex items-center justify-between px-4 py-3 rounded-xl mb-2"
-      style={{ background: CARD2, border: `1px solid ${BORDER}` }}>
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: typeColor }} />
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 min-w-0">
-            {bizId && (
-              <span className="text-[9px] font-black px-1.5 py-0.5 rounded flex-shrink-0"
-                style={{ backgroundColor: `${GOLD}22`, color: GOLD }}>{bizId}</span>
-            )}
-            <div className="text-sm font-black truncate" style={{ color: T1 }}>{project.clientName}</div>
-          </div>
-          <div className="text-xs truncate mt-0.5" style={{ color: T2 }}>{project.name}</div>
-        </div>
-      </div>
-      <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-          style={{ backgroundColor: typeColor + '22', color: typeColor }}>
-          {project.type}
-        </span>
-        <span className="text-[10px] font-bold" style={{ color: T2 }}>{project.tradeStatus}</span>
-      </div>
-    </div>
-  );
-}
 
 // Real-CRM row for the three "recent activity" blocks — deliberately not
 // reusing TaskRow (that one is shaped around legacy FollowUpTask fields:
@@ -162,7 +81,7 @@ function RealCrmRow({ name, sub, dateLabel, onClick }: { name: string; sub: stri
   );
 }
 
-export default function ControlCenter({ tasks, projects, todayFollowupCount, onTabSwitch, onSelectTask, onSelectBusiness }: Props) {
+export default function ControlCenter() {
   const { dict, lang } = useI18n();
   const ct = dict.crm.controlCenter;
   const navigate = useNavigate();
@@ -175,7 +94,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
   const [recentFollowups, setRecentFollowups] = useState<CrmFollowupWithCustomer[] | null>(null);
 
   // Business Overview data-source cleanup (2026-09-16) — real crm_customers/
-  // crm_projects counts, replacing the legacy ICARE_HISTORY_V1-derived
+  // crm_projects counts, replacing the legacy old-cache-derived
   // `overview` block below (which counted contactKey groups out of the old
   // Notion-sourced Follow-up Log, not the real CRM table at all — the
   // "28 vs actual 9" bug). null = not loaded yet, never coerced to 0.
@@ -187,7 +106,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
   // Business Overview data-source cleanup (2026-09-16, third revision) — the
   // bottom 4 task-oriented KPIs, same treatment: real crm_customers/
   // crm_followups/crm_projects queries, replacing buildDashboardStats()'s
-  // ICARE_HISTORY_V1-derived numbers (which this file no longer computes at
+  // old-cache-derived numbers (which this file no longer computes at
   // all — see the removed `dashboardStats` useMemo below). 高优先客户 reuses
   // the exact "isFocus" rule already established in getBossDecisions()
   // (priority contains 重点, or is exactly 'A') via
@@ -220,16 +139,7 @@ export default function ControlCenter({ tasks, projects, todayFollowupCount, onT
   // produced has now been replaced by a real query above; nothing in this
   // file reads it anymore, so it's gone rather than left computed-but-unused.
 
-  // activeTasks: used only for 成交漏斗 (analytics pipeline funnel).
-  // Uses notionSource filter to exclude orphan records.
-  const EXCLUDED_FROM_FUNNEL = ['暂缓', '执行中', '已成交', '已归档', '已转订单'];
-  const activeTasks = tasks.filter(t =>
-    t.status === 'todo' &&
-    !EXCLUDED_FROM_FUNNEL.includes(t.tradeStatus) &&
-    (t as any).notionSource !== 'contact_only'
-  );
-
-  // Legacy `overview` block (ICARE_HISTORY_V1-derived customer/new7/active30
+  // Legacy `overview` block (old-cache-derived customer/new7/active30
   // counts) removed in the 2026-09-16 data-source cleanup — see
   // customerTotal/newCustomers7d/activeCustomers30d state above, all real
   // crm_customers queries now. `quoting`/`archived` were computed here but

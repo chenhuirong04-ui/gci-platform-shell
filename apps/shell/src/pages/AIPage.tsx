@@ -8,7 +8,7 @@ import { InvoiceAssistantPanel } from '../components/invoice/InvoiceAssistantPan
 import { BillingProfileDraftPanel } from '../components/invoice/BillingProfileDraftPanel';
 import { detectAIIntent, getIntentSteps } from '../ai/aiRouter';
 import type { AIIntentMatch } from '../ai/aiRouter';
-import { readCRMTasks, getCRMBriefStats, getCRMCustomerData } from '../lib/crmLocalStore';
+import { CrmBriefSection, CrmCustomerSection } from '../ai/CrmResultSections';
 import SupplierSearchResult from '../ai/suppliers/SupplierSearchResult';
 import { searchSuppliers } from '../ai/suppliers/supplierSearchClient';
 import { getTodaysFollowups, findCustomerByName, logFollowup, createCustomerWithContact } from '../lib/crmSupabase';
@@ -1116,9 +1116,6 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
               )}
               <div style={{ fontSize: 10, color: SUBTLE, marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <span>数据来源：quotation_records · {new Date(state.resultData.asOf).toLocaleString('zh-CN')}</span>
-                {state.resultData.hasCrmRecords && (
-                  <span style={{ color: '#A5B4FC' }}>+ CRM 留底 {state.resultData.crmQuoteCount} 条</span>
-                )}
               </div>
             </div>
           )}
@@ -1705,65 +1702,8 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
                   <span>数据来源：{d.source}</span>
                   <span>{new Date(d.asOf).toLocaleString('zh-CN')}</span>
                 </div>
-                {/* CRM section — read from localStorage (Notion sync cache) */}
-                {(() => {
-                  const crmStats = getCRMBriefStats(readCRMTasks());
-                  if (!crmStats.hasData) {
-                    return (
-                      <div style={{ marginTop: 10, padding: '8px 12px', background: 'rgba(143,166,212,0.06)', border: '1px solid rgba(143,166,212,0.2)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                        <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>⚠</span>
-                        <div>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: '#8FA6D4', marginBottom: 2 }}>CRM 跟进数据暂未加载</div>
-                          <div style={{ fontSize: 11, color: MUTED, lineHeight: 1.6 }}>
-                            请先前往 <span style={{ color: '#8FA6D4' }}>CRM 模块</span> 同步 Notion 数据，之后简报将自动合并跟进记录。
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                  const PRIO_COLOR: Record<string, string> = { A: '#E0846A', B: '#D4A843', C: MUTED };
-                  return (
-                    <div style={{ marginTop: 10, padding: '10px 14px', background: 'rgba(91,163,201,0.06)', border: '1px solid rgba(91,163,201,0.22)', borderRadius: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: '#5BA3C9' }}>CRM 跟进（已从本地 Notion Sync 合并）</span>
-                        <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 10, background: 'rgba(91,163,201,0.12)', color: '#5BA3C9', fontFamily: 'monospace' }}>localStorage</span>
-                      </div>
-                      {/* Stats chips */}
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                        <div style={{ padding: '5px 10px', borderRadius: 7, background: 'rgba(91,163,201,0.08)', border: '1px solid rgba(91,163,201,0.18)' }}>
-                          <div style={{ fontSize: 9, color: MUTED, marginBottom: 1 }}>今日应跟进</div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: '#5BA3C9' }}>{crmStats.todayCount} 个</div>
-                        </div>
-                        {crmStats.overdueCount > 0 && (
-                          <div style={{ padding: '5px 10px', borderRadius: 7, background: 'rgba(224,132,106,0.08)', border: '1px solid rgba(224,132,106,0.2)' }}>
-                            <div style={{ fontSize: 9, color: MUTED, marginBottom: 1 }}>已超期</div>
-                            <div style={{ fontSize: 14, fontWeight: 700, color: '#E0846A' }}>{crmStats.overdueCount} 个</div>
-                          </div>
-                        )}
-                        {crmStats.highPriorityCount > 0 && (
-                          <div style={{ padding: '5px 10px', borderRadius: 7, background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.15)' }}>
-                            <div style={{ fontSize: 9, color: MUTED, marginBottom: 1 }}>A 级客户</div>
-                            <div style={{ fontSize: 14, fontWeight: 700, color: '#E0846A' }}>{crmStats.highPriorityCount} 个</div>
-                          </div>
-                        )}
-                      </div>
-                      {/* Top follow-up items */}
-                      {crmStats.topItems.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                          {crmStats.topItems.map((item, i) => (
-                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 6, background: item.isOverdue ? 'rgba(224,132,106,0.07)' : 'rgba(255,255,255,0.025)', border: `1px solid ${item.isOverdue ? 'rgba(224,132,106,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
-                              <span style={{ fontSize: 9, fontWeight: 700, color: PRIO_COLOR[item.priority] || MUTED, minWidth: 12 }}>{item.priority}</span>
-                              <span style={{ fontSize: 12, fontWeight: 600, color: TEXT, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.clientName}</span>
-                              <span style={{ fontSize: 10, color: MUTED, whiteSpace: 'nowrap' }}>{item.tradeStatus}</span>
-                              {item.owner && <span style={{ fontSize: 10, color: SUBTLE, whiteSpace: 'nowrap' }}>{item.owner}</span>}
-                              {item.isOverdue && <span style={{ fontSize: 9, color: '#E0846A', fontWeight: 700, whiteSpace: 'nowrap' }}>超期 {item.daysOverdue}天</span>}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                {/* CRM section — formal Supabase CRM (crm_customers) */}
+                <CrmBriefSection />
               </div>
             );
           })()}
@@ -1852,66 +1792,8 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
                   </div>
                 )}
 
-                {/* CRM section — read from localStorage and match by customer + aliases */}
-                {(() => {
-                  const allTasks = readCRMTasks();
-                  const crmMatch = getCRMCustomerData(allTasks, d.customerQuery, d.aliases || []);
-                  if (!crmMatch.hasData) {
-                    return (
-                      <div style={{ marginTop: 8, padding: '8px 12px', background: 'rgba(143,166,212,0.06)', border: '1px solid rgba(143,166,212,0.2)', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                        <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>⚠</span>
-                        <div>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: '#8FA6D4', marginBottom: 2 }}>CRM 数据暂未加载</div>
-                          <div style={{ fontSize: 11, color: MUTED, lineHeight: 1.6 }}>
-                            请先前往 <span style={{ color: '#8FA6D4' }}>CRM 模块</span> 同步 Notion 数据后查看。
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                  if (crmMatch.totalCount === 0) {
-                    return (
-                      <div style={{ marginTop: 8, padding: '8px 12px', background: 'rgba(143,166,212,0.04)', border: '1px solid rgba(143,166,212,0.15)', borderRadius: 8 }}>
-                        <div style={{ fontSize: 11, color: MUTED }}>
-                          未在 CRM 跟进记录中找到「{d.customerQuery}」。如有拼写不同，请手动前往 CRM 模块搜索。
-                        </div>
-                      </div>
-                    );
-                  }
-                  const latest = crmMatch.latestTask!;
-                  const PRIO_COLOR: Record<string, string> = { A: '#E0846A', B: '#D4A843', C: MUTED };
-                  return (
-                    <div style={{ marginTop: 8, padding: '10px 14px', background: 'rgba(91,163,201,0.06)', border: '1px solid rgba(91,163,201,0.22)', borderRadius: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: '#5BA3C9' }}>CRM 跟进（本地 Notion Sync）</span>
-                        <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 10, background: 'rgba(91,163,201,0.12)', color: '#5BA3C9', fontFamily: 'monospace' }}>
-                          {crmMatch.totalCount} 条记录 · {crmMatch.activeCount} 活跃
-                        </span>
-                      </div>
-                      {/* Latest record */}
-                      <div style={{ padding: '8px 10px', borderRadius: 7, background: latest.isOverdue ? 'rgba(224,132,106,0.07)' : 'rgba(255,255,255,0.025)', border: `1px solid ${latest.isOverdue ? 'rgba(224,132,106,0.2)' : 'rgba(255,255,255,0.07)'}`, marginBottom: 8 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <span style={{ fontSize: 9, fontWeight: 700, color: PRIO_COLOR[latest.priority] || MUTED }}>{latest.priority}级</span>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: TEXT, flex: 1 }}>{latest.clientName}</span>
-                          <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 6, background: 'rgba(91,163,201,0.1)', color: '#5BA3C9' }}>{latest.tradeStatus}</span>
-                          {latest.isOverdue && <span style={{ fontSize: 9, color: '#E0846A', fontWeight: 700 }}>超期 {latest.daysOverdue}天</span>}
-                        </div>
-                        {latest.goal && <div style={{ fontSize: 11, color: MUTED, marginBottom: 2 }}>目标：{latest.goal}</div>}
-                        {latest.lastContext && <div style={{ fontSize: 11, color: MUTED, marginBottom: 2 }}>上次：{latest.lastContext}</div>}
-                        <div style={{ display: 'flex', gap: 10, fontSize: 10, color: SUBTLE }}>
-                          {latest.nextFollowUpAt && <span>下次跟进：{latest.nextFollowUpAt.slice(0, 10)}</span>}
-                          {latest.owner && <span>负责人：{latest.owner}</span>}
-                        </div>
-                      </div>
-                      {/* Older records summary */}
-                      {crmMatch.matchedTasks.length > 1 && (
-                        <div style={{ fontSize: 10, color: SUBTLE }}>
-                          另有 {crmMatch.matchedTasks.length - 1} 条历史记录 · 状态：{[...new Set(crmMatch.matchedTasks.slice(1).map(t => t.tradeStatus))].join(' / ')}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                {/* CRM section — formal Supabase CRM, matched by customer name + aliases */}
+                <CrmCustomerSection customerQuery={d.customerQuery} aliases={d.aliases || []} />
               </div>
             );
           })()}
@@ -2923,7 +2805,7 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
               return (
                 <div style={{ marginBottom: 12, padding: '12px 14px', background: 'rgba(224,132,106,0.07)', border: '1px solid rgba(224,132,106,0.25)', borderRadius: 8 }}>
                   <div style={{ fontSize: 13, color: '#E0846A', fontWeight: 600, marginBottom: 4 }}>未找到客户</div>
-                  <div style={{ fontSize: 12, color: MUTED }}>在 CRM 本地记录中未找到「{d.customerName}」，请检查拼写或先前往 CRM 模块同步 Notion 数据。</div>
+                  <div style={{ fontSize: 12, color: MUTED }}>在 CRM 客户库中未找到唯一匹配的「{d.customerName}」，请检查拼写，或前往 CRM 客户页手动更新。</div>
                 </div>
               );
             }
@@ -2939,7 +2821,7 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
               return (
                 <div style={{ marginBottom: 12, padding: '12px 14px', background: 'rgba(111,191,142,0.07)', border: '1px solid rgba(111,191,142,0.25)', borderRadius: 8 }}>
                   <div style={{ fontSize: 13, color: '#6FBF8E', fontWeight: 600, marginBottom: 4 }}>✓ 状态已更新</div>
-                  <div style={{ fontSize: 12, color: MUTED }}>{d.customerName} → {d.newStatus}（已写回 Notion）</div>
+                  <div style={{ fontSize: 12, color: MUTED }}>{d.customerName} → {d.newStatus}（已写入 CRM 客户库）</div>
                 </div>
               );
             }
@@ -2953,7 +2835,7 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
             }
             // confirm phase
             const task = d.matchedTask;
-            const CLOSED_ON_WRITE = ['暂缓', '已归档', '已成交', '已关闭'];
+            const CLOSED_ON_WRITE = ['已关闭'];
             const willArchive = CLOSED_ON_WRITE.includes(d.newStatus);
             return (
               <div style={{ marginBottom: 12 }}>
@@ -2965,14 +2847,14 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
                     <span style={{ padding: '2px 8px', borderRadius: 5, background: willArchive ? 'rgba(224,132,106,0.12)' : 'rgba(111,191,142,0.12)', color: willArchive ? '#E0846A' : '#6FBF8E', fontWeight: 700 }}>{d.newStatus}</span>
                   </div>
                   {willArchive && (
-                    <div style={{ fontSize: 10, color: '#E0846A', marginTop: 4 }}>⚠ 此状态会将客户标记为归档，从跟进列表中移除。</div>
+                    <div style={{ fontSize: 10, color: '#E0846A', marginTop: 4 }}>⚠ 此状态会将客户从逾期跟进列表中移除。</div>
                   )}
                   {d.newStatus === '合同待签' && (
                     <div style={{ fontSize: 10, color: '#6FBF8E', marginTop: 4 }}>✓ 合同待签 = 活跃跟进，不会归档。</div>
                   )}
                   {task && (
                     <div style={{ fontSize: 10, color: SUBTLE, marginTop: 4 }}>
-                      Notion 页面：{task.leadId ? task.leadId.slice(0, 8) + '…' : '未知'}
+                      CRM 客户：{task.clientName}
                       {task.owner && ` · 负责人：${task.owner}`}
                     </div>
                   )}
@@ -2981,22 +2863,20 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
                   <button
                     disabled={writePhase === 'sending'}
                     onClick={() => {
-                      if (!task?.leadId) {
+                      if (!task?.customerId) {
                         setWritePhase('error');
-                        setWriteError('该客户无有效 Notion pageId，无法写回。请前往 CRM 模块手动更新。');
+                        setWriteError('未匹配到唯一的 CRM 客户，无法更新。请前往 CRM 客户页手动更新。');
                         return;
                       }
                       setWritePhase('sending');
-                      const base = typeof window !== 'undefined' ? window.location.origin : '';
-                      fetch(`${base}/api/crm/notion-update`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ pageId: task.leadId, action: 'update_status', tradeStatus: d.newStatus }),
+                      logFollowup({
+                        customerId: task.customerId,
+                        notes: `状态更新：${d.currentStatus || '未知'} → ${d.newStatus}（AI 指令）`,
+                        status: d.newStatus,
                       })
-                        .then(r => r.json())
                         .then(res => {
                           if (res.ok) { setWritePhase('done'); setWriteResult(res); }
-                          else { setWritePhase('error'); setWriteError(res.error || '写回失败'); }
+                          else { setWritePhase('error'); setWriteError(res.error || '写入失败'); }
                         })
                         .catch(e => { setWritePhase('error'); setWriteError(String(e)); });
                     }}
@@ -3031,10 +2911,7 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
               return (
                 <div style={{ marginBottom: 12, padding: '12px 14px', background: 'rgba(111,191,142,0.07)', border: '1px solid rgba(111,191,142,0.25)', borderRadius: 8 }}>
                   <div style={{ fontSize: 13, color: '#6FBF8E', fontWeight: 600, marginBottom: 6 }}>✓ 客户已创建</div>
-                  {writeResult.sbNumber && (
-                    <div style={{ fontSize: 12, color: MUTED, marginBottom: 2 }}>SB 编号：<span style={{ color: GOLD, fontWeight: 700 }}>{writeResult.sbNumber}</span></div>
-                  )}
-                  <div style={{ fontSize: 12, color: MUTED }}>已写入 Notion {draft.businessType === 'TRADE' ? 'SB Pool + Follow-up Log' : 'Follow-up Log'}</div>
+                  <div style={{ fontSize: 12, color: MUTED }}>已写入 CRM 客户库（客户 + 联系人 + 首条跟进）</div>
                 </div>
               );
             }
@@ -3076,29 +2953,35 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
                   ))}
                 </div>
                 <div style={{ fontSize: 11, color: SUBTLE, marginBottom: 8 }}>
-                  写入目标：Notion {draft.businessType === 'TRADE' ? 'SB Pool + Follow-up Log' : 'Follow-up Log'}
+                  写入目标：CRM 客户库（crm_customers / crm_contacts / crm_followups）
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button
                     disabled={writePhase === 'sending'}
                     onClick={() => {
                       setWritePhase('sending');
-                      const base = typeof window !== 'undefined' ? window.location.origin : '';
-                      const endpoint = draft.businessType === 'TRADE' ? '/api/crm/notion-write-lead' : '/api/crm/notion-create';
-                      const payload = draft.businessType === 'TRADE'
-                        ? { clientName: draft.clientName, phone: draft.phone, whatsapp: draft.whatsapp, email: draft.email, countryCity: draft.city, lastContext: draft.lastContext, owner: draft.owner, nextFollowUpAt: draft.nextFollowUpAt, source: 'AI录入' }
-                        : { clientName: draft.clientName, followUpNotes: draft.lastContext, followUpMethod: 'WhatsApp', nextFollowUpAt: draft.nextFollowUpAt, owner: draft.owner, source: 'AI录入' };
-                      fetch(`${base}${endpoint}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload),
-                      })
-                        .then(r => r.json())
-                        .then(res => {
-                          if (res.ok || res.sbNumber || res.pageId) { setWritePhase('done'); setWriteResult(res); }
-                          else { setWritePhase('error'); setWriteError(res.error || '创建失败'); }
-                        })
-                        .catch(e => { setWritePhase('error'); setWriteError(String(e)); });
+                      (async () => {
+                        const c = await createCustomerWithContact({
+                          customerName: draft.clientName,
+                          phone: draft.phone || undefined,
+                          whatsapp: draft.whatsapp || undefined,
+                          email: draft.email || undefined,
+                          owner: draft.owner || undefined,
+                        });
+                        if (!c.ok) throw new Error(c.error);
+                        const notes = [draft.city && `城市：${draft.city}`, draft.lastContext || 'AI 录入新客户'].filter(Boolean).join('；');
+                        const f = await logFollowup({
+                          customerId: c.customer.id,
+                          notes,
+                          nextFollowUpAt: draft.nextFollowUpAt,
+                          method: 'WhatsApp',
+                          status: '新询盘',
+                          owner: draft.owner || null,
+                        });
+                        if (!f.ok) throw new Error(`客户已创建，但首条跟进写入失败：${f.error}`);
+                        setWritePhase('done');
+                        setWriteResult({ customer: c.customer });
+                      })().catch(e => { setWritePhase('error'); setWriteError(String(e?.message || e)); });
                     }}
                     style={{ flex: 1, padding: '10px', borderRadius: 9, background: writePhase === 'sending' ? 'rgba(111,191,142,0.2)' : `linear-gradient(135deg,${GOLD},${GOLD_L})`, border: 'none', color: writePhase === 'sending' ? '#6FBF8E' : NAVY, fontSize: 14, fontWeight: 700, cursor: writePhase === 'sending' ? 'not-allowed' : 'pointer' }}
                   >
@@ -3169,31 +3052,21 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
                 .catch(() => doSave()); // fail-open: skip check, proceed to save
             };
 
-            const doFollowUp = () => {
+            const doFollowUp = async () => {
               setRegFollowUp('saving');
-              // Find the customer in CRM localStorage
-              const tasks = (() => { try { return JSON.parse(localStorage.getItem('ICARE_HISTORY_V1') || '[]'); } catch { return []; } })();
-              const nameLower = (draft.customerName || '').toLowerCase();
-              const task = tasks.find((t: any) => {
-                const tl = (t.clientName || '').toLowerCase();
-                return tl.includes(nameLower) || nameLower.includes(tl);
-              });
-              if (!task?.leadId) {
+              try {
+                // Only an unambiguous match in the formal CRM is updated (exact name, or a single contains-match).
+                const found = await findCustomerByName(draft.customerName || '');
+                if (!found.ok || !found.found) { setRegFollowUp('error'); return; }
+                const res = await logFollowup({
+                  customerId: found.customer.id,
+                  notes: `已登记报价${regSaved?.quote_no ? '（' + regSaved.quote_no + '）' : ''}`,
+                  status: '已报价待确认',
+                });
+                setRegFollowUp(res.ok ? 'done' : 'error');
+              } catch {
                 setRegFollowUp('error');
-                return;
               }
-              fetch(`${base}/api/crm/notion-update`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  action: 'update_status',
-                  leadId: task.leadId,
-                  tradeStatus: '已报价待确认',
-                }),
-              })
-                .then(r => r.json())
-                .then(res => setRegFollowUp(res.ok !== false ? 'done' : 'error'))
-                .catch(() => setRegFollowUp('error'));
             };
 
             return (
@@ -4559,87 +4432,10 @@ export function AIPage() {
           if (customer) params.set('customer', customer);
           if (product)  params.set('product',  product);
           const qs = params.toString() ? `?${params.toString()}` : '';
-          // Helper: read CRM customer_quote_record tasks from localStorage
-          const readCrmQuoteRecords = (customerQ: string, productQ: string) => {
-            try {
-              const tasks: any[] = JSON.parse(localStorage.getItem('ICARE_HISTORY_V1') || '[]');
-              const cqLower = customerQ.trim().toLowerCase();
-              const pqLower = productQ.trim().toLowerCase();
-              return tasks
-                .filter(t => {
-                  // Must be a customer_quote_record
-                  const isCqr = t.categories === 'customer_quote_record'
-                    || (t.lastContext || '').includes('[客户报价留底]')
-                    || (t.lastContext || '').includes('[customer_quote_record]');
-                  if (!isCqr) return false;
-                  // DO NOT include supplier_quote
-                  if (t.categories === 'supplier_quote') return false;
-                  // Customer filter
-                  if (cqLower) {
-                    const haystack = [t.clientName, t.inquirySummary, t.lastContext, t.goal]
-                      .join(' ').toLowerCase();
-                    if (!haystack.includes(cqLower)) return false;
-                  }
-                  // Product filter
-                  if (pqLower) {
-                    const pHaystack = [t.goal, t.lastContext, t.inquirySummary,
-                      ...(t.attachments || []).map((a: any) => a.name)]
-                      .join(' ').toLowerCase();
-                    if (!pHaystack.includes(pqLower)) return false;
-                  }
-                  return true;
-                })
-                .map(t => ({
-                  id:           t.id,
-                  source:       'crm_customer_quote_record',
-                  customerName: t.clientName || '—',
-                  projectName:  t.inquirySummary || '',
-                  quoteNo:      '—',
-                  grandTotal:   null,
-                  sellingTotal: null,
-                  vatAmount:    null,
-                  margin:       null,
-                  currency:     'AED',
-                  status:       'CRM_留底',
-                  statusZh:     '报价留底',
-                  quoteType:    'CRM',
-                  salesperson:  t.owner || '',
-                  quoteDate:    t.createdAt || '',
-                  createdAt:    t.createdAt || '',
-                  updatedAt:    t.updatedAt || '',
-                  items:        [],
-                  hiddenInvalidItemsCount: 0,
-                  isArchived:   t.status === 'archived',
-                  archiveReason: null,
-                  amountStatus: 'not_structured',
-                  // CRM-specific fields
-                  nextAction:           t.goal || '',
-                  lastContext:          t.lastContext || '',
-                  attachments:          t.attachments || [],
-                  categories:           t.categories || '',
-                  notionFollowupPageId: t.notionFollowupPageId || '',
-                  tradeStatus:          t.tradeStatus || '',
-                }));
-            } catch { return []; }
-          };
-
           fetch(`${base}/api/ai/quotation-history${qs}`)
             .then(r => r.json())
             .then(data => {
-              // Merge CRM customer_quote_records into results
-              const crmRecords = readCrmQuoteRecords(customer || '', product || '');
-              if (crmRecords.length > 0) {
-                const merged = {
-                  ...data,
-                  quotes: [...(data.quotes || []), ...crmRecords],
-                  total: (data.total || 0) + crmRecords.length,
-                  crmQuoteCount: crmRecords.length,
-                  hasCrmRecords: true,
-                };
-                setCmdState(prev => prev ? { ...prev, resultData: merged } : prev);
-              } else {
-                setCmdState(prev => prev ? { ...prev, resultData: data } : prev);
-              }
+              setCmdState(prev => prev ? { ...prev, resultData: data } : prev);
             })
             .catch(e => console.error('[AI] quotation history fetch failed', e));
         },
@@ -4882,15 +4678,6 @@ export function AIPage() {
     const UPDATE_STATUS_RE = /更新状态|改成|更新到|设置为|变成|待签合同|合同待签|等客户签合同|待签约|恢复跟进|关闭本次跟进|把.+(?:更新|改|变|设置)/i;
     if (UPDATE_STATUS_RE.test(t)) {
       const { customerName, newStatus } = extractUpdateIntent(raw.trim());
-      const crmTasks = readCRMTasks();
-      const nameLower = customerName.toLowerCase();
-      const matchedTask = nameLower
-        ? crmTasks.find(task =>
-            task.clientName.toLowerCase().includes(nameLower) ||
-            nameLower.includes(task.clientName.toLowerCase().trim())
-          ) || null
-        : null;
-      const notFound = !!customerName && !matchedTask;
       const updateMatch: AIIntentMatch = {
         intent: {
           intentId: 'update_followup_status',
@@ -4902,8 +4689,8 @@ export function AIPage() {
           targetTab: 'chat',
           targetModule: 'CRM',
           targetRoute: '/crm',
-          readSources: ['ICARE_HISTORY_V1'],
-          writeTargets: ['notion_followup_log'],
+          readSources: ['crm_customers'],
+          writeTargets: ['crm_followups', 'crm_customers'],
           requiredFields: [],
           approvalRequired: false,
           resultPanel: null,
@@ -4920,7 +4707,16 @@ export function AIPage() {
       runner.run(
         ['正在识别指令…', '正在查找客户记录…', '正在准备状态更新…'],
         (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
-        () => {
+        async () => {
+          // Formal CRM lookup: only an unambiguous match (exact name, or a single contains-match) can be updated.
+          let matchedTask: { customerId: string; clientName: string; tradeStatus: string; owner: string } | null = null;
+          if (customerName) {
+            try {
+              const r = await findCustomerByName(customerName);
+              if (r.ok && r.found) matchedTask = { customerId: r.customer.id, clientName: r.customer.customer_name, tradeStatus: r.customer.status || '', owner: r.customer.owner || '' };
+            } catch { /* treated as not found */ }
+          }
+          const notFound = !!customerName && !matchedTask;
           setCmdState(prev => prev ? {
             ...prev,
             phase: 'done',
@@ -4936,15 +4732,6 @@ export function AIPage() {
     const CREATE_CUSTOMER_RE = /新增客户|增加客户|录入客户|保存客户信息|新客户.*[:：]|create customer|add customer|new lead/i;
     if (CREATE_CUSTOMER_RE.test(t)) {
       const draft = parseCreateDraft(raw.trim());
-      // De-dup check against localStorage
-      const crmTasks = readCRMTasks();
-      const nameLower = draft.clientName.toLowerCase();
-      const dup = nameLower
-        ? crmTasks.find(task => {
-            const tl = task.clientName.toLowerCase();
-            return tl.includes(nameLower) || nameLower.includes(tl);
-          }) || null
-        : null;
       const createMatch: AIIntentMatch = {
         intent: {
           intentId: 'create_customer_from_ai',
@@ -4956,8 +4743,8 @@ export function AIPage() {
           targetTab: 'chat',
           targetModule: 'CRM',
           targetRoute: '/crm',
-          readSources: ['ICARE_HISTORY_V1'],
-          writeTargets: ['notion_sb_pool', 'notion_followup_log'],
+          readSources: ['crm_customers'],
+          writeTargets: ['crm_customers', 'crm_contacts', 'crm_followups'],
           requiredFields: [],
           approvalRequired: false,
           resultPanel: null,
@@ -4974,14 +4761,23 @@ export function AIPage() {
       runner.run(
         ['正在识别指令…', '正在解析客户信息…', '正在检查重复记录…'],
         (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
-        () => {
+        async () => {
+          // De-dup check against the formal CRM (exact name, or any close match).
+          let dupName: string | null = null;
+          if (draft.clientName) {
+            try {
+              const r = await findCustomerByName(draft.clientName);
+              if (r.ok && r.found) dupName = r.customer.customer_name;
+              else if (r.ok && r.multiple) dupName = r.candidates[0]?.customer_name || null;
+            } catch { /* no duplicate info; user still confirms */ }
+          }
           setCmdState(prev => prev ? {
             ...prev,
             phase: 'done',
             resultData: {
               type: 'create_customer_from_ai',
               draft,
-              dupCheck: { hasDup: !!dup, dupName: dup?.clientName || null },
+              dupCheck: { hasDup: !!dupName, dupName },
             },
           } : prev);
         },

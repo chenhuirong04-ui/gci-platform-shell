@@ -1110,6 +1110,11 @@ export const en = {
       saveChanges: 'Save Changes',
       taskCreatedToast: 'Task created',
       taskUpdatedToast: 'Task updated',
+      blockerFieldLabel: 'Waiting on / blocker',
+      blockerPlaceholder: 'e.g. waiting for the landlord to confirm the deposit refund',
+      loadingTasks: 'Loading…',
+      loadFailed: 'Failed to load',
+      saveFailed: 'Failed to save',
     },
   },
   trade: {
