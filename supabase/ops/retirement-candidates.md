@@ -27,3 +27,6 @@ Other dead code: `modules/crm/services/cloudSync.ts` and `modules/trade/services
 
 ## 3. Other records
 `transactions_cleanup` stays in `ops/data-fixes/` as **UNCONFIRMED** (7 rows ≠ 8) — not registered as executed. The earlier full-scope iCare project proposals were dropped.
+
+## 4. Final table retirement (2026-09)
+`icare_snapshots` (1 row) and `service_receivable_refs` (0 rows) are dropped by `migrations/20260921000300_retire_icare_snapshots_and_service_receivable_refs.sql` (rollback note in `rollbacks/…`: `service_receivable_refs` is empty, `icare_snapshots` data is not recoverable, no archive kept by decision). Runtime references: none. `deal` Vercel project deleted, GitHub `deal` archived; `quick-api` and `ICARE_GATE_PASSWORD` removal done in Supabase separately.
