@@ -716,7 +716,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                   </div>
 
                   {linkMode === 'customer' && (
-                    <CustomerProjectSelector value={cpSelection} onChange={setCpSelection} />
+                    <CustomerProjectSelector value={cpSelection} onChange={setCpSelection} allowLead={false} />
                   )}
 
                   {linkMode === 'supplier' && (

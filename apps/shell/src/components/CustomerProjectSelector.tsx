@@ -60,6 +60,9 @@ interface CustomerProjectSelectorProps {
   onChange: (next: CustomerProjectSelection) => void;
   /** BOQ/engineering-type work: true (project pick required). Plain PI / product sales: false (default). */
   requireProject?: boolean;
+  /** Offer "quote now as a temporary customer" (stage 待建档) in the create modal. Quotation screens: true (default). Finance screens: false — a
+   * ledger entry must not create a customer that is described as "to be quoted". */
+  allowLead?: boolean;
   className?: string;
 }
 
@@ -81,7 +84,7 @@ function selectionFrom(c: CrmCustomer, contact: CrmContact | null): CustomerProj
   };
 }
 
-export function CustomerProjectSelector({ value, onChange, requireProject, className }: CustomerProjectSelectorProps) {
+export function CustomerProjectSelector({ value, onChange, requireProject, allowLead = true, className }: CustomerProjectSelectorProps) {
   const { dict } = useI18n();
   const cp = dict.quotation.customerPicker;
   const [query, setQuery] = useState(value.customerName || '');
@@ -418,9 +421,11 @@ export function CustomerProjectSelector({ value, onChange, requireProject, class
               <button type="button" disabled={creating} onClick={() => submitCreate(false)} className="px-4 py-2.5 rounded-lg bg-[#080D1E] text-white text-[11px] font-black uppercase tracking-wide disabled:opacity-50">
                 {creating ? cp.creating : cp.create}
               </button>
-              <button type="button" disabled={creating} onClick={() => submitCreate(true)} className="px-4 py-2.5 rounded-lg bg-white border border-[#CBA85C] text-[#8A6D1F] text-[11px] font-black tracking-wide disabled:opacity-50">
-                {cp.createLead}
-              </button>
+              {allowLead && (
+                <button type="button" disabled={creating} onClick={() => submitCreate(true)} className="px-4 py-2.5 rounded-lg bg-white border border-[#CBA85C] text-[#8A6D1F] text-[11px] font-black tracking-wide disabled:opacity-50">
+                  {cp.createLead}
+                </button>
+              )}
               <button type="button" disabled={creating} onClick={() => setShowModal(false)} className="px-4 py-2.5 rounded-lg bg-gray-100 text-gray-500 text-[11px] font-black uppercase tracking-wide">
                 {cp.cancel}
               </button>

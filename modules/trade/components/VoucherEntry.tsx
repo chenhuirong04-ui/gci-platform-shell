@@ -302,7 +302,7 @@ export default function VoucherEntry() {
             </div>
           </div>
 
-          {linkMode === 'customer' && <CustomerProjectSelector value={cpSelection} onChange={setCpSelection} />}
+          {linkMode === 'customer' && <CustomerProjectSelector value={cpSelection} onChange={setCpSelection} allowLead={false} />}
 
           {linkMode === 'supplier' && (
             <div className="space-y-1.5 relative">
