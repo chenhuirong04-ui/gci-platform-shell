@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { colors } from '@gci/design-system';
+import { useAuth } from '../contexts/AuthContext';
 import { createCustomerWithContact, setCustomerActive } from '../lib/crmSupabase';
 import {
   resolveBusinessContext, buildBusinessSummaryFacts, buildContextSummaryForAI,
@@ -71,6 +72,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export function BusinessAssistant() {
   const navigate = useNavigate();
+  const { can } = useAuth();
   const [searchParams] = useSearchParams();
 
   const [inputValue, setInputValue] = useState('');
@@ -894,7 +896,7 @@ export function BusinessAssistant() {
                     {q.quoteDate || q.createdAt} · {q.quoteNo} · <span style={{ color: TEXT }}>{q.grandTotal ?? q.sellingTotal ?? '—'} {q.currency}</span> · {q.statusZh || q.status}
                   </div>
                 ))}
-                <a href="/trade?tab=history" style={{ fontSize: 11, color: GOLD, textDecoration: 'none' }}>查看全部报价 →</a>
+                {can('trade') && <a href="/trade?tab=history" style={{ fontSize: 11, color: GOLD, textDecoration: 'none' }}>查看全部报价 →</a>}
               </div>
             )}
 

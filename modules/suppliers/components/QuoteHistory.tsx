@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useI18n } from '@gci/i18n';
 import { supabase } from '../../../apps/shell/src/lib/supabase';
+import { useAuth } from '../../../apps/shell/src/contexts/AuthContext';
 
 const NAVY = '#0B1F44';
 const GOLD = '#C9A84C';
@@ -24,6 +25,9 @@ interface Props { supplierId: string; }
 
 export default function QuoteHistory({ supplierId }: Props) {
   const { dict } = useI18n();
+  // Upload goes into the Trade module — only offered with the trade module.
+  const { can } = useAuth();
+  const canTrade = can('trade');
   const t = dict.suppliers.quotes;
   const [quotes, setQuotes] = useState<QuoteRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,12 +61,14 @@ export default function QuoteHistory({ supplierId }: Props) {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <span style={{ fontSize: 13, color: T2 }}>{t.subtitle}</span>
+        {canTrade && (
         <button
           onClick={handleUploadQuote}
           style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
         >
           {t.upload}
         </button>
+        )}
       </div>
 
       {loading ? (
@@ -70,12 +76,14 @@ export default function QuoteHistory({ supplierId }: Props) {
       ) : quotes.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '48px 0' }}>
           <div style={{ color: T3, fontSize: 14, marginBottom: 12 }}>{t.empty}</div>
+          {canTrade && (
           <button
             onClick={handleUploadQuote}
             style={{ padding: '9px 20px', background: GOLD, color: NAVY, border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
           >
             {t.uploadCta}
           </button>
+          )}
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>

@@ -62,6 +62,12 @@ import { GoogleGenAI, Type } from "@google/genai";
 /** Single Gemini model used for ALL AI analysis (text / image / PDF / classification). */
 const GEMINI_MODEL = "gemini-2.5-flash";
 
+/** Same-origin URL of the shell's Trade PI tab. `encoded` is the btoa() payload for
+ * QuoteManager's ?inbound= parser; it must be URL-encoded because a raw base64 '+'
+ * is read back as a space by URLSearchParams and corrupts the payload. */
+const tradeQuoteUrl = (encoded?: string) =>
+  encoded ? `/trade?tab=quote&inbound=${encodeURIComponent(encoded)}` : '/trade?tab=quote';
+
 /** Wrap any promise with a timeout. Rejects with readable message on timeout. */
 function withTimeout<T>(promise: Promise<T>, ms: number, label = 'Request'): Promise<T> {
   return Promise.race([
@@ -77,6 +83,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label = 'Request'): Pro
 import * as XLSX from 'xlsx';
 import { translations, Language } from './translations';
 import { useI18n } from '@gci/i18n';
+import { useAuth } from '../../apps/shell/src/contexts/AuthContext';
 import { StepIndicator } from './components/StepIndicator';
 import { TypeSelection, QuoteType } from './components/TypeSelection';
 import { CustomerProjectSelector, emptyCustomerProjectSelection, type CustomerProjectSelection } from '../../apps/shell/src/components/CustomerProjectSelector';
@@ -309,6 +316,10 @@ interface QuotationModuleProps {
 
 export default function QuotationModule({ initialMode, initialView }: QuotationModuleProps = {}) {
   const { lang } = useI18n();
+  // Every "send to / open in Trade" button below is shown only with the trade module
+  // (same user_profiles.modules check /trade itself uses) — no quotation-only exception.
+  const { can } = useAuth();
+  const canTrade = can('trade');
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<FurnitureCategory | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
@@ -2206,16 +2217,18 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                 </button>
               </div>
               {svcSaveStatus === 'saved' && (
-                <div className="grid grid-cols-3 gap-3 animate-in fade-in duration-300">
+                <div className={`grid ${canTrade ? 'grid-cols-3' : 'grid-cols-2'} gap-3 animate-in fade-in duration-300`}>
                   <button onClick={generateServiceQuotePdf} className="py-3.5 rounded-[16px] text-[10.5px] font-black uppercase tracking-widest border border-[#0C1B3A]/15 text-[#0C1B3A]/60 hover:border-[#C9A84C] hover:text-[#0C1B3A] transition-all flex items-center justify-center gap-2">
                     <FileText className="w-4 h-4" /> PDF
                   </button>
                   <button onClick={handleSendServiceQuoteToDeal} className="py-3.5 rounded-[16px] text-[10.5px] font-black uppercase tracking-widest border border-[#0C1B3A]/15 text-[#0C1B3A]/60 hover:border-[#C9A84C] hover:text-[#0C1B3A] transition-all">
                     Send to DEAL
                   </button>
-                  <button onClick={handleSendServiceQuoteToTrade} className="py-3.5 rounded-[16px] text-[10.5px] font-black uppercase tracking-widest" style={{ backgroundColor: '#C9A84C', color: '#0C1B3A' }}>
-                    Send to TRADE
-                  </button>
+                  {canTrade && (
+                    <button onClick={handleSendServiceQuoteToTrade} className="py-3.5 rounded-[16px] text-[10.5px] font-black uppercase tracking-widest" style={{ backgroundColor: '#C9A84C', color: '#0C1B3A' }}>
+                      Send to TRADE
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -3603,7 +3616,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     };
 
     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-    window.open(`https://trade.globalcareinfo.com/?inbound=${encoded}&tab=quote`, '_blank');
+    window.open(tradeQuoteUrl(encoded), '_blank');
   };
 
   const generatePDF = () => {
@@ -4208,7 +4221,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       notes: svcMeta.notes || undefined,
     };
     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-    window.open(`https://trade.globalcareinfo.com/?inbound=${encoded}&tab=quote`, '_blank');
+    window.open(tradeQuoteUrl(encoded), '_blank');
   };
 
   /**
@@ -6290,7 +6303,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
         crmProjectId: quoteInfo.projectId || undefined,
       };
       const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-      window.open(`https://trade.globalcareinfo.com/?inbound=${encoded}&tab=quote`, '_blank');
+      window.open(tradeQuoteUrl(encoded), '_blank');
       // Mark cloud record as sent (fire-and-forget, best effort)
       if (cloudId) markSentToTrade(cloudId);
       // Mark flow as complete
@@ -6723,15 +6736,17 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 </div>
 
                 {/* 3 action buttons */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className={`grid grid-cols-1 ${canTrade ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3`}>
+                  {canTrade && (
                   <button
-                    onClick={() => window.open('https://trade.globalcareinfo.com/?tab=quote', '_blank')}
+                    onClick={() => window.open(tradeQuoteUrl(), '_blank')}
                     className="p-5 rounded-[20px] bg-[#0C1B3A] text-[#C9A84C] flex flex-col items-center gap-2 font-black text-[13px] uppercase tracking-wide hover:bg-[#0F2551] transition-all active:scale-95 border border-[#C9A84C]/30"
                   >
                     <ExternalLink className="w-5 h-5" />
                     {t('View in TRADE')}
                     <span className="text-[11px] text-[#C9A84C]/60 normal-case font-bold tracking-normal">{t('Open TRADE OS PI tab')}</span>
                   </button>
+                  )}
                   <button
                     onClick={() => { setSentToTrade(false); setView('history'); }}
                     className="p-5 rounded-[20px] bg-white border-2 border-[#0C1B3A]/12 text-[#0C1B3A] flex flex-col items-center gap-2 font-black text-[13px] uppercase tracking-wide hover:border-[#C9A84C] transition-all active:scale-95"
@@ -6763,12 +6778,14 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     : <><Download className="w-4 h-4" /> {t('Download PDF')}</>
                   }
                 </button>
+                {canTrade && (
                 <button
                   onClick={handleSendTradeToTrade}
                   className="flex-1 p-5 rounded-[24px] bg-[#0C1B3A] text-[#C9A84C] flex justify-center items-center gap-3 font-black uppercase tracking-widest text-xs shadow-xl hover:bg-[#0F2551] transition-all active:scale-95 border border-[#C9A84C]/30"
                 >
                   <ExternalLink className="w-4 h-4" /> {t('Send to TRADE')}
                 </button>
+                )}
               </div>
             )}
           </div>
@@ -8131,9 +8148,11 @@ Leave a field as empty string if not present. Never fabricate values.`;
              <button onClick={() => alert(t('Quotation sent message'))} className="flex-1 p-6 rounded-[28px] bg-brand-brown text-brand-ivory flex justify-center items-center gap-4 font-bold uppercase tracking-widest text-xs shadow-xl shadow-brand-brown/20 hover:bg-brand-brown/90 transition-all active:scale-95 group">
                <Download className="w-5 h-5 text-brand-gold group-hover:translate-y-1 transition-transform" /> {t('Sync to CRM')}
              </button>
+             {canTrade && (
              <button onClick={sendToTrade} className="flex-1 p-6 rounded-[28px] bg-[#0C1B3A] text-[#C9A84C] flex justify-center items-center gap-4 font-bold uppercase tracking-widest text-xs shadow-xl hover:bg-[#0F2551] transition-all active:scale-95 group border border-[#C9A84C]/30">
                <ExternalLink className="w-5 h-5 text-[#C9A84C] group-hover:translate-x-1 transition-transform" /> {t('Send to TRADE')}
              </button>
+             )}
              {/* Print Only View (English) */}
             <div id="quotation-print" className="hidden print:block p-10 bg-white text-black font-sans">
               <div className="border-b-2 border-brand-brown pb-6 mb-8 flex justify-between items-end">
