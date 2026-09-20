@@ -35,9 +35,8 @@ export default defineConfig(({ mode }) => {
         // still-live standalone deployments until each module's own
         // api/* routes are deployed with this monorepo.
         '/api/trade': {
-          target: 'https://trade.globalcareinfo.com',
+          target: 'https://app.globalcareinfo.com',
           changeOrigin: true,
-          rewrite: (p) => p.replace(/^\/api\/trade/, '/api'),
         },
         '/api/crm': {
           target: 'https://app.globalcareinfo.com',
