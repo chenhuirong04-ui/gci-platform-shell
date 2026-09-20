@@ -1118,6 +1118,10 @@ export const zh: typeof en = {
       loadingTasks: '加载中…',
       loadFailed: '加载失败',
       saveFailed: '保存失败',
+      showCompleted: '显示已完成',
+      hideCompleted: '隐藏已完成',
+      noRecentCompleted: '最近 30 天没有已完成事项',
+      olderCompletedHidden: '另有 {n} 条更早或无完成时间的事项未显示',
     },
   },
   trade: {

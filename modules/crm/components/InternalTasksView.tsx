@@ -26,6 +26,7 @@ interface InternalTasksViewProps {
 // The board's four columns. They are DERIVED from executive_tasks (status + blocker) — there is no separate
 // "waiting" status: waiting = in_progress with a blocker text (see internalTaskColumn in executiveTasks.ts).
 const COLUMNS: InternalTaskColumn[] = ['pending', 'in_progress', 'waiting', 'done'];
+const COMPLETED_VISIBLE_DAYS = 30;
 
 interface TaskForm {
   title: string;
@@ -54,6 +55,8 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ lang, onShowToast
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  // 已完成 column is collapsed by default: the daily board shows only 待处理 / 进行中 / 等待他人. Display only — nothing is deleted or changed in the database.
+  const [showDone, setShowDone] = useState(false);
   const [editingTask, setEditingTask] = useState<{ original: ExecutiveTask; form: TaskForm } | null>(null);
 
   const initialForm = (): TaskForm => ({
@@ -155,6 +158,11 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ lang, onShowToast
 
   const selectStyle = { background: CARD2, border: `1px solid ${BORDER}`, color: T1 };
 
+  // Completed items shown when 已完成 is expanded: completed within the last 30 days, judged ONLY by completed_at. A completed task without a
+  // completed_at (e.g. migrated from iCare, where it is NULL by design) is counted in the total but never shown as "recent" — no time is invented.
+  const doneCutoff = Date.now() - COMPLETED_VISIBLE_DAYS * 86400000;
+  const isRecentlyCompleted = (x: ExecutiveTask) => !!x.completed_at && new Date(x.completed_at).getTime() >= doneCutoff;
+
   return (
     <div className="flex flex-col gap-6 animate-fadeIn">
       <div className="flex items-center justify-between">
@@ -176,18 +184,35 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ lang, onShowToast
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 h-[calc(100vh-280px)] overflow-hidden">
         {COLUMNS.map(col => {
-          const colTasks = tasks.filter(x => internalTaskColumn(x) === col);
+          const isDone = col === 'done';
+          // 已完成 counts and lists status = completed only; cancelled tasks belong to no column of this board.
+          const allInColumn = tasks.filter(x => internalTaskColumn(x) === col && (!isDone || x.status === 'completed'));
+          // The count always covers every completed item; the cards shown when expanded are only those completed in the last 30 days.
+          const colTasks = isDone ? (showDone ? allInColumn.filter(isRecentlyCompleted) : []) : allInColumn;
+          const hiddenOlder = isDone ? allInColumn.length - allInColumn.filter(isRecentlyCompleted).length : 0;
+          const collapsed = isDone && !showDone;
           return (
-            <div key={col} className="flex flex-col gap-4 h-full overflow-hidden">
-              <div className="px-5 py-4 rounded-[24px] flex items-center justify-between shrink-0" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+            <div key={col} className={collapsed ? 'flex flex-col gap-4 self-start' : 'flex flex-col gap-4 h-full overflow-hidden'}>
+              <div
+                className={`px-5 py-4 rounded-[24px] flex items-center justify-between shrink-0${isDone ? ' cursor-pointer select-none' : ''}`}
+                style={{ background: CARD, border: `1px solid ${BORDER}` }}
+                {...(isDone ? { role: 'button', tabIndex: 0, 'aria-expanded': showDone, onClick: () => setShowDone(v => !v), onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowDone(v => !v); } } } : {})}
+              >
                 <div className="flex items-center gap-2">
                   {getStatusIcon(col)}
                   <span className="text-xs font-black uppercase tracking-widest" style={{ color: T1 }}>{COLUMN_LABEL[col]}</span>
                 </div>
-                <span className="px-2 py-0.5 rounded-lg text-[10px] font-black" style={{ background: 'rgba(255,255,255,0.07)', color: T2 }}>{colTasks.length}</span>
+                <div className="flex items-center gap-2">
+                  {isDone && <span className="text-[10px] font-bold" style={{ color: T2 }}>{showDone ? t.hideCompleted : t.showCompleted}</span>}
+                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-black" style={{ background: 'rgba(255,255,255,0.07)', color: T2 }}>{allInColumn.length}</span>
+                </div>
               </div>
 
+              {!collapsed && (
               <div className="flex-grow overflow-y-auto space-y-4 pb-12 pr-1 custom-scrollbar">
+                {isDone && colTasks.length === 0 && (
+                  <p className="text-[11px] font-bold px-2" style={{ color: T2 }}>{t.noRecentCompleted}</p>
+                )}
                 {colTasks.map(task => (
                   <div
                     key={task.id}
@@ -217,7 +242,11 @@ const InternalTasksView: React.FC<InternalTasksViewProps> = ({ lang, onShowToast
                     </div>
                   </div>
                 ))}
+                {isDone && hiddenOlder > 0 && (
+                  <p className="text-[10px] font-bold px-2" style={{ color: T2 }}>{t.olderCompletedHidden.replace('{n}', String(hiddenOlder))}</p>
+                )}
               </div>
+              )}
             </div>
           );
         })}

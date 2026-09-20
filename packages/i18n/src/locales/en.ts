@@ -1115,6 +1115,10 @@ export const en = {
       loadingTasks: 'Loading…',
       loadFailed: 'Failed to load',
       saveFailed: 'Failed to save',
+      showCompleted: 'Show completed',
+      hideCompleted: 'Hide completed',
+      noRecentCompleted: 'Nothing completed in the last 30 days',
+      olderCompletedHidden: '{n} older or undated completed item(s) not shown',
     },
   },
   trade: {
