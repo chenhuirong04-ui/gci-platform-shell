@@ -12,6 +12,7 @@ interface StepIndicatorProps {
   current: number; // 1–5
 }
 
+/** One compact strip (~52px): current step = deep navy + gold, done = gold check, upcoming = muted. */
 export const StepIndicator: React.FC<StepIndicatorProps> = ({ current }) => {
   const { dict } = useI18n();
   const s = dict.quotation.steps;
@@ -23,38 +24,25 @@ export const StepIndicator: React.FC<StepIndicatorProps> = ({ current }) => {
     { id: 5, label: s.sendToTrade },
   ];
   return (
-  <div className="w-full mb-8">
-    <div className="flex items-center justify-center gap-0">
+    <nav aria-label="Quotation steps" className="w-full h-[52px] mb-3 flex items-center gap-1 px-2 sm:px-3 rounded-xl bg-[#080D1E]/[0.04] border border-[#080D1E]/10 overflow-hidden">
       {STEPS.map((step, idx) => {
-        const done    = current > step.id;
-        const active  = current === step.id;
-        const pending = current < step.id;
+        const done = current > step.id;
+        const active = current === step.id;
         return (
           <React.Fragment key={step.id}>
-            {/* Node */}
-            <div className="flex flex-col items-center gap-1.5 min-w-[80px]">
-              <div className={`
-                w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-black transition-all
-                ${done    ? 'bg-[#CBA85C] text-[#080D1E]' : ''}
-                ${active  ? 'bg-[#080D1E] text-[#CBA85C] ring-2 ring-[#CBA85C]/40 ring-offset-1' : ''}
-                ${pending ? 'bg-white border-2 border-[#080D1E]/15 text-[#080D1E]/30' : ''}
-              `}>
-                {done ? '✓' : step.id}
-              </div>
-              <div className="text-center" style={{ fontFamily: "'IBM Plex Mono',monospace" }}>
-                <p className={`text-[9px] font-black uppercase tracking-wider leading-none ${active ? 'text-[#080D1E]' : done ? 'text-[#CBA85C]' : 'text-[#080D1E]/30'}`}>
-                  {step.label}
-                </p>
-              </div>
+            <div
+              aria-current={active ? 'step' : undefined}
+              className={`flex items-center gap-2 h-9 px-2.5 sm:px-3 rounded-lg min-w-0 transition-colors ${active ? 'bg-[#080D1E] text-[#E8C96A] shadow-sm' : done ? 'text-[#A8842F]' : 'text-[#080D1E]/35'}`}
+            >
+              <span className={`w-5 h-5 shrink-0 rounded-full flex items-center justify-center text-[10px] font-black ${active ? 'bg-[#CBA85C] text-[#080D1E]' : done ? 'bg-[#CBA85C]/25 text-[#A8842F]' : 'bg-[#080D1E]/8 text-[#080D1E]/40'}`}>
+                {done ? '✓' : String(step.id).padStart(2, '0')}
+              </span>
+              <span className={`text-[10px] sm:text-[11px] font-black uppercase tracking-wide truncate ${active ? 'inline' : 'hidden md:inline'}`}>{step.label}</span>
             </div>
-            {/* Connector */}
-            {idx < STEPS.length - 1 && (
-              <div className={`h-px flex-1 mx-1 mb-5 transition-all ${done ? 'bg-[#CBA85C]' : 'bg-[#080D1E]/10'}`} />
-            )}
+            {idx < STEPS.length - 1 && <div className={`h-px flex-1 min-w-[6px] ${done ? 'bg-[#CBA85C]' : 'bg-[#080D1E]/12'}`} />}
           </React.Fragment>
         );
       })}
-    </div>
-  </div>
+    </nav>
   );
 };

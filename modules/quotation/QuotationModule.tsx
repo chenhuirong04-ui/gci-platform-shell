@@ -315,7 +315,8 @@ interface QuotationModuleProps {
 }
 
 export default function QuotationModule({ initialMode, initialView }: QuotationModuleProps = {}) {
-  const { lang } = useI18n();
+  const { lang, dict } = useI18n();
+  const wb = dict.quotation.workbench;
   // Every "send to / open in Trade" button below is shown only with the trade module
   // (same user_profiles.modules check /trade itself uses) — no quotation-only exception.
   const { can } = useAuth();
@@ -378,6 +379,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   const [projectInfoSubmitted, setProjectInfoSubmitted] = useState(!!_prefillName || _autoTrade);
   const [quoteMode, setQuoteMode] = useState<'single' | 'package' | null>(_autoTrade ? 'package' : null);
   const [quoteType, setQuoteType] = useState<QuoteType | null>(_autoTrade ? 'trade' : null);
+  const isProjectInfoScreen = appMode === 'customer-quote' && view !== 'history' && !projectInfoSubmitted;
   const [tradePhase, setTradePhase] = useState<'upload' | 'pricing' | null>(_autoTrade ? 'upload' : null);
   const [sellingPrices, setSellingPrices] = useState<Record<string, number>>({});
   const [markupPercents, setMarkupPercents] = useState<Record<string, number>>({});
@@ -386,6 +388,11 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   const [quoteGenerated, setQuoteGenerated] = useState(false);
   const [tradeTerms, setTradeTerms] = useState<string>(''); // extracted terms / notes from supplier quote
   const [sentToTrade, setSentToTrade] = useState(false);    // flow completion flag
+  // Quote validity lives as its own first line inside the existing terms text, so it is saved (terms_notes), reloaded and sent with the quote by
+  // the existing paths — no new column, no separate state to keep in sync.
+  const VALID_LINE_RE = /^Valid until: (\d{4}-\d{2}-\d{2})\n?/;
+  const validUntil = (tradeTerms.match(VALID_LINE_RE) || [])[1] || '';
+  const setValidUntil = (date: string) => setTradeTerms(prev => { const rest = prev.replace(VALID_LINE_RE, ''); return date ? `Valid until: ${date}\n${rest}` : rest; });
   // Currency & exchange rate modal
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [pendingConversionItems, setPendingConversionItems] = useState<DraftItem[]>([]);
@@ -6134,41 +6141,58 @@ Leave a field as empty string if not present. Never fabricate values.`;
     [FurnitureCategory.OTHER]: Package
   };
 
-  const renderProjectInfo = () => (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-1000 ease-out">
-      {/* Back to Workflow Home */}
-      <button onClick={() => setAppMode('landing')} className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">
-        <ChevronLeft className="w-4 h-4" /> Workflow Home
-      </button>
-      <StepIndicator current={1} />
-      <div className="text-center space-y-6">
-        <div className="inline-block px-4 py-1.5 bg-brand-gold/10 rounded-full mb-2">
-          <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-brand-gold">Project Engineering Workspace</p>
-        </div>
-        <h2 className="text-5xl font-serif italic text-brand-brown tracking-tight">{t('Project Information')}</h2>
-        <p className="text-xs font-medium text-brand-brown-muted max-w-xl mx-auto leading-relaxed">
-          {t('Initialization phase')}
-        </p>
-      </div>
-      
-      <div className="max-w-4xl mx-auto w-full">
-        <div className="bg-white p-12 sm:p-20 rounded-[64px] border border-brand-beige shadow-[0_30px_100px_-20px_rgba(62,39,35,0.05)] relative overflow-hidden group">
-          {/* Decorative accents */}
-          <div className="absolute top-0 right-0 w-32 h-32 bg-brand-beige/20 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-1000" />
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-brand-gold/5 rounded-full -ml-12 -mb-12" />
+  const renderProjectInfo = () => {
+    // Quotation Summary values come only from real state; anything not known yet shows "—".
+    const confirmedSummary = draftItems.filter(it => it.status === 'Confirmed' && it.includeInGCI !== false);
+    const sumCost = confirmedSummary.reduce((s, it) => s + it.targetUnitPrice * it.quantity, 0);
+    const sumSelling = confirmedSummary.reduce((s, it) => s + (sellingPrices[it.id] || 0), 0);
+    const hasPricing = confirmedSummary.length > 0 && sumSelling > 0;
+    const fmt = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    const statusText = sentToTrade ? 'SENT_TO_TRADE' : quoteGenerated ? 'GENERATED' : wb.statusDraft;
+    const saveText = cloudSaveStatus === 'saving' ? wb.saving : cloudSaveStatus === 'saved' ? wb.saved : cloudSaveStatus === 'error' ? wb.saveError : wb.unsaved;
+    const summaryRows: Array<[string, string]> = [
+      [wb.customer, quoteInfo.customerProjectName ? cpSelection.customerName || quoteInfo.customerProjectName : '—'],
+      [wb.project, cpSelection.projectName || '—'],
+      [wb.quoteNo, quoteInfo.quoteNumber || '—'],
+      [wb.currency, 'AED'],
+      [wb.status, statusText],
+      [wb.cost, hasPricing ? `AED ${fmt(sumCost)}` : '—'],
+      [wb.margin, hasPricing && sumCost > 0 ? `${(((sumSelling - sumCost) / sumCost) * 100).toFixed(1)}%` : '—'],
+      [wb.finalQuote, hasPricing ? `AED ${fmt(sumSelling * 1.05)}` : '—'],
+      [wb.saveStatus, saveText],
+    ];
+    const labelCls = 'text-[10px] font-black text-gray-400 uppercase tracking-widest';
+    const fieldCls = 'w-full p-3 border border-gray-300 rounded-lg outline-none focus:border-[#CBA85C] text-sm font-bold text-gray-700 bg-white min-w-0';
+    const readonlyCls = 'w-full p-3 border border-gray-200 rounded-lg text-sm font-bold text-gray-500 bg-gray-50 min-w-0';
 
-          {/* Customer / Project Linking V1 (2026-09-15) — replaces the old
-              hand-typed "Customer / Project Name" free-text field. Search
-              and pick a real crm_customers row (Quick Create only once a
-              search genuinely finds nothing); project pick is available
-              here but not hard-required at this shared screen — it
-              precedes the BOQ-vs-Trade type choice below, so a hard
-              "project required" gate belongs one step later, on the BOQ
-              branch specifically (flagged as follow-up in the chat
-              report, not implemented in this round). */}
-          <div className="relative mb-12">
+    const requireCustomer = (): boolean => {
+      if (!quoteInfo.customerId) { setValidationError(wb.needCustomer); return false; }
+      setValidationError('');
+      return true;
+    };
+
+    return (
+      <div>
+        <StepIndicator current={1} />
+
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)] gap-4 items-start">
+          {/* ── Main form (~70%) ── */}
+          <section className="min-w-0 bg-white rounded-2xl border border-brand-beige p-4 sm:p-5 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-lg font-black text-[#0C1B3A] leading-tight">{wb.projectTitle}</h2>
+                <p className="text-xs text-gray-400 mt-0.5">{wb.projectSubtitle}</p>
+              </div>
+              <button onClick={() => setAppMode('landing')} className="shrink-0 flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 hover:text-[#C9A84C] transition-colors">
+                <ChevronLeft className="w-3.5 h-3.5" /> Workflow Home
+              </button>
+            </div>
+
+            {/* Customer / Project Linking (2026-09-15): the shared CRM-backed selector. Search covers company, contact, phone, email; no match offers
+                "+ Create customer" in a modal; a temporary customer is flagged until it is formally registered. */}
             <CustomerProjectSelector
               value={cpSelection}
+              requireProject
               onChange={(next) => {
                 setCpSelection(next);
                 const combinedName = next.projectName ? `${next.customerName} / ${next.projectName}` : next.customerName;
@@ -6178,84 +6202,88 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   phoneWhatsApp: next.whatsapp || next.phone || prev.phoneWhatsApp,
                   customerId: next.customerId,
                   projectId: next.projectId,
-                  // Auto-generate once a customer is first picked — never
-                  // overwrites a number already loaded from a saved draft.
+                  // Auto-generate once a customer is first picked — never overwrites a number already loaded from a saved draft.
                   quoteNumber: prev.quoteNumber || (next.customerId ? `GCI-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(100 + Math.random()*900)}` : prev.quoteNumber),
                 }));
                 if (validationError) setValidationError('');
               }}
             />
-          </div>
 
-          <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-x-16 gap-y-12">
-            {([
-              { key: 'salesperson', label: t('Salesperson'), placeholder: t('Salesperson') },
-              { key: 'quoteNumber', label: t('Quotation No.'), placeholder: 'Auto-generated' },
-              { key: 'date', label: t('Date'), type: 'date' },
-            ] as const).map(field => (
-              <div key={field.key} className="space-y-4 group/input">
-                <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-bold text-brand-brown-muted uppercase tracking-[0.2em] flex items-center gap-1.5 transition-colors group-focus-within/input:text-brand-gold">
-                    {field.label}
-                  </label>
-                </div>
-                <input
-                  type={('type' in field && field.type) || 'text'}
-                  value={quoteInfo[field.key]}
-                  placeholder={'placeholder' in field ? field.placeholder : undefined}
-                  onChange={e => {
-                    setQuoteInfo({...quoteInfo, [field.key]: e.target.value});
-                  }}
-                  className="w-full bg-transparent border-b-2 border-brand-beige text-2xl font-serif italic text-brand-brown focus:border-brand-gold outline-none pb-4 transition-all duration-300 placeholder:text-brand-brown/10 selection:bg-brand-gold/20"
-                />
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              <div className="space-y-1 min-w-0">
+                <label className={labelCls}>{wb.countryLocation}</label>
+                <div className={readonlyCls}>{cpSelection.country || '—'}</div>
               </div>
-            ))}
-          </div>
+              <div className="space-y-1 min-w-0">
+                <label className={labelCls}>{wb.currency}</label>
+                <div className={readonlyCls}>AED</div>
+              </div>
+              <div className="space-y-1 min-w-0">
+                <label className={labelCls}>{wb.validUntil}</label>
+                <input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} className={fieldCls} />
+              </div>
+              <div className="space-y-1 min-w-0">
+                <label className={labelCls}>{wb.salesperson}</label>
+                <input value={quoteInfo.salesperson} onChange={e => setQuoteInfo({ ...quoteInfo, salesperson: e.target.value })} className={fieldCls} />
+              </div>
+              <div className="space-y-1 min-w-0">
+                <label className={labelCls}>{wb.quoteNo}</label>
+                <input value={quoteInfo.quoteNumber} onChange={e => setQuoteInfo({ ...quoteInfo, quoteNumber: e.target.value })} placeholder={wb.autoNumber} className={fieldCls} />
+              </div>
+              <div className="space-y-1 min-w-0">
+                <label className={labelCls}>{wb.date}</label>
+                <input type="date" value={quoteInfo.date} onChange={e => setQuoteInfo({ ...quoteInfo, date: e.target.value })} className={fieldCls} />
+              </div>
+            </div>
 
-          <AnimatePresence>
             {validationError && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 10 }}
-                className="mt-12 p-4 bg-brand-gold/10 border border-brand-gold/20 rounded-[24px] flex items-center justify-center gap-3 animate-pulse"
-              >
-                <div className="w-1.5 h-1.5 bg-brand-gold rounded-full" />
-                <p className="text-[10px] font-bold text-brand-brown uppercase tracking-[0.2em]">
-                  {validationError}
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <div className="mt-20 flex justify-center">
-            <button
-              onClick={() => {
-                if (!quoteInfo.customerId) {
-                  setValidationError(t('Project name required'));
-                  return;
-                }
-                setValidationError('');
-                // Reset path selection so user picks quote type fresh
-                setQuoteType(null);
-                setQuoteMode(null);
-                setTradePhase(null);
-                setProjectInfoSubmitted(true);
-              }}
-              className="px-16 py-8 bg-brand-brown text-brand-ivory rounded-[36px] font-bold uppercase tracking-[0.3em] text-[11px] shadow-[0_25px_60px_-15px_rgba(62,39,35,0.3)] hover:bg-brand-brown/95 hover:-translate-y-1 active:scale-95 transition-all duration-500 flex items-center gap-6"
-            >
-              {t('Next: Select Category')} 
-              <div className="w-8 h-8 rounded-full bg-brand-gold/20 flex items-center justify-center group-hover:bg-brand-gold/30 transition-colors">
-                <ChevronRight className="w-4 h-4 text-brand-gold" />
+              <div className="p-2.5 bg-brand-gold/10 border border-brand-gold/20 rounded-lg flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-brand-gold rounded-full shrink-0" />
+                <p className="text-[11px] font-bold text-brand-brown">{validationError}</p>
               </div>
-            </button>
-          </div>
+            )}
 
-          {/* Load from History — done via History tab, not here */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button
+                onClick={() => {
+                  if (!requireCustomer()) return;
+                  setQuoteType(null); setQuoteMode(null); setTradePhase(null);
+                  setProjectInfoSubmitted(true);
+                  handleTypeSelect('boq');
+                }}
+                className="px-5 py-3 bg-[#0C1B3A] text-[#E8C96A] rounded-xl font-black uppercase tracking-wider text-[11px] hover:bg-[#0F2551] transition-colors flex items-center gap-2"
+              >
+                <Upload className="w-4 h-4" /> {wb.boqStart}
+              </button>
+              <button
+                onClick={() => {
+                  if (!requireCustomer()) return;
+                  setQuoteType(null); setQuoteMode(null); setTradePhase(null);
+                  setProjectInfoSubmitted(true);
+                }}
+                className="px-4 py-3 bg-white border border-[#0C1B3A]/20 text-[#0C1B3A] rounded-xl font-black uppercase tracking-wider text-[11px] hover:bg-[#0C1B3A]/5 transition-colors flex items-center gap-1.5"
+              >
+                {wb.otherTypes} <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </section>
+
+          {/* ── Quotation Summary (~30%) ── */}
+          <aside className="min-w-0 bg-[#0C1B3A] text-white rounded-2xl p-4 sm:p-5 lg:sticky lg:top-3">
+            <h3 className="text-[11px] font-black uppercase tracking-widest text-[#E8C96A] mb-3">{wb.summary}</h3>
+            <dl className="space-y-2">
+              {summaryRows.map(([k, v]) => (
+                <div key={k} className="flex items-baseline justify-between gap-3 border-b border-white/10 pb-1.5 last:border-0">
+                  <dt className="text-[10px] uppercase tracking-wider text-white/50 shrink-0">{k}</dt>
+                  <dd className="text-xs font-bold text-right truncate min-w-0" title={v}>{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </aside>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // ── Trade & Sourcing: Manual Pricing Review ─────────────────────────────
   const renderTradeQuoteReview = () => {
@@ -9342,7 +9370,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
         )}
       </AnimatePresence>
 
-      <div className="max-w-7xl mx-auto px-6 py-6 lg:py-12">
+      <div className={`max-w-7xl mx-auto px-3 sm:px-6 ${isProjectInfoScreen ? 'py-3' : 'py-6 lg:py-12'}`}>
         {_returnUrlParam && (
           <div className="mb-6 flex items-center justify-between px-5 py-2.5 bg-brand-brown rounded-2xl text-brand-ivory">
             <a
@@ -9360,33 +9388,33 @@ Leave a field as empty string if not present. Never fabricate values.`;
             </div>
           </div>
         )}
-        <header className="mb-10 flex justify-between items-center bg-gradient-to-r from-[#0C1B3A] via-[#0F2551] to-[#0C1B3A] text-white px-8 py-4 rounded-[28px] shadow-xl">
+        <header className="mb-3 flex justify-between items-center gap-3 bg-gradient-to-r from-[#0C1B3A] via-[#0F2551] to-[#0C1B3A] text-white px-4 sm:px-6 py-2.5 rounded-2xl shadow-lg">
           <div className="flex items-center gap-4">
-            <div className="bg-gradient-to-br from-[#C9A84C] to-[#A07C2D] w-9 h-9 rounded-xl flex items-center justify-center shadow-md shrink-0">
+            <div className="bg-gradient-to-br from-[#C9A84C] to-[#A07C2D] w-8 h-8 rounded-lg flex items-center justify-center shadow-md shrink-0">
               <span className="text-white font-black text-sm tracking-tight">G</span>
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base font-black tracking-tight uppercase leading-none">GCI Quotation Center</h1>
-                <span className="text-[9px] bg-[#C9A84C]/20 border border-[#C9A84C]/30 px-2 py-0.5 rounded text-[#E8C96A] font-bold tracking-wide">LIVING STUDIO</span>
+                <span className="hidden sm:inline text-[9px] bg-[#C9A84C]/20 border border-[#C9A84C]/30 px-2 py-0.5 rounded text-[#E8C96A] font-bold tracking-wide">LIVING STUDIO</span>
               </div>
-              <p className="text-[10px] text-white/50 font-medium mt-0.5">FF&amp;E · Engineering Quotation · BOQ</p>
+              <p className="text-[10px] text-white/50 font-medium mt-0.5 hidden sm:block">FF&amp;E · Engineering Quotation · BOQ</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setView(view === 'history' ? 'configurator' : 'history')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${view === 'history' ? 'bg-[#C9A84C] text-[#0C1B3A]' : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'}`}
+              className={`flex items-center gap-2 px-2.5 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shrink-0 ${view === 'history' ? 'bg-[#C9A84C] text-[#0C1B3A]' : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'}`}
             >
               <FileText className="w-3.5 h-3.5" />
-              {view === 'history' ? t('← Back') : t('History')}
+              <span className="hidden sm:inline">{view === 'history' ? t('← Back') : t('History')}</span>
             </button>
             <button
               onClick={() => setShowSettings(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all"
+              aria-label="Pricing" className="flex items-center gap-2 px-2.5 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all shrink-0"
             >
               <Settings className="w-3.5 h-3.5" />
-              Pricing
+              <span className="hidden sm:inline">Pricing</span>
             </button>
           </div>
         </header>
@@ -9398,8 +9426,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
             Deliberately excludes 'landing'/'service-quote'/history view —
             those keep their own existing navigation as-is. */}
         {(appMode === 'customer-quote' || appMode === 'supplier-quote' || appMode === 'package-quote') && view !== 'history' && (
-          <div className="mb-6 flex justify-center">
-            <div className="inline-flex bg-white p-1.5 rounded-2xl shadow-md border border-brand-beige gap-1">
+          <div className="mb-3 flex justify-start overflow-x-auto">
+            <div className="inline-flex bg-white p-1 rounded-xl border border-brand-beige gap-1">
               {([
                 { id: 'customer-quote', label: '工程 / BOQ 报价' },
                 { id: 'supplier-quote', label: '供应商报价' },
@@ -9408,7 +9436,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 <button
                   key={qt.id}
                   onClick={() => setAppMode(qt.id)}
-                  className={`px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all ${
+                  className={`px-4 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${
                     appMode === qt.id ? 'bg-[#0C1B3A] text-white shadow-lg' : 'text-[#0C1B3A]/50 hover:bg-[#0C1B3A]/5'
                   }`}
                 >
@@ -9419,8 +9447,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
           </div>
         )}
 
-        <main className="bg-white rounded-[56px] shadow-[0_45px_120px_-30px_rgba(62,39,35,0.08)] border border-brand-beige overflow-hidden">
-          <div className="p-8 sm:p-20 min-h-[650px] flex flex-col">
+        <main className={`bg-white ${isProjectInfoScreen ? 'rounded-2xl' : 'rounded-[56px] shadow-[0_45px_120px_-30px_rgba(62,39,35,0.08)]'} border border-brand-beige overflow-hidden`}>
+          <div className={`${isProjectInfoScreen ? 'p-3 sm:p-5' : 'p-8 sm:p-20 min-h-[650px]'} flex flex-col`}>
 
             {/* ── TOP-LEVEL: Landing / Supplier Upload / Customer Quote ── */}
             {appMode === 'landing' && view !== 'history' ? (
