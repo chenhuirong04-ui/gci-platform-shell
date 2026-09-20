@@ -63,6 +63,10 @@ interface CustomerProjectSelectorProps {
   /** Offer "quote now as a temporary customer" (stage 待建档) in the create modal. Quotation screens: true (default). Finance screens: false — a
    * ledger entry must not create a customer that is described as "to be quoted". */
   allowLead?: boolean;
+  /** Focus the customer search box on mount (the customer pick is the first step of the screen). */
+  autoFocus?: boolean;
+  /** Show a visible "+ New customer" entry under the search box, not only after a search finds nothing. */
+  showCreateLink?: boolean;
   className?: string;
 }
 
@@ -84,7 +88,7 @@ function selectionFrom(c: CrmCustomer, contact: CrmContact | null): CustomerProj
   };
 }
 
-export function CustomerProjectSelector({ value, onChange, requireProject, allowLead = true, className }: CustomerProjectSelectorProps) {
+export function CustomerProjectSelector({ value, onChange, requireProject, allowLead = true, autoFocus, showCreateLink, className }: CustomerProjectSelectorProps) {
   const { dict } = useI18n();
   const cp = dict.quotation.customerPicker;
   const [query, setQuery] = useState(value.customerName || '');
@@ -275,6 +279,7 @@ export function CustomerProjectSelector({ value, onChange, requireProject, allow
             onFocus={() => setDropdownOpen(true)}
             placeholder={cp.searchPlaceholder}
             aria-label={cp.label}
+            autoFocus={autoFocus}
             className="w-full pl-10 pr-16 p-3.5 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700 min-w-0"
           />
           {value.customerId && (
@@ -286,6 +291,10 @@ export function CustomerProjectSelector({ value, onChange, requireProject, allow
             </>
           )}
         </div>
+
+        {showCreateLink && !value.customerId && (
+          <button type="button" onClick={openModal} className="text-[11px] font-black text-[#B8960C] hover:text-[#8A6D1F] px-1">{cp.createLink}</button>
+        )}
 
         {showDropdown && (
           <div className="absolute z-20 mt-1 w-full max-h-72 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl">
@@ -374,7 +383,7 @@ export function CustomerProjectSelector({ value, onChange, requireProject, allow
             </div>
           )}
           {requireProject && !value.projectId && (
-            <p className="text-[11px] text-[#E0846A] font-bold px-1 pt-1">⚠️ {cp.projectRequired}</p>
+            <p className="text-[11px] text-gray-500 px-1 pt-1">{cp.projectRequired}</p>
           )}
         </div>
       )}

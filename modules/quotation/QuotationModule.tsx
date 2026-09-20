@@ -379,7 +379,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   const [projectInfoSubmitted, setProjectInfoSubmitted] = useState(!!_prefillName || _autoTrade);
   const [quoteMode, setQuoteMode] = useState<'single' | 'package' | null>(_autoTrade ? 'package' : null);
   const [quoteType, setQuoteType] = useState<QuoteType | null>(_autoTrade ? 'trade' : null);
-  const isProjectInfoScreen = appMode === 'customer-quote' && view !== 'history' && !projectInfoSubmitted;
+  // Steps 1 (project information) and 2 (quote method) of the engineering / custom quotation use the compact workbench layout.
+  const isProjectInfoScreen = appMode === 'customer-quote' && view !== 'history' && (!projectInfoSubmitted || !quoteType);
   const [tradePhase, setTradePhase] = useState<'upload' | 'pricing' | null>(_autoTrade ? 'upload' : null);
   const [sellingPrices, setSellingPrices] = useState<Record<string, number>>({});
   const [markupPercents, setMarkupPercents] = useState<Record<string, number>>({});
@@ -6141,7 +6142,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
     [FurnitureCategory.OTHER]: Package
   };
 
-  const renderProjectInfo = () => {
+  // Quotation Summary (right column of steps 1 and 2): values come only from real state; anything not known yet shows "—".
+  const renderQuotationSummary = () => {
     // Quotation Summary values come only from real state; anything not known yet shows "—".
     const confirmedSummary = draftItems.filter(it => it.status === 'Confirmed' && it.includeInGCI !== false);
     const sumCost = confirmedSummary.reduce((s, it) => s + it.targetUnitPrice * it.quantity, 0);
@@ -6161,15 +6163,35 @@ Leave a field as empty string if not present. Never fabricate values.`;
       [wb.finalQuote, hasPricing ? `AED ${fmt(sumSelling * 1.05)}` : '—'],
       [wb.saveStatus, saveText],
     ];
+    return (
+        <aside className="min-w-0 bg-[#0C1B3A] text-white rounded-2xl p-4 sm:p-5 lg:sticky lg:top-3">
+          <h3 className="text-[11px] font-black uppercase tracking-widest text-[#E8C96A] mb-3">{wb.summary}</h3>
+          <dl className="space-y-2">
+            {summaryRows.map(([k, v]) => (
+              <div key={k} className="flex items-baseline justify-between gap-3 border-b border-white/10 pb-1.5 last:border-0">
+                <dt className="text-[10px] uppercase tracking-wider text-white/50 shrink-0">{k}</dt>
+                <dd className="text-xs font-bold text-right truncate min-w-0" title={v}>{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </aside>
+    );
+  };
+
+  const renderProjectInfo = () => {
     const labelCls = 'text-[10px] font-black text-gray-400 uppercase tracking-widest';
     const fieldCls = 'w-full p-3 border border-gray-300 rounded-lg outline-none focus:border-[#CBA85C] text-sm font-bold text-gray-700 bg-white min-w-0';
     const readonlyCls = 'w-full p-3 border border-gray-200 rounded-lg text-sm font-bold text-gray-500 bg-gray-50 min-w-0';
 
-    const requireCustomer = (): boolean => {
-      if (!quoteInfo.customerId) { setValidationError(wb.needCustomer); return false; }
-      setValidationError('');
-      return true;
-    };
+    // Step 1 is a real workflow: pick / create the customer, pick the project, then start. Nothing is shown as an error before the user acts.
+    const hasCustomer = !!quoteInfo.customerId;
+    const hasProject = !!quoteInfo.projectId;
+    const canStart = hasCustomer && hasProject;
+    const flow: Array<{ label: string; state: 'done' | 'current' | 'todo' }> = [
+      { label: wb.flowCustomer, state: hasCustomer ? 'done' : 'current' },
+      { label: wb.flowProject, state: hasProject ? 'done' : hasCustomer ? 'current' : 'todo' },
+      { label: wb.flowStart, state: canStart ? 'current' : 'todo' },
+    ];
 
     return (
       <div>
@@ -6188,11 +6210,25 @@ Leave a field as empty string if not present. Never fabricate values.`;
               </button>
             </div>
 
+            <ol className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              {flow.map((s, i) => (
+                <li key={s.label} className="flex items-center gap-2">
+                  <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-black ${s.state === 'done' ? 'bg-[#CBA85C]/15 text-[#8A6D1F]' : s.state === 'current' ? 'bg-[#0C1B3A] text-[#E8C96A]' : 'bg-gray-100 text-gray-400'}`}>
+                    <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] bg-white/20">{s.state === 'done' ? '✓' : i + 1}</span>
+                    {s.label}
+                  </span>
+                  {i < flow.length - 1 && <ChevronRight className="w-3 h-3 text-gray-300" />}
+                </li>
+              ))}
+            </ol>
+
             {/* Customer / Project Linking (2026-09-15): the shared CRM-backed selector. Search covers company, contact, phone, email; no match offers
                 "+ Create customer" in a modal; a temporary customer is flagged until it is formally registered. */}
             <CustomerProjectSelector
               value={cpSelection}
               requireProject
+              autoFocus
+              showCreateLink
               onChange={(next) => {
                 setCpSelection(next);
                 const combinedName = next.projectName ? `${next.customerName} / ${next.projectName}` : next.customerName;
@@ -6236,50 +6272,24 @@ Leave a field as empty string if not present. Never fabricate values.`;
               </div>
             </div>
 
-            {validationError && (
-              <div className="p-2.5 bg-brand-gold/10 border border-brand-gold/20 rounded-lg flex items-center gap-2">
-                <div className="w-1.5 h-1.5 bg-brand-gold rounded-full shrink-0" />
-                <p className="text-[11px] font-bold text-brand-brown">{validationError}</p>
-              </div>
-            )}
-
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <button
+                disabled={!canStart}
                 onClick={() => {
-                  if (!requireCustomer()) return;
-                  setQuoteType(null); setQuoteMode(null); setTradePhase(null);
-                  setProjectInfoSubmitted(true);
-                  handleTypeSelect('boq');
-                }}
-                className="px-5 py-3 bg-[#0C1B3A] text-[#E8C96A] rounded-xl font-black uppercase tracking-wider text-[11px] hover:bg-[#0F2551] transition-colors flex items-center gap-2"
-              >
-                <Upload className="w-4 h-4" /> {wb.boqStart}
-              </button>
-              <button
-                onClick={() => {
-                  if (!requireCustomer()) return;
+                  if (!canStart) return;
+                  // Step 2 (quote method) is where manual build / BOQ upload / other-document import is chosen.
                   setQuoteType(null); setQuoteMode(null); setTradePhase(null);
                   setProjectInfoSubmitted(true);
                 }}
-                className="px-4 py-3 bg-white border border-[#0C1B3A]/20 text-[#0C1B3A] rounded-xl font-black uppercase tracking-wider text-[11px] hover:bg-[#0C1B3A]/5 transition-colors flex items-center gap-1.5"
+                className="px-6 py-3 bg-[#0C1B3A] text-[#E8C96A] rounded-xl font-black uppercase tracking-wider text-[11px] hover:bg-[#0F2551] transition-colors flex items-center gap-2 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
               >
-                {wb.otherTypes} <ChevronRight className="w-3.5 h-3.5" />
+                {wb.startCustom} <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </section>
 
           {/* ── Quotation Summary (~30%) ── */}
-          <aside className="min-w-0 bg-[#0C1B3A] text-white rounded-2xl p-4 sm:p-5 lg:sticky lg:top-3">
-            <h3 className="text-[11px] font-black uppercase tracking-widest text-[#E8C96A] mb-3">{wb.summary}</h3>
-            <dl className="space-y-2">
-              {summaryRows.map(([k, v]) => (
-                <div key={k} className="flex items-baseline justify-between gap-3 border-b border-white/10 pb-1.5 last:border-0">
-                  <dt className="text-[10px] uppercase tracking-wider text-white/50 shrink-0">{k}</dt>
-                  <dd className="text-xs font-bold text-right truncate min-w-0" title={v}>{v}</dd>
-                </div>
-              ))}
-            </dl>
-          </aside>
+          {renderQuotationSummary()}
         </div>
       </div>
     );
@@ -9429,7 +9439,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
           <div className="mb-3 flex justify-start overflow-x-auto">
             <div className="inline-flex bg-white p-1 rounded-xl border border-brand-beige gap-1">
               {([
-                { id: 'customer-quote', label: '工程 / BOQ 报价' },
+                { id: 'customer-quote', label: '工程 / 定制报价' },
                 { id: 'supplier-quote', label: '供应商报价' },
                 { id: 'package-quote', label: '套餐报价' },
               ] as { id: QuoteAppMode; label: string }[]).map(qt => (
@@ -9744,11 +9754,17 @@ Leave a field as empty string if not present. Never fabricate values.`;
             ) : !projectInfoSubmitted ? (
               renderProjectInfo()
             ) : !quoteType ? (
-              <TypeSelection
-                onSelect={handleTypeSelect}
-                onBack={() => setProjectInfoSubmitted(false)}
-                projectName={quoteInfo.customerProjectName}
-              />
+              <div>
+                <StepIndicator current={2} />
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)] gap-4 items-start">
+                  <TypeSelection
+                    onSelect={handleTypeSelect}
+                    onBack={() => setProjectInfoSubmitted(false)}
+                    projectName={quoteInfo.customerProjectName}
+                  />
+                  {renderQuotationSummary()}
+                </div>
+              </div>
             ) : (quoteType === 'trade' || quoteType === 'boq') && tradePhase === 'pricing' ? (
               renderTradeQuoteReview()
             ) : quoteMode === 'package' && !selectedCategory ? (
