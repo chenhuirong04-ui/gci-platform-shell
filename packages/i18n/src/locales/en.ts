@@ -1457,6 +1457,13 @@ export const en = {
       createShort: 'Create',
       projectRequired: 'Select a project (or create one) to continue.',
       createLink: '+ New customer',
+      whatsapp: 'WhatsApp',
+      businessLine: 'Business line',
+      stage: 'Status / stage',
+      formalTitle: 'Add customer (CRM profile)',
+      save: 'Save customer',
+      businessLineNone: 'Not set',
+      stageNone: 'Not set',
       createFailed: 'Could not create the customer',
     },
     workbench: {

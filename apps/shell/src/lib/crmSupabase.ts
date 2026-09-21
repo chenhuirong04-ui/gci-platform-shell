@@ -153,8 +153,12 @@ export async function logFollowup(input: {
   method?: string | null;
   status?: string | null;
   owner?: string | null;
+  /** the day the contact happened (YYYY-MM-DD); defaults to today (Dubai) */
+  followUpDate?: string | null;
+  /** which UI wrote it; defaults to 'ask_gci' */
+  source?: string;
 }): Promise<{ ok: true; followup: CrmFollowup; customer: CrmCustomer } | { ok: false; error: string }> {
-  const followUpDate = todayISO();
+  const followUpDate = input.followUpDate || todayISO();
 
   const { data: followup, error: fErr } = await supabase
     .from('crm_followups')
@@ -167,7 +171,7 @@ export async function logFollowup(input: {
       next_action: input.nextAction || null,
       status_after: input.status || null,
       owner: input.owner || null,
-      source: 'ask_gci',
+      source: input.source || 'ask_gci',
     })
     .select()
     .single();
@@ -425,7 +429,10 @@ export async function getAllCustomerNames(): Promise<
 // ── Task 13: Business Overview — customer count grouped by existing
 // business_type column. No guessing: a customer with no business_type set
 // is counted as UNKNOWN rather than assigned a line. ───────────────────────
-const BUSINESS_LINES = ['25H/AI', 'Trade', 'Workforce/Technical Services', 'Ecommerce', 'Other'] as const;
+export const BUSINESS_LINES = ['25H/AI', 'Trade', 'Workforce/Technical Services', 'Ecommerce', 'Other'] as const;
+
+/** Stage vocabulary of the existing CRM (crm_customers.status is free text; nothing new is introduced). */
+export const CRM_STAGES = ['新询盘', '需求整理中', '待报价', '已报价待确认', '合同待签', '执行中', '暂缓', '已成交', '已关闭'];
 
 export interface BusinessLineCount {
   line: string;
@@ -564,6 +571,58 @@ export async function setCustomerActive(
 // ── CRM customer classification (Task: 项目客户/批发·小贸易/服务类) — a
 // manual, explicit set only. Never called in a batch/auto-guess path; always
 // one row at a time from a human's dropdown pick in the customer directory. ──
+/** Calendar date in Asia/Dubai, offset by N days (0 = today, 1 = tomorrow). The CRM rule: the next follow-up starts the day AFTER it is entered. */
+export function crmDate(offsetDays = 0): string {
+  return new Date(Date.now() + 4 * 3600 * 1000 + offsetDays * 86400000).toISOString().slice(0, 10);
+}
+
+/** Change the customer's stage (crm_customers.status, the CRM's free-text stage field). Only that column and updated_at change. */
+export async function updateCustomerStage(
+  customerId: string,
+  status: string,
+): Promise<{ ok: true; customer: CrmCustomer } | { ok: false; error: string }> {
+  const { data, error } = await supabase
+    .from('crm_customers')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', customerId)
+    .select()
+    .single();
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, customer: data as CrmCustomer };
+}
+
+/** Change (or clear) the next follow-up date. A date must be after today (Dubai): entry day never counts as the next follow-up. */
+export async function updateCustomerNextFollowUp(
+  customerId: string,
+  date: string | null,
+): Promise<{ ok: true; customer: CrmCustomer } | { ok: false; error: string }> {
+  if (date && date <= todayISO()) return { ok: false, error: '下次跟进日期必须从明天开始' };
+  const { data, error } = await supabase
+    .from('crm_customers')
+    .update({ next_follow_up_at: date, updated_at: new Date().toISOString() })
+    .eq('id', customerId)
+    .select()
+    .single();
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, customer: data as CrmCustomer };
+}
+
+/** Recent follow-up log of one customer, newest first. */
+export async function listFollowupsForCustomer(
+  customerId: string,
+  limit = 20,
+): Promise<{ ok: true; rows: CrmFollowup[] } | { ok: false; error: string }> {
+  const { data, error } = await supabase
+    .from('crm_followups')
+    .select('*')
+    .eq('customer_id', customerId)
+    .order('follow_up_date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, rows: (data ?? []) as CrmFollowup[] };
+}
+
 export async function setCustomerPrimaryType(
   customerId: string,
   type: CustomerPrimaryType | null,

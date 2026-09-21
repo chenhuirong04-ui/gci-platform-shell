@@ -18,12 +18,12 @@
  *     customer's id.
  */
 import { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { Search, Check, Plus, User, Building2, X } from 'lucide-react';
 import { useI18n } from '@gci/i18n';
+import { CustomerCreateModal } from './CustomerCreateModal';
 import {
-  searchCustomers, listContactsForCustomer, listProjectsForCustomer, quickCreateCustomer, quickCreateProject, markCustomerFormal,
-  DuplicateCustomerError, isUnregisteredLead, type CrmProject, type CustomerSearchHit,
+  searchCustomers, listContactsForCustomer, listProjectsForCustomer, quickCreateProject, markCustomerFormal,
+  isUnregisteredLead, type CrmProject, type CustomerSearchHit,
 } from '../lib/crmProjects';
 import type { CrmCustomer, CrmContact } from '../lib/crmSupabase';
 
@@ -99,10 +99,6 @@ export function CustomerProjectSelector({ value, onChange, requireProject, allow
   const [projects, setProjects] = useState<CrmProject[]>([]);
 
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ name: '', country: '', contactName: '', mobile: '', email: '', type: '', source: '' });
-  const [creating, setCreating] = useState(false);
-  const [formError, setFormError] = useState('');
-  const [duplicate, setDuplicate] = useState<CrmCustomer | null>(null);
   const [converting, setConverting] = useState(false);
 
   const [showQuickCreateProject, setShowQuickCreateProject] = useState(false);
@@ -161,7 +157,6 @@ export function CustomerProjectSelector({ value, onChange, requireProject, allow
     setQuery(c.customer_name);
     setDropdownOpen(false);
     setShowModal(false);
-    setDuplicate(null);
     onChange(selectionFrom(c, contact));
   };
 
@@ -187,42 +182,14 @@ export function CustomerProjectSelector({ value, onChange, requireProject, allow
   };
 
   const openModal = () => {
-    setForm({ name: query.trim(), country: '', contactName: '', mobile: '', email: '', type: '', source: '' });
-    setFormError('');
-    setDuplicate(null);
     setDropdownOpen(false);
     setShowModal(true);
   };
 
-  const submitCreate = async (isLead: boolean) => {
-    if (!form.name.trim()) { setFormError(cp.required); return; }
-    setCreating(true);
-    setFormError('');
-    setDuplicate(null);
-    try {
-      const { customer, contact } = await quickCreateCustomer({
-        customerName: form.name,
-        country: form.country || undefined,
-        customerPrimaryType: form.type || null,
-        source: form.source || undefined,
-        isLead,
-        contactName: form.contactName || undefined,
-        phone: form.mobile || undefined,
-        email: form.email || undefined,
-      });
-      pick(customer, contact);
-    } catch (e: any) {
-      if (e instanceof DuplicateCustomerError) setDuplicate(e.existing);
-      else setFormError(e?.message || cp.createFailed);
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const useDuplicate = async () => {
-    if (!duplicate) return;
-    const list = await listContactsForCustomer(duplicate.id);
-    pick(duplicate, list.find(c => c.is_primary) || list[0] || null);
+  // A same-name customer already exists: use it (with its primary contact) instead of creating a duplicate.
+  const useExisting = async (existing: CrmCustomer) => {
+    const list = await listContactsForCustomer(existing.id);
+    pick(existing, list.find(c => c.is_primary) || list[0] || null);
   };
 
   const makeFormal = async () => {
@@ -388,61 +355,14 @@ export function CustomerProjectSelector({ value, onChange, requireProject, allow
         </div>
       )}
 
-      {showModal && createPortal(
-        <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={cp.modalTitle}>
-          <div className="absolute inset-0 bg-slate-900/60" onClick={() => !creating && setShowModal(false)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto p-5 sm:p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-black text-gray-800">{cp.modalTitle}</h3>
-              <button type="button" onClick={() => !creating && setShowModal(false)} className="p-1.5 text-gray-400 hover:text-gray-700" aria-label={cp.cancel}><X className="w-4 h-4" /></button>
-            </div>
-
-            <div className="space-y-1">
-              <label className={labelCls}>{cp.name} <span className="text-[#CBA85C]">*</span></label>
-              <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={inputCls} autoFocus />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1"><label className={labelCls}>{cp.country}</label><input value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} className={inputCls} /></div>
-              <div className="space-y-1"><label className={labelCls}>{cp.contactName}</label><input value={form.contactName} onChange={e => setForm({ ...form, contactName: e.target.value })} className={inputCls} /></div>
-              <div className="space-y-1"><label className={labelCls}>{cp.mobile}</label><input value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} className={inputCls} inputMode="tel" /></div>
-              <div className="space-y-1"><label className={labelCls}>{cp.email}</label><input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className={inputCls} inputMode="email" /></div>
-              <div className="space-y-1">
-                <label className={labelCls}>{cp.customerType}</label>
-                <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className={inputCls}>
-                  <option value="">{cp.typeNone}</option>
-                  <option value="project">{cp.typeProject}</option>
-                  <option value="trade">{cp.typeTrade}</option>
-                  <option value="services">{cp.typeServices}</option>
-                </select>
-              </div>
-              <div className="space-y-1"><label className={labelCls}>{cp.source}</label><input value={form.source} onChange={e => setForm({ ...form, source: e.target.value })} placeholder={cp.sourcePlaceholder} className={inputCls} /></div>
-            </div>
-
-            {duplicate && (
-              <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 flex flex-wrap items-center gap-2">
-                <span className="text-xs font-bold text-amber-800 flex-1 min-w-0">{cp.dupTitle.replace('{name}', duplicate.customer_name)}</span>
-                <button type="button" onClick={useDuplicate} className="px-3 py-1.5 rounded-md bg-[#080D1E] text-white text-[10px] font-black uppercase tracking-wide">{cp.dupUse}</button>
-              </div>
-            )}
-            {formError && <p className="text-xs font-bold text-[#E0846A]">{formError}</p>}
-
-            <div className="flex flex-wrap gap-2 pt-1">
-              <button type="button" disabled={creating} onClick={() => submitCreate(false)} className="px-4 py-2.5 rounded-lg bg-[#080D1E] text-white text-[11px] font-black uppercase tracking-wide disabled:opacity-50">
-                {creating ? cp.creating : cp.create}
-              </button>
-              {allowLead && (
-                <button type="button" disabled={creating} onClick={() => submitCreate(true)} className="px-4 py-2.5 rounded-lg bg-white border border-[#CBA85C] text-[#8A6D1F] text-[11px] font-black tracking-wide disabled:opacity-50">
-                  {cp.createLead}
-                </button>
-              )}
-              <button type="button" disabled={creating} onClick={() => setShowModal(false)} className="px-4 py-2.5 rounded-lg bg-gray-100 text-gray-500 text-[11px] font-black uppercase tracking-wide">
-                {cp.cancel}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      )}
+      <CustomerCreateModal
+        open={showModal}
+        initialName={query}
+        allowLead={allowLead}
+        onClose={() => setShowModal(false)}
+        onCreated={(c, contact) => pick(c, contact)}
+        onUseExisting={useExisting}
+      />
     </div>
   );
 }

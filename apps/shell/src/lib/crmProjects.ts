@@ -180,6 +180,10 @@ export async function quickCreateCustomer(input: {
   /** crm_customers.customer_primary_type (project | trade | services); anything else is dropped, never guessed */
   customerPrimaryType?: string | null;
   source?: string;
+  /** crm_customers.business_type (业务线) */
+  businessType?: string;
+  /** crm_customers.status (stage). Ignored when isLead (the lead stage 待建档 wins). */
+  status?: string;
   isLead?: boolean;
   contactName?: string;
   phone?: string;
@@ -194,6 +198,8 @@ export async function quickCreateCustomer(input: {
   const row: Record<string, unknown> = { customer_name: name, source: input.source?.trim() || 'quote_quick_create' };
   if (input.country?.trim()) row.country = input.country.trim();
   if (input.customerPrimaryType && PRIMARY_TYPES.has(input.customerPrimaryType)) row.customer_primary_type = input.customerPrimaryType;
+  if (input.businessType?.trim()) row.business_type = input.businessType.trim();
+  if (input.status?.trim()) row.status = input.status.trim();
   if (input.isLead) row.status = LEAD_STATUS;
 
   const { data: customer, error: cErr } = await supabase.from('crm_customers').insert(row).select().single();

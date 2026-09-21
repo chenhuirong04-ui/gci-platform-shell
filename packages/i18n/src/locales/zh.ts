@@ -1459,6 +1459,13 @@ export const zh: typeof en = {
       createShort: '创建',
       projectRequired: '请选择项目（或新建项目）以继续。',
       createLink: '+ 新建客户',
+      whatsapp: 'WhatsApp',
+      businessLine: '业务线',
+      stage: '状态 / 阶段',
+      formalTitle: '新增客户（正式建档）',
+      save: '保存客户',
+      businessLineNone: '未选择',
+      stageNone: '未设置',
       createFailed: '创建客户失败',
     },
     workbench: {

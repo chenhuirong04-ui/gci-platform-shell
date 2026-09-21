@@ -1,16 +1,17 @@
-// GCI Executive Desk — Task 17.2: the new正式 Supabase CRM page.
-// Read-only list over crm_customers/crm_contacts/crm_followups — no create/
-// edit forms here (GIA / Business Assistant remains the one write entry
-// point). Clicking a row reuses the existing Customer 360 view instead of
-// building a second detail page.
+// 客户与项目 CRM 工作台 — the formal Supabase CRM page (crm_customers / crm_contacts / crm_followups / crm_projects).
+// Everyday CRM work happens here: new customer, record follow-up, customer detail, stage and next-follow-up edits.
+// GIA (Business Assistant) stays as the natural-language assistant entry, not the only one.
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
 import {
   getCustomerDirectory, getTodaysFollowups, getOverdueFollowups, setCustomerActive,
-  setCustomerPrimaryType,
-  type CrmCustomerWithContact, type CrmOverdueCustomer, type CustomerPrimaryType,
+  setCustomerPrimaryType, updateCustomerStage, updateCustomerNextFollowUp, crmDate, CRM_STAGES,
+  type CrmCustomer, type CrmCustomerWithContact, type CrmOverdueCustomer, type CustomerPrimaryType,
 } from '../lib/crmSupabase';
+import { CustomerCreateModal } from '../components/CustomerCreateModal';
+import { CrmFollowupModal, type FollowupTarget } from '../components/crm/CrmFollowupModal';
+import { CrmCustomerDrawer } from '../components/crm/CrmCustomerDrawer';
 
 const GOLD = '#CBA85C';
 const RED = '#E0846A';
@@ -78,6 +79,14 @@ export function CrmCustomers() {
   const [restoreBusy, setRestoreBusy] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<TypeFilterKey>('all');
   const [typeBusy, setTypeBusy] = useState<string | null>(null);
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [followupOpen, setFollowupOpen] = useState(false);
+  const [followupFor, setFollowupFor] = useState<FollowupTarget | null>(null);
+  const [drawerRow, setDrawerRow] = useState<CrmCustomer | null>(null);
+  const [drawerReload, setDrawerReload] = useState(0);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -123,22 +132,79 @@ export function CrmCustomers() {
     ? rows
     : (rows as any[]).filter((r) => r.customer_primary_type === typeFilter);
 
-  function goToCustomer(name: string) {
-    navigate(`/business-assistant?customer=${encodeURIComponent(name)}`);
+  // GIA is the assistant for natural-language work ("记录今天和 ABC 的沟通" …); it is no longer the only way to do CRM work.
+  function openGia(name?: string) {
+    navigate(name ? `/business-assistant?customer=${encodeURIComponent(name)}` : '/business-assistant');
+  }
+
+  function flash(text: string) {
+    setNotice(text);
+    setTimeout(() => setNotice((n) => (n === text ? null : n)), 3500);
+  }
+
+  function openFollowup(target: FollowupTarget | null) {
+    setFollowupFor(target);
+    setFollowupOpen(true);
+  }
+
+  /** replace one row in the current list with the saved customer (keeps the joined contacts) */
+  function patchRow(saved: CrmCustomer) {
+    setRows((prev) => (prev as any[]).map((r) => (r.id === saved.id ? { ...r, ...saved, crm_contacts: r.crm_contacts } : r)));
+  }
+
+  async function handleStage(id: string, value: string) {
+    if (!value) return;
+    setRowBusy(id); setActionError(null);
+    const res = await updateCustomerStage(id, value);
+    setRowBusy(null);
+    if (!res.ok) { setActionError(res.error); return; }
+    patchRow(res.customer);
+  }
+
+  async function handleNextDate(id: string, value: string) {
+    setRowBusy(id); setActionError(null);
+    const res = await updateCustomerNextFollowUp(id, value || null);
+    setRowBusy(null);
+    if (!res.ok) { setActionError(res.error); return; }
+    // in the 今日/逾期 views a changed date can move the customer out of the list, so reload those
+    if (view === 'today' || view === 'overdue') load(); else patchRow(res.customer);
   }
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto', padding: '28px 28px 40px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18, flexWrap: 'wrap' }}>
         <button
           onClick={() => navigate('/')}
           style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 13, cursor: 'pointer' }}
         >
           ← 返回
         </button>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: TEXT, margin: 0, fontFamily: "'Space Grotesk',sans-serif" }}>
-          客户与项目 · Supabase CRM
-        </h1>
+        <div style={{ minWidth: 0 }}>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: TEXT, margin: 0, fontFamily: "'Space Grotesk',sans-serif" }}>
+            客户与项目 CRM 工作台
+          </h1>
+          <div style={{ fontSize: 11.5, color: MUTED, marginTop: 3 }}>正式客户库 · 客户 / 联系人 / 跟进 / 项目</div>
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setCreateOpen(true)}
+            style={{ padding: '9px 16px', borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#E2C988)`, border: 'none', color: '#080D1E' }}
+          >
+            + 新增客户
+          </button>
+          <button
+            onClick={() => openFollowup(null)}
+            style={{ padding: '9px 16px', borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', background: 'rgba(203,168,92,0.14)', border: `1px solid ${GOLD}`, color: GOLD }}
+          >
+            + 记录跟进
+          </button>
+          <button
+            onClick={() => openGia()}
+            style={{ padding: '9px 16px', borderRadius: 9, fontSize: 12.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: MUTED }}
+          >
+            GIA 智能助手
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
@@ -159,9 +225,12 @@ export function CrmCustomers() {
         ))}
       </div>
 
-      <div style={{ fontSize: 12, color: MUTED, marginBottom: 18 }}>
-        新建客户或记录跟进请使用 GIA（Business Assistant）——这里是查看/轻量管理入口。
-      </div>
+      {notice && (
+        <div role="status" style={{ marginBottom: 14, padding: '9px 14px', borderRadius: 9, background: 'rgba(111,191,142,0.12)', border: '1px solid rgba(111,191,142,0.35)', color: GREEN, fontSize: 12.5 }}>{notice}</div>
+      )}
+      {actionError && (
+        <div role="alert" style={{ marginBottom: 14, padding: '9px 14px', borderRadius: 9, background: 'rgba(224,132,106,0.1)', border: '1px solid rgba(224,132,106,0.35)', color: RED, fontSize: 12.5 }}>{actionError}</div>
+      )}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
         {VIEWS.map((v) => (
@@ -209,11 +278,11 @@ export function CrmCustomers() {
       )}
 
       {!loading && !error && filteredRows.length > 0 && (
-        <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
-                {['客户/公司', '联系人', '国家', '业务线', '客户类型', '状态', '最近沟通', '下次跟进', 'Next Action', '负责人', ''].map((h) => (
+                {['客户/公司', '联系人', '国家', '业务线', '客户类型', '阶段', '最近沟通', '下次跟进', 'Next Action', '负责人', '操作'].map((h) => (
                   <th key={h} style={{ textAlign: 'left', padding: '10px 14px', color: GOLD, fontWeight: 700, fontSize: 10.5, letterSpacing: '0.04em', borderBottom: `1px solid ${BORD}` }}>{h}</th>
                 ))}
               </tr>
@@ -222,7 +291,7 @@ export function CrmCustomers() {
               {filteredRows.map((r: any) => (
                 <tr
                   key={r.id}
-                  onClick={() => goToCustomer(r.customer_name)}
+                  onClick={() => setDrawerRow(r)}
                   style={{ cursor: 'pointer', borderBottom: `1px solid ${BORD}` }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
@@ -249,14 +318,50 @@ export function CrmCustomers() {
                       <option value="services">{PRIMARY_TYPE_LABEL.services}</option>
                     </select>
                   </td>
-                  <td style={{ padding: '10px 14px', color: MUTED }}>{r.status || '—'}</td>
+                  <td style={{ padding: '10px 14px' }} onClick={(e) => e.stopPropagation()}>
+                    <select
+                      aria-label="修改客户阶段"
+                      value={r.status || ''}
+                      disabled={rowBusy === r.id || view === 'archived'}
+                      onChange={(e) => handleStage(r.id, e.target.value)}
+                      style={{ padding: '4px 8px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: r.status ? TEXT : MUTED }}
+                    >
+                      {!r.status && <option value="">—</option>}
+                      {(r.status && !CRM_STAGES.includes(r.status) ? [r.status, ...CRM_STAGES] : CRM_STAGES).map((s: string) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </td>
                   <td style={{ padding: '10px 14px', color: MUTED }}>{fmtDate(r.last_follow_up_at)}</td>
-                  <td style={{ padding: '10px 14px', color: view === 'overdue' ? RED : MUTED }}>
-                    {fmtDate(r.next_follow_up_at)}{view === 'overdue' && r.overdueDays ? ` (逾期${r.overdueDays}天)` : ''}
+                  <td style={{ padding: '10px 14px', color: view === 'overdue' ? RED : MUTED, whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
+                    <input
+                      aria-label="修改下次跟进日期"
+                      type="date"
+                      value={r.next_follow_up_at || ''}
+                      min={crmDate(1)}
+                      disabled={rowBusy === r.id || view === 'archived'}
+                      onChange={(e) => handleNextDate(r.id, e.target.value)}
+                      style={{ padding: '3px 6px', borderRadius: 7, fontSize: 11.5, background: 'rgba(255,255,255,0.04)', border: `1px solid ${view === 'overdue' ? RED : BORD}`, color: view === 'overdue' ? RED : MUTED, colorScheme: 'dark' }}
+                    />
+                    {view === 'overdue' && r.overdueDays ? <span style={{ marginLeft: 6, fontSize: 11 }}>逾期{r.overdueDays}天</span> : null}
                   </td>
                   <td style={{ padding: '10px 14px', color: MUTED, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.next_action || '—'}</td>
                   <td style={{ padding: '10px 14px', color: MUTED }}>{r.owner || '—'}</td>
-                  <td style={{ padding: '10px 14px' }}>
+                  <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
+                    {view !== 'archived' && (
+                      <>
+                        <button
+                          onClick={() => setDrawerRow(r)}
+                          style={{ padding: '4px 10px', borderRadius: 7, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT, marginRight: 6 }}
+                        >
+                          详情
+                        </button>
+                        <button
+                          onClick={() => openFollowup({ id: r.id, customer_name: r.customer_name })}
+                          style={{ padding: '4px 10px', borderRadius: 7, fontSize: 11, cursor: 'pointer', background: 'rgba(203,168,92,0.12)', border: `1px solid ${GOLD}`, color: GOLD }}
+                        >
+                          + 跟进
+                        </button>
+                      </>
+                    )}
                     {view === 'archived' && (
                       <button
                         disabled={restoreBusy === r.id}
@@ -273,6 +378,47 @@ export function CrmCustomers() {
           </table>
         </div>
       )}
+
+      <CustomerCreateModal
+        open={createOpen}
+        extended
+        onClose={() => setCreateOpen(false)}
+        onCreated={(c) => {
+          setCreateOpen(false);
+          flash(`已新增客户「${c.customer_name}」`);
+          if (view !== 'directory') setView('directory'); else load();
+        }}
+        onUseExisting={(existing) => {
+          setCreateOpen(false);
+          setDrawerRow(existing);
+        }}
+      />
+
+      <CrmFollowupModal
+        open={followupOpen}
+        customer={followupFor}
+        onClose={() => setFollowupOpen(false)}
+        onSaved={(customerId) => {
+          setFollowupOpen(false);
+          flash('跟进已保存');
+          load();
+          setDrawerReload((n) => n + 1);
+          // keep an open detail panel in sync with the customer's new last/next follow-up
+          if (drawerRow && drawerRow.id === customerId) {
+            const fresh = (rows as any[]).find((r) => r.id === customerId);
+            if (fresh) setDrawerRow(fresh);
+          }
+        }}
+      />
+
+      <CrmCustomerDrawer
+        customer={drawerRow}
+        reloadKey={drawerReload}
+        onClose={() => setDrawerRow(null)}
+        onChanged={(saved) => { patchRow(saved); if (view === 'today' || view === 'overdue') load(); }}
+        onAddFollowup={(c) => openFollowup({ id: c.id, customer_name: c.customer_name })}
+        onOpenGia={(c) => openGia(c.customer_name)}
+      />
     </div>
   );
 }
