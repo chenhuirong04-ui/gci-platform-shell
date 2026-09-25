@@ -334,6 +334,9 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   const _modeParam = (initialMode || _sidebarParams.get('mode')) as QuoteAppMode | null;
   const _startMode = _modeParam && _validModes.includes(_modeParam) ? _modeParam : 'landing';
   const _startView = initialView || (_sidebarParams.get('view') === 'history' ? 'history' : 'configurator');
+  // ?sq=<supplier_quotes.id> (Suppliers → Quote History deep link): open the
+  // Supplier Quotes history tab with that quote highlighted.
+  const _focusSqId = _sidebarParams.get('sq');
   const [view, setView] = useState<'configurator' | 'history'>(_startView);
   // Top-level app mode — controls homepage entry point
   const [appMode, setAppMode] = useState<QuoteAppMode>(_startMode);
@@ -445,7 +448,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   const [cloudHistory, setCloudHistory] = useState<QuotationRecord[]>([]);
   const [cloudHistoryLoading, setCloudHistoryLoading] = useState(false);
   // Supplier Quote Archive
-  const [historyTab, setHistoryTab] = useState<'supplier' | 'gci'>('gci');
+  const [historyTab, setHistoryTab] = useState<'supplier' | 'gci'>(_focusSqId ? 'supplier' : 'gci');
   const [supplierQuotes, setSupplierQuotes] = useState<SupplierQuote[]>([]);
   const [supplierQuotesLoading, setSupplierQuotesLoading] = useState(false);
   const [sqSaveStatus, setSqSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -742,6 +745,12 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       .catch(e => console.error('[Supplier Quotes] Load failed:', e))
       .finally(() => setSupplierQuotesLoading(false));
   }, [view]);
+
+  // Scroll the ?sq= deep-linked supplier quote into view once the list is loaded.
+  useEffect(() => {
+    if (!_focusSqId || view !== 'history' || historyTab !== 'supplier') return;
+    document.getElementById(`sq-row-${_focusSqId}`)?.scrollIntoView({ block: 'center' });
+  }, [supplierQuotes, view, historyTab]);
 
   const resetProject = () => {
     setSelectedScenario(null);
@@ -9591,7 +9600,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                           : sq.status === 'Archived' ? 'bg-slate-100 text-slate-500'
                           : 'bg-[#CBA85C]/15 text-[#A07C2D]';
                         return (
-                          <div key={sq.id} className="p-5 bg-white border border-[#080D1E]/8 rounded-[24px] flex items-center gap-5 hover:border-[#CBA85C]/40 transition-all group">
+                          <div key={sq.id} id={`sq-row-${sq.id}`} className={`p-5 bg-white border rounded-[24px] flex items-center gap-5 hover:border-[#CBA85C]/40 transition-all group ${sq.id === _focusSqId ? 'border-[#CBA85C] ring-2 ring-[#CBA85C]/40' : 'border-[#080D1E]/8'}`}>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
                                 <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${statusColor}`}>{sq.status}</span>

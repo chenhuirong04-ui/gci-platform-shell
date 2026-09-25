@@ -499,11 +499,11 @@ export const zh: typeof en = {
       catDesign: '设计', catAgent: '代理', catOther: '其他',
     },
     quotes: {
-      subtitle: '来自 Trade 模块与该供应商关联的报价记录',
+      subtitle: '报价模块中与该供应商关联的供应商报价（点击行可打开）',
       upload: '+ 上传供应商报价',
       empty: '暂无关联报价记录',
       uploadCta: '前往上传供应商报价',
-      colNumber: '报价单号', colSubject: '主题', colStatus: '状态', colAmount: '金额',
+      colNumber: '报价单号', colSubject: '品类', colStatus: '状态', colAmount: '金额',
       colValidUntil: '有效期', colMatch: '匹配状态', colDate: '日期',
       matchMatched: '已匹配', matchSkipped: '已跳过', matchPending: '待确认',
     },

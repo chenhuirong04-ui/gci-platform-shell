@@ -9,12 +9,13 @@ const BORDER = '#e2e8f0';
 const T2 = '#374151';
 const T3 = '#6b7280';
 
+// Column names as written by the Quotation module (modules/quotation/lib/supplierQuoteCloud.ts).
 interface QuoteRow {
   id: string;
-  quote_number?: string;
-  subject?: string;
+  supplier_quote_no?: string;
+  category?: string;
   status?: string;
-  total_amount?: number;
+  total_cost?: number;
   currency?: string;
   created_at?: string;
   valid_until?: string;
@@ -25,9 +26,9 @@ interface Props { supplierId: string; }
 
 export default function QuoteHistory({ supplierId }: Props) {
   const { dict } = useI18n();
-  // Upload goes into the Trade module — only offered with the trade module.
+  // Supplier quotes live in the Quotation module — upload/open are only offered with it.
   const { can } = useAuth();
-  const canTrade = can('trade');
+  const canQuotation = can('quotation');
   const t = dict.suppliers.quotes;
   const [quotes, setQuotes] = useState<QuoteRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,7 +38,7 @@ export default function QuoteHistory({ supplierId }: Props) {
       setLoading(true);
       const { data } = await supabase
         .from('supplier_quotes')
-        .select('id, quote_number, subject, status, total_amount, currency, created_at, valid_until, supplier_match_status')
+        .select('id, supplier_quote_no, category, status, total_cost, currency, created_at, valid_until, supplier_match_status')
         .eq('supplier_id', supplierId)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -53,15 +54,19 @@ export default function QuoteHistory({ supplierId }: Props) {
   };
 
   const handleUploadQuote = () => {
-    // Navigate to trade module supplier-quote tab with supplier pre-selected
-    window.location.href = `/trade?tab=quote&supplier_id=${supplierId}`;
+    window.location.href = '/quotation?mode=supplier-quote';
+  };
+
+  // Opens Quotation → History → Supplier Quotes with this quote highlighted.
+  const openQuote = (id: string) => {
+    window.location.href = `/quotation?view=history&sq=${encodeURIComponent(id)}`;
   };
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <span style={{ fontSize: 13, color: T2 }}>{t.subtitle}</span>
-        {canTrade && (
+        {canQuotation && (
         <button
           onClick={handleUploadQuote}
           style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
@@ -76,7 +81,7 @@ export default function QuoteHistory({ supplierId }: Props) {
       ) : quotes.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '48px 0' }}>
           <div style={{ color: T3, fontSize: 14, marginBottom: 12 }}>{t.empty}</div>
-          {canTrade && (
+          {canQuotation && (
           <button
             onClick={handleUploadQuote}
             style={{ padding: '9px 20px', background: GOLD, color: NAVY, border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
@@ -99,17 +104,18 @@ export default function QuoteHistory({ supplierId }: Props) {
               {quotes.map(q => {
                 const mb = matchBadge(q.supplier_match_status);
                 return (
-                  <tr key={q.id} style={{ borderBottom: `1px solid ${BORDER}` }}
+                  <tr key={q.id} style={{ borderBottom: `1px solid ${BORDER}`, cursor: canQuotation ? 'pointer' : undefined }}
+                    onClick={canQuotation ? () => openQuote(q.id) : undefined}
                     onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                     onMouseLeave={e => (e.currentTarget.style.background = '')}
                   >
-                    <td style={{ padding: '10px', color: NAVY, fontWeight: 600 }}>{q.quote_number ?? '—'}</td>
-                    <td style={{ padding: '10px', color: T2 }}>{q.subject ?? '—'}</td>
+                    <td style={{ padding: '10px', color: NAVY, fontWeight: 600 }}>{q.supplier_quote_no || '—'}</td>
+                    <td style={{ padding: '10px', color: T2 }}>{q.category || '—'}</td>
                     <td style={{ padding: '10px' }}>
                       <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 999, background: '#f1f5f9', color: T2, fontWeight: 600 }}>{q.status ?? '—'}</span>
                     </td>
                     <td style={{ padding: '10px', color: T2, fontWeight: 600 }}>
-                      {q.total_amount != null ? `${q.total_amount.toLocaleString()} ${q.currency ?? 'USD'}` : '—'}
+                      {q.total_cost != null ? `${q.total_cost.toLocaleString()} ${q.currency ?? 'USD'}` : '—'}
                     </td>
                     <td style={{ padding: '10px', color: T3 }}>{q.valid_until?.slice(0, 10) ?? '—'}</td>
                     <td style={{ padding: '10px' }}>

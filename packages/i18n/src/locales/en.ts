@@ -498,11 +498,11 @@ export const en = {
       catDesign: 'Design', catAgent: 'Agent', catOther: 'Other',
     },
     quotes: {
-      subtitle: 'Quote records linked to this supplier from the Trade module',
+      subtitle: 'Supplier quotes linked to this supplier in the Quotation module — click a row to open it',
       upload: '+ Upload Supplier Quote',
       empty: 'No linked quote records yet',
       uploadCta: 'Go Upload a Supplier Quote',
-      colNumber: 'Quote No.', colSubject: 'Subject', colStatus: 'Status', colAmount: 'Amount',
+      colNumber: 'Quote No.', colSubject: 'Category', colStatus: 'Status', colAmount: 'Amount',
       colValidUntil: 'Valid Until', colMatch: 'Match Status', colDate: 'Date',
       matchMatched: 'Matched', matchSkipped: 'Skipped', matchPending: 'Pending',
     },
