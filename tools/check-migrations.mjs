@@ -33,6 +33,8 @@ for (const f of modern) {
   for (const m of sql.matchAll(/\b(insert\s+into|delete\s+from|update)\s+(?:only\s+)?("?[a-z_][a-z0-9_]*"?(?:\."?[a-z_][a-z0-9_]*"?)?)/gi)) {
     const target = m[2].replace(/"/g, '');
     if (/^(update)$/i.test(m[1]) && /^set$/i.test(target)) continue;
+    // trigger event clause (CREATE TRIGGER … BEFORE UPDATE ON t / UPDATE OF col), not an UPDATE statement
+    if (/^(update)$/i.test(m[1]) && /^(on|of)$/i.test(target)) continue;
     if (!DML_ALLOWED.test(target)) errors.push(`${f}: ${m[1].toUpperCase()} on "${target}" — data changes are not allowed in migrations/ (move it to supabase/ops/data-fixes/)`);
   }
   // 2) rollback pair (baseline files are exempt: they are never rolled back, only re-generated)

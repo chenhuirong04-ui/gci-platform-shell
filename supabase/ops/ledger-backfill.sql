@@ -9,7 +9,12 @@ insert into ops.migration_ledger (version, name, kind, applied_at, applied_by, n
 
   -- Executed by Chris in the Supabase SQL Editor on 2026-09-19 (before the ledger existed). File is byte-identical to what was pasted (sha256[:16] a2f2c5a4a4deca9c).
   ('20260921000100', 'policy_storage_suppliers', 'policy', '2026-09-19 00:00:00+00', 'chris (SQL Editor)',
-   'Batch 2a file 07: storage.objects policies b2a_sup_select/insert/delete on suppliers-private/public. Verified in Production.')
+   'Batch 2a file 07: storage.objects policies b2a_sup_select/insert/delete on suppliers-private/public. Verified in Production.'),
+
+  -- Baseline: describes the 8 Quotation tables that already exist in Production. Registered WITHOUT executing it.
+  -- Generated from the read-only catalog snapshot of 2026-09-25; replay-tested on a scratch DB (schema identical to the snapshot).
+  ('20260920000040', 'baseline_40_quotation_bs', 'baseline', now(), 'chris',
+   'quotation_records/items, supplier_quotes/items, service_categories/catalog_items/quotes/quote_items. RLS/policies/grants recorded as-is (Security Audit SA-Q1..Q4).')
 
 on conflict (version) do nothing;
 
