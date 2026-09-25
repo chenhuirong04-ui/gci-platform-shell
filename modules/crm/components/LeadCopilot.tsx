@@ -4,7 +4,7 @@ import {
   Copy, Check, RefreshCw, ChevronDown, ChevronUp, ShieldAlert
 } from 'lucide-react';
 import { FollowUpTask } from '../types';
-import { GoogleGenAI } from '@google/genai';
+import { geminiProxy } from '../../../apps/shell/src/lib/geminiProxy';
 
 const GOLD = '#B8960C';
 const NAVY = '#0F172A';
@@ -33,10 +33,6 @@ function addDays(iso: string, n: number): string {
   const d = new Date(iso);
   d.setDate(d.getDate() + n);
   return d.toISOString().slice(0, 10);
-}
-
-function getApiKey(): string {
-  return (import.meta as any).env?.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
 }
 
 // ── Rule Engine ───────────────────────────────────────────────────────────────
@@ -231,15 +227,10 @@ export default function LeadCopilot({ task }: Props) {
   const [copied, setCopied] = useState(false);
 
   const generateWA = async () => {
-    const apiKey = getApiKey();
-    if (!apiKey) {
-      setWaError('未配置 GEMINI_API_KEY，无法生成草稿');
-      return;
-    }
     setWaLoading(true);
     setWaError('');
     try {
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = geminiProxy;
       const res = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: [{ role: 'user', parts: [{ text: buildWAPrompt(task, analysis) }] }],

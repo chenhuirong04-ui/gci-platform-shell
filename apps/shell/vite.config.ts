@@ -6,7 +6,6 @@ import path from 'path'
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, path.resolve(__dirname, '../..'), '')
-  const geminiKey = env.GEMINI_API_KEY || env.VITE_API_KEY || ''
   const claudeKey = env.CLAUDE_API_KEY || ''
 
   return {
@@ -20,12 +19,10 @@ export default defineConfig(({ mode }) => {
         '@gci/module-quotation': path.resolve(__dirname, '../../modules/quotation'),
       },
     },
-    // Trade/CRM modules' services read these process.env vars as fallbacks
-    // (geminiService.ts in both, claudeService.ts in CRM) — same defines
-    // each used standalone, kept for parity during migration.
+    // Gemini is NOT injected: all Gemini calls go through the server-side
+    // /api/ai/gemini-generate proxy (apps/shell/src/lib/geminiProxy.ts).
+    // CRM's claudeService.ts still reads CLAUDE_API_KEY in the browser.
     define: {
-      'process.env.API_KEY': JSON.stringify(geminiKey),
-      'process.env.GEMINI_API_KEY': JSON.stringify(geminiKey),
       'process.env.CLAUDE_API_KEY': JSON.stringify(claudeKey),
     },
     server: {

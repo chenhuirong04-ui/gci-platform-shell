@@ -57,7 +57,8 @@ import {
   ShoppingCart,
   FileSearch
 } from 'lucide-react';
-import { GoogleGenAI, Type } from "@google/genai";
+// Gemini runs server-side via /api/ai/gemini-generate (key never in the browser).
+import { geminiProxy, SchemaType as Type } from '../../apps/shell/src/lib/geminiProxy';
 
 /** Single Gemini model used for ALL AI analysis (text / image / PDF / classification). */
 const GEMINI_MODEL = "gemini-2.5-flash";
@@ -5045,11 +5046,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       const base64 = await fileToBase64(file);
       console.log('[PDF] Step 2 base64 length:', base64.length, '| first 40 chars:', base64.slice(0, 40));
 
-      // ── Step 3: API key ───────────────────────────────────────────────
-      const apiKey = process.env.GEMINI_API_KEY || '';
-      console.log('[PDF] Step 3 API key present:', apiKey.length > 0, '| key prefix:', apiKey.slice(0, 8));
-
-      const ai = new GoogleGenAI({ apiKey });
+      // ── Step 3: AI client (server-side proxy) ─────────────────────────
+      const ai = geminiProxy;
 
       const prompt = `Analyze this supplier quote PDF (it may be in Chinese or English). Separate into:
 1. PRODUCT ITEMS — read every detail available for each item, including any text visible in embedded images (model numbers, dimensions, material callouts).
@@ -5250,15 +5248,12 @@ Leave a field as empty string if not present. Never fabricate values.`;
     const entries = Object.entries(byRow).map(([rowIdxStr, dataUrl]) => ({ rowIdx: Number(rowIdxStr), dataUrl }));
     if (entries.length === 0) return;
 
-    const apiKey = process.env.GEMINI_API_KEY || '';
-    if (!apiKey) { console.warn('[ocrAndMergeExcelImages] No Gemini API key — skipping OCR, images still shown as thumbnails.'); return; }
-
     const capped = entries.slice(0, MAX_OCR_IMAGES);
     if (entries.length > MAX_OCR_IMAGES) {
       console.warn(`[ocrAndMergeExcelImages] ${entries.length} embedded images found, OCR-ing first ${MAX_OCR_IMAGES} only.`);
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = geminiProxy;
     const imageParts = capped.map(e => {
       const m = e.dataUrl.match(/^data:([^;]+);base64,(.+)$/);
       return { inlineData: { mimeType: m?.[1] || 'image/png', data: m?.[2] || '' } };
@@ -5701,7 +5696,7 @@ Set "productDetected":false if the photo is a logo, blank, or has no identifiabl
     setIsProcessingAI(true);
     try {
       const base64 = await fileToBase64(file);
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+      const ai = geminiProxy;
       
       const prompt = `
         Analyze this supplier quote / requirement image. It may be a WeChat screenshot, phone photo, Excel screenshot, or scanned PDF page, in Chinese or English.
@@ -5820,8 +5815,7 @@ Set "productDetected":false if the photo is a logo, blank, or has no identifiabl
         } catch { /* skip unreadable media */ }
       }
 
-      const apiKey = process.env.GEMINI_API_KEY || '';
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = geminiProxy;
 
       const prompt = `Analyze this supplier quote extracted from a Word document (Chinese or English). The text below was flattened from a Word table/paragraphs — " | " separates cells in the same row.
 ${imageParts.length > 0 ? `${imageParts.length} photo(s) embedded in the document are attached after this text — use them for extra detail (model numbers, appearance, labels) where relevant, cross-referencing by context.` : ''}
@@ -5895,7 +5889,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
     
     setIsProcessingAI(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+      const ai = geminiProxy;
       const prompt = `
         Analyze this supplier quote / requirement text.
         Separate the content into TWO categories:
@@ -5982,12 +5976,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
     }
 
     try {
-      const apiKey = process.env.GEMINI_API_KEY || '';
-      if (!apiKey) {
-        throw new Error('Gemini API Key is not configured. Please check your environment.');
-      }
-
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = geminiProxy;
       
       const itemDescriptions = items.map(it => `[Item: ${it.originalName}, Spec: ${it.originalSpec}]`).join('\n');
       

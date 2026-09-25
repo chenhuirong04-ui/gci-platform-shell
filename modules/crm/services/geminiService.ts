@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { geminiProxy } from '../../../apps/shell/src/lib/geminiProxy';
 import { CMOResponse, FollowUpTask, AIInsights, Attachment } from "../types";
 
 const SYSTEM_INSTRUCTION = `
@@ -27,28 +27,12 @@ const SYSTEM_INSTRUCTION = `
 }
 `;
 
-function getApiKey(): string {
-  // 优先用 VITE_ 前缀变量（Vite 原生保证注入，兼容 Vercel）
-  // 其次兜底 process.env（本地开发 .env.local 仍可用旧 key 名）
-  const key =
-    (import.meta as any).env?.VITE_GEMINI_API_KEY ||
-    process.env.GEMINI_API_KEY ||
-    process.env.API_KEY ||
-    "";
-  if (!key || key === "undefined" || key.trim() === "") {
-    throw new Error(
-      "GEMINI_API_KEY 未配置。请在 Vercel 环境变量里添加 VITE_GEMINI_API_KEY。"
-    );
-  }
-  return key;
-}
-
 export const generateTaskContent = async (
   task: Partial<FollowUpTask>,
   correction?: string
 ): Promise<CMOResponse> => {
 
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const ai = geminiProxy;
 
   const promptText = `
 立场: ${task.myRole}
@@ -176,7 +160,7 @@ export const extractFormDataFromAttachments = async (
   attachments: Attachment[]
 ): Promise<ExtractedFormData> => {
 
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const ai = geminiProxy;
 
   const imageAttachments = attachments.filter((att) => att.type.startsWith("image/"));
 
@@ -287,7 +271,7 @@ A client can appear in multiple categories. Keep each list to max 8 entries.
 export const generateOperationsBrief = async (
   tasks: FollowUpTask[]
 ): Promise<OperationsBrief> => {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const ai = geminiProxy;
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -371,7 +355,7 @@ JSON format:
 `.trim();
 
 export const extractFBInquiry = async (chatText: string): Promise<FBInquiryResult> => {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const ai = geminiProxy;
 
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
@@ -457,7 +441,7 @@ The closing message must:
 export const generateSalesCloser = async (
   task: Partial<FollowUpTask>
 ): Promise<SalesCloserResult> => {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const ai = geminiProxy;
 
   // Detect missing fields from task data
   const missingFields: MissingField[] = [

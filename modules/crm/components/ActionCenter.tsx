@@ -9,7 +9,7 @@ import { colors, statusMap, type StatusKey, Card, Badge, SectionHeader } from '@
 import { useI18n } from '@gci/i18n';
 import { FollowUpTask, Project } from '../types';
 import { getTaskBusinessId } from '../utils/businessId';
-import { GoogleGenAI } from '@google/genai';
+import { geminiProxy } from '../../../apps/shell/src/lib/geminiProxy';
 
 // All colors in this file now resolve through the design-system's centralized
 // statusMap/colors — no raw hex for status semantics. The 5 action-priority
@@ -67,10 +67,6 @@ function calcDaysOverdue(nextFollowUpAt: string | undefined): number {
   const a = new Date(nextFollowUpAt.slice(0, 10)).getTime();
   const b = new Date(today).getTime();
   return Math.round((b - a) / 86400000);
-}
-
-function getGeminiKey(): string {
-  return (import.meta as any).env?.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
 }
 
 // Display-layer mapping for the raw tradeStatus enum value (Notion 行动状态).
@@ -384,11 +380,9 @@ function WAModal({ item, onClose }: { item: ActionItem; onClose: () => void }) {
   const [copied, setCopied]   = useState(false);
 
   const generate = async () => {
-    const key = getGeminiKey();
-    if (!key) { setError('未配置 GEMINI API KEY'); return; }
     setLoading(true); setError('');
     try {
-      const ai = new GoogleGenAI({ apiKey: key });
+      const ai = geminiProxy;
       const res = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: [{ role: 'user', parts: [{ text: buildWAPrompt(item) }] }],

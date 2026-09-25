@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { geminiProxy, SchemaType as Type } from '../../../apps/shell/src/lib/geminiProxy';
 
 /**
  * Key fixes required by Chris:
@@ -69,27 +69,8 @@ const EXTRACTION_SCHEMA = {
   required: ["customer", "items"],
 } as const;
 
-/**
- * IMPORTANT for Vite:
- * - Frontend env vars should be VITE_*
- * - We support both VITE_API_KEY and API_KEY for compatibility
- */
-function getApiKey(): string {
-  const viteKey =
-    (import.meta as any)?.env?.VITE_API_KEY ||
-    (import.meta as any)?.env?.VITE_GEMINI_API_KEY ||
-    (import.meta as any)?.env?.VITE_GOOGLE_API_KEY;
-
-  const nodeKey = (process as any)?.env?.API_KEY;
-
-  const key = (viteKey || nodeKey || "").trim();
-  if (!key) throw new Error("API Key is missing. Please set VITE_API_KEY (recommended) or API_KEY.");
-  return key;
-}
-
 export const generateInvoiceFromText = async (text: string): Promise<string> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = geminiProxy;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -107,8 +88,7 @@ export const generateInvoiceFromText = async (text: string): Promise<string> => 
 export const extractItemsFromChat = async (
   text: string
 ): Promise<{ customer: string; items: { desc: string; price: number; qty: number }[] }> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = geminiProxy;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -126,8 +106,7 @@ export const parseFinancialDocument = async (
   imageBase64: string,
   mimeType: string
 ): Promise<{ amount: number; date: string; note: string; type: "in" | "out" }> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = geminiProxy;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",

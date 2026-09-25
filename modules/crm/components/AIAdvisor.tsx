@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Brain, AlertTriangle, Zap, Clock, ChevronRight, MessageSquare, X, Copy, Check } from 'lucide-react';
 import { FollowUpTask, Project } from '../types';
-import { GoogleGenAI } from '@google/genai';
+import { geminiProxy } from '../../../apps/shell/src/lib/geminiProxy';
 
 const GOLD = '#B8960C';
 const NAVY = '#0F172A';
@@ -30,10 +30,6 @@ function daysBetween(dateA: string, dateB: string): number {
   const a = new Date(dateA).getTime();
   const b = new Date(dateB).getTime();
   return Math.round((b - a) / (1000 * 60 * 60 * 24));
-}
-
-function getApiKey(): string {
-  return (import.meta as any).env?.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
 }
 
 function computeRisks(tasks: FollowUpTask[], todayISO: string): RiskItem[] {
@@ -187,15 +183,10 @@ function WhatsAppDraftModal({ task, project, onClose }: WhatsAppDraftModalProps)
   const [copied, setCopied] = useState(false);
 
   const generate = async () => {
-    const apiKey = getApiKey();
-    if (!apiKey) {
-      setError('未配置 GEMINI API KEY，无法生成草稿');
-      return;
-    }
     setLoading(true);
     setError('');
     try {
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = geminiProxy;
       const prompt = buildWhatsAppPrompt(task, project);
       const res = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
