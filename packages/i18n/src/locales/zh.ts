@@ -24,6 +24,7 @@ export const zh: typeof en = {
     quotationCenter: '报价中心',
     serviceQuote: '服务报价',
     businessSolutions: '企业解决方案',
+    knowledgeRules: '知识与规则',
     quoteHistory: '报价历史',
     inventory: '库存',
     consignment: '寄售',

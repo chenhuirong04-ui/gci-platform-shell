@@ -22,6 +22,7 @@ export const en = {
     quotationCenter: 'Quotation Center',
     serviceQuote: 'Service Quote',
     businessSolutions: 'Business Solutions',
+    knowledgeRules: 'Knowledge & Rules',
     quoteHistory: 'Quote History',
     inventory: 'Inventory',
     consignment: 'Consignment',

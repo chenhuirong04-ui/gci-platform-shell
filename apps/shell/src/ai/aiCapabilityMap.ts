@@ -322,6 +322,27 @@ export const AI_CAPABILITY_MAP: AIIntent[] = [
     fallbackBehavior: '显示"部分接入"提示，附直接链接到 /trade?tab=quote。',
   },
 
+  // ── 13b. Knowledge Search (search_knowledge) ──────────────────────────────
+  // Routed by the KNOWLEDGE_RE pre-check in AIPage (not by keywords here).
+  {
+    intentId: 'search_knowledge',
+    intentNameZh: '知识检索',
+    intentNameEn: 'Knowledge Search',
+    category: 'query',
+    triggerKeywordsZh: [],
+    triggerKeywordsEn: [],
+    targetTab: 'chat',
+    targetModule: 'Knowledge & Rules',
+    targetRoute: '/business-solutions/knowledge',
+    readSources: ['knowledge_rules', 'knowledge_items', 'knowledge_activities (knowledge_search RPC, RLS-scoped)'],
+    writeTargets: [],
+    requiredFields: [],
+    approvalRequired: false,
+    resultPanel: 'KnowledgeSearchResult',
+    implementationStatus: 'real',
+    fallbackBehavior: '无命中时回答「知识库中暂未找到可确认的条目。」；PENDING 条目标注「该条目尚未完成复核。」',
+  },
+
   // ── 13. Supplier Text Search ──────────────────────────────────────────────
   {
     intentId: 'search_suppliers_text',

@@ -16,6 +16,7 @@ export interface ModuleDef {
     | 'quotationCenter'
     | 'serviceQuote'
     | 'businessSolutions'
+    | 'knowledgeRules'
     | 'quoteHistory'
     | 'inventory'
     | 'consignment'
@@ -35,6 +36,10 @@ export interface ModuleDef {
   badgeBg?: string;
   /** Internal SPA route. Items without a path fall back to a "coming soon" toast. */
   path?: string;
+  /** Optional: only show this entry to users holding one of these modules (or Admin, if adminSees).
+   * Entries without it are always shown, as before. Data access is still decided by RLS. */
+  modules?: string[];
+  adminSees?: boolean;
 }
 
 export interface SectionDef {
@@ -156,6 +161,9 @@ export const sections: SectionDef[] = [
     labelKey: 'businessServicesSection',
     items: [
       { code: 'BS', nameKey: 'businessSolutions', path: '/business-solutions' },
+      // Knowledge & Rules (migrated Knowledge Hub) — part of Enterprise Services, not its own section.
+      { code: 'KR', nameKey: 'knowledgeRules', path: '/business-solutions/knowledge',
+        modules: ['knowledge_public', 'knowledge', 'knowledge_confidential'], adminSees: true },
     ],
   },
   {

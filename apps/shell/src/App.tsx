@@ -18,6 +18,7 @@ import { Decisions } from './pages/Decisions';
 import { Commitments } from './pages/Commitments';
 import { Tasks } from './pages/Tasks';
 import { CompanyDocuments } from './pages/CompanyDocuments';
+import KnowledgePage from './pages/KnowledgePage';
 import { Settings } from './pages/Settings';
 import { BusinessAssistant } from './pages/BusinessAssistant';
 import { CrmCustomers } from './pages/CrmCustomers';
@@ -58,7 +59,7 @@ function Shell() {
     setMobileNavOpen(false);
   }, [location.pathname]);
 
-  const { loading, session, profile, signOut, error: authError, retry: retryAuth } = useAuth();
+  const { loading, session, profile, signOut, error: authError, retry: retryAuth, can } = useAuth();
 
   const flash = (msg: string) => {
     setToast(msg);
@@ -70,7 +71,9 @@ function Shell() {
     () =>
       sectionDefs.map((section) => ({
         label: dict.nav[section.labelKey],
-        items: section.items.map((m) => ({
+        items: section.items
+          .filter((m) => !m.modules || m.modules.some((k) => can(k)) || (m.adminSees && profile?.role_label === 'Admin'))
+          .map((m) => ({
           code: m.code,
           name: dict.nav[m.nameKey],
           count: m.count,
@@ -83,7 +86,7 @@ function Shell() {
             : () => flash(dict.toast.enterModule(dict.nav[m.nameKey])),
         })),
       })),
-    [dict, currentUrl, navigate],
+    [dict, currentUrl, navigate, can, profile],
   );
 
   const dateLine = new Date()
@@ -218,6 +221,14 @@ function Shell() {
             element={
               <ProtectedRoute module={['trade', 'quotation', 'crm']}>
                 <SuppliersModule />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/business-solutions/knowledge"
+            element={
+              <ProtectedRoute module={['knowledge_public', 'knowledge', 'knowledge_confidential']} allowAdmin>
+                <KnowledgePage />
               </ProtectedRoute>
             }
           />

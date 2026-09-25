@@ -7,11 +7,13 @@ interface Props {
   /** One or more module keys — access is granted if the user has ANY of them.
    * e.g. module="trade" or module={['trade','finance','warehouse']} */
   module: string | string[];
+  /** Also let role_label 'Admin' in without holding the module (default false). */
+  allowAdmin?: boolean;
   children: ReactNode;
 }
 
-export function ProtectedRoute({ module, children }: Props) {
-  const { loading, session, can, error, retry, profileLoading } = useAuth();
+export function ProtectedRoute({ module, allowAdmin = false, children }: Props) {
+  const { loading, session, can, error, retry, profileLoading, profile } = useAuth();
 
   // Task 16.1 — same black-screen fix as App.tsx: a visible state instead
   // of `return null` while the session restore is in flight or failed.
@@ -26,7 +28,7 @@ export function ProtectedRoute({ module, children }: Props) {
   if (profileLoading) return <StartupLoading />;
 
   const keys = Array.isArray(module) ? module : [module];
-  const allowed = keys.some(k => can(k));
+  const allowed = keys.some(k => can(k)) || (allowAdmin && profile?.role_label === 'Admin');
   if (!allowed) return <Navigate to="/access-denied" replace />;
 
   return <>{children}</>;

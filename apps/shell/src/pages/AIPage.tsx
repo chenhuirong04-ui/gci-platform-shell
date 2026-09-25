@@ -11,6 +11,9 @@ import type { AIIntentMatch } from '../ai/aiRouter';
 import { CrmBriefSection, CrmCustomerSection } from '../ai/CrmResultSections';
 import SupplierSearchResult from '../ai/suppliers/SupplierSearchResult';
 import { searchSuppliers } from '../ai/suppliers/supplierSearchClient';
+import KnowledgeSearchResult from '../ai/knowledge/KnowledgeSearchResult';
+import { searchKnowledgeForQuestion, KNOWLEDGE_MODULES } from '../lib/knowledge';
+import { useAuth } from '../contexts/AuthContext';
 import { getTodaysFollowups, findCustomerByName, logFollowup, createCustomerWithContact } from '../lib/crmSupabase';
 import { parseQueryCustomerCommand, parseLogFollowupCommand, parseCreateCrmCustomerCommand } from '../ai/crmAskGciParsers';
 import { getSystemRegistry } from '../lib/systemRegistry';
@@ -1811,6 +1814,20 @@ function CommandPanel({ state, onApprove, onEdit, onCancel, setCmdState }: {
             </div>
           )}
 
+          {/* ── Knowledge Search Result (search_knowledge) ── */}
+          {intent.intentId === 'search_knowledge' && state.resultData?.ok && (
+            <KnowledgeSearchResult data={state.resultData} onClose={onCancel} />
+          )}
+          {intent.intentId === 'search_knowledge' && !state.resultData && (
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>正在检索知识库…</div>
+          )}
+          {intent.intentId === 'search_knowledge' && state.resultData && !state.resultData.ok && (
+            <div style={{ fontSize: 13, color: '#E0846A', marginBottom: 12, padding: '10px 12px', background: 'rgba(224,132,106,0.06)', border: '1px solid rgba(224,132,106,0.2)', borderRadius: 8 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>知识检索失败</div>
+              <div style={{ color: MUTED, fontSize: 12 }}>{state.resultData.error || '未知错误'}</div>
+            </div>
+          )}
+
           {/* ── Supplier Search Result ── */}
           {intent.intentId === 'search_suppliers_text' && state.resultData?.ok && (
             <SupplierSearchResult
@@ -3542,6 +3559,7 @@ export function AIPage() {
   const [billingProfileMode, setBillingProfileMode] = useState(false);
   const [billingProfileInitialText, setBillingProfileInitialText] = useState('');
   const runner = useStepRunner();
+  const { can: canModule, profile: authProfile } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const { dict } = useI18n();
 
@@ -3591,6 +3609,56 @@ export function AIPage() {
       setTab('assistant');
       setCmdState(null);
       setInvoiceMode(true);
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+      return;
+    }
+
+    // Knowledge search (search_knowledge) — UAE setup / licence / activities / tax / customs / compliance / visa questions.
+    // Runs before the CRM / product / sales pre-checks (their "多少钱" / "sales" patterns would otherwise catch these).
+    // Answers only from knowledge_search() (RLS-scoped); no web, no LLM. Quote / customer / stock / payment wording is left
+    // to the existing intents.
+    const KNOWLEDGE_RE = /golden\s*visa|黄金签证|green\s*visa|work\s*permit|工作许可|签证|\bvisas?\b|劳工|\blabou?r\b|mohre|emirates\s*id|居留|增值税|\bvat\b|corporate\s*tax|企业所得税|公司税|海关|customs|hs\s*code|产品合规|free\s*zone|freezone|自贸区|自由区|mainland|大陆公司|\bifza\b|expo\s*city|\bdmcc\b|\bjafza\b|经营活动|经营范围|activity\s*code|活动代码|营业执照|执照|licen[cs]e|公司注册|注册公司|设立公司|company\s*(?:setup|formation)|^\s*\d{4}(?:\.\d{1,4})?\s*$/i;
+    const NOT_KNOWLEDGE_RE = /报价|quot(?:e|ation)|客户|跟进|库存|stock|inventory|付款|应收|收款|订单|order/i;
+    if (KNOWLEDGE_RE.test(t) && !NOT_KNOWLEDGE_RE.test(t)) {
+      const knowledgeMatch: AIIntentMatch = {
+        intent: {
+          intentId: 'search_knowledge',
+          intentNameZh: '知识检索',
+          intentNameEn: 'Knowledge Search',
+          category: 'query',
+          triggerKeywordsZh: [],
+          triggerKeywordsEn: [],
+          targetTab: 'chat',
+          targetModule: 'Knowledge & Rules',
+          targetRoute: '/business-solutions/knowledge',
+          readSources: ['knowledge_rules', 'knowledge_items', 'knowledge_activities'],
+          writeTargets: [],
+          requiredFields: [],
+          approvalRequired: false,
+          resultPanel: 'KnowledgeSearchResult',
+          implementationStatus: 'real',
+          fallbackBehavior: '',
+        },
+        confidence: 1,
+        raw: raw.trim(),
+        detectedMissingFields: [],
+      };
+      const noAccess = !KNOWLEDGE_MODULES.some((k) => canModule(k)) && authProfile?.role_label !== 'Admin';
+      setTab('chat');
+      setCmdState({ raw: raw.trim(), match: knowledgeMatch, phase: 'processing', step: 0 });
+      runner.run(
+        ['正在识别问题…', '正在提取关键词…', '正在检索知识库…', '正在核对复核状态…'],
+        (i) => setCmdState(prev => prev ? { ...prev, step: i } : prev),
+        () => {
+          setCmdState(prev => prev ? { ...prev, phase: 'done' } : prev);
+          searchKnowledgeForQuestion(raw.trim())
+            .then(({ terms, hits }) => setCmdState(prev => prev ? { ...prev, resultData: { ok: true, question: raw.trim(), terms, hits, noAccess } } : prev))
+            .catch(e => {
+              console.error('[search_knowledge] failed', e);
+              setCmdState(prev => prev ? { ...prev, resultData: { ok: false, error: String(e?.message ?? e) } } : prev);
+            });
+        },
+      );
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
       return;
     }
