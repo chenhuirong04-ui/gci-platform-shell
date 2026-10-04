@@ -1,5 +1,5 @@
 // Server-to-server MIA -> GCI CRM promotion endpoint.
-// It accepts qualified HUMAN_REPLY promotions only. No prospect or MIA
+// It accepts qualified HUMAN_REPLY promotions or audited manual overrides. No prospect or MIA
 // follow-up data is imported, and preview is the safe default.
 export const config = { runtime: 'edge' };
 
@@ -21,7 +21,9 @@ export default async function handler(request: Request): Promise<Response> {
   const body = await request.json().catch(() => null) as any;
   const p = body?.promotion;
   if (!p || !body?.idempotencyKey) return json({ ok: false, error: 'invalid_payload' }, 400);
-  if (p.replyClassification !== 'HUMAN_REPLY') return json({ ok: false, error: 'human_reply_required' }, 422);
+  if (!['automatic', 'manual'].includes(p.promotionMode)) return json({ ok: false, error: 'invalid_promotion_mode' }, 422);
+  if (p.promotionMode === 'automatic' && p.replyClassification !== 'HUMAN_REPLY') return json({ ok: false, error: 'human_reply_required' }, 422);
+  if (p.promotionMode === 'manual' && (!p.promotionReason?.trim() || !p.promotedBy?.trim())) return json({ ok: false, error: 'manual_audit_fields_required' }, 422);
   if (!p.miaCompanyId || !p.companyName?.trim() || !CRM_STAGES.has(p.status)) {
     return json({ ok: false, error: 'invalid_promotion_fields' }, 422);
   }
@@ -51,8 +53,13 @@ export default async function handler(request: Request): Promise<Response> {
       p_intent: p.intent || null,
       p_reply_classification: p.replyClassification,
       p_recommended_next_action: p.recommendedNextAction || null,
-      p_summary: p.summary || null,
+      p_summary: p.latestReplySummary || null,
       p_status: p.status,
+      p_confidence: typeof p.confidence === 'number' ? p.confidence : null,
+      p_promotion_mode: p.promotionMode,
+      p_promotion_reason: p.promotionReason || null,
+      p_promoted_by: p.promotedBy || 'MIA',
+      p_promoted_at: p.promotedAt || new Date().toISOString(),
       p_external_refs: { ...p.externalRefs, mia_promotion_idempotency_key: body.idempotencyKey },
     }),
   });

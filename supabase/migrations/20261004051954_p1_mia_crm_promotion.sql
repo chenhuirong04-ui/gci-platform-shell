@@ -11,7 +11,12 @@ alter table public.crm_customers
   add column if not exists last_reply_at timestamptz,
   add column if not exists mia_intent text,
   add column if not exists mia_reply_classification text,
-  add column if not exists promotion_summary text,
+  add column if not exists latest_reply_summary text,
+  add column if not exists mia_confidence numeric,
+  add column if not exists promotion_mode text,
+  add column if not exists promotion_reason text,
+  add column if not exists promoted_by text,
+  add column if not exists promoted_at timestamptz,
   add column if not exists external_refs jsonb not null default '{}'::jsonb;
 
 create unique index if not exists uq_crm_customers_mia_company_id
@@ -62,19 +67,30 @@ create or replace function public.promote_mia_company(
   p_recommended_next_action text default null,
   p_summary text default null,
   p_status text default '新询盘',
+  p_confidence numeric default null,
+  p_promotion_mode text default 'automatic',
+  p_promotion_reason text default null,
+  p_promoted_by text default 'MIA',
+  p_promoted_at timestamptz default now(),
   p_external_refs jsonb default '{}'::jsonb
 )
 returns table(customer_id uuid, created boolean)
 language plpgsql
-security definer
-set search_path = public
+security invoker
+set search_path = ''
 as $$
 declare
   v_customer_id uuid;
   v_created boolean := false;
 begin
-  if p_reply_classification <> 'HUMAN_REPLY' then
-    raise exception 'Only HUMAN_REPLY can be promoted';
+  if p_promotion_mode not in ('automatic', 'manual') then
+    raise exception 'Invalid promotion mode: %', p_promotion_mode;
+  end if;
+  if p_promotion_mode = 'automatic' and p_reply_classification <> 'HUMAN_REPLY' then
+    raise exception 'Automatic promotion requires HUMAN_REPLY';
+  end if;
+  if p_promotion_mode = 'manual' and (nullif(trim(coalesce(p_promotion_reason, '')), '') is null or nullif(trim(coalesce(p_promoted_by, '')), '') is null) then
+    raise exception 'Manual promotion requires reason and promoted_by';
   end if;
   if p_status not in ('新询盘', '需求整理中', '待报价', '已报价待确认') then
     raise exception 'Invalid MIA promotion status: %', p_status;
@@ -88,11 +104,13 @@ begin
     insert into public.crm_customers (
       customer_name, website_url, status, source, source_detail, mia_company_id,
       original_outreach_subject, first_contact_at, last_reply_at, mia_intent,
-      mia_reply_classification, next_action, promotion_summary, external_refs
+      mia_reply_classification, next_action, latest_reply_summary, mia_confidence,
+      promotion_mode, promotion_reason, promoted_by, promoted_at, external_refs
     ) values (
       p_company_name, p_website_url, p_status, 'MIA', 'AI Sales Agent', p_mia_company_id,
       p_original_outreach_subject, p_first_contact_at, p_last_reply_at, p_intent,
-      p_reply_classification, p_recommended_next_action, p_summary, p_external_refs
+      p_reply_classification, p_recommended_next_action, p_summary, p_confidence,
+      p_promotion_mode, p_promotion_reason, p_promoted_by, p_promoted_at, p_external_refs
     ) returning id into v_customer_id;
     v_created := true;
   else
@@ -108,7 +126,12 @@ begin
       mia_intent = p_intent,
       mia_reply_classification = p_reply_classification,
       next_action = p_recommended_next_action,
-      promotion_summary = p_summary,
+      latest_reply_summary = p_summary,
+      mia_confidence = p_confidence,
+      promotion_mode = p_promotion_mode,
+      promotion_reason = p_promotion_reason,
+      promoted_by = p_promoted_by,
+      promoted_at = p_promoted_at,
       external_refs = coalesce(external_refs, '{}'::jsonb) || coalesce(p_external_refs, '{}'::jsonb),
       updated_at = now(),
       is_active = true
@@ -139,6 +162,11 @@ begin
       'intent', p_intent,
       'reply_classification', p_reply_classification,
       'summary', p_summary,
+      'confidence', p_confidence,
+      'promotion_mode', p_promotion_mode,
+      'promotion_reason', p_promotion_reason,
+      'promoted_by', p_promoted_by,
+      'promoted_at', p_promoted_at,
       'external_refs', coalesce(p_external_refs, '{}'::jsonb)
     )
   ) on conflict (customer_id, activity_type)
@@ -150,12 +178,12 @@ $$;
 
 revoke all on function public.promote_mia_company(
   uuid, text, text, text, text, text, text, timestamptz, timestamptz,
-  text, text, text, text, text, jsonb
+  text, text, text, text, text, numeric, text, text, text, timestamptz, jsonb
 ) from public, anon, authenticated;
 grant execute on function public.promote_mia_company(
   uuid, text, text, text, text, text, text, timestamptz, timestamptz,
-  text, text, text, text, text, jsonb
+  text, text, text, text, text, numeric, text, text, text, timestamptz, jsonb
 ) to service_role;
 
 comment on function public.promote_mia_company is
-  'Service-role-only atomic upsert for qualified MIA HUMAN_REPLY promotions. Never creates crm_followups.';
+  'Service-role-only SECURITY INVOKER atomic upsert for qualified MIA HUMAN_REPLY or audited manual promotions. Never creates crm_followups.';
