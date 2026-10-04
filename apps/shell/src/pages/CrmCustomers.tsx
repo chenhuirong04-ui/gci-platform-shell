@@ -1,7 +1,7 @@
 // 客户与项目 CRM 工作台 — the formal Supabase CRM page (crm_customers / crm_contacts / crm_followups / crm_projects).
 // Everyday CRM work happens here: new customer, record follow-up, customer detail, stage and next-follow-up edits.
 // GIA (Business Assistant) stays as the natural-language assistant entry, not the only one.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
 import {
@@ -87,6 +87,7 @@ export function CrmCustomers() {
   const [drawerRow, setDrawerRow] = useState<CrmCustomer | null>(null);
   const [drawerReload, setDrawerReload] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
+  const deepLinkHandled = useRef(false);
 
   async function load() {
     setLoading(true);
@@ -110,6 +111,17 @@ export function CrmCustomers() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
+
+  useEffect(() => {
+    if (deepLinkHandled.current || rows.length === 0) return;
+    const customerId = new URLSearchParams(window.location.search).get('customer_id');
+    if (!customerId) return;
+    const matched = (rows as CrmCustomer[]).find((row) => row.id === customerId);
+    if (matched) {
+      deepLinkHandled.current = true;
+      setDrawerRow(matched);
+    }
+  }, [rows]);
 
   async function handleRestore(id: string) {
     setRestoreBusy(id);
