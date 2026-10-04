@@ -36,6 +36,12 @@ function notionHeaders(token: string) {
   };
 }
 
+function notionError(prefix: string, status: number, body: any): Error {
+  const code = typeof body?.code === 'string' ? body.code : 'unknown';
+  const message = typeof body?.message === 'string' ? body.message.replace(/\s+/g, ' ').slice(0, 240) : 'no_message';
+  return new Error(`${prefix}_${status}:${code}:${message}`);
+}
+
 async function sha256(value: string): Promise<string> {
   const bytes = new TextEncoder().encode(value);
   const digest = await crypto.subtle.digest('SHA-256', bytes);
@@ -77,7 +83,7 @@ async function findNotionPage(token: string, databaseId: string, marker: string)
     }),
   });
   const body = await response.json().catch(() => null) as any;
-  if (!response.ok) throw new Error(`notion_query_${response.status}`);
+  if (!response.ok) throw notionError('notion_query', response.status, body);
   return Array.isArray(body?.results) && body.results[0]?.id ? body.results[0].id : null;
 }
 
@@ -107,7 +113,7 @@ async function createNotionPage(
     }),
   });
   const body = await response.json().catch(() => null) as any;
-  if (!response.ok || !body?.id) throw new Error(`notion_create_${response.status}`);
+  if (!response.ok || !body?.id) throw notionError('notion_create', response.status, body);
   return body.id;
 }
 
