@@ -77,6 +77,11 @@ export default async function handler(request: Request): Promise<Response> {
     notionDatabaseId: process.env.NOTION_FOLLOWUP_DB_ID,
     customerId,
   });
+  if (notionSync.status === 'failed') {
+    console.error('[mia-promote] Notion follow-up sync failed:', notionSync.reason);
+  } else {
+    console.info('[mia-promote] Notion follow-up sync:', notionSync.status);
+  }
   const base = process.env.GCI_CRM_BASE_URL || new URL(request.url).origin;
   return json({
     ok: true,
