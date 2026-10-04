@@ -3,6 +3,8 @@
 // follow-up data is imported, and preview is the safe default.
 export const config = { runtime: 'edge' };
 
+import { syncMiaPromotionFollowup } from '../_lib/notionFollowupSync';
+
 const CRM_STAGES = new Set(['新询盘', '需求整理中', '待报价', '已报价待确认']);
 
 function json(body: unknown, status = 200) {
@@ -30,7 +32,7 @@ export default async function handler(request: Request): Promise<Response> {
 
   const preview = body.mode !== 'execute' || process.env.MIA_PROMOTION_MODE !== 'execute';
   if (preview) {
-    return json({ ok: true, mode: 'preview', wouldUpsert: true, wouldCreateFollowup: false, stage: p.status });
+    return json({ ok: true, mode: 'preview', wouldUpsert: true, wouldCreateFollowup: false, wouldSyncNotionFollowup: true, stage: p.status });
   }
 
   const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -67,6 +69,21 @@ export default async function handler(request: Request): Promise<Response> {
   if (!rpc.ok) return json({ ok: false, error: result?.message || `crm_rpc_${rpc.status}` }, 502);
   const row = Array.isArray(result) ? result[0] : result;
   const customerId = row?.customer_id;
+  if (!customerId) return json({ ok: false, error: 'crm_rpc_missing_customer_id' }, 502);
+  const notionSync = await syncMiaPromotionFollowup({
+    supabaseUrl,
+    serviceKey,
+    notionToken: process.env.NOTION_TOKEN,
+    notionDatabaseId: process.env.NOTION_FOLLOWUP_DB_ID,
+    customerId,
+  });
   const base = process.env.GCI_CRM_BASE_URL || new URL(request.url).origin;
-  return json({ ok: true, mode: 'execute', customerId, created: row?.created === true, crmLink: `${base}/crm-customers?customer_id=${encodeURIComponent(customerId)}` });
+  return json({
+    ok: true,
+    mode: 'execute',
+    customerId,
+    created: row?.created === true,
+    crmLink: `${base}/crm-customers?customer_id=${encodeURIComponent(customerId)}`,
+    notionFollowup: notionSync,
+  });
 }
