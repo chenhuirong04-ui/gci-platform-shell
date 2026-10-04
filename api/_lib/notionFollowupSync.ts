@@ -113,7 +113,17 @@ async function createNotionPage(
     }),
   });
   const body = await response.json().catch(() => null) as any;
-  if (!response.ok || !body?.id) throw notionError('notion_create', response.status, body);
+  if (!response.ok || !body?.id) {
+    const identityResponse = await fetch('https://api.notion.com/v1/users/me', {
+      headers: notionHeaders(token),
+    });
+    const identity = await identityResponse.json().catch(() => null) as any;
+    const integrationName = typeof identity?.name === 'string'
+      ? identity.name.replace(/\s+/g, ' ').slice(0, 80)
+      : 'unknown_integration';
+    const error = notionError('notion_create', response.status, body);
+    throw new Error(`${error.message}:integration=${integrationName}`);
+  }
   return body.id;
 }
 
