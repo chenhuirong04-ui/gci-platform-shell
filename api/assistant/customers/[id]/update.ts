@@ -16,7 +16,16 @@ export default async function handler(request: Request): Promise<Response> {
   const invalidKeys = validateKeys(parsed.body, ['status', 'priority', 'notes', 'next_action', 'next_follow_up_at']);
   if (invalidKeys) return invalidKeys;
   const { status, priority, notes, next_action: nextAction, next_follow_up_at: nextFollowUpAt } = parsed.body;
-  if (status !== undefined && (typeof status !== 'string' || !SAFE_STATUSES.has(status))) return json({ ok: false, error: 'unsafe_status' }, 422);
+  if (status !== undefined) {
+    if (typeof status !== 'string' || !SAFE_STATUSES.has(status)) return json({ ok: false, error: 'unsafe_status' }, 422);
+    return json({
+      ok: false,
+      error: 'confirmation_required',
+      risk: 'medium',
+      action_type: 'customer_status_update',
+      preview_endpoint: '/api/assistant/actions/preview',
+    }, 409);
+  }
   if (priority !== undefined && (typeof priority !== 'string' || !SAFE_PRIORITIES.has(priority.toUpperCase()))) return json({ ok: false, error: 'invalid_priority' }, 422);
   if (notes !== undefined && !validateText(notes, 5000)) return json({ ok: false, error: 'invalid_notes' }, 422);
   if (nextAction !== undefined && !validateText(nextAction, 2000)) return json({ ok: false, error: 'invalid_next_action' }, 422);

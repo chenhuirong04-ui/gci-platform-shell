@@ -11,7 +11,7 @@ const CLOSED_STATUSES = new Set(['已关闭', '已完成', 'closed', 'done']);
 export const SAFE_STATUSES = new Set(['新询盘', '需求整理中', '待报价', '已报价待确认', '合同待签', '执行中', '暂缓', '已成交']);
 export const SAFE_PRIORITIES = new Set(['A', 'B', 'C']);
 
-type AssistantContext = { supabaseUrl: string; serviceKey: string; actor: string };
+export type AssistantContext = { supabaseUrl: string; serviceKey: string; actor: string };
 type AuthResult = { ok: true; ctx: AssistantContext } | { ok: false; response: Response };
 
 export function json(body: unknown, status = 200): Response {
@@ -61,7 +61,7 @@ function restHeaders(ctx: AssistantContext): Record<string, string> {
   };
 }
 
-async function restGet<T>(ctx: AssistantContext, path: string): Promise<{ ok: true; data: T } | { ok: false; response: Response }> {
+export async function restGet<T>(ctx: AssistantContext, path: string): Promise<{ ok: true; data: T } | { ok: false; response: Response }> {
   let response: Response;
   try {
     response = await fetch(`${ctx.supabaseUrl}/rest/v1/${path}`, { headers: restHeaders(ctx) });
@@ -126,10 +126,37 @@ function stable(value: unknown): unknown {
   return value;
 }
 
+export async function actionRequestHash(action: string, targetId: string | null, payload: Record<string, unknown>): Promise<string> {
+  const bytes = new TextEncoder().encode(JSON.stringify(stable({ action, targetId, payload })));
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+  return Array.from(hash, (value) => value.toString(16).padStart(2, '0')).join('');
+}
+
 async function requestHash(action: string, customerId: string, payload: Record<string, unknown>): Promise<string> {
   const bytes = new TextEncoder().encode(JSON.stringify(stable({ action, customerId, payload })));
   const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
   return Array.from(hash, (value) => value.toString(16).padStart(2, '0')).join('');
+}
+
+export async function callRpc<T>(
+  ctx: AssistantContext,
+  rpc: string,
+  body: Record<string, unknown>,
+): Promise<{ ok: true; data: T } | { ok: false; status: number; detail: string }> {
+  try {
+    const response = await fetch(`${ctx.supabaseUrl}/rest/v1/rpc/${rpc}`, {
+      method: 'POST',
+      headers: restHeaders(ctx),
+      body: JSON.stringify(body),
+    });
+    const parsed = await response.json().catch(() => null) as any;
+    if (!response.ok) {
+      return { ok: false, status: response.status, detail: String(parsed?.message || parsed?.code || '') };
+    }
+    return { ok: true, data: parsed as T };
+  } catch {
+    return { ok: false, status: 502, detail: 'crm_unreachable' };
+  }
 }
 
 export function idempotencyKey(request: Request): string | null {
