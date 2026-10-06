@@ -10,6 +10,7 @@ export const ACTION_RISK = {
   close_decision: 'medium',
   mark_decision_duplicate: 'medium',
   update_asset_review_status: 'medium',
+  update_decision_execution_status: 'medium',
   quotation_draft_create: 'low',
   invoice_draft_create: 'low',
   project_note_update: 'low',
@@ -34,6 +35,7 @@ const ACTION_CENTER_ACTIONS = new Set<AssistantAction>([
   'close_decision',
   'mark_decision_duplicate',
   'update_asset_review_status',
+  'update_decision_execution_status',
 ]);
 
 export function isAssistantAction(value: unknown): value is AssistantAction {

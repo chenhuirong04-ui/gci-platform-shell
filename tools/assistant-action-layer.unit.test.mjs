@@ -32,7 +32,7 @@ test('medium and high actions cannot execute without a preview confirmation', as
   for (const action_type of [
     'quotation_draft_update', 'invoice_issue', 'update_task_status',
     'complete_commitment', 'close_decision', 'mark_decision_duplicate',
-    'update_asset_review_status',
+    'update_asset_review_status', 'update_decision_execution_status',
   ]) {
     const response = await executeHandler(new Request('https://app.globalcareinfo.com/api/assistant/actions/execute', {
       method: 'POST', headers: authHeaders,
@@ -43,7 +43,7 @@ test('medium and high actions cannot execute without a preview confirmation', as
   }
 });
 
-test('Claude MCP credential is scoped to the six Action Center writes', async () => {
+test('Claude MCP credential is scoped to the allowed Action Center writes', async () => {
   configure();
   const originalFetch = globalThis.fetch;
   const calls = [];
@@ -63,6 +63,7 @@ test('Claude MCP credential is scoped to the six Action Center writes', async ()
       ['close_decision', { note: 'TEST-UAT' }],
       ['mark_decision_duplicate', { duplicate_of_id: '22222222-2222-4222-8222-222222222222' }],
       ['update_asset_review_status', { review_status: 'review' }],
+      ['update_decision_execution_status', { execution_status: 'completed' }],
     ];
     for (const [action_type, payload] of controlled) {
       const target_id = '11111111-1111-4111-8111-111111111111';
@@ -96,7 +97,7 @@ test('Claude MCP credential is scoped to the six Action Center writes', async ()
       }),
     }));
     assert.equal(due.status, 200);
-    assert.equal(calls.length, 11);
+    assert.equal(calls.length, 13);
     assert.ok(calls.every((call) => call.body.p_actor === 'gci-claude-mcp'));
   } finally {
     globalThis.fetch = originalFetch;

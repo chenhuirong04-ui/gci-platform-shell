@@ -24,6 +24,7 @@ export const CLAUDE_MCP_ACTION_CENTER_ACTIONS = new Set([
   'close_decision',
   'mark_decision_duplicate',
   'update_asset_review_status',
+  'update_decision_execution_status',
 ]);
 
 export function json(body: unknown, status = 200): Response {

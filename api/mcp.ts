@@ -11,7 +11,7 @@ import { CLAUDE_MCP_ACTION_CENTER_ACTIONS, authenticateMcpSecret } from './assis
 export const config = { runtime: 'edge' };
 
 const SERVER_NAME = 'gci-executive-assistant-mcp-server';
-const SERVER_VERSION = '1.1.0';
+const SERVER_VERSION = '1.2.0';
 const ASSISTANT_BASE_URL = 'https://app.globalcareinfo.com';
 const CHARACTER_LIMIT = 25_000;
 const ALLOWED_HOSTS = ['app.globalcareinfo.com'];
@@ -457,6 +457,24 @@ function registerTools(server: McpServer): void {
     schema: z.object({ target_id: uuid('Systems Registry Asset'), review_status: z.enum(['unknown', 'review', 'safe_candidate', 'do_not_delete']), reason, ...controlledConfirmation }).strict(),
     annotations: writeAnnotations,
     run: (input) => controlledAction('update_asset_review_status', 'update_asset_review_status', input, { review_status: input.review_status }),
+  });
+
+  register(server, 'update_decision_execution_status', {
+    title: 'Update Decision Execution Status',
+    description: 'Preview or update only the execution_status of one existing Executive Decision. Requires explicit Chris confirmation and does not change the decision, selected option, note, assignee, dates, or related records.',
+    schema: z.object({
+      target_id: uuid('Executive Decision'),
+      execution_status: z.enum(['not_required', 'pending', 'in_progress', 'completed', 'blocked', 'failed']),
+      reason,
+      ...controlledConfirmation,
+    }).strict(),
+    annotations: writeAnnotations,
+    run: (input) => controlledAction(
+      'update_decision_execution_status',
+      'update_decision_execution_status',
+      input,
+      { execution_status: input.execution_status },
+    ),
   });
 
   register(server, 'preview_invoice_issue', {
