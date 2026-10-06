@@ -39,9 +39,12 @@ async function secretMatches(received: string, expected: string): Promise<boolea
   return different === 0;
 }
 
+export async function authenticateAssistantSecret(request: Request): Promise<boolean> {
+  return secretMatches(bearer(request), process.env.GCI_ASSISTANT_API_SECRET || '');
+}
+
 export async function authenticateAssistant(request: Request): Promise<AuthResult> {
-  const expectedSecret = process.env.GCI_ASSISTANT_API_SECRET || '';
-  if (!(await secretMatches(bearer(request), expectedSecret))) {
+  if (!(await authenticateAssistantSecret(request))) {
     return { ok: false, response: json({ ok: false, error: 'unauthorized' }, 401) };
   }
 
