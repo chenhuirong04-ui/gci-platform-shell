@@ -158,6 +158,30 @@ function actionBody(actionType: string, input: ToolInput, payload: JsonObject): 
   };
 }
 
+function controlledAction(
+  tool: string,
+  actionType: string,
+  input: ToolInput,
+  payload: JsonObject,
+): Promise<ReturnType<typeof toolResult>> {
+  const token = optionalString(input, 'confirmation_token');
+  const confirmer = optionalString(input, 'confirmed_by');
+  if ((token && !confirmer) || (!token && confirmer)) {
+    return Promise.resolve(localError(422, 'confirmation_pair_required', 'Provide both confirmation_token and confirmed_by, or omit both to preview.'));
+  }
+  if (!token) {
+    return callAssistant('/api/assistant/actions/preview', {
+      method: 'POST', body: actionBody(actionType, input, payload),
+    }).then(toolResult);
+  }
+  return post(
+    '/api/assistant/actions/execute',
+    actionBody(actionType, input, payload),
+    tool,
+    optionalString(input, 'idempotency_key'),
+  );
+}
+
 function registerTools(server: McpServer): void {
   register(server, 'search_customers', {
     title: 'Search Customers',
@@ -374,6 +398,60 @@ function registerTools(server: McpServer): void {
     title: 'Add Internal Task', description: 'Create one audited internal Executive Task. This does not contact customers or suppliers.',
     schema: z.object({ title: z.string().trim().min(1).max(500), description: z.string().max(5000).optional(), business_area: z.enum(['25H_AI', 'TRADE', 'ECOMMERCE', 'COMPANY_ADMIN', 'OTHER']).default('OTHER'), priority: z.enum(['P1', 'P2', 'P3']).default('P3'), due_at: z.string().datetime({ offset: true }).optional(), reminder_at: z.string().datetime({ offset: true }).optional(), related_customer_id: uuid('Customer').optional(), reason, idempotency_key: idempotencyKey }).strict(), annotations: writeAnnotations,
     run: (input) => post('/api/assistant/actions/execute', actionBody('task_create', input, Object.fromEntries(Object.entries(input).filter(([key]) => !['reason', 'idempotency_key'].includes(key)))), 'add_internal_task', optionalString(input, 'idempotency_key')),
+  });
+
+  const controlledConfirmation = {
+    confirmation_token: confirmationToken.optional().describe('Omit on the first call to receive a preview token; provide it after Chris confirms.'),
+    confirmed_by: confirmedBy.optional().describe('Omit on preview; provide with confirmation_token after explicit human confirmation.'),
+    idempotency_key: idempotencyKey,
+  };
+
+  register(server, 'update_task_status', {
+    title: 'Update Task Status',
+    description: 'Preview or execute one Executive Task status change. The first call returns a confirmation token and performs no write; call again only after Chris confirms. Never bulk updates.',
+    schema: z.object({ target_id: uuid('Executive Task'), status: z.enum(['open', 'in_progress', 'completed', 'cancelled']), reason, ...controlledConfirmation }).strict(),
+    annotations: writeAnnotations,
+    run: (input) => controlledAction('update_task_status', 'update_task_status', input, { status: input.status }),
+  });
+
+  register(server, 'update_task_due_date', {
+    title: 'Update Task Due Date',
+    description: 'Update or clear the due date of one Executive Task through the audited, idempotent Action Layer. This never changes task status.',
+    schema: z.object({ target_id: uuid('Executive Task'), due_at: z.string().datetime({ offset: true }).nullable(), reason, idempotency_key: idempotencyKey }).strict(),
+    annotations: writeAnnotations,
+    run: (input) => post('/api/assistant/actions/execute', actionBody('update_task_due_date', input, { due_at: input.due_at }), 'update_task_due_date', optionalString(input, 'idempotency_key')),
+  });
+
+  register(server, 'complete_commitment', {
+    title: 'Complete Commitment',
+    description: 'Preview or complete one open Executive Commitment. Completion requires a preview token and explicit Chris confirmation; it records completion time and an optional internal note.',
+    schema: z.object({ target_id: uuid('Executive Commitment'), completion_note: z.string().max(5000).optional(), reason, ...controlledConfirmation }).strict(),
+    annotations: writeAnnotations,
+    run: (input) => controlledAction('complete_commitment', 'complete_commitment', input, input.completion_note === undefined ? {} : { completion_note: input.completion_note }),
+  });
+
+  register(server, 'close_decision', {
+    title: 'Close Decision',
+    description: 'Preview or dismiss one pending Executive Decision as closed. This requires a preview token and explicit Chris confirmation and never triggers external actions.',
+    schema: z.object({ target_id: uuid('Executive Decision'), note: z.string().max(5000).optional(), reason, ...controlledConfirmation }).strict(),
+    annotations: writeAnnotations,
+    run: (input) => controlledAction('close_decision', 'close_decision', input, input.note === undefined ? {} : { note: input.note }),
+  });
+
+  register(server, 'mark_decision_duplicate', {
+    title: 'Mark Decision Duplicate',
+    description: 'Preview or dismiss one pending Executive Decision as a duplicate of another decision. Requires a valid duplicate decision ID and explicit Chris confirmation.',
+    schema: z.object({ target_id: uuid('Executive Decision'), duplicate_of_id: uuid('Canonical Executive Decision'), note: z.string().max(5000).optional(), reason, ...controlledConfirmation }).strict(),
+    annotations: writeAnnotations,
+    run: (input) => controlledAction('mark_decision_duplicate', 'mark_decision_duplicate', input, { duplicate_of_id: input.duplicate_of_id, ...(input.note === undefined ? {} : { note: input.note }) }),
+  });
+
+  register(server, 'update_asset_review_status', {
+    title: 'Update Asset Review Status',
+    description: 'Preview or update one Systems Registry asset review classification (deletion_status). Requires explicit Chris confirmation and never deletes, archives, deploys, or changes lifecycle status.',
+    schema: z.object({ target_id: uuid('Systems Registry Asset'), review_status: z.enum(['unknown', 'review', 'safe_candidate', 'do_not_delete']), reason, ...controlledConfirmation }).strict(),
+    annotations: writeAnnotations,
+    run: (input) => controlledAction('update_asset_review_status', 'update_asset_review_status', input, { review_status: input.review_status }),
   });
 
   register(server, 'preview_invoice_issue', {

@@ -4,6 +4,12 @@ import {
 
 export const ACTION_RISK = {
   task_create: 'low',
+  update_task_due_date: 'low',
+  update_task_status: 'medium',
+  complete_commitment: 'medium',
+  close_decision: 'medium',
+  mark_decision_duplicate: 'medium',
+  update_asset_review_status: 'medium',
   quotation_draft_create: 'low',
   invoice_draft_create: 'low',
   project_note_update: 'low',
@@ -20,6 +26,15 @@ export const ACTION_RISK = {
 } as const;
 
 export type AssistantAction = keyof typeof ACTION_RISK;
+
+const ACTION_CENTER_ACTIONS = new Set<AssistantAction>([
+  'update_task_due_date',
+  'update_task_status',
+  'complete_commitment',
+  'close_decision',
+  'mark_decision_duplicate',
+  'update_asset_review_status',
+]);
 
 export function isAssistantAction(value: unknown): value is AssistantAction {
   return typeof value === 'string' && value in ACTION_RISK;
@@ -66,7 +81,10 @@ export async function previewAction(
   reason: string,
 ): Promise<Response> {
   const hash = await actionRequestHash(action, targetId, payload);
-  const result = await callRpc<any>(ctx, 'assistant_preview_business_action', {
+  const rpc = ACTION_CENTER_ACTIONS.has(action)
+    ? 'assistant_preview_action_center_action'
+    : 'assistant_preview_business_action';
+  const result = await callRpc<any>(ctx, rpc, {
     p_action_type: action,
     p_target_id: targetId,
     p_payload: payload,
@@ -91,7 +109,10 @@ export async function executeAction(
   const key = idempotencyKey(request);
   if (!key) return json({ ok: false, error: 'valid_idempotency_key_required' }, 400);
   const hash = await actionRequestHash(action, targetId, payload);
-  const result = await callRpc<any>(ctx, 'assistant_execute_business_action', {
+  const rpc = ACTION_CENTER_ACTIONS.has(action)
+    ? 'assistant_execute_action_center_action'
+    : 'assistant_execute_business_action';
+  const result = await callRpc<any>(ctx, rpc, {
     p_action_type: action,
     p_target_id: targetId,
     p_payload: payload,

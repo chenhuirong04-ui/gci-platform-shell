@@ -31,6 +31,11 @@ const ids = {
   quotation: '55555555-5555-4555-8555-555555555555',
   invoice: '66666666-6666-4666-8666-666666666666',
   preview: '77777777-7777-4777-8777-777777777777',
+  task: '88888888-8888-4888-8888-888888888888',
+  commitment: '99999999-9999-4999-8999-999999999999',
+  decision: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  canonicalDecision: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  asset: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
 };
 const calls = [];
 
@@ -55,6 +60,9 @@ function assistantFixture(request) {
     if (body.action_type === 'quotation_draft_update') return { status: 200, body: { ok: true, target_id: ids.quotation, risk: 'medium' } };
     if (body.action_type === 'invoice_draft_create') return { status: 200, body: { ok: true, target_id: ids.invoice, risk: 'low', result: { status: 'draft' } } };
     if (body.action_type === 'invoice_issue') return { status: 409, body: { ok: false, error: 'confirmation_required' } };
+    if (['update_task_status', 'update_task_due_date', 'complete_commitment', 'close_decision', 'mark_decision_duplicate', 'update_asset_review_status'].includes(body.action_type)) {
+      return { status: 200, body: { ok: true, target_id: body.target_id, risk: body.action_type === 'update_task_due_date' ? 'low' : 'medium', result: body.payload } };
+    }
     return { status: 422, body: { ok: false, error: 'unsupported_action' } };
   });
   return { status: 404, body: { ok: false, error: 'TEST-UAT_fixture_missing', path: url.pathname } };
@@ -97,9 +105,11 @@ test('MCP client lists all required GCI tools with schemas and safety annotation
       'update_customer_followup', 'update_next_action', 'update_next_followup_date',
       'update_customer_priority', 'add_customer_note', 'upsert_contact',
       'create_quotation_draft', 'update_quotation_draft', 'create_invoice_draft', 'add_internal_task',
+      'update_task_status', 'update_task_due_date', 'complete_commitment', 'close_decision',
+      'mark_decision_duplicate', 'update_asset_review_status',
       'preview_invoice_issue', 'issue_invoice', 'preview_quotation_send', 'send_quotation',
     ];
-    assert.equal(result.tools.length, 38);
+    assert.equal(result.tools.length, 44);
     for (const name of required) assert.ok(names.has(name), `missing tool ${name}`);
     for (const tool of result.tools) {
       assert.ok(tool.description);
@@ -113,7 +123,7 @@ test('MCP client lists all required GCI tools with schemas and safety annotation
 test('MCP endpoint accepts the dedicated Claude connector secret', async () => {
   await withClient(async (client) => {
     const result = await client.listTools();
-    assert.equal(result.tools.length, 38);
+    assert.equal(result.tools.length, 44);
   }, CLAUDE_SECRET);
 });
 
@@ -145,6 +155,35 @@ test('MCP TEST-UAT read flows and controlled draft flows use only Assistant APIs
   assert.ok(calls.length >= 14);
   assert.ok(calls.filter((call) => call.method === 'POST').every((call) => call.path.startsWith('/api/assistant/')));
   assert.ok(calls.filter((call) => call.method === 'POST' && call.path.endsWith('/execute')).every((call) => call.idempotencyKey));
+});
+
+test('MCP Action Center writes preview controlled actions and execute only after confirmation', async () => {
+  await withClient(async (client) => {
+    const controlled = [
+      ['update_task_status', { target_id: ids.task, status: 'completed', reason: 'TEST-UAT task status' }],
+      ['complete_commitment', { target_id: ids.commitment, completion_note: 'TEST-UAT complete', reason: 'TEST-UAT commitment' }],
+      ['close_decision', { target_id: ids.decision, note: 'TEST-UAT close', reason: 'TEST-UAT decision close' }],
+      ['mark_decision_duplicate', { target_id: ids.decision, duplicate_of_id: ids.canonicalDecision, reason: 'TEST-UAT duplicate' }],
+      ['update_asset_review_status', { target_id: ids.asset, review_status: 'safe_candidate', reason: 'TEST-UAT asset review' }],
+    ];
+    for (const [name, args] of controlled) {
+      const preview = await client.callTool({ name, arguments: args });
+      assert.equal(status(preview), 200, `${name} preview failed`);
+      assert.equal(preview.structuredContent?.data?.confirmation_required, true);
+      const executed = await client.callTool({
+        name,
+        arguments: { ...args, confirmation_token: ids.preview, confirmed_by: 'Chris TEST-UAT', idempotency_key: `TEST-UAT-${name}` },
+      });
+      assert.equal(status(executed), 200, `${name} confirmed execute failed`);
+    }
+    const due = await client.callTool({
+      name: 'update_task_due_date',
+      arguments: { target_id: ids.task, due_at: '2026-10-07T09:00:00+04:00', reason: 'TEST-UAT due date', idempotency_key: 'TEST-UAT-task-due-date' },
+    });
+    assert.equal(status(due), 200);
+  });
+  assert.ok(calls.some((call) => call.path.endsWith('/preview')));
+  assert.ok(calls.some((call) => call.path.endsWith('/execute') && call.idempotencyKey));
 });
 
 test('MCP endpoint rejects missing bearer token before protocol handling', async () => {
