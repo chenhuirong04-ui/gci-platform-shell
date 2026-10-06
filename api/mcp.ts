@@ -6,7 +6,7 @@ import {
   type ToolAnnotations,
 } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
-import { authenticateAssistantSecret } from './assistant/_lib.js';
+import { authenticateMcpSecret } from './assistant/_lib.js';
 
 export const config = { runtime: 'edge' };
 
@@ -415,7 +415,7 @@ export default async function handler(request: Request): Promise<Response> {
   if (hostRejected) return hostRejected;
   const originRejected = originValidationResponse(request, ALLOWED_ORIGINS);
   if (originRejected) return originRejected;
-  if (!(await authenticateAssistantSecret(request))) {
+  if (!(await authenticateMcpSecret(request))) {
     return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store, private', 'WWW-Authenticate': 'Bearer realm="gci-executive-assistant-mcp"' },

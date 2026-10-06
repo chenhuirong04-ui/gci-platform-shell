@@ -43,6 +43,15 @@ export async function authenticateAssistantSecret(request: Request): Promise<boo
   return secretMatches(bearer(request), process.env.GCI_ASSISTANT_API_SECRET || '');
 }
 
+export async function authenticateMcpSecret(request: Request): Promise<boolean> {
+  const received = bearer(request);
+  const [assistantSecretMatches, claudeSecretMatches] = await Promise.all([
+    secretMatches(received, process.env.GCI_ASSISTANT_API_SECRET || ''),
+    secretMatches(received, process.env.GCI_CLAUDE_MCP_SECRET || ''),
+  ]);
+  return assistantSecretMatches || claudeSecretMatches;
+}
+
 export async function authenticateAssistant(request: Request): Promise<AuthResult> {
   if (!(await authenticateAssistantSecret(request))) {
     return { ok: false, response: json({ ok: false, error: 'unauthorized' }, 401) };

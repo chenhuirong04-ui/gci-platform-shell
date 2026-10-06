@@ -15,7 +15,9 @@ registerHooks({
 });
 
 const SECRET = 'TEST-UAT-MCP-secret';
+const CLAUDE_SECRET = 'TEST-UAT-Claude-MCP-secret';
 process.env.GCI_ASSISTANT_API_SECRET = SECRET;
+process.env.GCI_CLAUDE_MCP_SECRET = CLAUDE_SECRET;
 process.env.SUPABASE_URL = 'https://efrkvwhzpgahjgfukjth.supabase.co';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'TEST-UAT-server-only';
 
@@ -67,10 +69,10 @@ globalThis.fetch = async (input, init) => {
   return new Response(JSON.stringify(fixture.body), { status: fixture.status, headers: { 'Content-Type': 'application/json' } });
 };
 
-async function withClient(run) {
+async function withClient(run, bearerSecret = SECRET) {
   const client = new Client({ name: 'gci-mcp-TEST-UAT', version: '1.0.0' });
   const transport = new StreamableHTTPClientTransport(new URL('https://app.globalcareinfo.com/api/mcp'), {
-    requestInit: { headers: { Authorization: `Bearer ${SECRET}`, Host: 'app.globalcareinfo.com' } },
+    requestInit: { headers: { Authorization: `Bearer ${bearerSecret}`, Host: 'app.globalcareinfo.com' } },
     fetch: globalThis.fetch,
   });
   await client.connect(transport);
@@ -106,6 +108,13 @@ test('MCP client lists all required GCI tools with schemas and safety annotation
       assert.equal(typeof tool.annotations?.readOnlyHint, 'boolean');
     }
   });
+});
+
+test('MCP endpoint accepts the dedicated Claude connector secret', async () => {
+  await withClient(async (client) => {
+    const result = await client.listTools();
+    assert.equal(result.tools.length, 38);
+  }, CLAUDE_SECRET);
 });
 
 test('MCP TEST-UAT read flows and controlled draft flows use only Assistant APIs', async () => {
