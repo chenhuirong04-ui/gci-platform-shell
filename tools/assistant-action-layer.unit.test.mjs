@@ -32,7 +32,7 @@ test('medium and high actions cannot execute without a preview confirmation', as
   for (const action_type of [
     'quotation_draft_update', 'invoice_issue', 'update_task_status',
     'complete_commitment', 'close_decision', 'mark_decision_duplicate',
-    'update_asset_review_status', 'update_decision_execution_status',
+    'update_asset_review_status', 'update_asset_system_metadata', 'update_decision_execution_status',
   ]) {
     const response = await executeHandler(new Request('https://app.globalcareinfo.com/api/assistant/actions/execute', {
       method: 'POST', headers: authHeaders,
@@ -63,6 +63,11 @@ test('Claude MCP credential is scoped to the allowed Action Center writes', asyn
       ['close_decision', { note: 'TEST-UAT' }],
       ['mark_decision_duplicate', { duplicate_of_id: '22222222-2222-4222-8222-222222222222' }],
       ['update_asset_review_status', { review_status: 'review' }],
+      ['update_asset_system_metadata', {
+        supabase_project_name: 'gci-ai-sales-agent',
+        supabase_project_ref: 'wpozpsquijuauluapulg',
+        supabase_url: 'https://wpozpsquijuauluapulg.supabase.co',
+      }],
       ['update_decision_execution_status', { execution_status: 'completed' }],
     ];
     for (const [action_type, payload] of controlled) {
@@ -97,7 +102,7 @@ test('Claude MCP credential is scoped to the allowed Action Center writes', asyn
       }),
     }));
     assert.equal(due.status, 200);
-    assert.equal(calls.length, 13);
+    assert.equal(calls.length, 15);
     assert.ok(calls.every((call) => call.body.p_actor === 'gci-claude-mcp'));
   } finally {
     globalThis.fetch = originalFetch;
@@ -179,6 +184,36 @@ test('Action Center preview routes to the dedicated RPC and never executes', asy
     assert.equal(calls.length, 1);
     assert.match(calls[0].url, /rpc\/assistant_preview_action_center_action$/);
     assert.equal(calls[0].body.p_action_type, 'complete_commitment');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('asset system metadata preview routes to its narrowly scoped RPC', async () => {
+  configure();
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), body: JSON.parse(init.body) });
+    return new Response(JSON.stringify({ ok: true, preview_id: '22222222-2222-4222-8222-222222222222', risk: 'medium' }), { status: 200 });
+  };
+  try {
+    const response = await previewHandler(new Request('https://app.globalcareinfo.com/api/assistant/actions/preview', {
+      method: 'POST', headers: claudeAuthHeaders,
+      body: JSON.stringify({
+        action_type: 'update_asset_system_metadata',
+        target_id: '11111111-1111-4111-8111-111111111111',
+        payload: {
+          supabase_project_name: 'gci-ai-sales-agent',
+          supabase_project_ref: 'wpozpsquijuauluapulg',
+          supabase_url: 'https://wpozpsquijuauluapulg.supabase.co',
+        },
+        reason: 'TEST-UAT metadata preview',
+      }),
+    }));
+    assert.equal(response.status, 200);
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].url, /rpc\/assistant_preview_asset_system_metadata$/);
   } finally {
     globalThis.fetch = originalFetch;
   }

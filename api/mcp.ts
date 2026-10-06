@@ -11,7 +11,7 @@ import { CLAUDE_MCP_ACTION_CENTER_ACTIONS, authenticateMcpSecret } from './assis
 export const config = { runtime: 'edge' };
 
 const SERVER_NAME = 'gci-executive-assistant-mcp-server';
-const SERVER_VERSION = '1.2.0';
+const SERVER_VERSION = '1.3.0';
 const ASSISTANT_BASE_URL = 'https://app.globalcareinfo.com';
 const CHARACTER_LIMIT = 25_000;
 const ALLOWED_HOSTS = ['app.globalcareinfo.com'];
@@ -457,6 +457,30 @@ function registerTools(server: McpServer): void {
     schema: z.object({ target_id: uuid('Systems Registry Asset'), review_status: z.enum(['unknown', 'review', 'safe_candidate', 'do_not_delete']), reason, ...controlledConfirmation }).strict(),
     annotations: writeAnnotations,
     run: (input) => controlledAction('update_asset_review_status', 'update_asset_review_status', input, { review_status: input.review_status }),
+  });
+
+  register(server, 'update_asset_system_metadata', {
+    title: 'Update Asset System Metadata',
+    description: 'Preview or update only the Supabase project name, project ref, and derived Supabase URL for one existing Systems Registry asset. Requires explicit Chris confirmation; it never changes lifecycle status, review status, notes, deployment fields, or MIA business data.',
+    schema: z.object({
+      target_id: uuid('Systems Registry Asset'),
+      supabase_project_name: z.string().trim().min(1).max(200).describe('Confirmed Supabase project name.'),
+      supabase_project_ref: z.string().regex(/^[a-z0-9]{20}$/).describe('Confirmed 20-character Supabase project ref.'),
+      supabase_url: z.string().url().max(200).describe('Canonical Supabase project URL matching the project ref.'),
+      reason,
+      ...controlledConfirmation,
+    }).strict(),
+    annotations: writeAnnotations,
+    run: (input) => controlledAction(
+      'update_asset_system_metadata',
+      'update_asset_system_metadata',
+      input,
+      {
+        supabase_project_name: input.supabase_project_name,
+        supabase_project_ref: input.supabase_project_ref,
+        supabase_url: input.supabase_url,
+      },
+    ),
   });
 
   register(server, 'update_decision_execution_status', {

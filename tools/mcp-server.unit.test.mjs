@@ -44,7 +44,7 @@ async function assistantFixture(request) {
   let expectedSecret = SECRET;
   if (url.pathname.startsWith('/api/assistant/actions/')) {
     const body = await request.clone().json();
-    if (['update_task_status', 'update_task_due_date', 'complete_commitment', 'close_decision', 'mark_decision_duplicate', 'update_asset_review_status', 'update_decision_execution_status'].includes(body.action_type)) {
+    if (['update_task_status', 'update_task_due_date', 'complete_commitment', 'close_decision', 'mark_decision_duplicate', 'update_asset_review_status', 'update_asset_system_metadata', 'update_decision_execution_status'].includes(body.action_type)) {
       expectedSecret = CLAUDE_SECRET;
     }
   }
@@ -67,7 +67,7 @@ async function assistantFixture(request) {
     if (body.action_type === 'quotation_draft_update') return { status: 200, body: { ok: true, target_id: ids.quotation, risk: 'medium' } };
     if (body.action_type === 'invoice_draft_create') return { status: 200, body: { ok: true, target_id: ids.invoice, risk: 'low', result: { status: 'draft' } } };
     if (body.action_type === 'invoice_issue') return { status: 409, body: { ok: false, error: 'confirmation_required' } };
-    if (['update_task_status', 'update_task_due_date', 'complete_commitment', 'close_decision', 'mark_decision_duplicate', 'update_asset_review_status', 'update_decision_execution_status'].includes(body.action_type)) {
+    if (['update_task_status', 'update_task_due_date', 'complete_commitment', 'close_decision', 'mark_decision_duplicate', 'update_asset_review_status', 'update_asset_system_metadata', 'update_decision_execution_status'].includes(body.action_type)) {
       return { status: 200, body: { ok: true, target_id: body.target_id, risk: body.action_type === 'update_task_due_date' ? 'low' : 'medium', result: body.payload } };
     }
     return { status: 422, body: { ok: false, error: 'unsupported_action' } };
@@ -114,10 +114,11 @@ test('MCP client lists all required GCI tools with schemas and safety annotation
       'create_quotation_draft', 'update_quotation_draft', 'create_invoice_draft', 'add_internal_task',
       'update_task_status', 'update_task_due_date', 'complete_commitment', 'close_decision',
       'mark_decision_duplicate', 'update_asset_review_status',
+      'update_asset_system_metadata',
       'update_decision_execution_status',
       'preview_invoice_issue', 'issue_invoice', 'preview_quotation_send', 'send_quotation',
     ];
-    assert.equal(result.tools.length, 45);
+    assert.equal(result.tools.length, 46);
     for (const name of required) assert.ok(names.has(name), `missing tool ${name}`);
     for (const tool of result.tools) {
       assert.ok(tool.description);
@@ -130,9 +131,9 @@ test('MCP client lists all required GCI tools with schemas and safety annotation
 
 test('MCP endpoint accepts the dedicated Claude connector secret', async () => {
   await withClient(async (client) => {
-    assert.equal(client.getServerVersion()?.version, '1.2.0');
+    assert.equal(client.getServerVersion()?.version, '1.3.0');
     const result = await client.listTools();
-    assert.equal(result.tools.length, 45);
+    assert.equal(result.tools.length, 46);
   }, CLAUDE_SECRET);
 });
 
@@ -174,6 +175,13 @@ test('MCP Action Center writes preview controlled actions and execute only after
       ['close_decision', { target_id: ids.decision, note: 'TEST-UAT close', reason: 'TEST-UAT decision close' }],
       ['mark_decision_duplicate', { target_id: ids.decision, duplicate_of_id: ids.canonicalDecision, reason: 'TEST-UAT duplicate' }],
       ['update_asset_review_status', { target_id: ids.asset, review_status: 'safe_candidate', reason: 'TEST-UAT asset review' }],
+      ['update_asset_system_metadata', {
+        target_id: ids.asset,
+        supabase_project_name: 'gci-ai-sales-agent',
+        supabase_project_ref: 'wpozpsquijuauluapulg',
+        supabase_url: 'https://wpozpsquijuauluapulg.supabase.co',
+        reason: 'TEST-UAT asset Supabase metadata',
+      }],
       ['update_decision_execution_status', { target_id: ids.decision, execution_status: 'completed', reason: 'TEST-UAT decision execution' }],
     ];
     for (const [name, args] of controlled) {

@@ -10,6 +10,7 @@ export const ACTION_RISK = {
   close_decision: 'medium',
   mark_decision_duplicate: 'medium',
   update_asset_review_status: 'medium',
+  update_asset_system_metadata: 'medium',
   update_decision_execution_status: 'medium',
   quotation_draft_create: 'low',
   invoice_draft_create: 'low',
@@ -35,6 +36,7 @@ const ACTION_CENTER_ACTIONS = new Set<AssistantAction>([
   'close_decision',
   'mark_decision_duplicate',
   'update_asset_review_status',
+  'update_asset_system_metadata',
   'update_decision_execution_status',
 ]);
 
@@ -83,9 +85,11 @@ export async function previewAction(
   reason: string,
 ): Promise<Response> {
   const hash = await actionRequestHash(action, targetId, payload);
-  const rpc = ACTION_CENTER_ACTIONS.has(action)
-    ? 'assistant_preview_action_center_action'
-    : 'assistant_preview_business_action';
+  const rpc = action === 'update_asset_system_metadata'
+    ? 'assistant_preview_asset_system_metadata'
+    : ACTION_CENTER_ACTIONS.has(action)
+      ? 'assistant_preview_action_center_action'
+      : 'assistant_preview_business_action';
   const result = await callRpc<any>(ctx, rpc, {
     p_action_type: action,
     p_target_id: targetId,
@@ -111,9 +115,11 @@ export async function executeAction(
   const key = idempotencyKey(request);
   if (!key) return json({ ok: false, error: 'valid_idempotency_key_required' }, 400);
   const hash = await actionRequestHash(action, targetId, payload);
-  const rpc = ACTION_CENTER_ACTIONS.has(action)
-    ? 'assistant_execute_action_center_action'
-    : 'assistant_execute_business_action';
+  const rpc = action === 'update_asset_system_metadata'
+    ? 'assistant_execute_asset_system_metadata'
+    : ACTION_CENTER_ACTIONS.has(action)
+      ? 'assistant_execute_action_center_action'
+      : 'assistant_execute_business_action';
   const result = await callRpc<any>(ctx, rpc, {
     p_action_type: action,
     p_target_id: targetId,
