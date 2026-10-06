@@ -11,6 +11,7 @@ import { authenticateMcpSecret } from './assistant/_lib.js';
 export const config = { runtime: 'edge' };
 
 const SERVER_NAME = 'gci-executive-assistant-mcp-server';
+const SERVER_VERSION = '1.1.0';
 const ASSISTANT_BASE_URL = 'https://app.globalcareinfo.com';
 const CHARACTER_LIMIT = 25_000;
 const ALLOWED_HOSTS = ['app.globalcareinfo.com'];
@@ -478,7 +479,7 @@ function registerTools(server: McpServer): void {
 }
 
 function buildServer(): McpServer {
-  const server = new McpServer({ name: SERVER_NAME, version: '1.0.0' });
+  const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
   registerTools(server);
   return server;
 }
@@ -499,5 +500,9 @@ export default async function handler(request: Request): Promise<Response> {
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store, private', 'WWW-Authenticate': 'Bearer realm="gci-executive-assistant-mcp"' },
     });
   }
-  return mcp.fetch(request, { authInfo: { token: 'verified', clientId: 'claude-custom-connector', scopes: ['gci-assistant'] } });
+  const response = await mcp.fetch(request, { authInfo: { token: 'verified', clientId: 'claude-custom-connector', scopes: ['gci-assistant'] } });
+  const headers = new Headers(response.headers);
+  headers.set('Cache-Control', 'no-store, private');
+  headers.set('Vary', 'Authorization');
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }

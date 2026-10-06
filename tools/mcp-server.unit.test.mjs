@@ -122,6 +122,7 @@ test('MCP client lists all required GCI tools with schemas and safety annotation
 
 test('MCP endpoint accepts the dedicated Claude connector secret', async () => {
   await withClient(async (client) => {
+    assert.equal(client.getServerVersion()?.version, '1.1.0');
     const result = await client.listTools();
     assert.equal(result.tools.length, 44);
   }, CLAUDE_SECRET);
