@@ -6,7 +6,7 @@ import {
   type ToolAnnotations,
 } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
-import { authenticateMcpSecret } from './assistant/_lib.js';
+import { CLAUDE_MCP_ACTION_CENTER_ACTIONS, authenticateMcpSecret } from './assistant/_lib.js';
 
 export const config = { runtime: 'edge' };
 
@@ -52,7 +52,11 @@ async function callAssistant(
   path: string,
   options: { method?: 'GET' | 'POST'; body?: JsonObject; idempotencyKey?: string } = {},
 ): Promise<AssistantResponse> {
-  const secret = process.env.GCI_ASSISTANT_API_SECRET || '';
+  const actionType = typeof options.body?.action_type === 'string' ? options.body.action_type : '';
+  const useClaudeActionCredential = CLAUDE_MCP_ACTION_CENTER_ACTIONS.has(actionType);
+  const secret = useClaudeActionCredential
+    ? process.env.GCI_CLAUDE_MCP_SECRET || ''
+    : process.env.GCI_ASSISTANT_API_SECRET || '';
   if (!secret) return { status: 500, data: { ok: false, error: 'assistant_secret_not_configured' } };
   try {
     const headers: Record<string, string> = {

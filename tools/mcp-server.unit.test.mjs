@@ -39,9 +39,16 @@ const ids = {
 };
 const calls = [];
 
-function assistantFixture(request) {
+async function assistantFixture(request) {
   const url = new URL(request.url);
-  assert.equal(request.headers.get('authorization'), `Bearer ${SECRET}`);
+  let expectedSecret = SECRET;
+  if (url.pathname.startsWith('/api/assistant/actions/')) {
+    const body = await request.clone().json();
+    if (['update_task_status', 'update_task_due_date', 'complete_commitment', 'close_decision', 'mark_decision_duplicate', 'update_asset_review_status'].includes(body.action_type)) {
+      expectedSecret = CLAUDE_SECRET;
+    }
+  }
+  assert.equal(request.headers.get('authorization'), `Bearer ${expectedSecret}`);
   calls.push({ path: url.pathname, method: request.method, idempotencyKey: request.headers.get('idempotency-key') });
   if (url.pathname === '/api/assistant/capabilities') return { status: 200, body: { ok: true, actions: { invoice_issue: 'high' }, forbidden: ['external_communication'] } };
   if (url.pathname === '/api/assistant/customers/search') return { status: 200, body: { ok: true, customers: [{ id: ids.customer, customer_name: 'TEST-UAT ABC' }] } };

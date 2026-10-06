@@ -13,6 +13,18 @@ export const SAFE_PRIORITIES = new Set(['A', 'B', 'C']);
 
 export type AssistantContext = { supabaseUrl: string; serviceKey: string; actor: string };
 type AuthResult = { ok: true; ctx: AssistantContext } | { ok: false; response: Response };
+export type AssistantActionAuthResult =
+  | { ok: true; ctx: AssistantContext; credential: 'assistant' | 'claude-mcp' }
+  | { ok: false; response: Response };
+
+export const CLAUDE_MCP_ACTION_CENTER_ACTIONS = new Set([
+  'update_task_status',
+  'update_task_due_date',
+  'complete_commitment',
+  'close_decision',
+  'mark_decision_duplicate',
+  'update_asset_review_status',
+]);
 
 export function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -52,17 +64,49 @@ export async function authenticateMcpSecret(request: Request): Promise<boolean> 
   return assistantSecretMatches || claudeSecretMatches;
 }
 
+function serverContext(actor: string): AssistantContext | null {
+  const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  return supabaseUrl === EXPECTED_SUPABASE_ORIGIN && serviceKey
+    ? { supabaseUrl, serviceKey, actor }
+    : null;
+}
+
+export async function authenticateAssistantAction(request: Request): Promise<AssistantActionAuthResult> {
+  const received = bearer(request);
+  const [assistantSecretMatches, claudeSecretMatches] = await Promise.all([
+    secretMatches(received, process.env.GCI_ASSISTANT_API_SECRET || ''),
+    secretMatches(received, process.env.GCI_CLAUDE_MCP_SECRET || ''),
+  ]);
+  if (!assistantSecretMatches && !claudeSecretMatches) {
+    return { ok: false, response: json({ ok: false, error: 'unauthorized' }, 401) };
+  }
+  const credential = assistantSecretMatches ? 'assistant' : 'claude-mcp';
+  const ctx = serverContext(credential === 'assistant' ? 'gci-executive-assistant' : 'gci-claude-mcp');
+  if (!ctx) return { ok: false, response: json({ ok: false, error: 'server_config_missing' }, 500) };
+  return { ok: true, ctx, credential };
+}
+
+export function authorizeAssistantAction(
+  auth: Extract<AssistantActionAuthResult, { ok: true }>,
+  action: string,
+): Response | null {
+  if (auth.credential === 'claude-mcp' && !CLAUDE_MCP_ACTION_CENTER_ACTIONS.has(action)) {
+    return json({ ok: false, error: 'forbidden_action' }, 403);
+  }
+  return null;
+}
+
 export async function authenticateAssistant(request: Request): Promise<AuthResult> {
   if (!(await authenticateAssistantSecret(request))) {
     return { ok: false, response: json({ ok: false, error: 'unauthorized' }, 401) };
   }
 
-  const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-  if (supabaseUrl !== EXPECTED_SUPABASE_ORIGIN || !serviceKey) {
+  const ctx = serverContext('gci-executive-assistant');
+  if (!ctx) {
     return { ok: false, response: json({ ok: false, error: 'server_config_missing' }, 500) };
   }
-  return { ok: true, ctx: { supabaseUrl, serviceKey, actor: 'gci-executive-assistant' } };
+  return { ok: true, ctx };
 }
 
 function restHeaders(ctx: AssistantContext): Record<string, string> {
