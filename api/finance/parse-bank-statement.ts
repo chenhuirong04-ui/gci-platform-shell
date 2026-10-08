@@ -37,7 +37,7 @@ Return ONLY valid JSON - no markdown, no explanation. Use this schema:
 }
 Rules: One entry per transaction line, in the same order as the statement. Convert dates to YYYY-MM-DD. amount must be a positive plain number. Never merge two lines into one, never invent a line that isn't shown. If you cannot read a field, use null for that field but still include the line.`;
 
-const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+const GEMINI_MODELS = ['gemini-2.5-flash'];
 
 import { requireModule } from '../_lib/auth';
 
@@ -74,7 +74,7 @@ export default async function handler(request: Request): Promise<Response> {
         { inline_data: { mime_type: mimeType, data: base64 } },
       ],
     }],
-    generationConfig: { temperature: 0.1, maxOutputTokens: 8192, responseMimeType: 'application/json' },
+    generationConfig: { maxOutputTokens: 8192, responseMimeType: 'application/json' },
   };
 
   let lastError = '';

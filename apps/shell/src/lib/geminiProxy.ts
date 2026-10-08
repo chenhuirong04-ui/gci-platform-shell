@@ -9,7 +9,6 @@ export interface GeminiProxyRequest {
   config?: {
     systemInstruction?: string;
     maxOutputTokens?: number;
-    temperature?: number;
     responseMimeType?: string;
     responseSchema?: unknown;
   };

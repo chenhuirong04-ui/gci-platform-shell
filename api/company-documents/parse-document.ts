@@ -135,7 +135,7 @@ export default async function handler(request: Request): Promise<Response> {
         { inline_data: { mime_type: mimeType, data: base64 } },
       ],
     }],
-    generationConfig: { temperature: 0.1, maxOutputTokens: 1024, responseMimeType: 'application/json' },
+    generationConfig: { maxOutputTokens: 1024, responseMimeType: 'application/json' },
   };
 
   const triedModels: string[] = [];

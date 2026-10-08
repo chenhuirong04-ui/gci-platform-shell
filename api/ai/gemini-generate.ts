@@ -12,7 +12,7 @@ export const config = { runtime: 'edge' };
 import { requireModule } from '../_lib/auth';
 
 const DEFAULT_MODEL = 'gemini-2.5-flash';
-const ALLOWED_MODELS = new Set(['gemini-2.5-flash', 'gemini-3-flash-preview']);
+const ALLOWED_MODELS = new Set(['gemini-2.5-flash', 'gemini-3.6-flash']);
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -58,8 +58,6 @@ export default async function handler(request: Request): Promise<Response> {
   if (cfg.responseMimeType) generationConfig.responseMimeType = cfg.responseMimeType;
   if (cfg.responseSchema) generationConfig.responseSchema = cfg.responseSchema;
   if (typeof cfg.maxOutputTokens === 'number') generationConfig.maxOutputTokens = cfg.maxOutputTokens;
-  if (typeof cfg.temperature === 'number') generationConfig.temperature = cfg.temperature;
-
   const restBody: Record<string, unknown> = { contents, generationConfig };
   if (typeof cfg.systemInstruction === 'string' && cfg.systemInstruction) {
     restBody.systemInstruction = { parts: [{ text: cfg.systemInstruction }] };

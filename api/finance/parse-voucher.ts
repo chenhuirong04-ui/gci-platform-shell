@@ -39,7 +39,7 @@ Return ONLY valid JSON - no markdown, no explanation. Use this schema:
 }
 Rules: Convert dates to YYYY-MM-DD. amount and vat_amount must be plain numbers (e.g. 1250.50), never strings with currency symbols. If a field is not visible, use null. Never guess.`;
 
-const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+const GEMINI_MODELS = ['gemini-2.5-flash'];
 
 import { requireModule } from '../_lib/auth';
 
@@ -76,7 +76,7 @@ export default async function handler(request: Request): Promise<Response> {
         { inline_data: { mime_type: mimeType, data: base64 } },
       ],
     }],
-    generationConfig: { temperature: 0.1, maxOutputTokens: 1024, responseMimeType: 'application/json' },
+    generationConfig: { maxOutputTokens: 1024, responseMimeType: 'application/json' },
   };
 
   let lastError = '';

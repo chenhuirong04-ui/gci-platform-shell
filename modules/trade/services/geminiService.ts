@@ -73,7 +73,7 @@ export const generateInvoiceFromText = async (text: string): Promise<string> => 
   const ai = geminiProxy;
 
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-3.6-flash",
     contents: text,
     config: { systemInstruction: SYSTEM_INSTRUCTION_MARKDOWN },
   });
@@ -91,7 +91,7 @@ export const extractItemsFromChat = async (
   const ai = geminiProxy;
 
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-3.6-flash",
     contents: `Extract order details from this chat log: ${text}`,
     config: {
       responseMimeType: "application/json",
@@ -109,7 +109,7 @@ export const parseFinancialDocument = async (
   const ai = geminiProxy;
 
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-3.6-flash",
     contents: {
       parts: [
         { inlineData: { mimeType, data: imageBase64 } },

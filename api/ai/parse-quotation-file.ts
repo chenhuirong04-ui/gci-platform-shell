@@ -49,12 +49,7 @@ Rules:
 - If a numeric value cannot be read, use null — never guess.
 - confidence: "high" if all key columns (name, qty, price) are clearly visible; "low" if many values unclear.`;
 
-// Models tried in order. gemini-2.0-flash is more widely available than 2.5-flash.
-const GEMINI_MODELS = [
-  'gemini-2.0-flash',
-  'gemini-2.5-flash',
-  'gemini-1.5-flash',
-];
+const GEMINI_MODELS = ['gemini-2.5-flash'];
 
 import { requireModule } from '../_lib/auth';
 
@@ -144,7 +139,6 @@ Chinese summary format rules:
       ],
     }],
     generationConfig: {
-      temperature: 0.1,
       ...(isJsonMode ? { responseMimeType: 'application/json' } : {}),
     },
   });
