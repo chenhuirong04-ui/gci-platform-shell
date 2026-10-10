@@ -11,7 +11,7 @@ import { CLAUDE_MCP_ACTION_CENTER_ACTIONS, authenticateMcpSecret } from './assis
 export const config = { runtime: 'edge' };
 
 const SERVER_NAME = 'gci-executive-assistant-mcp-server';
-const SERVER_VERSION = '1.3.0';
+const SERVER_VERSION = '1.4.0';
 const ASSISTANT_BASE_URL = 'https://app.globalcareinfo.com';
 const CHARACTER_LIMIT = 25_000;
 const ALLOWED_HOSTS = ['app.globalcareinfo.com'];
@@ -188,6 +188,25 @@ function controlledAction(
 }
 
 function registerTools(server: McpServer): void {
+  register(server, 'create_customer', {
+    title: 'Create Customer',
+    description: 'Create one basic GCI CRM customer after a server-side exact normalized-name check across active, inactive, and archived records. It never writes WorkforceOS.',
+    schema: z.object({
+      customer_name: z.string().trim().min(1).max(300),
+      business_type: z.enum(['25H/AI', 'Trade', 'Workforce/Technical Services', 'Ecommerce', 'Other']).optional(),
+      country: z.string().trim().max(100).optional(),
+      city: z.string().trim().max(100).optional(),
+      idempotency_key: idempotencyKey,
+    }).strict(),
+    annotations: writeAnnotations,
+    run: (input) => post(
+      '/api/assistant/customers/create',
+      Object.fromEntries(Object.entries(input).filter(([key, value]) => key !== 'idempotency_key' && value !== undefined)),
+      'create_customer',
+      optionalString(input, 'idempotency_key'),
+    ),
+  });
+
   register(server, 'search_customers', {
     title: 'Search Customers',
     description: 'Search active GCI CRM customers by exact or partial customer name. Use this before customer-specific tools when only a name is known.',

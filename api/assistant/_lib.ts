@@ -268,6 +268,35 @@ export async function executeWrite(
   return json(result);
 }
 
+export async function createCustomer(
+  request: Request,
+  ctx: AssistantContext,
+  payload: Record<string, unknown>,
+): Promise<Response> {
+  const key = idempotencyKey(request);
+  if (!key) return json({ ok: false, error: 'valid_idempotency_key_required' }, 400);
+  const hash = await actionRequestHash('customer_create', null, payload);
+  const result = await callRpc<any>(ctx, 'assistant_create_crm_customer', {
+    p_payload: payload,
+    p_idempotency_key: key,
+    p_request_hash: hash,
+    p_actor: ctx.actor,
+  });
+  if (!result.ok) {
+    const known: Record<string, [number, string]> = {
+      assistant_idempotency_conflict: [409, 'idempotency_conflict'],
+      assistant_invalid_payload: [422, 'invalid_payload'],
+      assistant_service_role_required: [403, 'forbidden'],
+    };
+    const match = Object.entries(known).find(([needle]) => result.detail.includes(needle));
+    if (match) return json({ ok: false, error: match[1][1] }, match[1][0]);
+    console.error('[assistant-api] Customer creation failed:', result.status);
+    return json({ ok: false, error: 'crm_action_failed' }, 502);
+  }
+  const status = result.data?.outcome === 'duplicate' ? 409 : 201;
+  return json(result.data, status);
+}
+
 export async function searchCustomers(request: Request, ctx: AssistantContext): Promise<Response> {
   const query = (new URL(request.url).searchParams.get('q') || '').trim();
   if (!query || query.length > 100) return json({ ok: false, error: 'q_required_max_100' }, 400);

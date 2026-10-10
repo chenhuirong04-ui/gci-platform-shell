@@ -52,6 +52,7 @@ async function assistantFixture(request) {
   calls.push({ path: url.pathname, method: request.method, idempotencyKey: request.headers.get('idempotency-key') });
   if (url.pathname === '/api/assistant/capabilities') return { status: 200, body: { ok: true, actions: { invoice_issue: 'high' }, forbidden: ['external_communication'] } };
   if (url.pathname === '/api/assistant/customers/search') return { status: 200, body: { ok: true, customers: [{ id: ids.customer, customer_name: 'TEST-UAT ABC' }] } };
+  if (url.pathname === '/api/assistant/customers/create') return { status: 201, body: { ok: true, outcome: 'created', customer: { id: ids.customer, customer_name: 'TEST-UAT ABC' } } };
   if (url.pathname === `/api/assistant/context/customer/${ids.customer}`) return { status: 200, body: { ok: true, customer: { id: ids.customer }, projects: [{ id: ids.project }], quotations: [{ id: ids.quotation }], invoices: [{ id: ids.invoice }], receivables: { service: [] }, payments: {}, documents: [] } };
   if (url.pathname === '/api/assistant/followups/today') return { status: 200, body: { ok: true, date: '2026-10-06', today: [{ customer_id: ids.customer }], overdue: [] } };
   if (url.pathname === '/api/assistant/management/today') return { status: 200, body: { ok: true, tasks: { today: [], overdue: [], unscheduled: [] }, commitments: [], decisions: [] } };
@@ -103,7 +104,7 @@ test('MCP client lists all required GCI tools with schemas and safety annotation
     const result = await client.listTools();
     const names = new Set(result.tools.map((tool) => tool.name));
     const required = [
-      'search_customers', 'get_customer_context', 'get_today_followups', 'get_overdue_actions',
+      'create_customer', 'search_customers', 'get_customer_context', 'get_today_followups', 'get_overdue_actions',
       'search_products', 'get_product_context', 'get_inventory', 'get_price_history',
       'search_suppliers', 'get_supplier_context', 'get_supplier_quotes', 'get_quotation',
       'list_customer_quotations', 'get_project_context', 'list_customer_projects',
@@ -118,7 +119,7 @@ test('MCP client lists all required GCI tools with schemas and safety annotation
       'update_decision_execution_status',
       'preview_invoice_issue', 'issue_invoice', 'preview_quotation_send', 'send_quotation',
     ];
-    assert.equal(result.tools.length, 46);
+    assert.equal(result.tools.length, 47);
     for (const name of required) assert.ok(names.has(name), `missing tool ${name}`);
     for (const tool of result.tools) {
       assert.ok(tool.description);
@@ -131,9 +132,9 @@ test('MCP client lists all required GCI tools with schemas and safety annotation
 
 test('MCP endpoint accepts the dedicated Claude connector secret', async () => {
   await withClient(async (client) => {
-    assert.equal(client.getServerVersion()?.version, '1.3.0');
+    assert.equal(client.getServerVersion()?.version, '1.4.0');
     const result = await client.listTools();
-    assert.equal(result.tools.length, 46);
+    assert.equal(result.tools.length, 47);
   }, CLAUDE_SECRET);
 });
 
@@ -141,6 +142,7 @@ test('MCP TEST-UAT read flows and controlled draft flows use only Assistant APIs
   await withClient(async (client) => {
     const scenarios = [
       ['get_capabilities', {}],
+      ['create_customer', { customer_name: 'TEST-UAT ABC', business_type: 'Workforce/Technical Services', idempotency_key: 'TEST-UAT-MCP-customer-create' }],
       ['search_customers', { query: 'TEST-UAT ABC' }],
       ['get_customer_context', { customer_id: ids.customer }],
       ['get_today_followups', {}],
@@ -156,7 +158,7 @@ test('MCP TEST-UAT read flows and controlled draft flows use only Assistant APIs
     ];
     for (const [name, args] of scenarios) {
       const result = await client.callTool({ name, arguments: args });
-      assert.equal(status(result), 200, `${name} failed: ${JSON.stringify(result.structuredContent)}`);
+      assert.equal(status(result), name === 'create_customer' ? 201 : 200, `${name} failed: ${JSON.stringify(result.structuredContent)}`);
     }
     const blocked = await client.callTool({ name: 'issue_invoice', arguments: { target_id: ids.invoice, reason: 'TEST-UAT must stay blocked', confirmation_token: ids.preview, confirmed_by: 'Chris TEST-UAT', idempotency_key: 'TEST-UAT-MCP-invoice-issue' } });
     assert.equal(status(blocked), 409);
