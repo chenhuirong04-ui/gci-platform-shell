@@ -318,6 +318,33 @@ export async function searchCustomers(request: Request, ctx: AssistantContext): 
   return json({ ok: true, query, match: 'contains', customers: contains.data });
 }
 
+type ContactEmailMatch = { customer_id: string; email: string | null };
+
+export async function findCustomerByEmail(request: Request, ctx: AssistantContext): Promise<Response> {
+  const email = (new URL(request.url).searchParams.get('email') || '').trim().toLowerCase();
+  if (!email || email.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return json({ ok: false, error: 'valid_email_required' }, 400);
+  }
+
+  const params = new URLSearchParams({
+    select: 'customer_id,email',
+    email: `ilike.${email}`,
+    limit: '100',
+  });
+  const result = await restGet<ContactEmailMatch[]>(ctx, `crm_contacts?${params}`);
+  if (!result.ok) return result.response;
+
+  const customerIds = new Set(
+    result.data
+      .filter((row) => typeof row.email === 'string' && row.email.trim().toLowerCase() === email)
+      .map((row) => row.customer_id)
+      .filter((customerId) => isUuid(customerId)),
+  );
+  if (customerIds.size === 0) return json({ ok: false, error: 'not_found' }, 404);
+  if (customerIds.size > 1) return json({ ok: false, error: 'ambiguous' }, 409);
+  return json({ ok: true, customer_id: [...customerIds][0] });
+}
+
 export async function getCustomerDetail(customerId: string, ctx: AssistantContext): Promise<Response> {
   const customerParams = new URLSearchParams({ select: CUSTOMER_FIELDS, id: `eq.${customerId}`, limit: '1' });
   const contactParams = new URLSearchParams({ select: CONTACT_FIELDS, customer_id: `eq.${customerId}`, order: 'is_primary.desc,created_at.asc' });

@@ -215,6 +215,14 @@ function registerTools(server: McpServer): void {
     run: (input) => get(`/api/assistant/customers/search?q=${encodeURIComponent(stringValue(input, 'query'))}`),
   });
 
+  register(server, 'find_customer_by_email', {
+    title: 'Find Customer by Contact Email',
+    description: 'Find exactly one GCI CRM customer from an exact, case-insensitive contact email match. Returns only customer_id; returns not_found for no match and ambiguous when the email belongs to multiple customers.',
+    schema: z.object({ email: z.string().trim().email().max(320).describe('Exact CRM contact email address.') }).strict(),
+    annotations: readAnnotations,
+    run: (input) => get(`/api/assistant/customers/find-by-email?email=${encodeURIComponent(stringValue(input, 'email').trim().toLowerCase())}`),
+  });
+
   register(server, 'get_customer_context', {
     title: 'Get Customer Context',
     description: 'Read the unified customer profile, contacts, follow-ups, activity, quotations, projects, invoices, payments, receivables, documents, tasks, next action, and risks.',
