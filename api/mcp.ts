@@ -295,6 +295,67 @@ function registerTools(server: McpServer): void {
     run: async (input) => toolResult(projected(await callAssistant(`/api/assistant/context/supplier/${stringValue(input, 'supplier_id')}`), ['supplier', 'quotations', 'quotation_items', 'gaps'])),
   });
 
+  const supplierBaseSchema = {
+    supplier_name_display: z.string().trim().min(1).max(500).optional(),
+    name_cn: z.string().trim().max(500).nullable().optional(),
+    name_en: z.string().trim().max(500).nullable().optional(),
+    supplier_type: z.enum(['Factory', 'Trading', 'Integrated', 'Service', 'Agent', 'Unknown']).optional(),
+    product_categories: z.array(z.string().trim().min(1).max(200)).max(100).optional(),
+    country: z.string().trim().max(200).nullable().optional(),
+    city: z.string().trim().max(200).nullable().optional(),
+    is_preferred: z.boolean().optional(),
+    status: z.enum(['active', 'inactive', 'blacklisted', 'under_review', 'archived']).optional(),
+    current_rating: z.enum(['A', 'B', 'C', 'D']).nullable().optional(),
+    internal_owner: z.string().trim().max(200).nullable().optional(),
+    default_lead_time_days: z.number().int().min(0).max(3650).nullable().optional(),
+    payment_terms: z.string().trim().max(2000).nullable().optional(),
+    strength_notes: z.string().trim().max(5000).nullable().optional(),
+    website: z.string().trim().max(1000).nullable().optional(),
+    established_year: z.number().int().min(1000).max(2200).nullable().optional(),
+    notes: z.string().trim().max(5000).nullable().optional(),
+  };
+
+  register(server, 'create_supplier', {
+    title: 'Create Supplier',
+    description: 'Create one basic supplier after server-side exact checks on normalized company names and supplied existing identifiers. Does not create follow-ups or access Notion.',
+    schema: z.object({
+      ...supplierBaseSchema,
+      supplier_name_display: z.string().trim().min(1).max(500),
+      short_code: z.string().trim().min(1).max(100).optional(),
+      legacy_short_code: z.string().trim().max(100).nullable().optional(),
+      idempotency_key: idempotencyKey,
+    }).strict(),
+    annotations: writeAnnotations,
+    run: (input) => post('/api/assistant/suppliers/create', Object.fromEntries(Object.entries(input).filter(([key, value]) => key !== 'idempotency_key' && value !== undefined)), 'create_supplier', optionalString(input, 'idempotency_key')),
+  });
+
+  register(server, 'update_supplier', {
+    title: 'Update Supplier',
+    description: 'Update the whitelisted basic profile fields of one existing supplier. Existing supplier identifiers are not changed.',
+    schema: z.object({ supplier_id: uuid('Supplier'), ...supplierBaseSchema, idempotency_key: idempotencyKey }).strict(),
+    annotations: writeAnnotations,
+    run: (input) => post(`/api/assistant/suppliers/${stringValue(input, 'supplier_id')}/update`, Object.fromEntries(Object.entries(input).filter(([key, value]) => !['supplier_id', 'idempotency_key'].includes(key) && value !== undefined)), 'update_supplier', optionalString(input, 'idempotency_key')),
+  });
+
+  register(server, 'upsert_supplier_contact', {
+    title: 'Create or Update Supplier Contact',
+    description: 'Create a supplier contact, or update an existing contact only when its contact_id belongs to the stated supplier.',
+    schema: z.object({
+      supplier_id: uuid('Supplier'), contact_id: uuid('Supplier contact').optional(),
+      full_name: z.string().trim().min(1).max(300).optional(), job_title: z.string().trim().max(200).nullable().optional(),
+      department: z.string().trim().max(200).nullable().optional(), contact_role: z.string().trim().max(200).nullable().optional(),
+      phone: z.string().trim().max(100).nullable().optional(), mobile: z.string().trim().max(100).nullable().optional(),
+      whatsapp: z.string().trim().max(100).nullable().optional(), wechat: z.string().trim().max(100).nullable().optional(),
+      email: z.string().trim().email().max(320).nullable().optional(), preferred_language: z.string().trim().max(100).nullable().optional(),
+      is_primary: z.boolean().optional(), is_decision_maker: z.boolean().optional(), is_commercial_contact: z.boolean().optional(),
+      is_technical_contact: z.boolean().optional(), is_finance_contact: z.boolean().optional(), is_logistics_contact: z.boolean().optional(),
+      status: z.string().trim().max(100).nullable().optional(), notes: z.string().trim().max(5000).nullable().optional(),
+      idempotency_key: idempotencyKey,
+    }).strict().refine((value) => value.contact_id || value.full_name, { message: 'full_name is required when creating a contact' }),
+    annotations: writeAnnotations,
+    run: (input) => post(`/api/assistant/suppliers/${stringValue(input, 'supplier_id')}/contact`, Object.fromEntries(Object.entries(input).filter(([key, value]) => !['supplier_id', 'idempotency_key'].includes(key) && value !== undefined)), 'upsert_supplier_contact', optionalString(input, 'idempotency_key')),
+  });
+
   register(server, 'get_quotation', {
     title: 'Get Quotation', description: 'Read one trade quotation and all quotation items by quotation UUID.',
     schema: z.object({ quotation_id: uuid('Quotation') }).strict(), annotations: readAnnotations,

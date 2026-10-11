@@ -107,6 +107,7 @@ test('MCP client lists all required GCI tools with schemas and safety annotation
       'create_customer', 'search_customers', 'find_customer_by_email', 'get_customer_context', 'get_today_followups', 'get_overdue_actions',
       'search_products', 'get_product_context', 'get_inventory', 'get_price_history',
       'search_suppliers', 'get_supplier_context', 'get_supplier_quotes', 'get_quotation',
+      'create_supplier', 'update_supplier', 'upsert_supplier_contact',
       'list_customer_quotations', 'get_project_context', 'list_customer_projects',
       'get_finance_context', 'get_customer_receivables', 'get_invoice', 'list_customer_invoices',
       'get_documents', 'get_action_center', 'get_business_overview', 'get_capabilities',
@@ -119,7 +120,7 @@ test('MCP client lists all required GCI tools with schemas and safety annotation
       'update_decision_execution_status',
       'preview_invoice_issue', 'issue_invoice', 'preview_quotation_send', 'send_quotation',
     ];
-    assert.equal(result.tools.length, 50);
+    assert.equal(result.tools.length, 53);
     for (const name of required) assert.ok(names.has(name), `missing tool ${name}`);
     for (const tool of result.tools) {
       assert.ok(tool.description);
@@ -134,7 +135,7 @@ test('MCP endpoint accepts the dedicated Claude connector secret', async () => {
   await withClient(async (client) => {
     assert.equal(client.getServerVersion()?.version, '1.4.0');
     const result = await client.listTools();
-    assert.equal(result.tools.length, 50);
+    assert.equal(result.tools.length, 53);
   }, CLAUDE_SECRET);
 });
 

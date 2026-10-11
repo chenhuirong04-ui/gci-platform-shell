@@ -10,6 +10,8 @@ test('Vercel maps dynamic Assistant API functions before the SPA fallback', () =
     { source: '/api/assistant/customers/:id/followup', destination: '/api/assistant/customers/[id]/followup' },
     { source: '/api/assistant/customers/:id/update', destination: '/api/assistant/customers/[id]/update' },
     { source: '/api/assistant/customers/:id/contact', destination: '/api/assistant/customers/[id]/contact' },
+    { source: '/api/assistant/suppliers/:id/update', destination: '/api/assistant/suppliers/[id]/update' },
+    { source: '/api/assistant/suppliers/:id/contact', destination: '/api/assistant/suppliers/[id]/contact' },
     { source: '/(.*)', destination: '/index.html' },
   ]);
 });

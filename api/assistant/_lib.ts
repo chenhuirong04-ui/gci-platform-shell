@@ -147,6 +147,12 @@ export function customerIdFromUrl(request: Request): string {
   return index >= 0 ? parts[index + 1] || '' : '';
 }
 
+export function supplierIdFromUrl(request: Request): string {
+  const parts = new URL(request.url).pathname.split('/').filter(Boolean);
+  const index = parts.indexOf('suppliers');
+  return index >= 0 ? parts[index + 1] || '' : '';
+}
+
 export function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
@@ -295,6 +301,41 @@ export async function createCustomer(
   }
   const status = result.data?.outcome === 'duplicate' ? 409 : 201;
   return json(result.data, status);
+}
+
+export async function executeSupplierWrite(
+  request: Request,
+  ctx: AssistantContext,
+  action: 'supplier_create' | 'supplier_update' | 'supplier_contact_upsert',
+  supplierId: string | null,
+  payload: Record<string, unknown>,
+): Promise<Response> {
+  const key = idempotencyKey(request);
+  if (!key) return json({ ok: false, error: 'valid_idempotency_key_required' }, 400);
+  const hash = await actionRequestHash(action, supplierId, payload);
+  const result = await callRpc<any>(ctx, 'assistant_execute_supplier_action', {
+    p_action: action,
+    p_supplier_id: supplierId,
+    p_payload: payload,
+    p_idempotency_key: key,
+    p_request_hash: hash,
+    p_actor: ctx.actor,
+  });
+  if (!result.ok) {
+    const known: Record<string, [number, string]> = {
+      assistant_idempotency_conflict: [409, 'idempotency_conflict'],
+      assistant_supplier_duplicate: [409, 'supplier_duplicate'],
+      assistant_supplier_not_found: [404, 'supplier_not_found'],
+      assistant_supplier_contact_not_found: [404, 'supplier_contact_not_found'],
+      assistant_invalid_payload: [422, 'invalid_payload'],
+      assistant_service_role_required: [403, 'forbidden'],
+    };
+    const match = Object.entries(known).find(([needle]) => result.detail.includes(needle));
+    if (match) return json({ ok: false, error: match[1][1] }, match[1][0]);
+    console.error('[assistant-api] Supplier action failed:', result.status);
+    return json({ ok: false, error: 'supplier_action_failed' }, 502);
+  }
+  return json(result.data, action === 'supplier_create' ? 201 : 200);
 }
 
 export async function searchCustomers(request: Request, ctx: AssistantContext): Promise<Response> {
