@@ -7,6 +7,7 @@ const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.u
 test('Vercel maps dynamic Assistant API functions before the SPA fallback', () => {
   assert.deepEqual(config.rewrites, [
     { source: '/api/assistant/context/customer/:id', destination: '/api/assistant/context/customer/[id]' },
+    { source: '/api/assistant/context/supplier/:id', destination: '/api/assistant/context/supplier/[id]' },
     { source: '/api/assistant/customers/:id/followup', destination: '/api/assistant/customers/[id]/followup' },
     { source: '/api/assistant/customers/:id/update', destination: '/api/assistant/customers/[id]/update' },
     { source: '/api/assistant/customers/:id/contact', destination: '/api/assistant/customers/[id]/contact' },
