@@ -392,6 +392,8 @@ function registerTools(server: McpServer): void {
   customerFieldTool('update_next_followup_date', 'Update Next Follow-up Date', 'Update one customer next_follow_up_at date through the audited CRM Action API.', 'next_follow_up_at', z.string().date().nullable());
   customerFieldTool('update_customer_priority', 'Update Customer Priority', 'Set one customer priority to A, B, or C through the audited CRM Action API.', 'priority', z.enum(['A', 'B', 'C']));
   customerFieldTool('add_customer_note', 'Add Customer Note', 'Append or set one customer note through the existing audited CRM Action API.', 'notes', z.string().max(5000).nullable());
+  customerFieldTool('update_customer_country', 'Update Customer Country', 'Update one customer country through the audited CRM Action API.', 'country', z.string().trim().min(1).max(100));
+  customerFieldTool('update_customer_business_type', 'Update Customer Business Type', 'Update one customer business type through the audited CRM Action API.', 'business_type', z.enum(['25H/AI', 'Trade', 'Workforce/Technical Services', 'Ecommerce', 'Other']));
 
   register(server, 'upsert_contact', {
     title: 'Upsert Customer Contact', description: 'Create or update one contact for one customer. Provide contact_id only for an update.',

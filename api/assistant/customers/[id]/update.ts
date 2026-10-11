@@ -5,6 +5,8 @@ import {
 
 export const config = { runtime: 'edge' };
 
+const BUSINESS_TYPES = new Set(['25H/AI', 'Trade', 'Workforce/Technical Services', 'Ecommerce', 'Other']);
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405);
   const auth = await authenticateAssistant(request);
@@ -13,9 +15,9 @@ export default async function handler(request: Request): Promise<Response> {
   if (!isUuid(customerId)) return json({ ok: false, error: 'invalid_customer_id' }, 400);
   const parsed = await readBody(request);
   if (!parsed.ok) return parsed.response;
-  const invalidKeys = validateKeys(parsed.body, ['status', 'priority', 'notes', 'next_action', 'next_follow_up_at']);
+  const invalidKeys = validateKeys(parsed.body, ['status', 'priority', 'notes', 'next_action', 'next_follow_up_at', 'country', 'business_type']);
   if (invalidKeys) return invalidKeys;
-  const { status, priority, notes, next_action: nextAction, next_follow_up_at: nextFollowUpAt } = parsed.body;
+  const { status, priority, notes, next_action: nextAction, next_follow_up_at: nextFollowUpAt, country, business_type: businessType } = parsed.body;
   if (status !== undefined) {
     if (typeof status !== 'string' || !SAFE_STATUSES.has(status)) return json({ ok: false, error: 'unsafe_status' }, 422);
     return json({
@@ -30,6 +32,9 @@ export default async function handler(request: Request): Promise<Response> {
   if (notes !== undefined && !validateText(notes, 5000)) return json({ ok: false, error: 'invalid_notes' }, 422);
   if (nextAction !== undefined && !validateText(nextAction, 2000)) return json({ ok: false, error: 'invalid_next_action' }, 422);
   if (nextFollowUpAt !== undefined && nextFollowUpAt !== null && !isIsoDate(nextFollowUpAt)) return json({ ok: false, error: 'invalid_next_follow_up_at' }, 422);
+  if (country !== undefined && (typeof country !== 'string' || !country.trim() || country.trim().length > 100)) return json({ ok: false, error: 'invalid_country' }, 422);
+  if (businessType !== undefined && (typeof businessType !== 'string' || !BUSINESS_TYPES.has(businessType))) return json({ ok: false, error: 'invalid_business_type' }, 422);
   if (typeof priority === 'string') parsed.body.priority = priority.toUpperCase();
+  if (typeof country === 'string') parsed.body.country = country.trim();
   return executeWrite(request, auth.ctx, 'customer_update', customerId, parsed.body);
 }

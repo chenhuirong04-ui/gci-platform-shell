@@ -104,14 +104,14 @@ test('MCP client lists all required GCI tools with schemas and safety annotation
     const result = await client.listTools();
     const names = new Set(result.tools.map((tool) => tool.name));
     const required = [
-      'create_customer', 'search_customers', 'get_customer_context', 'get_today_followups', 'get_overdue_actions',
+      'create_customer', 'search_customers', 'find_customer_by_email', 'get_customer_context', 'get_today_followups', 'get_overdue_actions',
       'search_products', 'get_product_context', 'get_inventory', 'get_price_history',
       'search_suppliers', 'get_supplier_context', 'get_supplier_quotes', 'get_quotation',
       'list_customer_quotations', 'get_project_context', 'list_customer_projects',
       'get_finance_context', 'get_customer_receivables', 'get_invoice', 'list_customer_invoices',
       'get_documents', 'get_action_center', 'get_business_overview', 'get_capabilities',
       'update_customer_followup', 'update_next_action', 'update_next_followup_date',
-      'update_customer_priority', 'add_customer_note', 'upsert_contact',
+      'update_customer_priority', 'add_customer_note', 'update_customer_country', 'update_customer_business_type', 'upsert_contact',
       'create_quotation_draft', 'update_quotation_draft', 'create_invoice_draft', 'add_internal_task',
       'update_task_status', 'update_task_due_date', 'complete_commitment', 'close_decision',
       'mark_decision_duplicate', 'update_asset_review_status',
@@ -119,7 +119,7 @@ test('MCP client lists all required GCI tools with schemas and safety annotation
       'update_decision_execution_status',
       'preview_invoice_issue', 'issue_invoice', 'preview_quotation_send', 'send_quotation',
     ];
-    assert.equal(result.tools.length, 47);
+    assert.equal(result.tools.length, 50);
     for (const name of required) assert.ok(names.has(name), `missing tool ${name}`);
     for (const tool of result.tools) {
       assert.ok(tool.description);
@@ -134,7 +134,7 @@ test('MCP endpoint accepts the dedicated Claude connector secret', async () => {
   await withClient(async (client) => {
     assert.equal(client.getServerVersion()?.version, '1.4.0');
     const result = await client.listTools();
-    assert.equal(result.tools.length, 47);
+    assert.equal(result.tools.length, 50);
   }, CLAUDE_SECRET);
 });
 
