@@ -12,6 +12,7 @@ import {
 import { CustomerCreateModal } from '../components/CustomerCreateModal';
 import { CrmFollowupModal, type FollowupTarget } from '../components/crm/CrmFollowupModal';
 import { CrmCustomerDrawer } from '../components/crm/CrmCustomerDrawer';
+import { nextFollowUpDateForSave } from '../lib/crmDateInput';
 
 const GOLD = '#CBA85C';
 const RED = '#E0846A';
@@ -182,6 +183,12 @@ export function CrmCustomers() {
     if (view === 'today' || view === 'overdue') load(); else patchRow(res.customer);
   }
 
+  function handleNextDateBlur(id: string, persistedValue: string | null, inputValue: string) {
+    const value = nextFollowUpDateForSave(inputValue, persistedValue);
+    if (value === undefined) return;
+    void handleNextDate(id, value || '');
+  }
+
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto', padding: '28px 28px 40px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18, flexWrap: 'wrap' }}>
@@ -345,12 +352,14 @@ export function CrmCustomers() {
                   <td style={{ padding: '10px 14px', color: MUTED }}>{fmtDate(r.last_follow_up_at)}</td>
                   <td style={{ padding: '10px 14px', color: view === 'overdue' ? RED : MUTED, whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
                     <input
+                      key={`${r.id}:${r.next_follow_up_at || ''}`}
                       aria-label="修改下次跟进日期"
                       type="date"
-                      value={r.next_follow_up_at || ''}
+                      defaultValue={r.next_follow_up_at || ''}
                       min={crmDate(1)}
                       disabled={rowBusy === r.id || view === 'archived'}
-                      onChange={(e) => handleNextDate(r.id, e.target.value)}
+                      onBlur={(e) => handleNextDateBlur(r.id, r.next_follow_up_at || null, e.currentTarget.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                       style={{ padding: '3px 6px', borderRadius: 7, fontSize: 11.5, background: 'rgba(255,255,255,0.04)', border: `1px solid ${view === 'overdue' ? RED : BORD}`, color: view === 'overdue' ? RED : MUTED, colorScheme: 'dark' }}
                     />
                     {view === 'overdue' && r.overdueDays ? <span style={{ marginLeft: 6, fontSize: 11 }}>逾期{r.overdueDays}天</span> : null}
