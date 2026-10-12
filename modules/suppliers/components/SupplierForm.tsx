@@ -128,6 +128,8 @@ const FORM_INIT = (s?: Supplier) => ({
   default_lead_time_days: s?.default_lead_time_days ? String(s.default_lead_time_days) : '',
   website:               s?.website ?? '',
   established_year:      s?.established_year ? String(s.established_year) : '',
+  next_action:            s?.next_action ?? '',
+  next_follow_up_at:      s?.next_follow_up_at ?? '',
   notes:                 s?.notes ?? '',
 });
 type FormState = ReturnType<typeof FORM_INIT>;
@@ -310,6 +312,8 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
         default_lead_time_days: form.default_lead_time_days ? Number(form.default_lead_time_days) : undefined,
         website:               form.website || undefined,
         established_year:      form.established_year ? Number(form.established_year) : undefined,
+        next_action:            form.next_action || null,
+        next_follow_up_at:      form.next_follow_up_at || null,
         notes:                 form.notes || undefined,
       };
 
@@ -606,6 +610,14 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                 </FLD>
                 <FLD label={t.fWebsite} ai={aiFilledKeys.has('website')}>
                   <input style={{ ...INP, ...aiInp(aiFilledKeys.has('website')) }} value={form.website} onChange={e => setF('website', e.target.value)} placeholder="https://..." />
+                </FLD>
+              </div>
+              <div style={R2}>
+                <FLD label={t.fNextAction}>
+                  <input style={INP} value={form.next_action} onChange={e => setF('next_action', e.target.value)} placeholder={t.fNextActionPlaceholder} />
+                </FLD>
+                <FLD label={t.fNextFollowUpAt}>
+                  <input style={INP} type="date" value={form.next_follow_up_at} onChange={e => setF('next_follow_up_at', e.target.value)} />
                 </FLD>
               </div>
             </div>

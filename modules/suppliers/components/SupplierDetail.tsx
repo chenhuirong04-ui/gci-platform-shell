@@ -234,6 +234,8 @@ function OverviewTab({ supplier }: { supplier: Supplier }) {
           <ROW label={o.paymentTerms} value={supplier.payment_terms} />
           <ROW label={o.defaultLeadTime} value={supplier.default_lead_time_days ? `${supplier.default_lead_time_days} ${o.days}` : undefined} />
           <ROW label={o.internalOwner} value={supplier.internal_owner} />
+          <ROW label={o.nextAction} value={supplier.next_action} />
+          <ROW label={o.nextFollowUpAt} value={supplier.next_follow_up_at} />
           <ROW label={o.createdAt} value={supplier.created_at?.slice(0, 10)} />
         </Card>
       </div>

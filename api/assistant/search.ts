@@ -5,7 +5,7 @@ export const config = { runtime: 'edge' };
 const clean = (value: string) => value.replace(/[%*,()"'\\]/g, ' ').replace(/\s+/g, ' ').trim();
 
 const MAP: Record<string, { table: string; select: string; or: (q: string) => string; order: string }> = {
-  supplier: { table: 'suppliers', select: 'id,supplier_name_display,name_cn,name_en,short_code,country,city,status,is_preferred,current_rating,updated_at', or: (q) => `(supplier_name_display.ilike.*${q}*,name_cn.ilike.*${q}*,name_en.ilike.*${q}*,short_code.ilike.*${q}*)`, order: 'updated_at.desc' },
+  supplier: { table: 'suppliers', select: 'id,supplier_name_display,name_cn,name_en,short_code,country,city,status,is_preferred,current_rating,next_action,next_follow_up_at,updated_at', or: (q) => `(supplier_name_display.ilike.*${q}*,name_cn.ilike.*${q}*,name_en.ilike.*${q}*,short_code.ilike.*${q}*)`, order: 'updated_at.desc' },
   project: { table: 'crm_projects', select: 'id,customer_id,project_name,status,notes,updated_at', or: (q) => `(project_name.ilike.*${q}*,notes.ilike.*${q}*)`, order: 'updated_at.desc' },
   quotation: { table: 'quotation_records', select: 'id,quote_no,customer_id,project_id,customer_name,project_name,status,grand_total,quote_date,updated_at', or: (q) => `(quote_no.ilike.*${q}*,customer_name.ilike.*${q}*,project_name.ilike.*${q}*)`, order: 'updated_at.desc' },
   invoice: { table: 'invoice_drafts', select: 'id,invoice_no,customer_name,status,currency,total,invoice_date,due_date,updated_at', or: (q) => `(invoice_no.ilike.*${q}*,customer_name.ilike.*${q}*)`, order: 'updated_at.desc' },

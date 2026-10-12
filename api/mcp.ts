@@ -312,6 +312,8 @@ function registerTools(server: McpServer): void {
     strength_notes: z.string().trim().max(5000).nullable().optional(),
     website: z.string().trim().max(1000).nullable().optional(),
     established_year: z.number().int().min(1000).max(2200).nullable().optional(),
+    next_action: z.string().trim().max(2000).nullable().optional(),
+    next_follow_up_at: z.string().date().nullable().optional(),
     notes: z.string().trim().max(5000).nullable().optional(),
   };
 

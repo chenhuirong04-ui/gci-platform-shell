@@ -457,7 +457,7 @@ export const zh: typeof en = {
         categories: '供应品类', noCategories: '暂无品类',
         cooperation: '合作信息', paymentTerms: '付款条款',
         defaultLeadTime: '默认交期', days: '天',
-        internalOwner: '内部对接人', createdAt: '创建时间',
+        internalOwner: '内部对接人', nextAction: '下次行动', nextFollowUpAt: '下次跟进日期', createdAt: '创建时间',
       },
     },
     contacts: {
@@ -731,6 +731,7 @@ export const zh: typeof en = {
       fCountry: '国家', fCity: '城市',
       fPaymentTerms: '付款条款', fDefaultLeadTime: '默认交期（天）', fInternalOwner: 'GCI 内部对接人',
       fStatus: '状态', fRating: '评级', fWebsite: '网站',
+      fNextAction: '下次行动', fNextActionPlaceholder: '例如：确认最新报价与交期', fNextFollowUpAt: '下次跟进日期',
       aiNotesExtracted: '✓ AI 已从公司资料提取：主要产品 / 联系人 / 电话 / 邮箱，已填入备注',
       fNotesPlaceholder: '内部备注（主要产品、联系人信息、合作说明等）…',
       saving: '保存中…', saveWithFile: '确认创建供应商 + 归档文件 + 写入执照信息 →',

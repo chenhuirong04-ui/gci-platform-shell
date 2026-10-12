@@ -456,7 +456,7 @@ export const en = {
         categories: 'Product Categories', noCategories: 'No categories yet',
         cooperation: 'Cooperation Info', paymentTerms: 'Payment Terms',
         defaultLeadTime: 'Default Lead Time', days: 'days',
-        internalOwner: 'Internal Owner', createdAt: 'Created At',
+        internalOwner: 'Internal Owner', nextAction: 'Next Action', nextFollowUpAt: 'Next Follow-up Date', createdAt: 'Created At',
       },
     },
     contacts: {
@@ -730,6 +730,7 @@ export const en = {
       fCountry: 'Country', fCity: 'City',
       fPaymentTerms: 'Payment Terms', fDefaultLeadTime: 'Default Lead Time (days)', fInternalOwner: 'GCI Internal Owner',
       fStatus: 'Status', fRating: 'Rating', fWebsite: 'Website',
+      fNextAction: 'Next Action', fNextActionPlaceholder: 'e.g. Confirm latest quote and lead time', fNextFollowUpAt: 'Next Follow-up Date',
       aiNotesExtracted: '✓ AI extracted from company profile: main products / contact / phone / email — filled into notes',
       fNotesPlaceholder: 'Internal notes (main products, contact info, cooperation notes, etc.)…',
       saving: 'Saving…', saveWithFile: 'Confirm Create Supplier + Archive File + Save License Info →',

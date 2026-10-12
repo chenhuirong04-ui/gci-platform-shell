@@ -27,6 +27,8 @@ export interface Supplier {
   strength_notes?: string;
   website?: string;
   established_year?: number;
+  next_action?: string | null;
+  next_follow_up_at?: string | null;
   notes?: string;
   notion_page_id?: string;
   notion_page_url?: string;
