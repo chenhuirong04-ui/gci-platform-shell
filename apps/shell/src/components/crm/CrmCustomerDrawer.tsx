@@ -1,6 +1,7 @@
 /**
  * Customer detail panel of the CRM workbench (opens from a row): profile, contacts, projects and the recent follow-up log, plus the two
  * everyday edits — stage and next follow-up date — and "记录跟进". Reads/writes crm_customers, crm_contacts, crm_followups, crm_projects only.
+ * Tabs 客户文件 / 合规事项 / 公司人员 open the customer's file archive (CrmCustomerFiles, owned by crm_customers.id); the panel widens for them.
  */
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -10,6 +11,7 @@ import {
   type CrmCustomer, type CrmContact, type CrmFollowup,
 } from '../../lib/crmSupabase';
 import { listContactsForCustomer, listProjectsForCustomer, type CrmProject } from '../../lib/crmProjects';
+import { CrmCustomerFiles, type CrmFilesTab } from './CrmCustomerFiles';
 
 interface Props {
   customer: CrmCustomer | null;
@@ -43,8 +45,10 @@ export function CrmCustomerDrawer({ customer, onClose, onChanged, onAddFollowup,
   const [followups, setFollowups] = useState<CrmFollowup[]>([]);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<'overview' | CrmFilesTab>('overview');
 
   useEffect(() => { setC(customer); setMsg(''); }, [customer]);
+  useEffect(() => { setTab('overview'); }, [customer?.id]);
 
   useEffect(() => {
     if (!customer) return;
@@ -85,7 +89,7 @@ export function CrmCustomerDrawer({ customer, onClose, onChanged, onAddFollowup,
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 3000 }} role="dialog" aria-modal="true" aria-label="客户详情">
       <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(3,7,18,0.55)' }} />
-      <aside style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(460px, 100vw)', background: '#0E1628', borderLeft: `1px solid ${BORD}`, overflowY: 'auto', padding: '20px 22px 28px' }}>
+      <aside style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: tab === 'overview' ? 'min(460px, 100vw)' : 'min(960px, 100vw)', background: '#0E1628', borderLeft: `1px solid ${BORD}`, overflowY: 'auto', padding: '20px 22px 28px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 16 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 17, fontWeight: 700, color: '#E8F0FF', wordBreak: 'break-word' }}>{c.customer_name}</div>
@@ -98,6 +102,22 @@ export function CrmCustomerDrawer({ customer, onClose, onChanged, onAddFollowup,
           <button onClick={() => onAddFollowup(c)} style={{ padding: '8px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#E2C988)`, border: 'none', color: '#080D1E' }}>+ 记录跟进</button>
           <button onClick={() => onOpenGia(c)} style={{ padding: '8px 14px', borderRadius: 9, fontSize: 12.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: MUTED }}>GIA 智能助手</button>
         </div>
+
+        <div role="tablist" aria-label="客户档案" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18, borderBottom: `1px solid ${BORD}`, paddingBottom: 10 }}>
+          {([['overview', '客户概况'], ['documents', '客户文件'], ['compliance', '合规事项'], ['persons', '公司人员']] as const).map(([k, label]) => (
+            <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+              style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12.5, cursor: 'pointer', fontWeight: tab === k ? 700 : 400,
+                background: tab === k ? 'rgba(203,168,92,0.16)' : 'transparent', border: `1px solid ${tab === k ? GOLD : BORD}`, color: tab === k ? GOLD : MUTED }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab !== 'overview' && (
+          <CrmCustomerFiles crmCustomerId={c.id} customerName={c.customer_name} tab={tab} onTabChange={setTab} />
+        )}
+
+        {tab === 'overview' && (<>
 
         <Section title="阶段 与 下次跟进">
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -152,6 +172,7 @@ export function CrmCustomerDrawer({ customer, onClose, onChanged, onAddFollowup,
             </div>
           ))}
         </Section>
+        </>)}
       </aside>
     </div>,
     document.body,

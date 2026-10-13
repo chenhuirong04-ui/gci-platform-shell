@@ -416,9 +416,9 @@ export function CrmCustomers() {
         open={createOpen}
         extended
         onClose={() => setCreateOpen(false)}
-        onCreated={(c) => {
+        onCreated={(c, _contact, notice) => {
           setCreateOpen(false);
-          flash(`已新增客户「${c.customer_name}」`);
+          flash(notice || `已新增客户「${c.customer_name}」`);
           if (view !== 'directory') setView('directory'); else load();
         }}
         onUseExisting={(existing) => {

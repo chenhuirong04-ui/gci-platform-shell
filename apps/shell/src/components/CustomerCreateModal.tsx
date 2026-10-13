@@ -4,6 +4,8 @@
  * Used by the quotation customer picker (CustomerProjectSelector) and by the CRM workbench page.
  * `allowLead` adds "quote now as temporary customer" (stage 待建档) — quotation screens only.
  * `extended` = the full CRM customer profile (also WhatsApp, business line, stage) — the CRM workbench; the quotation screens keep the short form.
+ * `extended` also offers the optional 上传营业执照识别: AI pre-fills the form, the user corrects and saves as usual, then the licence is archived
+ * as the new customer's 营业执照 document + compliance item. Manual entry without a licence works exactly as before.
  */
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -11,6 +13,7 @@ import { X } from 'lucide-react';
 import { useI18n } from '@gci/i18n';
 import { quickCreateCustomer, DuplicateCustomerError } from '../lib/crmProjects';
 import { BUSINESS_LINES, CRM_STAGES, type CrmCustomer, type CrmContact } from '../lib/crmSupabase';
+import { parseTradeLicense, licenseToFormPatch, archiveTradeLicense, LICENSE_ACCEPT, type TradeLicenseFields } from '../lib/crmTradeLicense';
 
 interface CustomerCreateModalProps {
   open: boolean;
@@ -21,7 +24,7 @@ interface CustomerCreateModalProps {
   extended?: boolean;
   onClose: () => void;
   /** called after the customer (and contact) were written */
-  onCreated: (customer: CrmCustomer, contact: CrmContact | null) => void;
+  onCreated: (customer: CrmCustomer, contact: CrmContact | null, notice?: string) => void;
   /** called when the user chooses the existing same-name customer instead of creating a duplicate */
   onUseExisting: (existing: CrmCustomer) => void;
 }
@@ -37,6 +40,11 @@ export function CustomerCreateModal({ open, initialName = '', allowLead = false,
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState('');
   const [duplicate, setDuplicate] = useState<CrmCustomer | null>(null);
+  // optional trade licence (extended form only)
+  const [licFile, setLicFile] = useState<File | null>(null);
+  const [licFields, setLicFields] = useState<TradeLicenseFields | null>(null);
+  const [licBusy, setLicBusy] = useState(false);
+  const [licMsg, setLicMsg] = useState('');
 
   // every time the dialog opens it starts from the typed name with an empty form
   useEffect(() => {
@@ -44,10 +52,27 @@ export function CustomerCreateModal({ open, initialName = '', allowLead = false,
     setForm({ ...emptyForm, name: initialName.trim() });
     setFormError('');
     setDuplicate(null);
+    setLicFile(null); setLicFields(null); setLicBusy(false); setLicMsg('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   if (!open) return null;
+
+  const pickLicense = async (file: File | null) => {
+    if (!file) return;
+    setLicFile(file); setLicFields(null); setLicMsg(''); setLicBusy(true);
+    try {
+      const fields = await parseTradeLicense(file);
+      setLicFields(fields);
+      setForm((f) => ({ ...f, ...licenseToFormPatch(fields, f) }));
+      setLicMsg('已识别并填入表单，请核对后保存');
+    } catch (e: any) {
+      setLicMsg(`识别失败：${e?.message || ''}（可继续手工填写）`);
+    } finally {
+      setLicBusy(false);
+    }
+  };
+  const setLic = (k: keyof TradeLicenseFields, v: string) => setLicFields((f) => ({ ...(f || {}), [k]: v }));
 
   const submit = async (isLead: boolean) => {
     if (!form.name.trim()) { setFormError(cp.required); return; }
@@ -68,7 +93,16 @@ export function CustomerCreateModal({ open, initialName = '', allowLead = false,
         businessType: extended ? form.businessLine || undefined : undefined,
         status: extended ? form.stage || undefined : undefined,
       });
-      onCreated(customer, contact);
+      let notice: string | undefined;
+      if (extended && licFile && licFields) {
+        try {
+          await archiveTradeLicense(customer.id, licFile, licFields);
+          notice = `已新增客户「${customer.customer_name}」，营业执照已存入客户文件与合规事项`;
+        } catch (e: any) {
+          notice = `已新增客户「${customer.customer_name}」，但营业执照未能存档：${e?.message || ''}（可在「查看档案 → 客户文件」重新上传）`;
+        }
+      }
+      onCreated(customer, contact, notice);
     } catch (e: any) {
       if (e instanceof DuplicateCustomerError) setDuplicate(e.existing);
       else setFormError(e?.message || cp.createFailed);
@@ -85,6 +119,27 @@ export function CustomerCreateModal({ open, initialName = '', allowLead = false,
           <h3 className="text-base font-black text-gray-800">{extended ? cp.formalTitle : cp.modalTitle}</h3>
           <button type="button" onClick={() => !creating && onClose()} className="p-1.5 text-gray-400 hover:text-gray-700" aria-label={cp.cancel}><X className="w-4 h-4" /></button>
         </div>
+
+        {extended && (
+          <div className="p-3 rounded-lg border border-dashed border-[#CBA85C] bg-[#FBF7EC] space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="px-3 py-1.5 rounded-md bg-[#080D1E] text-white text-[11px] font-black cursor-pointer">
+                {licBusy ? 'AI 识别中…' : '上传营业执照识别'}
+                <input type="file" accept={LICENSE_ACCEPT} className="hidden" disabled={licBusy || creating}
+                  aria-label="上传营业执照识别" onChange={(e) => { pickLicense(e.target.files?.[0] || null); e.target.value = ''; }} />
+              </label>
+              <span className="text-[11px] text-gray-500 min-w-0 truncate">{licFile ? licFile.name : '可选：AI 读取营业执照并预填公司信息'}</span>
+            </div>
+            {licMsg && <p className={`text-[11px] font-bold ${licFields ? 'text-emerald-700' : 'text-[#B45309]'}`}>{licMsg}</p>}
+            {licFields && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="space-y-1"><label className={labelCls}>执照号码</label><input aria-label="执照号码" value={licFields.license_number || ''} onChange={e => setLic('license_number', e.target.value)} className={inputCls} /></div>
+                <div className="space-y-1"><label className={labelCls}>签发日期</label><input aria-label="执照签发日期" type="date" value={licFields.issue_date || ''} onChange={e => setLic('issue_date', e.target.value)} className={inputCls} /></div>
+                <div className="space-y-1"><label className={labelCls}>到期日期</label><input aria-label="执照到期日期" type="date" value={licFields.expiry_date || ''} onChange={e => setLic('expiry_date', e.target.value)} className={inputCls} /></div>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="space-y-1">
           <label className={labelCls}>{cp.name} <span className="text-[#CBA85C]">*</span></label>
@@ -135,7 +190,7 @@ export function CustomerCreateModal({ open, initialName = '', allowLead = false,
         {formError && <p className="text-xs font-bold text-[#E0846A]">{formError}</p>}
 
         <div className="flex flex-wrap gap-2 pt-1">
-          <button type="button" disabled={creating} onClick={() => submit(false)} className="px-4 py-2.5 rounded-lg bg-[#080D1E] text-white text-[11px] font-black uppercase tracking-wide disabled:opacity-50">
+          <button type="button" disabled={creating || licBusy} onClick={() => submit(false)} className="px-4 py-2.5 rounded-lg bg-[#080D1E] text-white text-[11px] font-black uppercase tracking-wide disabled:opacity-50">
             {creating ? cp.creating : extended ? cp.save : cp.create}
           </button>
           {allowLead && (

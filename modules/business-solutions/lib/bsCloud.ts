@@ -28,6 +28,27 @@ async function sbFetch(path: string, init: RequestInit = {}): Promise<Response |
   }
 }
 
+// ── File owner: service customer (historical) or unified CRM customer ─────────
+// The three customer-file tables (documents / compliance items / persons) and the bucket serve two owners:
+//   a service_customers.id (Business Solutions, unchanged)  → column customer_id,  path service-customers/<id>/…
+//   crmOwnerKey(crm_customers.id) = 'crm:<id>' (CRM drawer) → column crm_customer_id, path crm-customers/<id>/…
+// Components keep passing one opaque customerId; only this file knows the difference.
+const CRM_OWNER_PREFIX = 'crm:';
+export const crmOwnerKey = (crmCustomerId: string) => CRM_OWNER_PREFIX + crmCustomerId;
+const crmIdOf = (ownerKey: string) => (ownerKey.startsWith(CRM_OWNER_PREFIX) ? ownerKey.slice(CRM_OWNER_PREFIX.length) : null);
+/** PostgREST filter selecting the rows of one owner. */
+function ownerFilter(ownerKey: string): string {
+  const crm = crmIdOf(ownerKey);
+  return crm ? `crm_customer_id=eq.${encodeURIComponent(crm)}` : `customer_id=eq.${encodeURIComponent(ownerKey)}`;
+}
+/** Rewrites a payload's customer_id owner key into the real owner column (exactly one of the two is set). */
+function withOwner<T extends { customer_id?: string | null }>(row: T): Record<string, unknown> {
+  const key = row.customer_id;
+  if (typeof key !== 'string') return row as Record<string, unknown>;
+  const crm = crmIdOf(key);
+  return crm ? { ...row, customer_id: null, crm_customer_id: crm } : row as Record<string, unknown>;
+}
+
 // ── Customer number generator ─────────────────────────────────────────────────
 export function generateCustomerNumber(): string {
   const year = new Date().getFullYear();
@@ -363,7 +384,7 @@ export interface CustomerDocument {
 
 export async function listCustomerDocuments(customerId: string): Promise<CustomerDocument[]> {
   const res = await sbFetch(
-    `/rest/v1/service_customer_documents?customer_id=eq.${encodeURIComponent(customerId)}&order=created_at.desc`,
+    `/rest/v1/service_customer_documents?${ownerFilter(customerId)}&order=created_at.desc`,
     { method: 'GET' },
   );
   if (!res) return [];
@@ -371,7 +392,7 @@ export async function listCustomerDocuments(customerId: string): Promise<Custome
 }
 
 export async function saveCustomerDocument(doc: CustomerDocument): Promise<CustomerDocument | null> {
-  const payload = { ...doc, updated_at: new Date().toISOString() };
+  const payload = { ...withOwner(doc), updated_at: new Date().toISOString() };
   const res = await sbFetch('/rest/v1/service_customer_documents', {
     method: 'POST',
     headers: { Prefer: 'return=representation' },
@@ -386,7 +407,7 @@ export async function updateCustomerDocument(id: string, patch: Partial<Customer
   const res = await sbFetch(`/rest/v1/service_customer_documents?id=eq.${encodeURIComponent(id)}`, {
     method: 'PATCH',
     headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
+    body: JSON.stringify({ ...withOwner(patch), updated_at: new Date().toISOString() }),
   });
   return res !== null;
 }
@@ -406,7 +427,8 @@ export async function uploadDocumentFile(
   file: File,
 ): Promise<{ path: string; url: string } | null> {
   const ext = file.name.split('.').pop() || 'bin';
-  const path = `service-customers/${customerId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+  const crm = crmIdOf(customerId);
+  const path = `${crm ? `crm-customers/${crm}` : `service-customers/${customerId}`}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
   const uploadUrl = `${SUPA_URL}/storage/v1/object/${BUCKET}/${path}`;
   try {
     const res = await fetch(uploadUrl, {
@@ -503,7 +525,7 @@ export interface ComplianceItem {
 
 export async function listComplianceItems(customerId: string): Promise<ComplianceItem[]> {
   const res = await sbFetch(
-    `/rest/v1/service_customer_compliance_items?customer_id=eq.${encodeURIComponent(customerId)}&order=expiry_date.asc.nullslast`,
+    `/rest/v1/service_customer_compliance_items?${ownerFilter(customerId)}&order=expiry_date.asc.nullslast`,
     { method: 'GET' },
   );
   if (!res) return [];
@@ -516,7 +538,7 @@ export async function listComplianceItems(customerId: string): Promise<Complianc
 // customers list and needs its own query.
 export async function findCustomerIdByLicenseNumber(licenseNumber: string): Promise<string | null> {
   const res = await sbFetch(
-    `/rest/v1/service_customer_compliance_items?license_number=eq.${encodeURIComponent(licenseNumber)}&select=customer_id&limit=1`,
+    `/rest/v1/service_customer_compliance_items?license_number=eq.${encodeURIComponent(licenseNumber)}&customer_id=not.is.null&select=customer_id&limit=1`,
     { method: 'GET' },
   );
   if (!res) return null;
@@ -535,7 +557,7 @@ export async function saveComplianceItem(item: ComplianceItem): Promise<Complian
       const rows = await existing.json().catch(() => []);
       if (Array.isArray(rows) && rows.length > 0) {
         const existingId = rows[0].id;
-        const patch = { ...item, updated_at: new Date().toISOString() };
+        const patch = { ...withOwner(item), updated_at: new Date().toISOString() };
         const upRes = await sbFetch(
           `/rest/v1/service_customer_compliance_items?id=eq.${encodeURIComponent(existingId)}`,
           { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) },
@@ -546,7 +568,7 @@ export async function saveComplianceItem(item: ComplianceItem): Promise<Complian
       }
     }
   }
-  const payload = { ...item, updated_at: new Date().toISOString() };
+  const payload = { ...withOwner(item), updated_at: new Date().toISOString() };
   const res = await sbFetch('/rest/v1/service_customer_compliance_items', {
     method: 'POST',
     headers: { Prefer: 'return=representation' },
@@ -561,7 +583,7 @@ export async function updateComplianceItem(id: string, patch: Partial<Compliance
   const res = await sbFetch(`/rest/v1/service_customer_compliance_items?id=eq.${encodeURIComponent(id)}`, {
     method: 'PATCH',
     headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
+    body: JSON.stringify({ ...withOwner(patch), updated_at: new Date().toISOString() }),
   });
   return res !== null;
 }
@@ -602,7 +624,7 @@ export interface CustomerPerson {
 
 export async function listPersons(customerId: string): Promise<CustomerPerson[]> {
   const res = await sbFetch(
-    `/rest/v1/service_customer_persons?customer_id=eq.${encodeURIComponent(customerId)}&order=created_at.asc`,
+    `/rest/v1/service_customer_persons?${ownerFilter(customerId)}&order=created_at.asc`,
     { method: 'GET' },
   );
   if (!res) return [];
@@ -610,7 +632,7 @@ export async function listPersons(customerId: string): Promise<CustomerPerson[]>
 }
 
 export async function savePerson(p: CustomerPerson): Promise<CustomerPerson | null> {
-  const payload = { ...p, updated_at: new Date().toISOString() };
+  const payload = { ...withOwner(p), updated_at: new Date().toISOString() };
   const res = await sbFetch('/rest/v1/service_customer_persons', {
     method: 'POST',
     headers: { Prefer: 'return=representation' },
@@ -625,7 +647,7 @@ export async function updatePerson(id: string, patch: Partial<CustomerPerson>): 
   const res = await sbFetch(`/rest/v1/service_customer_persons?id=eq.${encodeURIComponent(id)}`, {
     method: 'PATCH',
     headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
+    body: JSON.stringify({ ...withOwner(patch), updated_at: new Date().toISOString() }),
   });
   return res !== null;
 }
@@ -643,7 +665,7 @@ export async function listExpiringCompliance(days = 90): Promise<ComplianceItem[
   const today  = new Date().toISOString().slice(0, 10);
   // Items where expiry_date <= future (includes already expired)
   const res = await sbFetch(
-    `/rest/v1/service_customer_compliance_items?expiry_date=lte.${future}&status=eq.ACTIVE&order=expiry_date.asc&limit=200`,
+    `/rest/v1/service_customer_compliance_items?expiry_date=lte.${future}&status=eq.ACTIVE&customer_id=not.is.null&order=expiry_date.asc&limit=200`,
     { method: 'GET' },
   );
   if (!res) return [];
