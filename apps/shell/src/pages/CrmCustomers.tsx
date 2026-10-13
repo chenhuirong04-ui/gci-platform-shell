@@ -22,16 +22,6 @@ const TEXT = colors.textPrimary;
 const CARD = 'rgba(255,255,255,0.025)';
 const BORD = 'rgba(255,255,255,0.07)';
 
-// Nav final collapse (2026-09-16) — this page is now the "客户档案" first
-// tab of the sidebar's 客户与项目 entry (a future 项目 tab would be a
-// sibling of OUTER_TABS below, not built this round — no other content
-// exists yet). VIEWS below is a separate, pre-existing inner tab strip
-// (directory/today/overdue/archived) that stays exactly as it was.
-type OuterTab = 'customerArchive';
-const OUTER_TABS: { key: OuterTab; label: string }[] = [
-  { key: 'customerArchive', label: '客户档案' },
-];
-
 type ViewKey = 'directory' | 'today' | 'overdue' | 'archived';
 
 const VIEWS: { key: ViewKey; label: string }[] = [
@@ -72,7 +62,6 @@ function fmtDate(d: string | null): string {
 
 export function CrmCustomers() {
   const navigate = useNavigate();
-  const [outerTab, setOuterTab] = useState<OuterTab>('customerArchive');
   const [view, setView] = useState<ViewKey>('directory');
   const [rows, setRows] = useState<CrmCustomerWithContact[] | CrmOverdueCustomer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -224,24 +213,6 @@ export function CrmCustomers() {
             GIA 智能助手
           </button>
         </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
-        {OUTER_TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setOuterTab(t.key)}
-            style={{
-              padding: '8px 16px', borderRadius: 9, fontSize: 12.5, cursor: 'pointer',
-              background: outerTab === t.key ? `linear-gradient(135deg,${GOLD},#E2C988)` : 'rgba(255,255,255,0.04)',
-              border: `1px solid ${outerTab === t.key ? 'transparent' : BORD}`,
-              color: outerTab === t.key ? '#080D1E' : MUTED,
-              fontWeight: outerTab === t.key ? 700 : 400,
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
       </div>
 
       {notice && (
