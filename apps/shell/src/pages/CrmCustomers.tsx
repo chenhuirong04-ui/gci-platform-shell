@@ -315,7 +315,19 @@ export function CrmCustomers() {
                   onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <td style={{ padding: '10px 14px', color: TEXT, fontWeight: 600 }}>{r.customer_name}</td>
+                  {/* The name is the visible "open profile" entry — the 详情 button sits in the last column, off-screen on a laptop-width table. */}
+                  <td style={{ padding: '10px 14px' }} onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={() => setDrawerRow(r)}
+                      title="查看客户档案"
+                      aria-label={`查看客户档案：${r.customer_name}`}
+                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', color: TEXT, fontWeight: 600, fontSize: 12.5, fontFamily: 'inherit' }}
+                    >
+                      <span style={{ textDecoration: 'underline', textDecorationColor: 'rgba(203,168,92,0.5)', textUnderlineOffset: 3 }}>{r.customer_name}</span>
+                      <span style={{ display: 'block', fontSize: 10.5, fontWeight: 400, color: GOLD, marginTop: 2 }}>查看档案 ›</span>
+                    </button>
+                  </td>
                   <td style={{ padding: '10px 14px', color: MUTED }}>{view === 'today' || view === 'overdue' ? (primaryContact(r) ?? '—') : primaryContact(r)}</td>
                   <td style={{ padding: '10px 14px', color: MUTED }}>{r.country || '—'}</td>
                   <td style={{ padding: '10px 14px', color: MUTED }}>{r.business_type || '—'}</td>
