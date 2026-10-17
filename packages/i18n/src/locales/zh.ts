@@ -807,6 +807,13 @@ export const zh: typeof en = {
       recentCommsTitle: '最新跟进动态',
       noRecentItems: '暂无记录',
       noPendingItems: '暂无待处理事项',
+      viewAll: '查看全部 →',
+      close: '关闭',
+      previousPage: '上一页',
+      nextPage: '下一页',
+      pageOf: '第 {page} / {total} 页',
+      totalRecords: '共 {count} 条记录',
+      loadError: '记录加载失败，请稍后重试',
     },
     workspace: {
       na: '待补充',

@@ -806,6 +806,13 @@ export const en = {
       recentCommsTitle: 'Latest Follow-up Activity',
       noRecentItems: 'Nothing yet',
       noPendingItems: 'No pending items',
+      viewAll: 'View all →',
+      close: 'Close',
+      previousPage: 'Previous',
+      nextPage: 'Next',
+      pageOf: 'Page {page} of {total}',
+      totalRecords: '{count} records',
+      loadError: 'Could not load records. Please try again.',
     },
     workspace: {
       na: 'To be completed',

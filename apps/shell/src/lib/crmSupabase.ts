@@ -269,6 +269,59 @@ export async function getRecentlyUpdatedCustomers(
   return { ok: true, rows: (data ?? []) as CrmRecentlyUpdatedRow[] };
 }
 
+// Business Overview "view all" — Supabase projects can cap a single response,
+// so read in stable batches instead of treating one large .limit() as complete.
+export async function getAllRecentlyUpdatedCustomers(): Promise<
+  { ok: true; rows: CrmRecentlyUpdatedRow[] } | { ok: false; error: string }
+> {
+  const rows: CrmRecentlyUpdatedRow[] = [];
+  const batchSize = 1000;
+  for (let from = 0; ; from += batchSize) {
+    const { data, error } = await supabase
+      .from('crm_customers')
+      .select('id, customer_name, updated_at, status, business_type')
+      .eq('is_active', true)
+      .order('updated_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, from + batchSize - 1);
+    if (error) return { ok: false, error: error.message };
+    const batch = (data ?? []) as CrmRecentlyUpdatedRow[];
+    rows.push(...batch);
+    if (batch.length < batchSize) break;
+  }
+  return { ok: true, rows };
+}
+
+// Business Overview "view all" pending records. This is the complete form of
+// the existing today + overdue rule and deliberately keeps the same closed
+// status exclusions as getOverdueFollowups().
+export async function getAllPendingFollowups(): Promise<
+  { ok: true; rows: CrmCustomer[] } | { ok: false; error: string }
+> {
+  const today = todayISO();
+  const rows: CrmCustomer[] = [];
+  const batchSize = 1000;
+  for (let from = 0; ; from += batchSize) {
+    const { data, error } = await supabase
+      .from('crm_customers')
+      .select('*, crm_contacts(contact_name, is_primary)')
+      .lte('next_follow_up_at', today)
+      .not('next_follow_up_at', 'is', null)
+      .eq('is_active', true)
+      .order('next_follow_up_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + batchSize - 1);
+    if (error) return { ok: false, error: error.message };
+    const batch = (data ?? []) as CrmCustomer[];
+    rows.push(...batch);
+    if (batch.length < batchSize) break;
+  }
+  return {
+    ok: true,
+    rows: rows.filter((c) => !CLOSED_STATUSES.some((s) => (c.status || '').trim().toLowerCase() === s)),
+  };
+}
+
 // Business Overview data-source cleanup (2026-09-16) — "最近30天活跃"
 // replacement for the legacy old-cache-derived count. Count-only
 // query (head:true) since the tile only needs a number, not rows.
@@ -484,6 +537,31 @@ export async function getRecentFollowupsWithNotes(
     ...r,
     customer_name: r.crm_customers?.customer_name ?? null,
   }));
+  return { ok: true, rows };
+}
+
+// Business Overview "view all" follow-ups. No date window or total-row cap;
+// stable ordering keeps pagination deterministic even when dates are equal.
+export async function getAllFollowupsWithNotes(): Promise<
+  { ok: true; rows: CrmFollowupWithCustomer[] } | { ok: false; error: string }
+> {
+  const rows: CrmFollowupWithCustomer[] = [];
+  const batchSize = 1000;
+  for (let from = 0; ; from += batchSize) {
+    const { data, error } = await supabase
+      .from('crm_followups')
+      .select('id, customer_id, follow_up_date, next_follow_up_at, method, notes, next_action, status_after, owner, crm_customers(customer_name)')
+      .order('follow_up_date', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, from + batchSize - 1);
+    if (error) return { ok: false, error: error.message };
+    const batch = (data ?? []).map((r: any) => ({
+      ...r,
+      customer_name: r.crm_customers?.customer_name ?? null,
+    })) as CrmFollowupWithCustomer[];
+    rows.push(...batch);
+    if (batch.length < batchSize) break;
+  }
   return { ok: true, rows };
 }
 

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Calendar, AlertTriangle, Briefcase,
-  ChevronRight, TrendingUp, Users, MessageSquare
+  ChevronLeft, ChevronRight, TrendingUp, Users, MessageSquare, X
 } from 'lucide-react';
 import { PageHeader, StatCard } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
@@ -14,7 +14,8 @@ import { useI18n } from '@gci/i18n';
 import {
   getRecentlyUpdatedCustomers, getRecentNewCustomers, getRecentFollowupsWithNotes,
   getAllCustomerNames, getActiveCustomerCount, getTodaysFollowups, getOverdueFollowups,
-  getHighPriorityCustomerCount,
+  getHighPriorityCustomerCount, getAllRecentlyUpdatedCustomers,
+  getAllPendingFollowups, getAllFollowupsWithNotes,
   type CrmCustomer, type CrmRecentlyUpdatedRow, type CrmFollowupWithCustomer,
 } from '../../../apps/shell/src/lib/crmSupabase';
 // Business Overview data-source cleanup (2026-09-16) — "项目总数" now reads
@@ -30,6 +31,23 @@ const CARD2  = '#162A45';
 const BORDER = 'rgba(255,255,255,0.09)';
 const T1     = '#E8F0FF';
 const T2     = '#7A9CC5';
+const PAGE_SIZE = 20;
+
+type AllListKey = 'businesses' | 'pending' | 'followups';
+type AllListRow = CrmRecentlyUpdatedRow | CrmCustomer | CrmFollowupWithCustomer;
+
+function sortPendingItems(rows: CrmCustomer[]): CrmCustomer[] {
+  const today = new Date(Date.now() + 4 * 3600 * 1000).toISOString().slice(0, 10);
+  const rank = (row: CrmCustomer) => {
+    if (row.next_follow_up_at && row.next_follow_up_at.slice(0, 10) < today) return 0;
+    const status = (row.status || '').toLowerCase();
+    if (status.includes('待报价') || status.includes('quote')) return 1;
+    if (status.includes('待确认') || status.includes('需求') || status.includes('confirm')) return 2;
+    return 3;
+  };
+  return [...rows].sort((a, b) => rank(a) - rank(b)
+    || (a.next_follow_up_at || '9999').localeCompare(b.next_follow_up_at || '9999'));
+}
 
 function SectionHeader({ icon, title, color = T1 }: {
   icon: React.ReactNode; title: string; color?: string;
@@ -85,6 +103,11 @@ export default function ControlCenter() {
   const [recentUpdated, setRecentUpdated] = useState<CrmRecentlyUpdatedRow[] | null>(null);
   const [pendingFollowups, setPendingFollowups] = useState<CrmCustomer[] | null>(null);
   const [recentFollowups, setRecentFollowups] = useState<CrmFollowupWithCustomer[] | null>(null);
+  const [allList, setAllList] = useState<AllListKey | null>(null);
+  const [allRows, setAllRows] = useState<AllListRow[]>([]);
+  const [allLoading, setAllLoading] = useState(false);
+  const [allError, setAllError] = useState(false);
+  const [allPage, setAllPage] = useState(1);
 
   // Business Overview data-source cleanup (2026-09-16) — real crm_customers/
   // crm_projects counts, replacing the legacy old-cache-derived
@@ -134,22 +157,48 @@ export default function ControlCenter() {
   }, []);
   const goToCustomer = (name: string) => navigate(`/business-assistant?customer=${encodeURIComponent(name)}`);
   const goToComms = () => navigate('/crm?tab=comms');
+  const goToCustomerRecord = (id: string) => navigate(`/crm-customers?customer_id=${encodeURIComponent(id)}`);
+
+  useEffect(() => {
+    if (!allList) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setAllList(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [allList]);
+
+  const openAll = async (key: AllListKey) => {
+    setAllList(key);
+    setAllRows([]);
+    setAllPage(1);
+    setAllError(false);
+    setAllLoading(true);
+    const result = key === 'businesses'
+      ? await getAllRecentlyUpdatedCustomers()
+      : key === 'pending'
+        ? await getAllPendingFollowups()
+        : await getAllFollowupsWithNotes();
+    if (result.ok) {
+      setAllRows(key === 'pending' ? sortPendingItems(result.rows as CrmCustomer[]) : result.rows);
+    } else {
+      setAllError(true);
+    }
+    setAllLoading(false);
+  };
 
   const pendingItems = useMemo(() => {
     if (pendingFollowups === null) return null;
-    const today = new Date(Date.now() + 4 * 3600 * 1000).toISOString().slice(0, 10);
-    const rank = (row: CrmCustomer) => {
-      if (row.next_follow_up_at && row.next_follow_up_at.slice(0, 10) < today) return 0;
-      const status = (row.status || '').toLowerCase();
-      if (status.includes('待报价') || status.includes('quote')) return 1;
-      if (status.includes('待确认') || status.includes('需求') || status.includes('confirm')) return 2;
-      return 3;
-    };
-    return [...pendingFollowups]
-      .sort((a, b) => rank(a) - rank(b)
-        || (a.next_follow_up_at || '9999').localeCompare(b.next_follow_up_at || '9999'))
-      .slice(0, 4);
+    return sortPendingItems(pendingFollowups).slice(0, 4);
   }, [pendingFollowups]);
+
+  const allPageCount = Math.max(1, Math.ceil(allRows.length / PAGE_SIZE));
+  const allPageRows = allRows.slice((allPage - 1) * PAGE_SIZE, allPage * PAGE_SIZE);
+  const allTitle = allList === 'businesses'
+    ? ct.recentBusinessesTitle
+    : allList === 'pending'
+      ? ct.recentCustomersTitle
+      : ct.recentCommsTitle;
 
   // Legacy `dashboardStats` (buildDashboardStats(tasks, todayFollowupCount))
   // removed in the 2026-09-16 (third revision) cleanup — every number it
@@ -206,55 +255,105 @@ export default function ControlCenter() {
       {/* Recent activity — three compact lists so "最近有多少项目/客户/沟通"
           is answerable at a glance without opening another tab. */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="rounded-[18px] border p-5 shadow-sm" style={{ backgroundColor: CARD, borderColor: BORDER }}>
+        <div className="rounded-[18px] border p-5 shadow-sm flex flex-col" style={{ backgroundColor: CARD, borderColor: BORDER }}>
           <SectionHeader icon={<Briefcase className="w-4 h-4" />} title={ct.recentBusinessesTitle} />
-          {recentUpdated === null
-            ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{(lang === 'zh' ? '加载中…' : 'Loading…')}</div>
-            : recentUpdated.length === 0
-              ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{ct.noRecentItems}</div>
-              : recentUpdated.map(c => (
-                  <RealCrmRow
-                    key={c.id}
-                    name={c.customer_name}
-                    sub={c.status || c.business_type}
-                    dateLabel={c.updated_at?.slice(0, 10) || null}
-                    onClick={() => goToCustomer(c.customer_name)}
-                  />
-                ))}
+          <div className="flex-1">
+            {recentUpdated === null
+              ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{(lang === 'zh' ? '加载中…' : 'Loading…')}</div>
+              : recentUpdated.length === 0
+                ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{ct.noRecentItems}</div>
+                : recentUpdated.map(c => (
+                    <RealCrmRow
+                      key={c.id}
+                      name={c.customer_name}
+                      sub={c.status || c.business_type}
+                      dateLabel={c.updated_at?.slice(0, 10) || null}
+                      onClick={() => goToCustomer(c.customer_name)}
+                    />
+                  ))}
+          </div>
+          <button onClick={() => void openAll('businesses')} className="mt-2 w-full border-t pt-3 text-right text-xs font-black transition-colors" style={{ borderColor: BORDER, color: GOLD }}>{ct.viewAll}</button>
         </div>
-        <div className="rounded-[18px] border p-5 shadow-sm" style={{ backgroundColor: CARD, borderColor: BORDER }}>
+        <div className="rounded-[18px] border p-5 shadow-sm flex flex-col" style={{ backgroundColor: CARD, borderColor: BORDER }}>
           <SectionHeader icon={<Users className="w-4 h-4" />} title={ct.recentCustomersTitle} />
-          {pendingItems === null
-            ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{(lang === 'zh' ? '加载中…' : 'Loading…')}</div>
-            : pendingItems.length === 0
-              ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{ct.noPendingItems}</div>
-              : pendingItems.map(c => (
-                  <RealCrmRow
-                    key={c.id}
-                    name={c.customer_name}
-                    sub={[c.status, c.next_action || c.follow_up_notes].filter(Boolean).join(' · ') || null}
-                    dateLabel={c.next_follow_up_at?.slice(0, 10) || null}
-                    onClick={() => goToCustomer(c.customer_name)}
-                  />
-                ))}
+          <div className="flex-1">
+            {pendingItems === null
+              ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{(lang === 'zh' ? '加载中…' : 'Loading…')}</div>
+              : pendingItems.length === 0
+                ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{ct.noPendingItems}</div>
+                : pendingItems.map(c => (
+                    <RealCrmRow
+                      key={c.id}
+                      name={c.customer_name}
+                      sub={[c.status, c.next_action || c.follow_up_notes].filter(Boolean).join(' · ') || null}
+                      dateLabel={c.next_follow_up_at?.slice(0, 10) || null}
+                      onClick={() => goToCustomer(c.customer_name)}
+                    />
+                  ))}
+          </div>
+          <button onClick={() => void openAll('pending')} className="mt-2 w-full border-t pt-3 text-right text-xs font-black transition-colors" style={{ borderColor: BORDER, color: GOLD }}>{ct.viewAll}</button>
         </div>
-        <div className="rounded-[18px] border p-5 shadow-sm" style={{ backgroundColor: CARD, borderColor: BORDER }}>
+        <div className="rounded-[18px] border p-5 shadow-sm flex flex-col" style={{ backgroundColor: CARD, borderColor: BORDER }}>
           <SectionHeader icon={<MessageSquare className="w-4 h-4" />} title={ct.recentCommsTitle} />
-          {recentFollowups === null
-            ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{(lang === 'zh' ? '加载中…' : 'Loading…')}</div>
-            : recentFollowups.length === 0
-              ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{ct.noRecentItems}</div>
-              : recentFollowups.map((f) => (
-                  <RealCrmRow
-                    key={f.id}
-                    name={f.customer_name || '—'}
-                    sub={f.notes || f.next_action || '—'}
-                    dateLabel={f.follow_up_date?.slice(0, 10) || null}
-                    onClick={() => f.customer_name ? goToCustomer(f.customer_name) : goToComms()}
-                  />
-                ))}
+          <div className="flex-1">
+            {recentFollowups === null
+              ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{(lang === 'zh' ? '加载中…' : 'Loading…')}</div>
+              : recentFollowups.length === 0
+                ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{ct.noRecentItems}</div>
+                : recentFollowups.map((f) => (
+                    <RealCrmRow
+                      key={f.id}
+                      name={f.customer_name || '—'}
+                      sub={f.notes || f.next_action || '—'}
+                      dateLabel={f.follow_up_date?.slice(0, 10) || null}
+                      onClick={() => f.customer_name ? goToCustomer(f.customer_name) : goToComms()}
+                    />
+                  ))}
+          </div>
+          <button onClick={() => void openAll('followups')} className="mt-2 w-full border-t pt-3 text-right text-xs font-black transition-colors" style={{ borderColor: BORDER, color: GOLD }}>{ct.viewAll}</button>
         </div>
       </div>
+
+      {allList && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={allTitle}>
+          <button className="absolute inset-0 bg-black/70" aria-label={ct.close} onClick={() => setAllList(null)} />
+          <div className="relative z-10 flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-[20px] border shadow-2xl" style={{ background: NAVY, borderColor: 'rgba(203,168,92,0.35)' }}>
+            <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: BORDER }}>
+              <div>
+                <h2 className="text-base font-black" style={{ color: T1 }}>{allTitle}</h2>
+                {!allLoading && !allError && <p className="mt-1 text-[11px] font-bold" style={{ color: T2 }}>{ct.totalRecords.replace('{count}', String(allRows.length))}</p>}
+              </div>
+              <button onClick={() => setAllList(null)} className="rounded-lg p-2" aria-label={ct.close} style={{ color: T2 }}><X className="h-5 w-5" /></button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              {allLoading && <div className="py-10 text-center text-sm font-bold" style={{ color: T2 }}>{lang === 'zh' ? '加载中…' : 'Loading…'}</div>}
+              {allError && <div className="py-10 text-center text-sm font-bold" style={{ color: '#E0846A' }}>{ct.loadError}</div>}
+              {!allLoading && !allError && allPageRows.length === 0 && <div className="py-10 text-center text-sm font-bold" style={{ color: T2 }}>{allList === 'pending' ? ct.noPendingItems : ct.noRecentItems}</div>}
+              {!allLoading && !allError && allPageRows.map(row => {
+                if (allList === 'businesses') {
+                  const c = row as CrmRecentlyUpdatedRow;
+                  return <RealCrmRow key={c.id} name={c.customer_name} sub={c.status || c.business_type} dateLabel={c.updated_at?.slice(0, 10) || null} onClick={() => goToCustomerRecord(c.id)} />;
+                }
+                if (allList === 'pending') {
+                  const c = row as CrmCustomer;
+                  return <RealCrmRow key={c.id} name={c.customer_name} sub={[c.status, c.next_action || c.follow_up_notes].filter(Boolean).join(' · ') || null} dateLabel={c.next_follow_up_at?.slice(0, 10) || null} onClick={() => goToCustomerRecord(c.id)} />;
+                }
+                const f = row as CrmFollowupWithCustomer;
+                return <RealCrmRow key={f.id} name={f.customer_name || '—'} sub={f.notes || f.next_action || '—'} dateLabel={f.follow_up_date?.slice(0, 10) || null} onClick={() => goToCustomerRecord(f.customer_id)} />;
+              })}
+            </div>
+
+            {!allLoading && !allError && allRows.length > 0 && (
+              <div className="flex items-center justify-between gap-3 border-t px-5 py-4" style={{ borderColor: BORDER }}>
+                <button disabled={allPage === 1} onClick={() => setAllPage(page => Math.max(1, page - 1))} className="flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-30" style={{ color: GOLD, border: `1px solid ${BORDER}` }}><ChevronLeft className="h-3.5 w-3.5" />{ct.previousPage}</button>
+                <span className="text-[11px] font-bold" style={{ color: T2 }}>{ct.pageOf.replace('{page}', String(allPage)).replace('{total}', String(allPageCount))}</span>
+                <button disabled={allPage === allPageCount} onClick={() => setAllPage(page => Math.min(allPageCount, page + 1))} className="flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-30" style={{ color: GOLD, border: `1px solid ${BORDER}` }}>{ct.nextPage}<ChevronRight className="h-3.5 w-3.5" /></button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Task-oriented KPIs — kept, but now secondary to the overview above */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
