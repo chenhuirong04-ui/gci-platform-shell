@@ -15,20 +15,13 @@ import {
   getRecentlyUpdatedCustomers, getRecentNewCustomers, getRecentFollowupsWithNotes,
   getAllCustomerNames, getActiveCustomerCount, getTodaysFollowups, getOverdueFollowups,
   getHighPriorityCustomerCount,
-  type CrmRecentlyUpdatedRow, type CrmNewCustomerRow, type CrmFollowupWithCustomer,
+  type CrmCustomer, type CrmRecentlyUpdatedRow, type CrmFollowupWithCustomer,
 } from '../../../apps/shell/src/lib/crmSupabase';
 // Business Overview data-source cleanup (2026-09-16) — "项目总数" now reads
 // the real crm_projects table instead of the legacy old-cache-derived
 // businessType='PROJECT' count. Same cross-module import convention as the
 // crmSupabase import above.
 import { listAllProjects } from '../../../apps/shell/src/lib/crmProjects';
-
-// A raw migration-bookkeeping marker (crm_customers.source, set once by the
-// 2026-09-15 Notion migration script) is not customer-facing information —
-// never render it as if it were a business_type/source label.
-function isMigrationMarker(v: string | null | undefined): boolean {
-  return !!v && /^notion_migration/i.test(v);
-}
 
 const GOLD = '#B8960C';
 const NAVY = '#0F172A';
@@ -90,7 +83,7 @@ export default function ControlCenter() {
   // 2026-09) — fetched independently of the legacy tasks/projects props,
   // which still drive the stat cards above/below (out of this round's scope).
   const [recentUpdated, setRecentUpdated] = useState<CrmRecentlyUpdatedRow[] | null>(null);
-  const [recentNewCustomers, setRecentNewCustomers] = useState<CrmNewCustomerRow[] | null>(null);
+  const [pendingFollowups, setPendingFollowups] = useState<CrmCustomer[] | null>(null);
   const [recentFollowups, setRecentFollowups] = useState<CrmFollowupWithCustomer[] | null>(null);
 
   // Business Overview data-source cleanup (2026-09-16) — real crm_customers/
@@ -119,7 +112,7 @@ export default function ControlCenter() {
   useEffect(() => {
     getRecentlyUpdatedCustomers(4).then(res => { if (res.ok) setRecentUpdated(res.rows); });
     getRecentNewCustomers(7).then(res => {
-      if (res.ok) { setRecentNewCustomers(res.rows.slice(0, 4)); setNewCustomers7d(res.rows.length); }
+      if (res.ok) setNewCustomers7d(res.rows.length);
     });
     getRecentFollowupsWithNotes(30).then(res => { if (res.ok) setRecentFollowups(res.rows.slice(0, 4)); });
     getAllCustomerNames().then(res => { if (res.ok) setCustomerTotal(res.rows.length); });
@@ -128,11 +121,35 @@ export default function ControlCenter() {
       setProjectTotal(rows.length);
       setActiveProjectsReal(rows.filter(p => p.status === 'active').length);
     });
-    getTodaysFollowups().then(res => { if (res.ok) setTodayFollowupsReal(res.rows.length); });
+    Promise.all([getTodaysFollowups(), getOverdueFollowups()]).then(([today, overdue]) => {
+      if (today.ok) setTodayFollowupsReal(today.rows.length);
+      if (overdue.ok) setOverdueReal(overdue.rows.length);
+      if (today.ok && overdue.ok) {
+        const byId = new Map<string, CrmCustomer>();
+        [...overdue.rows, ...today.rows].forEach(row => byId.set(row.id, row));
+        setPendingFollowups([...byId.values()]);
+      }
+    });
     getHighPriorityCustomerCount().then(res => { if (res.ok) setHighPriorityReal(res.count); });
-    getOverdueFollowups().then(res => { if (res.ok) setOverdueReal(res.rows.length); });
   }, []);
   const goToCustomer = (name: string) => navigate(`/business-assistant?customer=${encodeURIComponent(name)}`);
+  const goToComms = () => navigate('/crm?tab=comms');
+
+  const pendingItems = useMemo(() => {
+    if (pendingFollowups === null) return null;
+    const today = new Date(Date.now() + 4 * 3600 * 1000).toISOString().slice(0, 10);
+    const rank = (row: CrmCustomer) => {
+      if (row.next_follow_up_at && row.next_follow_up_at.slice(0, 10) < today) return 0;
+      const status = (row.status || '').toLowerCase();
+      if (status.includes('待报价') || status.includes('quote')) return 1;
+      if (status.includes('待确认') || status.includes('需求') || status.includes('confirm')) return 2;
+      return 3;
+    };
+    return [...pendingFollowups]
+      .sort((a, b) => rank(a) - rank(b)
+        || (a.next_follow_up_at || '9999').localeCompare(b.next_follow_up_at || '9999'))
+      .slice(0, 4);
+  }, [pendingFollowups]);
 
   // Legacy `dashboardStats` (buildDashboardStats(tasks, todayFollowupCount))
   // removed in the 2026-09-16 (third revision) cleanup — every number it
@@ -207,16 +224,16 @@ export default function ControlCenter() {
         </div>
         <div className="rounded-[18px] border p-5 shadow-sm" style={{ backgroundColor: CARD, borderColor: BORDER }}>
           <SectionHeader icon={<Users className="w-4 h-4" />} title={ct.recentCustomersTitle} />
-          {recentNewCustomers === null
+          {pendingItems === null
             ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{(lang === 'zh' ? '加载中…' : 'Loading…')}</div>
-            : recentNewCustomers.length === 0
-              ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{ct.noRecentItems}</div>
-              : recentNewCustomers.map(c => (
+            : pendingItems.length === 0
+              ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{ct.noPendingItems}</div>
+              : pendingItems.map(c => (
                   <RealCrmRow
                     key={c.id}
                     name={c.customer_name}
-                    sub={c.business_type || (isMigrationMarker(c.source) ? null : c.source)}
-                    dateLabel={c.created_at?.slice(0, 10) || null}
+                    sub={[c.status, c.next_action || c.follow_up_notes].filter(Boolean).join(' · ') || null}
+                    dateLabel={c.next_follow_up_at?.slice(0, 10) || null}
                     onClick={() => goToCustomer(c.customer_name)}
                   />
                 ))}
@@ -228,15 +245,13 @@ export default function ControlCenter() {
             : recentFollowups.length === 0
               ? <div className="text-xs font-medium py-3" style={{ color: T2 }}>{ct.noRecentItems}</div>
               : recentFollowups.map((f) => (
-                  <button
+                  <RealCrmRow
                     key={f.id}
-                    onClick={() => f.customer_name && goToCustomer(f.customer_name)}
-                    className="w-full text-left px-3 py-2.5 rounded-xl mb-2 transition-colors"
-                    style={{ background: CARD2, border: `1px solid ${BORDER}` }}
-                  >
-                    <div className="text-xs font-black truncate" style={{ color: T1 }}>{f.customer_name || '—'}</div>
-                    <div className="text-[11px] truncate mt-0.5" style={{ color: T2 }}>{f.notes || f.next_action || '—'}</div>
-                  </button>
+                    name={f.customer_name || '—'}
+                    sub={f.notes || f.next_action || '—'}
+                    dateLabel={f.follow_up_date?.slice(0, 10) || null}
+                    onClick={() => f.customer_name ? goToCustomer(f.customer_name) : goToComms()}
+                  />
                 ))}
         </div>
       </div>
