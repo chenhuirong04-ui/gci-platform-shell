@@ -220,7 +220,7 @@ export default function ControlCenter() {
     <div className="space-y-8" style={{ color: T1 }}>
 
       {/* Header — shared PageHeader (GCI Design System V1 pilot) */}
-      <PageHeader title={ct.pageTitle} eyebrow={nowLabel} />
+      <PageHeader title={ct.pageTitle} eyebrow={nowLabel} className="[&>h1]:!text-white" />
 
       {/* Business Overview stats (V1) — asset-first framing: how many
           customers/projects exist and what changed recently.
