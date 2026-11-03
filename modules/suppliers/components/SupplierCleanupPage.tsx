@@ -3,10 +3,11 @@ import { useI18n, type Dictionary } from '@gci/i18n';
 import CountryDistributionChart from './CountryDistributionChart';
 import CategoryDistributionChart from './CategoryDistributionChart';
 import { getCountryLabel, getCategoryLabel } from '../lib/labelMaps';
+import { workspace } from '@gci/design-system';
 
 const GOLD = '#C9A84C';
 const NAVY = '#0c1b3a';
-const CARD_BORDER = '#e8e0d0';
+const CARD_BORDER = workspace.border;
 
 const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3000' : '';
 
@@ -332,7 +333,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
   })).filter(g => g.records.length > 1);
 
   return (
-    <div style={{ minHeight: 'calc(100vh - 49px)', background: '#f5f3ef' }}>
+    <div style={{ minHeight: 'calc(100vh - 49px)', background: workspace.surfacePage }}>
       {/* Header */}
       <div style={{ background: '#fff', borderBottom: `1px solid ${CARD_BORDER}`, padding: '14px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
         <button
@@ -431,7 +432,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                     <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-                      <tr style={{ background: '#f5f3ef' }}>
+                      <tr style={{ background: workspace.surfaceSubtle }}>
                         <SH col="country" label={t.colCountry} />
                         <SH col="supplierCount" label={t.colSupplierCount} />
                         <SH col="percentage" label={t.colPercentage} />
@@ -440,7 +441,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                         <SH col="missingCategoryCount" label={t.colMissingCategory} />
                         <SH col="missingBizLicenseCount" label={t.colMissingBizLicense} />
                         <SH col="missingCatalogCount" label={t.colMissingCatalog} />
-                        <th style={{ padding: '10px 14px', fontSize: 11, color: '#64748b', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap', background: '#f5f3ef' }}>{t.colAction}</th>
+                        <th style={{ padding: '10px 14px', fontSize: 11, color: '#64748b', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap', background: workspace.surfaceSubtle }}>{t.colAction}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -515,7 +516,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                   </div>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                     <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-                      <tr style={{ background: '#f5f3ef' }}>
+                      <tr style={{ background: workspace.surfaceSubtle }}>
                         <SH col="category" label={t.colCategory} />
                         <SH col="supplierCount" label={t.colSupplierCount} />
                         <SH col="preferredCount" label={t.colPreferred} />
@@ -523,7 +524,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                         <SH col="catalogCount" label={t.colWithCatalog} />
                         <SH col="certificationCount" label={t.colWithCertification} />
                         <SH col="missingCountryCount" label={t.colMissingCountry} />
-                        <th style={{ padding: '10px 14px', fontSize: 11, color: '#64748b', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap', background: '#f5f3ef' }}>{t.colAction}</th>
+                        <th style={{ padding: '10px 14px', fontSize: 11, color: '#64748b', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap', background: workspace.surfaceSubtle }}>{t.colAction}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -641,7 +642,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                   <thead>
-                    <tr style={{ background: '#f5f3ef' }}>
+                    <tr style={{ background: workspace.surfaceSubtle }}>
                       {[t.pendingColName, t.pendingColCode, t.pendingColLocation, t.pendingColCategory, t.pendingColContact, t.pendingColPreferred, t.pendingColCompleteness, t.pendingColMissing, t.pendingColAction].map(h => (
                         <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap' }}>{h}</th>
                       ))}

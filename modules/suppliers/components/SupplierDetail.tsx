@@ -10,12 +10,13 @@ import DocumentCenter from './DocumentCenter';
 import CertificationManager from './CertificationManager';
 import QuoteHistory from './QuoteHistory';
 import RatingNotes from './RatingNotes';
+import { workspace } from '@gci/design-system';
 
 // ── Design tokens (matches Business Solutions module) ─────────────────────────
 const GOLD = '#C9A84C';
 const NAVY = '#0c1b3a';
-const PAGE_BG = '#f5f3ef';
-const CARD_BORDER = '#e8e0d0';
+const PAGE_BG = workspace.surfacePage;
+const CARD_BORDER = workspace.border;
 
 type TabKey = 'overview' | 'contacts' | 'products' | 'documents' | 'certifications' | 'quotes' | 'rating';
 
@@ -127,12 +128,12 @@ export default function SupplierDetail({ supplierId, onBack, onEdit }: Props) {
               onClick={() => setTab(a.tab)}
               style={{
                 padding: '7px 14px', borderRadius: 8,
-                background: '#f5f3ef', border: `1px solid ${CARD_BORDER}`,
+                background: workspace.surfaceSubtle, border: `1px solid ${CARD_BORDER}`,
                 fontSize: 12, fontWeight: 600, color: NAVY, cursor: 'pointer',
                 transition: 'background .12s',
               }}
               onMouseEnter={e => (e.currentTarget.style.background = `${GOLD}20`)}
-              onMouseLeave={e => (e.currentTarget.style.background = '#f5f3ef')}
+              onMouseLeave={e => (e.currentTarget.style.background = workspace.surfaceSubtle)}
             >
               {a.label}
             </button>

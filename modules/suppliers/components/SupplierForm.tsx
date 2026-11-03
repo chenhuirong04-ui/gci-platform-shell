@@ -4,12 +4,13 @@ import type { Supplier, SupplierType, SupplierStatus, SupplierRating, DocumentTy
 import { createSupplier, generateShortCode, updateSupplier } from '../lib/suppliersCloud';
 import { createDocument, moveStorageFile, resolveStorageBucket } from '../lib/documentsCloud';
 import { getStatusLabel, getDocTypeLabel, getSupplierTypeLabel } from '../lib/labelMaps';
+import { workspace } from '@gci/design-system';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const GOLD    = '#C9A84C';
 const NAVY    = '#0c1b3a';
-const BG      = '#f5f3ef';
-const CBORDER = '#e8e0d0';
+const BG      = workspace.surfacePage;
+const CBORDER = workspace.border;
 
 const INP: React.CSSProperties = {
   display: 'block', width: '100%', boxSizing: 'border-box',

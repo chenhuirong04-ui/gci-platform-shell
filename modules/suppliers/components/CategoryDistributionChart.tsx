@@ -1,10 +1,11 @@
 import React from 'react';
 import { useI18n } from '@gci/i18n';
 import { getCategoryLabel } from '../lib/labelMaps';
+import { workspace } from '@gci/design-system';
 
 const NAVY = '#0c1b3a';
 const GOLD = '#C9A84C';
-const CARD_BORDER = '#e8e0d0';
+const CARD_BORDER = workspace.border;
 
 interface CategoryBar {
   category: string;

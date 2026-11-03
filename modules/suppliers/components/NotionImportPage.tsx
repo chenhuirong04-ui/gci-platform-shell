@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from 'react';
 import { useI18n } from '@gci/i18n';
+import { workspace } from '@gci/design-system';
 
 const GOLD = '#C9A84C';
 const NAVY = '#0c1b3a';
-const CARD_BORDER = '#e8e0d0';
+const CARD_BORDER = workspace.border;
 const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost'
   ? 'http://localhost:3000'
   : '';
@@ -261,7 +262,7 @@ export default function NotionImportPage({ onBack }: Props) {
 
   // ────────────────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: 'calc(100vh - 49px)', background: '#f5f3ef', padding: '24px' }}>
+    <div style={{ minHeight: 'calc(100vh - 49px)', background: workspace.surfacePage, padding: '24px' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
@@ -372,7 +373,7 @@ export default function NotionImportPage({ onBack }: Props) {
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
-                  <tr style={{ background: '#f5f3ef' }}>
+                  <tr style={{ background: workspace.surfaceSubtle }}>
                     <th style={{ padding: '10px 14px', textAlign: 'left', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>
                         <input
@@ -545,7 +546,7 @@ export default function NotionImportPage({ onBack }: Props) {
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
-                <tr style={{ background: '#f5f3ef' }}>
+                <tr style={{ background: workspace.surfaceSubtle }}>
                   {[t.reportColName, t.reportColResult, t.reportColContacts, t.reportColCerts, t.reportColDocs, t.reportColWarnings].map(h => (
                     <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, borderBottom: `1px solid ${CARD_BORDER}` }}>{h}</th>
                   ))}
