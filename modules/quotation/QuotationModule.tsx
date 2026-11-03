@@ -3829,10 +3829,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     items: typeof draftItems,
     grandTotal: number,
     totalSelling: number,
-    totalVAT: number,
-    totalSupplierCost: number,
-    totalProfit: number,
-    overallMargin: number
+    totalVAT: number
   ) => {
     const doc = new jsPDF();
     const navy: [number, number, number] = [12, 27, 58];
@@ -3943,16 +3940,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     doc.text(`AED ${grandTotal.toFixed(2)}`, w - margin, y + 5.5, { align: 'right' });
     y += 14;
 
-    // Internal summary (light grey box) — Supplier Cost/Profit/Margin must NEVER appear on a
-    // Module 2-sourced customer PDF (Supplier Unit Cost / Margin % are always-internal fields).
-    if (!isModule2Quote) {
-      doc.setFillColor(245, 245, 248);
-      doc.rect(margin, y, w - margin * 2, 10, 'F');
-      doc.setTextColor(120, 120, 120);
-      doc.setFontSize(7.5); doc.setFont('helvetica', 'normal');
-      doc.text(`Supplier Cost: AED ${totalSupplierCost.toFixed(2)}  |  Profit: AED ${totalProfit.toFixed(2)}  |  Margin: ${overallMargin.toFixed(1)}%`, w / 2, y + 6.5, { align: 'center' });
-      y += 16;
-    }
+    // Customer PDFs never include internal costs, profit, or markup summaries.
 
     // Terms & Notes
     if (tradeTerms) {
@@ -6759,7 +6747,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 <div className="flex justify-center">
                   <button
                     onClick={() => {
-                      generateTradePDF(confirmed, grandTotal, totalSelling, totalVAT, totalSupplierCost, totalProfit, overallMargin);
+                      generateTradePDF(confirmed, grandTotal, totalSelling, totalVAT);
                       setPdfDownloaded(true);
                     }}
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white border border-[#0C1B3A]/15 text-[#0C1B3A] text-[13px] font-bold hover:border-[#C9A84C] transition-all"
@@ -6804,7 +6792,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
               <div className="flex flex-col sm:flex-row gap-4 pt-2">
                 <button
                   onClick={() => {
-                    generateTradePDF(confirmed, grandTotal, totalSelling, totalVAT, totalSupplierCost, totalProfit, overallMargin);
+                    generateTradePDF(confirmed, grandTotal, totalSelling, totalVAT);
                     setPdfDownloaded(true);
                   }}
                   className="flex-1 p-5 rounded-[24px] bg-white border-2 border-[#0C1B3A]/15 text-[#0C1B3A] flex justify-center items-center gap-3 font-black uppercase tracking-widest text-xs hover:border-[#C9A84C] transition-all active:scale-95"
