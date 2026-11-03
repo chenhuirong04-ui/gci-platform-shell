@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import JSZip from 'jszip';
 import { jsPDF } from 'jspdf';
@@ -1947,8 +1948,12 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             )}
           </div>
 
-          {/* Sticky cart bar */}
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#0C1B3A]/10 shadow-2xl px-6 py-4 flex items-center justify-between z-20">
+          {/* Sticky cart bar — portalled to <body>: the Shell's <main> keeps a transform
+              (fadeUp, fill-mode both) that would make `fixed` relative to it, and this
+              module's card is overflow:hidden, which defeats `sticky`. Starts right of the
+              sidebar from md up (sidebar hidden below md). */}
+          {createPortal(
+          <div className="fixed bottom-0 left-0 md:left-[var(--sidebar-w)] right-0 bg-white border-t border-[#0C1B3A]/10 shadow-2xl px-6 py-4 flex items-center justify-between z-20">
             <p className="text-[12px] font-bold text-[#0C1B3A]/60">{svcItems.length} service{svcItems.length === 1 ? '' : 's'} selected 已选择</p>
             <button onClick={() => setSvcView('editor')} disabled={svcItems.length === 0}
               className="px-8 py-3 rounded-[14px] text-[11px] font-black uppercase tracking-widest flex items-center gap-2 disabled:opacity-30 transition-all"
@@ -1956,7 +1961,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             >
               Continue to Quote 进入报价单 <ChevronRight className="w-4 h-4" />
             </button>
-          </div>
+          </div>,
+          document.body)}
         </div>
       );
     }
