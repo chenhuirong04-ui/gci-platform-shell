@@ -44,9 +44,57 @@ export const radii = {
   md: 10,
   lg: 14,
   xl: 18,
+  /** Badges / chips (Design System V1). */
+  pill: 9999,
 };
 
 export const spacing = [4, 8, 12, 16, 20, 24, 32, 40, 48, 64];
+
+/** Design System V1 — light business workspace (CRM, Quotation, Sales Ops /
+ * Finance, Suppliers, Settings content area). The dark brand area (sidebar,
+ * header, Home / Daily Workspace) keeps using `colors` above. Reference these
+ * by meaning (surface / text / border / accent / action), never by hex. */
+export const workspace = {
+  surfacePage: '#F5F6FA',
+  surfaceCard: '#FFFFFF',
+  /** Table header, read-only fields. */
+  surfaceSubtle: '#F8F9FB',
+  textPrimary: '#0C1B3A',
+  textSecondary: 'rgba(12,27,58,0.6)',
+  border: 'rgba(12,27,58,0.1)',
+  /** Selected-tab underline, focus ring, key figures. Only the dark gold reads
+   * well on a light background. */
+  accent: colors.goldMuted,
+  /** Primary button: navy fill, white text. */
+  actionPrimaryBg: colors.bgBase,
+  actionPrimaryText: '#FFFFFF',
+};
+
+/** Design System V1 type scale (px). Body 14, standard tables 13, minimum 12;
+ * `label` (11) is for mono code labels only. */
+export const fontSizes = {
+  label: 11,
+  xs: 12,
+  sm: 13,
+  md: 14,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  display: 32,
+};
+
+/** Design System V1 stacking order — one shared ladder instead of ad-hoc
+ * z-50 / z-[5000] values. */
+export const zIndex = {
+  base: 0,
+  header: 10,
+  stickyBar: 20,
+  dropdown: 30,
+  mobileNav: 100,
+  drawer: 1000,
+  modal: 1100,
+  toast: 1200,
+};
 
 export const logoGradient = `linear-gradient(135deg,${colors.goldStrong},${colors.goldMuted})`;
 

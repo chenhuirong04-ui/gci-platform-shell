@@ -39,6 +39,7 @@
   --r-md: 10px;
   --r-lg: 14px;
   --r-xl: 18px;
+  --r-pill: 9999px;
 
   /* SPACING SCALE */
   --s1: 4px;
@@ -51,4 +52,35 @@
   --s10: 40px;
   --s12: 48px;
   --s16: 64px;
+
+  /* DESIGN SYSTEM V1 — LIGHT BUSINESS WORKSPACE */
+  --ws-surface-page: #f5f6fa;
+  --ws-surface-card: #ffffff;
+  --ws-surface-subtle: #f8f9fb;
+  --ws-text-primary: #0c1b3a;
+  --ws-text-secondary: rgba(12, 27, 58, 0.6);
+  --ws-border: rgba(12, 27, 58, 0.1);
+  --ws-accent: var(--gold-muted);
+  --ws-action-primary-bg: var(--bg-base);
+  --ws-action-primary-text: #ffffff;
+
+  /* DESIGN SYSTEM V1 — TYPE SCALE */
+  --fs-label: 11px;
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-xxl: 24px;
+  --fs-display: 32px;
+
+  /* DESIGN SYSTEM V1 — Z-INDEX */
+  --z-base: 0;
+  --z-header: 10;
+  --z-sticky-bar: 20;
+  --z-dropdown: 30;
+  --z-mobile-nav: 100;
+  --z-drawer: 1000;
+  --z-modal: 1100;
+  --z-toast: 1200;
 }
