@@ -153,6 +153,8 @@ export const sections: SectionDef[] = [
       { code: 'VL', nameKey: 'supplierLibrary', path: '/suppliers' },
     ],
   },
+  // Temporarily hidden from sidebar navigation; routes and modules remain available.
+  /*
   {
     // BUSINESS SERVICES — split out of the old mixed "TRADE · 贸易运营"
     // section (2026-09-15); Business Solutions was never actually a Trade
@@ -166,6 +168,7 @@ export const sections: SectionDef[] = [
         modules: ['knowledge_public', 'knowledge', 'knowledge_confidential'], adminSees: true },
     ],
   },
+  */
   {
     // Nav consolidation V2 (2026-09): 资金流水 (CH) and 财务账 (FL) used to
     // be two separate sidebar rows pointing at two separate TradeModule
