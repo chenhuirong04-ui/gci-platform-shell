@@ -145,6 +145,11 @@ export async function saveQuotation(payload: SaveQuotationPayload): Promise<stri
  * conflict, or when existing items would be replaced by an empty list.
  */
 export async function updateQuotation(id: string, payload: SaveQuotationPayload): Promise<boolean> {
+  // The RPC refuses an update without a version token; fail fast with a clear reason.
+  if (!lastSeenUpdatedAt.has(id)) {
+    console.error('[quotationCloud] Update refused: quotation was not loaded or saved in this session (no version token)');
+    return false;
+  }
   return (await saveAtomic(id, payload)) !== null;
 }
 

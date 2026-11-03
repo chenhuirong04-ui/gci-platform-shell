@@ -4,7 +4,7 @@
 -- ones (a failed insert lost them). public.save_quotation_with_items() does the whole save atomically:
 --   * any error (constraint, bad input, conflict) rolls back the header AND the items — nothing half-written;
 --   * an update refuses to replace existing items with an empty list (protects against a failed/empty load);
---   * optional optimistic lock: p_expected_updated_at must match the row's updated_at, else the save is refused;
+--   * optimistic lock: an update MUST pass p_expected_updated_at (null is refused) and it must equal the row's updated_at;
 --   * header update only touches the keys present in p_record (same semantics as the old PostgREST PATCH);
 --   * item columns are whitelisted; sort_order is the array position.
 -- Permissions: SECURITY INVOKER — runs with the caller's own table privileges (anon/authenticated already hold them on
@@ -14,6 +14,7 @@
 -- ── STEP 0 — before snapshot (read-only; run separately, keep the output) ──
 -- select count(*) records, (select count(*) from public.quotation_items) items from public.quotation_records;
 -- select proname from pg_proc where proname = 'save_quotation_with_items';   -- expect 0 rows
+-- select count(*) from public.quotation_records where updated_at is null;     -- expect 0 (such a quote could not be updated: no version token)
 
 begin;
 
@@ -74,12 +75,16 @@ begin
     )
     returning id into v_id;
   else
-    -- Existing quotation: lock the header so concurrent saves of the same quote run one after another.
+    -- Existing quotation: the caller must prove which version it edited — no update without a version token.
+    if p_expected_updated_at is null then
+      raise exception 'QUOTATION_SAVE_VERSION_REQUIRED: updating quotation % requires p_expected_updated_at', p_id;
+    end if;
+    -- Lock the header so concurrent saves of the same quote run one after another.
     select * into v_cur from public.quotation_records where id = p_id for update;
     if not found then
       raise exception 'QUOTATION_SAVE_NOT_FOUND: quotation % does not exist', p_id;
     end if;
-    if p_expected_updated_at is not null and v_cur.updated_at is distinct from p_expected_updated_at then
+    if v_cur.updated_at is distinct from p_expected_updated_at then
       raise exception 'QUOTATION_SAVE_CONFLICT: quotation % was changed elsewhere (now %, expected %)',
         p_id, v_cur.updated_at, p_expected_updated_at;
     end if;
