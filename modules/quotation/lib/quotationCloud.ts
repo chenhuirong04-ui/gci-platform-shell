@@ -96,84 +96,67 @@ async function sbFetch(path: string, init: RequestInit = {}): Promise<Response |
   }
 }
 
-// ── Public API ───────────────────────────────────────────────────────────────
+// ── Atomic save (BOQ P0-02) ──────────────────────────────────────────────────
 
 /**
- * Save a new quotation draft to cloud.
- * Returns the saved record id (UUID), or null on failure.
+ * updated_at last seen per quotation id (from load / save / markSentToTrade).
+ * Sent as the optimistic-lock token on update so a save never silently
+ * overwrites a newer version saved elsewhere.
  */
-export async function saveQuotation(payload: SaveQuotationPayload): Promise<string | null> {
-  const { record, items } = payload;
+const lastSeenUpdatedAt = new Map<string, string>();
 
-  // 1. Insert quotation_records
-  const res = await sbFetch('/rest/v1/quotation_records', {
+/**
+ * Save header + items in ONE database transaction via
+ * public.save_quotation_with_items (migration 20261103090000). Any failure
+ * rolls back everything; returns the record id, or null on failure.
+ */
+async function saveAtomic(id: string | null, payload: SaveQuotationPayload): Promise<string | null> {
+  const res = await sbFetch('/rest/v1/rpc/save_quotation_with_items', {
     method: 'POST',
-    headers: { Prefer: 'return=representation' },
-    body: JSON.stringify(record),
+    body: JSON.stringify({
+      p_id: id,
+      p_record: payload.record,
+      p_items: payload.items,
+      p_expected_updated_at: id ? lastSeenUpdatedAt.get(id) ?? null : null,
+    }),
   });
   if (!res) return null;
 
   const saved = await res.json().catch(() => null);
-  const savedRecord = Array.isArray(saved) ? saved[0] : saved;
-  const id: string = savedRecord?.id;
-  if (!id) { console.error('[quotationCloud] No id returned from save'); return null; }
+  const savedId: string | undefined = saved?.id;
+  if (!savedId) { console.error('[quotationCloud] No id returned from save'); return null; }
+  if (saved.updated_at) lastSeenUpdatedAt.set(savedId, saved.updated_at);
+  return savedId;
+}
 
-  // 2. Insert quotation_items with quotation_id
-  if (items.length > 0) {
-    const itemRows = items.map((it, i) => ({ ...it, quotation_id: id, sort_order: i }));
-    const itemRes = await sbFetch('/rest/v1/quotation_items', {
-      method: 'POST',
-      headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify(itemRows),
-    });
-    if (!itemRes) console.warn('[quotationCloud] Items save failed, record saved without items');
-  }
+// ── Public API ───────────────────────────────────────────────────────────────
 
-  return id;
+/**
+ * Save a new quotation draft to cloud (header + items, all-or-nothing).
+ * Returns the saved record id (UUID), or null on failure.
+ */
+export async function saveQuotation(payload: SaveQuotationPayload): Promise<string | null> {
+  return saveAtomic(null, payload);
 }
 
 /**
- * Update an existing quotation record + replace its items.
- * Deletes old items and inserts new ones.
+ * Update an existing quotation record + replace its items, all-or-nothing.
+ * Returns false (nothing changed) on any failure, on a concurrent-edit
+ * conflict, or when existing items would be replaced by an empty list.
  */
 export async function updateQuotation(id: string, payload: SaveQuotationPayload): Promise<boolean> {
-  const { record, items } = payload;
-
-  // 1. Patch quotation_records
-  const patchRes = await sbFetch(
-    `/rest/v1/quotation_records?id=eq.${encodeURIComponent(id)}`,
-    {
-      method: 'PATCH',
-      headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify({
-        ...record,
-        updated_at: new Date().toISOString(),
-      }),
-    }
-  );
-  if (!patchRes) return false;
-
-  // 2. Delete old items
-  await sbFetch(`/rest/v1/quotation_items?quotation_id=eq.${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-  });
-
-  // 3. Insert new items
-  if (items.length > 0) {
-    const itemRows = items.map((it, i) => ({ ...it, quotation_id: id, sort_order: i }));
-    await sbFetch('/rest/v1/quotation_items', {
-      method: 'POST',
-      headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify(itemRows),
-    });
+  // The RPC refuses an update without a version token; fail fast with a clear reason.
+  if (!lastSeenUpdatedAt.has(id)) {
+    console.error('[quotationCloud] Update refused: quotation was not loaded or saved in this session (no version token)');
+    return false;
   }
-
-  return true;
+  return (await saveAtomic(id, payload)) !== null;
 }
 
 /**
  * Load a quotation by quote_no (e.g. "GCI-20250531-001").
- * Returns null if not found.
+ * Returns null if not found, or if the items could not be loaded (never an
+ * empty list in place of real items).
  */
 export async function loadByQuoteNo(quoteNo: string): Promise<LoadedQuotation | null> {
   // 1. Fetch record
@@ -192,9 +175,12 @@ export async function loadByQuoteNo(quoteNo: string): Promise<LoadedQuotation | 
     `/rest/v1/quotation_items?quotation_id=eq.${encodeURIComponent(record.id!)}&order=sort_order.asc`,
     { method: 'GET' }
   );
-  const items: QuotationItem[] = itemRes ? (await itemRes.json().catch(() => [])) : [];
+  if (!itemRes) { console.error('[quotationCloud] Items load failed'); return null; }
+  const items = await itemRes.json().catch(() => null);
+  if (!Array.isArray(items)) { console.error('[quotationCloud] Items load returned no list'); return null; }
 
-  return { record, items };
+  if (record.id && record.updated_at) lastSeenUpdatedAt.set(record.id, record.updated_at);
+  return { record, items: items as QuotationItem[] };
 }
 
 /**
@@ -222,13 +208,16 @@ export async function deleteQuotation(id: string): Promise<boolean> {
  * Mark a quotation as SENT_TO_TRADE and optionally write the PI id.
  */
 export async function markSentToTrade(id: string, tradePiId?: string): Promise<void> {
-  await sbFetch(`/rest/v1/quotation_records?id=eq.${encodeURIComponent(id)}`, {
+  const res = await sbFetch(`/rest/v1/quotation_records?id=eq.${encodeURIComponent(id)}&select=updated_at`, {
     method: 'PATCH',
-    headers: { Prefer: 'return=minimal' },
+    headers: { Prefer: 'return=representation' },
     body: JSON.stringify({
       status: 'SENT_TO_TRADE',
       trade_pi_id: tradePiId || null,
       updated_at: new Date().toISOString(),
     }),
   });
+  // Our own change — refresh the lock token so the next update isn't refused as a conflict.
+  const rows = res ? await res.json().catch(() => null) : null;
+  if (Array.isArray(rows) && rows[0]?.updated_at) lastSeenUpdatedAt.set(id, rows[0].updated_at);
 }
