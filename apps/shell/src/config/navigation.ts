@@ -131,7 +131,7 @@ export const sections: SectionDef[] = [
       // `landing` picker, per explicit instruction — landing itself is
       // untouched and still reachable from inside the module. All three old
       // ?mode= deep links keep working unchanged.
-      { code: 'QC', nameKey: 'quotationCenter', count: '4', badgeColor: '#A89878', badgeBg: 'rgba(255,255,255,0.07)', path: '/quotation?mode=customer-quote' },
+      { code: 'QC', nameKey: 'quotationCenter', path: '/quotation?mode=customer-quote' },
       // Nav consolidation V1 (2026-09) — PI Quote / Quote History / Inventory
       // / Consignment / Stock Ledger used to each get their own flat sidebar
       // row, all five pointing into TradeModule via ?tab= — duplicating the
