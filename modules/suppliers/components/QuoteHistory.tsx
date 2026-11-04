@@ -2,10 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useI18n } from '@gci/i18n';
 import { supabase } from '../../../apps/shell/src/lib/supabase';
 import { useAuth } from '../../../apps/shell/src/contexts/AuthContext';
-import { fontSizes, fonts } from '@gci/design-system';
+import { workspace, fontSizes, fonts } from '@gci/design-system';
 
-const NAVY = '#0B1F44';
-const GOLD = '#C9A84C';
+const NAVY = workspace.textPrimary;
+const GOLD = workspace.accent;
 const BORDER = '#e2e8f0';
 const T2 = '#374151';
 const T3 = '#6b7280';
@@ -70,7 +70,7 @@ export default function QuoteHistory({ supplierId }: Props) {
         {canQuotation && (
         <button
           onClick={handleUploadQuote}
-          style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
+          style={{ padding: '7px 16px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 7, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
         >
           {t.upload}
         </button>
@@ -85,7 +85,7 @@ export default function QuoteHistory({ supplierId }: Props) {
           {canQuotation && (
           <button
             onClick={handleUploadQuote}
-            style={{ padding: '9px 20px', background: GOLD, color: NAVY, border: 'none', borderRadius: 8, fontWeight: 700, fontSize: fontSizes.sm, cursor: 'pointer' }}
+            style={{ padding: '9px 20px', background: workspace.actionPrimaryBg, color: workspace.actionPrimaryText, border: 'none', borderRadius: 8, fontWeight: 700, fontSize: fontSizes.sm, cursor: 'pointer' }}
           >
             {t.uploadCta}
           </button>

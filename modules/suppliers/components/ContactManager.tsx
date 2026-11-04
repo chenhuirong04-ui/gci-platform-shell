@@ -2,10 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useI18n } from '@gci/i18n';
 import type { SupplierContact } from '../types';
 import { createContact, deleteContact, listContacts, updateContact } from '../lib/suppliersCloud';
-import { fontSizes } from '@gci/design-system';
+import { workspace, fontSizes } from '@gci/design-system';
 
-const NAVY = '#0B1F44';
-const GOLD = '#C9A84C';
+const NAVY = workspace.textPrimary;
+const GOLD = workspace.accent;
 const BORDER = '#e2e8f0';
 const T2 = '#374151';
 const T3 = '#6b7280';
@@ -67,7 +67,7 @@ export default function ContactManager({ supplierId }: Props) {
         <span style={{ fontSize: fontSizes.sm, color: T2 }}>{t.count(contacts.length)}</span>
         <button
           onClick={() => setEditContact(EMPTY_CONTACT(supplierId))}
-          style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
+          style={{ padding: '7px 16px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 7, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
         >
           {t.add}
         </button>
@@ -143,7 +143,7 @@ export default function ContactManager({ supplierId }: Props) {
               ))}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '10px 0', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>{saving ? c0.saving : c0.save}</button>
+              <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '10px 0', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>{saving ? c0.saving : c0.save}</button>
               <button onClick={() => setEditContact(null)} style={{ padding: '10px 20px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T2, fontWeight: 600, cursor: 'pointer' }}>{c0.cancel}</button>
             </div>
           </div>

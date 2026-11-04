@@ -3,9 +3,9 @@ import type { SupplierCertification, SupplierProduct, CertProductLink as CertPro
 import { listCertifications } from '../lib/certificationsCloud';
 import { listProducts } from '../lib/suppliersCloud';
 import { createCertProductLink, deleteCertProductLink, listCertProductLinks } from '../lib/certificationsCloud';
-import { fontSizes } from '@gci/design-system';
+import { workspace, fontSizes } from '@gci/design-system';
 
-const NAVY = '#0B1F44';
+const NAVY = workspace.textPrimary;
 const BORDER = '#CBD5E1';
 const T2 = '#475569';
 const T3 = '#94a3b8';
@@ -75,7 +75,7 @@ export default function CertProductLink({ supplierId }: Props) {
             <input style={INP} value={form.model_number} onChange={e => setForm(f => ({ ...f, model_number: e.target.value }))} placeholder="可填具体型号" />
           </div>
         </div>
-        <button onClick={handleAdd} disabled={saving || !form.certification_id || !form.supplier_product_id} style={{ padding: '8px 20px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer', opacity: (!form.certification_id || !form.supplier_product_id) ? 0.5 : 1 }}>
+        <button onClick={handleAdd} disabled={saving || !form.certification_id || !form.supplier_product_id} style={{ padding: '8px 20px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 7, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer', opacity: (!form.certification_id || !form.supplier_product_id) ? 0.5 : 1 }}>
           {saving ? '添加中…' : '添加关联'}
         </button>
       </div>

@@ -9,8 +9,8 @@ import { workspace, fontSizes } from '@gci/design-system';
 import { getDocStatusLabel, getDocTypeLabel } from '../lib/labelMaps';
 import TradeLicenseUploader from './TradeLicenseUploader';
 
-const GOLD = '#C9A84C';
-const NAVY = '#0c1b3a';
+const GOLD = workspace.accent;
+const NAVY = workspace.textPrimary;
 const BORDER = workspace.border;
 const T2 = '#334155';
 const T3 = '#94a3b8';
@@ -245,7 +245,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
         <span style={{ fontSize: fontSizes.xs, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t.quickUpload}</span>
         <button
           onClick={() => setShowLicenseUploader(true)}
-          style={{ padding: '9px 18px', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+          style={{ padding: '9px 18px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 8, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
         >
           {t.uploadLicenseBtn}
         </button>
@@ -259,7 +259,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <span style={{ fontSize: fontSizes.sm, color: T2 }}>{t.count(docs.length)}</span>
-        <button onClick={() => openEdit(EMPTY(supplierId))} style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}>{t.add}</button>
+        <button onClick={() => openEdit(EMPTY(supplierId))} style={{ padding: '7px 16px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 7, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}>{t.add}</button>
       </div>
 
       {loading ? <div style={{ color: T3, textAlign: 'center', padding: 40 }}>{c0.loading}</div>
@@ -445,7 +445,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
                 onClick={handleSave}
                 disabled={!canSave}
                 title={!canSave && !saving ? t.errNoFile : undefined}
-                style={{ flex: 1, padding: '10px 0', background: canSave ? NAVY : '#94a3b8', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: canSave ? 'pointer' : 'not-allowed', transition: 'background .15s' }}
+                style={{ flex: 1, padding: '10px 0', background: canSave ? workspace.actionPrimaryBg : '#94a3b8', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: canSave ? 'pointer' : 'not-allowed', transition: 'background .15s' }}
               >
                 {saveLabel}
               </button>

@@ -9,7 +9,7 @@ import { workspace, fontSizes } from '@gci/design-system';
 import { listDocuments } from '../lib/documentsCloud';
 import CertificationUploader from './CertificationUploader';
 
-const NAVY = '#0c1b3a';
+const NAVY = workspace.textPrimary;
 const BORDER = workspace.border;
 const T2 = '#334155';
 const T3 = '#94a3b8';
@@ -103,7 +103,7 @@ export default function CertificationManager({ supplierId }: Props) {
         <span style={{ fontSize: fontSizes.xs, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t.quickUpload}</span>
         <button
           onClick={() => setShowUploader(true)}
-          style={{ padding: '9px 18px', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
+          style={{ padding: '9px 18px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 8, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
         >
           {t.uploadBtn}
         </button>
@@ -186,7 +186,7 @@ export default function CertificationManager({ supplierId }: Props) {
             </div>
             <F label={t.fNotes}><textarea style={{ ...INP, resize: 'vertical', minHeight: 60 }} value={edit.notes ?? ''} onChange={e => setEdit(v => ({ ...v!, notes: e.target.value }))} /></F>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '10px 0', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>{saving ? c0.saving : c0.save}</button>
+              <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '10px 0', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>{saving ? c0.saving : c0.save}</button>
               <button onClick={() => setEdit(null)} style={{ padding: '10px 20px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T2, fontWeight: 600, cursor: 'pointer' }}>{c0.cancel}</button>
             </div>
           </div>

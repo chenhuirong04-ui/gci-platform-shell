@@ -13,8 +13,8 @@ import { workspace, fontSizes, fonts } from '@gci/design-system';
 // falls through to Noto Sans SC. Codes / amounts opt into fonts.mono locally.
 const UI_FONT = `'Space Grotesk', ${fonts.body}`;
 
-const GOLD = '#C9A84C';
-const NAVY = '#0c1b3a';
+const GOLD = workspace.accent;
+const NAVY = workspace.textPrimary;
 
 type TopTab = 'list' | 'new' | 'docs' | 'quotes';
 

@@ -2,8 +2,10 @@ import React, { useState, useCallback } from 'react';
 import { useI18n } from '@gci/i18n';
 import { workspace, fontSizes } from '@gci/design-system';
 
-const GOLD = '#C9A84C';
-const NAVY = '#0c1b3a';
+// Progress bars and decorative gradients keep the original gold.
+const CHART_GOLD = '#C9A84C';
+const GOLD = workspace.accent;
+const NAVY = workspace.textPrimary;
 const CARD_BORDER = workspace.border;
 const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost'
   ? 'http://localhost:3000'
@@ -293,7 +295,7 @@ export default function NotionImportPage({ onBack }: Props) {
           </div>
           <button
             onClick={loadPreview}
-            style={{ padding: '11px 32px', borderRadius: 10, background: NAVY, color: '#fff', border: 'none', fontSize: fontSizes.md, fontWeight: 700, cursor: 'pointer' }}
+            style={{ padding: '11px 32px', borderRadius: 10, background: workspace.actionPrimaryBg, color: '#fff', border: 'none', fontSize: fontSizes.md, fontWeight: 700, cursor: 'pointer' }}
           >
             {t.loadBtn}
           </button>
@@ -305,7 +307,7 @@ export default function NotionImportPage({ onBack }: Props) {
         <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${CARD_BORDER}`, padding: '48px', textAlign: 'center' }}>
           <div style={{ fontSize: fontSizes.sm, color: '#64748b' }}>{t.loadingText}</div>
           <div style={{ marginTop: 16, height: 4, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
-            <div style={{ height: '100%', background: GOLD, width: '60%', animation: 'pulse 1.5s ease-in-out infinite' }} />
+            <div style={{ height: '100%', background: CHART_GOLD, width: '60%', animation: 'pulse 1.5s ease-in-out infinite' }} />
           </div>
         </div>
       )}
@@ -335,8 +337,8 @@ export default function NotionImportPage({ onBack }: Props) {
                 key={s}
                 onClick={() => setFilterStatus(s)}
                 style={{
-                  padding: '5px 12px', borderRadius: 8, border: `1.5px solid ${filterStatus === s ? NAVY : CARD_BORDER}`,
-                  background: filterStatus === s ? NAVY : '#fff', color: filterStatus === s ? '#fff' : '#475569',
+                  padding: '5px 12px', borderRadius: 8, border: `1.5px solid ${filterStatus === s ? workspace.actionPrimaryBg : CARD_BORDER}`,
+                  background: filterStatus === s ? workspace.actionPrimaryBg : '#fff', color: filterStatus === s ? '#fff' : '#475569',
                   fontSize: fontSizes.xs, fontWeight: 600, cursor: 'pointer',
                 }}
               >
@@ -506,7 +508,7 @@ export default function NotionImportPage({ onBack }: Props) {
                 <button
                   onClick={runImport}
                   disabled={selected.size === 0}
-                  style={{ padding: '9px 24px', borderRadius: 10, background: selected.size === 0 ? '#94a3b8' : NAVY, color: '#fff', border: 'none', fontSize: fontSizes.md, fontWeight: 700, cursor: selected.size === 0 ? 'not-allowed' : 'pointer' }}
+                  style={{ padding: '9px 24px', borderRadius: 10, background: selected.size === 0 ? '#94a3b8' : workspace.actionPrimaryBg, color: '#fff', border: 'none', fontSize: fontSizes.md, fontWeight: 700, cursor: selected.size === 0 ? 'not-allowed' : 'pointer' }}
                 >
                   {t.importSelected(selected.size)}
                 </button>
@@ -523,7 +525,7 @@ export default function NotionImportPage({ onBack }: Props) {
             {t.importingProgress(importProgress, importTotal)}
           </div>
           <div style={{ height: 8, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden', marginBottom: 20 }}>
-            <div style={{ height: '100%', background: GOLD, width: `${importTotal > 0 ? (importProgress / importTotal) * 100 : 0}%`, transition: 'width 0.4s ease', borderRadius: 4 }} />
+            <div style={{ height: '100%', background: CHART_GOLD, width: `${importTotal > 0 ? (importProgress / importTotal) * 100 : 0}%`, transition: 'width 0.4s ease', borderRadius: 4 }} />
           </div>
           <div style={{ fontSize: fontSizes.xs, color: '#64748b' }}>{t.importingNote}</div>
         </div>
@@ -581,7 +583,7 @@ export default function NotionImportPage({ onBack }: Props) {
           <div style={{ marginTop: 20, display: 'flex', gap: 10 }}>
             <button
               onClick={onBack}
-              style={{ padding: '9px 20px', borderRadius: 10, background: NAVY, color: '#fff', border: 'none', fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
+              style={{ padding: '9px 20px', borderRadius: 10, background: workspace.actionPrimaryBg, color: '#fff', border: 'none', fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
             >
               {t.backToList}
             </button>
