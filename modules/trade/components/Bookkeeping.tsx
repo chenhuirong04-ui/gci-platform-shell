@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Landmark, FileImage } from 'lucide-react';
 import { colors } from '@gci/design-system';
+import { useI18n } from '@gci/i18n';
 import BankReconciliation from './BankReconciliation';
 import VoucherEntry from './VoucherEntry';
 
@@ -12,16 +13,17 @@ type Tab = 'bank' | 'voucher';
  * bookkeepingService.ts and supabase/migrations/20260915_finance_bookkeeping_v1.sql.
  */
 export default function Bookkeeping() {
+  const L = useI18n().dict.trade.finance;
   const [tab, setTab] = useState<Tab>('bank');
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>记账与对账 / Bookkeeping &amp; Reconciliation</h1>
+      <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>{L.bookkeepingTitle}</h1>
 
       <div className="bg-white p-2 rounded-2xl border border-gray-200 shadow-md flex gap-2 w-fit">
         {[
-          { id: 'bank' as Tab, label: '银行对账', icon: Landmark },
-          { id: 'voucher' as Tab, label: '凭证录入', icon: FileImage },
+          { id: 'bank' as Tab, label: L.bankRecon, icon: Landmark },
+          { id: 'voucher' as Tab, label: L.voucherEntry, icon: FileImage },
         ].map(t => {
           const Icon = t.icon;
           const isActive = tab === t.id;

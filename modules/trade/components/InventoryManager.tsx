@@ -179,7 +179,7 @@ async function writeStockAdjust(params: {
   });
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`写入失败: ${err}`);
+    throw new Error(String(err));
   }
 }
 

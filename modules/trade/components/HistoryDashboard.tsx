@@ -58,6 +58,7 @@ const safeDateStr = (v: any) => safeStr(v) ? safeStr(v) : '0000-00-00T00:00:00.0
 const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) => {
   const { dict } = useI18n();
   const t = dict.trade.history;
+  const H = dict.trade.orders;
   const QUOTE_STATUS_LABEL: Record<string, string> = {
     DRAFT: t.statusDraft,
     QUOTED: t.statusQuoted,
@@ -295,7 +296,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
   // iframe + window.print() — bypasses html2pdf entirely, uses browser print dialog (Save as PDF)
   const printPiByIframe = (elementId: string, title = 'PI') => {
     const el = document.getElementById(elementId);
-    if (!el) { alert(`❌ 找不到打印区域: #${elementId}`); return; }
+    if (!el) { alert(H.errPrintArea(elementId)); return; }
 
     const headNodes: string[] = [];
     document.querySelectorAll('link[rel="stylesheet"]').forEach((node) => {
@@ -321,7 +322,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
     const doc = iframe.contentDocument;
     const win = iframe.contentWindow;
-    if (!doc || !win) { document.body.removeChild(iframe); alert('❌ 打印初始化失败'); return; }
+    if (!doc || !win) { document.body.removeChild(iframe); alert(H.errPrintInit); return; }
 
     doc.open();
     doc.write(`<!doctype html><html><head><meta charset="utf-8"/>${headNodes.join('\n')}</head><body>${el.outerHTML}</body></html>`);
@@ -871,11 +872,11 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
     setAdjAmount('');
     setAdjReason('');
     setSelectedOrder(null);
-    alert(`✅ 冲账订单 ${adjId} 已创建。`);
+    alert(H.adjCreated(adjId));
   };
 
   const handleVoidOrder = async (orderId: string) => {
-    if (!window.confirm(`确认作废订单 ${orderId}？\n作废后不计入统计，但保留记录。`)) return;
+    if (!window.confirm(H.confirmVoidOrder(orderId))) return;
     const targetOrder = (orders || []).find(o => o.id === orderId);
     if (!targetOrder) return;
     // Finance V1 fix (2026-09): only this order's own row is touched now —
@@ -896,7 +897,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
     await loadLocalData();
     setSelectedOrder(null);
-    alert(`✅ 订单 ${orderId} 已作废`);
+    alert(H.orderVoided(orderId));
   };
 
   const handleArchiveQuote = async (quoteId: string) => {
@@ -904,10 +905,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
     if (!q) return;
 
     const confirmed = window.confirm(
-      `此操作不会删除历史报价。\n它只会将该报价标记为未成交并从默认列表隐藏。\n之后仍可通过"显示归档"、搜索或 AI 查询查看。\n\n` +
-      `This will not delete the quote.\nIt will archive it as unsuccessful and hide it from the default list.\nIt can still be found through search, AI, or archived records.\n\n` +
-      (q.status === 'CONVERTED' ? `⚠️ 该报价单已转为订单 ${(q as any).convertedOrderId}，归档不影响已生成的订单。\n\n` : '') +
-      `报价单：${quoteId}`
+      H.confirmArchiveQuote(quoteId, q.status === 'CONVERTED' ? String((q as any).convertedOrderId) : null)
     );
     if (!confirmed) return;
 
@@ -927,13 +925,13 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
     await persistence.updateQuote(archived);
     await loadLocalData();
     setSelectedQuote(null);
-    alert(`✅ 报价单 ${quoteId} 已归档（未成交）。可通过"显示归档"查看。`);
+    alert(H.quoteArchived(quoteId));
   };
 
   const handleDeletePayment = async (paymentId: string) => {
     const target = (payments || []).find(p => p.id === paymentId);
     if (!target) return;
-    if (!window.confirm(`确认删除收款记录 ${paymentId}（AED ${target.amount}）？\n将自动还原应收金额。`)) return;
+    if (!window.confirm(H.confirmDeletePayment(paymentId, String(target.amount)))) return;
     const remainingPayments = (payments || []).filter(p => p.id !== paymentId);
     const orderPayments = remainingPayments.filter(p => p.orderId === target.orderId);
     const newPaid = roundTo2(orderPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0));
@@ -954,14 +952,14 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
   };
 
   const handleVoidAdjustment = async (adjId: string) => {
-    if (!window.confirm(`确认撤销冲账单 ${adjId}？\n撤销后不计入统计，但保留记录。`)) return;
+    if (!window.confirm(H.confirmRevokeAdj(adjId))) return;
     const targetOrder = (orders || []).find(o => o.id === adjId);
     if (!targetOrder) return;
     // Finance V1 fix (2026-09): only this adjustment order's own row is
     // touched now — see persistenceService.updateOrder().
     await persistence.updateOrder({ ...targetOrder, status: 'VOIDED' as any });
     await loadLocalData();
-    alert(`✅ 冲账单 ${adjId} 已撤销`);
+    alert(H.adjRevoked(adjId));
   };
 
   // Logic for adding a settlement record to isolated order-specific storage
@@ -970,24 +968,24 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
     // Guard 1: 销售数量必须为正整数
     if (!Number.isInteger(setForm.sold_qty) || setForm.sold_qty <= 0) {
-      alert("⚠️ 本次销售数量必须为正整数（≥ 1）。");
+      alert(H.errSoldQty);
       return;
     }
 
     // Guard 2: 没有收到钱，不登记冲账
     if (setForm.paid_amount <= 0) {
-      alert("⚠️ 没有收到钱，不登记冲账。\n货继续留在寄售库存。请先确认实际收款金额（> 0）再提交。");
+      alert(H.errNoMoney);
       return;
     }
 
     // Guard 3: 实收不能超过确认销售金额
     if (setForm.paid_amount > setForm.amount) {
-      alert(`⚠️ 本次实收金额（AED ${setForm.paid_amount.toFixed(2)}）不能大于本次确认销售金额（AED ${setForm.amount.toFixed(2)}）。`);
+      alert(H.errPaidOverAmount(setForm.paid_amount.toFixed(2), setForm.amount.toFixed(2)));
       return;
     }
 
     // Guard 4 (Finance V1): 结算实收必须带 payment_method / bank_account_id
-    const settlementSyncError = validatePaymentMethodValue(settlementPaymentMethodValue, 'in');
+    const settlementSyncError = validatePaymentMethodValue(settlementPaymentMethodValue, 'in', dict.trade.pm);
     if (settlementSyncError) { alert(`⚠️ ${settlementSyncError}`); return; }
     let settlementCashAccountId: string | null = null;
     if (settlementPaymentMethodValue.payment_method === 'CASH') {
@@ -1075,7 +1073,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
   const handleSaveItemDesc = async (item: any, newDesc: string) => {
     const trimmed = newDesc.trim();
-    if (!trimmed) { alert('产品名不能为空'); return; }
+    if (!trimmed) { alert(H.errEmptyName); return; }
     const updated = (orderItems || []).map(i =>
       (i as any).id === item.id ? { ...i, desc: trimmed } : i
     );
@@ -1108,7 +1106,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
     // ── Guard 1: already converted (status check) ──────────────────────────
     if (quote.status === 'CONVERTED') {
-      alert('⚠️ 该报价单已转单，请勿重复操作。');
+      alert(H.errAlreadyConverted);
       return;
     }
 
@@ -1118,7 +1116,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
     // ── Guard 3: in-memory order dedup (quoteId already has an order) ──────
     const existingOrder = (orders || []).find((o: any) => o.quoteId === quote.id);
     if (existingOrder) {
-      alert(`⚠️ 该报价单已生成订单：${existingOrder.id}，请勿重复创建。`);
+      alert(H.errOrderExists(existingOrder.id));
       return;
     }
 
@@ -1224,9 +1222,9 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
       await loadLocalData();
       setSelectedQuote(null);
-      alert(`✅ 订单 ${soNo} 已生成（${mode === 'Consignment' ? '代售' : '直售'}）`);
+      alert(H.orderCreated(soNo, mode === 'Consignment'));
     } catch (e: any) {
-      alert(`❌ 订单生成失败：${e?.message || '未知错误'}，请重试。`);
+      alert(H.errOrderCreate(e?.message || H.unknownError));
     } finally {
       // 一定执行：无论成功/失败/网络异常，均解锁按钮
       setIsConverting(false);
@@ -1243,12 +1241,12 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
     // ✅ Guard: prevent double-payment on already-settled orders
     const currentOutstanding = roundTo2(targetOrder.outstandingAmount ?? targetOrder.grandTotal ?? 0);
     if (currentOutstanding <= 0) {
-      alert("⚠️ 该订单已结清（应收余额为 0），无需再次付款。");
+      alert(H.errSettled);
       setShowPaymentModal(null);
       return;
     }
     if (amt <= 0) {
-      alert("⚠️ 收款金额必须大于 0。");
+      alert(H.errPayPositive);
       return;
     }
 
@@ -1256,7 +1254,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
     // "Corporate"/"Cash" label — same validation + Cash resolution used by
     // FinanceTracker's manual entries and consignment settlements, so all
     // three entry points can never disagree on the rules.
-    const syncError = validatePaymentMethodValue(pmValue, 'in');
+    const syncError = validatePaymentMethodValue(pmValue, 'in', dict.trade.pm);
     if (syncError) { alert(`⚠️ ${syncError}`); return; }
     let cashAccountId: string | null = null;
     if (pmValue.payment_method === 'CASH') {
@@ -1270,7 +1268,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
     const newOutstanding = calculateOutstanding(targetOrder.grandTotal, newPaid);
 
     if (!verifyFinancialBalance(targetOrder.grandTotal, newPaid, newOutstanding)) {
-      alert("⚠️ 核销精度异常，请重新尝试。");
+      alert(H.errPrecision);
       return;
     }
 
@@ -1722,7 +1720,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
               <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300" />
               <input
                 type="text"
-                placeholder="搜索订单..."
+                placeholder={H.searchOrders}
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 className="w-full pl-16 p-5 bg-white border-2 border-gray-100 rounded-[30px] font-bold text-sm outline-none focus:border-[#CBA85C] shadow-sm transition-all"
@@ -1734,13 +1732,13 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                 onClick={() => setOrderViewFilter('ALL')}
                 className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${orderViewFilter === 'ALL' ? 'bg-[#080D1E] text-white' : 'text-gray-400'}`}
               >
-                全部订单
+                {H.allOrders}
               </button>
               <button
                 onClick={() => setOrderViewFilter('CONSIGNMENT')}
                 className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${orderViewFilter === 'CONSIGNMENT' ? 'bg-[#D4A843] text-white' : 'text-gray-400'}`}
               >
-                代售订单
+                {H.consignmentOrders}
               </button>
             </div>
           </div>
@@ -1822,7 +1820,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                 {filteredOrders.length === 0 && (
                   <tr>
                     <td colSpan={7} className="py-20 text-center text-gray-300 font-black uppercase text-xs">
-                      没有匹配的订单
+                      {H.noMatchingOrders}
                     </td>
                   </tr>
                 )}
@@ -1843,14 +1841,14 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                 onClick={() => setArMode('OUTSTANDING')}
                 className={`px-6 py-3 rounded-[16px] text-xs font-black uppercase tracking-wide transition-all ${arMode === 'OUTSTANDING' ? 'bg-[#080D1E] text-white shadow-md' : 'text-gray-400 hover:bg-gray-50'}`}
               >
-                仅应收(未结清)
+                {H.outstandingOnly}
               </button>
               <button
                 type="button"
                 onClick={() => setArMode('ALL')}
                 className={`px-6 py-3 rounded-[16px] text-xs font-black uppercase tracking-wide transition-all ${arMode === 'ALL' ? 'bg-[#080D1E] text-white shadow-md' : 'text-gray-400 hover:bg-gray-50'}`}
               >
-                全部订单(含已结清)
+                {H.allInclSettled}
               </button>
             </div>
           </div>
@@ -1914,7 +1912,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                       onClick={() => setSelectedOrder(o)}
                       className="w-full py-5 bg-white border border-gray-100 text-gray-700 rounded-[28px] font-black uppercase text-xs tracking-wide shadow-sm flex items-center justify-center gap-3 hover:bg-gray-50 transition-all active:scale-95"
                     >
-                      <Eye className="w-4 h-4" /> 查看详情
+                      <Eye className="w-4 h-4" /> {H.viewDetails}
                     </button>
 
                     <button
@@ -1923,7 +1921,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                       onClick={() => { setShowPaymentModal({ orderId: o.id, total: o.outstandingAmount }); setPaymentMethodValue(emptyPaymentMethodValue()); }}
                       className={`w-full py-5 rounded-[28px] font-black uppercase text-xs tracking-wide shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 ${isPaid ? 'bg-gray-100 text-gray-300 cursor-not-allowed shadow-none' : 'bg-gray-900 text-white hover:bg-[#3F7D58]'}`}
                     >
-                      <CreditCard className="w-4 h-4" /> 录入收款
+                      <CreditCard className="w-4 h-4" /> {H.recordPayment}
                     </button>
                   </div>
                 </div>
@@ -1932,7 +1930,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
             {arLedger.length === 0 && (
               <div className="col-span-full py-40 text-center text-gray-300 uppercase text-xs font-black tracking-wide">
-                {arMode === 'OUTSTANDING' ? '完美！所有应收已结清。' : '暂无任何订单记录。'}
+                {arMode === 'OUTSTANDING' ? H.allSettled : H.noOrders}
               </div>
             )}
           </div>
@@ -1991,7 +1989,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                 {selectedQuote.status === 'CONVERTED' ? (
                   <div className="flex flex-col items-end">
                     <div className="px-10 py-5 bg-[#6FBF8E]/10 text-[#3F7D58] rounded-[24px] font-black uppercase text-xs tracking-widest flex items-center gap-3 border border-[#6FBF8E]/20">
-                      <PackageCheck className="w-5 h-5" /> 已转为订单
+                      <PackageCheck className="w-5 h-5" /> {H.convertedToOrder}
                     </div>
                     <span className="text-xs font-black text-[#6FBF8E] mt-2 font-mono">SO Ref: {safeStr((selectedQuote as any).convertedOrderId)}</span>
                   </div>
@@ -2018,7 +2016,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                       className={`px-12 py-6 ${conversionMode === 'Consignment' ? 'bg-[#D4A843]' : 'bg-[#080D1E]'} text-white rounded-[32px] font-black uppercase text-xs tracking-[0.4em] flex items-center gap-4 hover:bg-black transition-all shadow-2xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100`}
                     >
                       <Zap className={`w-5 h-5 fill-white ${isConverting ? 'animate-spin' : ''}`} />
-                      {isConverting ? '正在生成，请勿重复点击...' : (conversionMode === 'Consignment' ? '生成代售订单' : '生成直售订单')}
+                      {isConverting ? H.generating : (conversionMode === 'Consignment' ? H.genConsignment : H.genDirect)}
                     </button>
                   </>
                 )}
@@ -2071,7 +2069,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                   return (
                     <div className="mt-8 p-8 bg-[#6FBF8E]/5 rounded-[40px] border border-[#6FBF8E]/20">
                       <h4 className="text-xs font-black text-[#3F7D58] uppercase tracking-wide mb-6 flex items-center gap-2">
-                        <CreditCard className="w-4 h-4" /> 收款记录 / Payment History
+                        <CreditCard className="w-4 h-4" /> {H.paymentHistory}
                       </h4>
                       <div className="space-y-2">
                         {orderPays.map(p => (
@@ -2101,7 +2099,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                   return (
                     <div className="mt-8 p-8 bg-gray-50/30 rounded-[40px] border border-gray-100">
                       <h4 className="text-xs font-black text-gray-500 uppercase tracking-wide mb-4 flex items-center gap-2">
-                        <Edit3 className="w-4 h-4" /> 订单明细 · 产品名修正
+                        <Edit3 className="w-4 h-4" /> {H.orderItemsEdit}
                       </h4>
                       <div className="space-y-2">
                         {curItems.map((item, idx) => {
@@ -2117,8 +2115,8 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                                     autoFocus
                                     onKeyDown={e => { if (e.key === 'Enter') handleSaveItemDesc(item, editingItemDesc); if (e.key === 'Escape') setEditingItemId(null); }}
                                   />
-                                  <button onClick={() => handleSaveItemDesc(item, editingItemDesc)} className="px-3 py-1.5 bg-[#080D1E] text-white rounded-lg text-xs font-black shrink-0">保存</button>
-                                  <button onClick={() => setEditingItemId(null)} className="px-3 py-1.5 bg-gray-100 text-gray-500 rounded-lg text-xs font-black shrink-0">取消</button>
+                                  <button onClick={() => handleSaveItemDesc(item, editingItemDesc)} className="px-3 py-1.5 bg-[#080D1E] text-white rounded-lg text-xs font-black shrink-0">{H.save}</button>
+                                  <button onClick={() => setEditingItemId(null)} className="px-3 py-1.5 bg-gray-100 text-gray-500 rounded-lg text-xs font-black shrink-0">{H.cancel}</button>
                                 </>
                               ) : (
                                 <>
@@ -2128,7 +2126,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                                   <button
                                     onClick={() => { setEditingItemId(itemId); setEditingItemDesc(item.desc || ''); }}
                                     className="p-1.5 text-gray-300 hover:text-[#CBA85C] hover:bg-[#CBA85C]/10 rounded-lg transition-all shrink-0"
-                                    title="修改产品名"
+                                    title={H.editProductName}
                                   ><Edit3 className="w-3.5 h-3.5" /></button>
                                 </>
                               )}
@@ -2144,41 +2142,41 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                 <div className="mt-8 p-10 bg-[#D4A843]/5 rounded-[50px] border-2 border-[#D4A843]/20 relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-2 h-full bg-[#D4A843]"></div>
                   <h4 className="text-xs font-black text-[#D4A843] uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
-                    <Box className="w-5 h-5" /> 寄售发货跟踪 / Consignment Tracking
+                    <Box className="w-5 h-5" /> {H.consignmentTracking}
                   </h4>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     <div className="space-y-3">
-                      <label className="text-xs font-black text-[#D4A843] uppercase tracking-wide ml-1">交易模式</label>
+                      <label className="text-xs font-black text-[#D4A843] uppercase tracking-wide ml-1">{H.transactionMode}</label>
                       <select
                         value={selectedOrder.transactionMode || 'Direct Sale'}
                         onChange={(e) => handleUpdateOrderMetadata(selectedOrder.id, { transactionMode: e.target.value as any })}
                         className="w-full p-4 bg-white border-2 border-[#D4A843]/20 rounded-2xl font-black text-xs uppercase outline-none focus:border-[#D4A843] shadow-sm transition-all"
                       >
-                        <option value="Direct Sale">Direct Sale (直售)</option>
-                        <option value="Consignment">Consignment (代售)</option>
+                        <option value="Direct Sale">{H.modeDirect}</option>
+                        <option value="Consignment">{H.modeConsignment}</option>
                       </select>
                     </div>
 
                     {selectedOrder.transactionMode === 'Consignment' && (
                       <>
                         <div className="space-y-3 animate-in fade-in slide-in-from-left-4">
-                          <label className="text-xs font-black text-[#D4A843] uppercase tracking-wide ml-1">代售状态</label>
+                          <label className="text-xs font-black text-[#D4A843] uppercase tracking-wide ml-1">{H.consignmentStatus}</label>
                           <select
                             value={(selectedOrder as any).consignmentStatus || 'Sent'}
                             onChange={(e) => handleUpdateOrderMetadata(selectedOrder.id, { consignmentStatus: e.target.value as any } as any)}
                             className="w-full p-4 bg-white border-2 border-[#D4A843]/20 rounded-2xl font-black text-xs uppercase outline-none focus:border-[#D4A843] shadow-sm transition-all"
                           >
-                            <option value="Sent">已发货 (Sent)</option>
-                            <option value="On Sale">上架销售中 (On Sale)</option>
-                            <option value="Sold Reported">客户已报销售数 (Sold Reported)</option>
-                            <option value="Settled">已结算 (Settled)</option>
-                            <option value="Exception">异常 (Exception)</option>
+                            <option value="Sent">{H.statusSent}</option>
+                            <option value="On Sale">{H.statusOnSale}</option>
+                            <option value="Sold Reported">{H.statusSoldReported}</option>
+                            <option value="Settled">{H.statusSettled}</option>
+                            <option value="Exception">{H.statusException}</option>
                           </select>
                         </div>
 
                         <div className="space-y-3 animate-in fade-in slide-in-from-left-8">
-                          <label className="text-xs font-black text-[#D4A843] uppercase tracking-wide ml-1">代售已售数量</label>
+                          <label className="text-xs font-black text-[#D4A843] uppercase tracking-wide ml-1">{H.consignmentSoldQty}</label>
                           <input
                             type="number"
                             value={(selectedOrder as any).consignmentSoldQty === 0 ? '' : (selectedOrder as any).consignmentSoldQty}
@@ -2195,7 +2193,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                   </div>
 
                   <div className="mt-8 flex items-center gap-2 text-xs font-bold text-[#D4A843]/70">
-                    <Info className="w-3 h-3" /> 本栏仅记录发货状态，不产生收款、不影响应收。客户实际卖出后，请在下方「寄售销售结算」录入销售数量和收款。
+                    <Info className="w-3 h-3" /> {H.trackingNote}
                   </div>
                 </div>
 
@@ -2206,10 +2204,10 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                     <div className="flex justify-between items-start mb-8">
                       <div>
                         <h4 className="text-xs font-black text-[#080D1E] uppercase tracking-[0.2em] flex items-center gap-3">
-                          <History className="w-5 h-5" /> 寄售销售结算 / Consignment Settlement
+                          <History className="w-5 h-5" /> {H.consignmentSettlement}
                         </h4>
                         <p className="text-xs font-bold text-[#CBA85C]/70 mt-2">
-                          客户实际卖出寄售商品后，在此录入销售数量、结算金额与收款状态。数据保存至结算台账，供对账查询使用。
+                          {H.settlementIntro}
                         </p>
                       </div>
                     </div>
@@ -2217,36 +2215,36 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                     {settlementTotals.sold_qty > deliveredQty && (
                       <div className="mb-6 p-4 bg-[#D4A843]/15 border border-[#D4A843]/30 rounded-2xl flex items-center gap-3 text-[#D4A843] text-xs font-black animate-pulse">
                         <AlertTriangle className="w-4 h-4" />
-                        ⚠️ 注意：结算总销售数量已超过发货数量（发货量：{deliveredQty}件），请核实。
+                        {H.overDelivered(deliveredQty)}
                       </div>
                     )}
 
                     <div className="grid grid-cols-4 gap-6 mb-10">
                       <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm">
-                        <p className="text-xs font-black text-gray-400 uppercase mb-1">累计销售数量</p>
-                        <p className="text-xl font-black text-[#080D1E] font-mono">{settlementTotals.sold_qty} 件</p>
+                        <p className="text-xs font-black text-gray-400 uppercase mb-1">{H.totalSoldQty}</p>
+                        <p className="text-xl font-black text-[#080D1E] font-mono">{H.pcs(settlementTotals.sold_qty)}</p>
                       </div>
                       <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm">
-                        <p className="text-xs font-black text-gray-400 uppercase mb-1">应收结算金额</p>
+                        <p className="text-xs font-black text-gray-400 uppercase mb-1">{H.settlementReceivable}</p>
                         <p className="text-xl font-black text-[#080D1E] font-mono">AED {settlementTotals.should_collect.toFixed(2)}</p>
                       </div>
                       <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm">
-                        <p className="text-xs font-black text-[#6FBF8E] uppercase mb-1">已收金额</p>
+                        <p className="text-xs font-black text-[#6FBF8E] uppercase mb-1">{H.receivedAmount}</p>
                         <p className="text-xl font-black text-[#3F7D58] font-mono">AED {settlementTotals.paid.toFixed(2)}</p>
                       </div>
                       <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm">
-                        <p className="text-xs font-black text-[#E0846A] uppercase mb-1">未收余额</p>
+                        <p className="text-xs font-black text-[#E0846A] uppercase mb-1">{H.unpaidBalance}</p>
                         <p className="text-xl font-black text-[#E0846A] font-mono">AED {settlementTotals.outstanding.toFixed(2)}</p>
                       </div>
                     </div>
 
                     <div className="bg-white/60 backdrop-blur p-8 rounded-[32px] border border-[#CBA85C]/20 mb-10">
                       <h5 className="text-xs font-black text-[#CBA85C]/70 uppercase tracking-wide mb-6 flex items-center gap-2">
-                        <Plus className="w-3 h-3" /> 新增结算记录 / Add Settlement
+                        <Plus className="w-3 h-3" /> {H.addSettlement}
                       </h5>
 
                       <div className="mb-8 p-6 bg-gray-50 border border-gray-100 rounded-3xl space-y-3">
-                        <label className="text-xs font-black text-gray-400 uppercase tracking-wide ml-1">结算商品（选择本次销售的产品）</label>
+                        <label className="text-xs font-black text-gray-400 uppercase tracking-wide ml-1">{H.settlementItem}</label>
                         <select
                           value={setForm.selectedItemName}
                           onChange={(e) => {
@@ -2270,7 +2268,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                         >
                           {(orderItems || []).filter(it => it.orderId === selectedOrder.id).map((it, idx) => (
                             <option key={idx} value={safeStr(it.desc)}>
-                              {safeStr(it.desc)} | 未税 {(it.price ?? 0).toFixed(2)} → 含税 {roundTo2((it.price ?? 0) * 1.05).toFixed(2)} AED
+                              {H.priceLine(safeStr(it.desc), (it.price ?? 0).toFixed(2), roundTo2((it.price ?? 0) * 1.05).toFixed(2))}
                             </option>
                           ))}
                         </select>
@@ -2278,19 +2276,19 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
                       {/* VAT 价格分解说明栏 */}
                       <div className="flex items-center gap-3 mb-6 px-4 py-3 bg-[#D4A843]/10 border border-[#D4A843]/20 rounded-2xl text-xs font-bold text-[#D4A843]">
-                        <span>未税单价</span>
+                        <span>{H.priceExVat}</span>
                         <span className="font-mono text-sm font-black">AED {(setForm.unit_price || 0).toFixed(2)}</span>
                         <span className="text-[#D4A843]/70">×</span>
                         <span className="px-2 py-0.5 bg-[#D4A843]/15 rounded-full font-black text-[#D4A843]">VAT 5%</span>
                         <span className="text-[#D4A843]/70">=</span>
-                        <span>含税单价</span>
+                        <span>{H.priceIncVat}</span>
                         <span className="font-mono text-sm font-black text-[#3F7D58]">AED {(setForm.tax_inclusive_price || roundTo2((setForm.unit_price || 0) * 1.05)).toFixed(2)}</span>
                       </div>
 
                       {/* Row 1: 数量 + 含税单价(只读) + 确认销售金额(只读) */}
                       <div className="grid grid-cols-3 gap-6 mb-6">
                         <div className="space-y-2">
-                          <label className="text-xs font-black text-gray-400 uppercase">本次销售数量</label>
+                          <label className="text-xs font-black text-gray-400 uppercase">{H.soldQtyThisTime}</label>
                           <input
                             type="number"
                             value={setForm.sold_qty || ''}
@@ -2305,12 +2303,12 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                               }));
                             }}
                             className="w-full p-4 bg-white border border-[#CBA85C]/20 rounded-2xl font-black text-sm outline-none focus:border-[#CBA85C]"
-                            placeholder="0 件"
+                            placeholder={H.qtyPlaceholder}
                           />
                         </div>
 
                         <div className="space-y-2">
-                          <label className="text-xs font-black text-gray-400 uppercase">含税单价 (AED) <span className="text-[#D4A843]/70 normal-case font-normal">= 未税 × 1.05</span></label>
+                          <label className="text-xs font-black text-gray-400 uppercase">{H.priceIncVatAed} <span className="text-[#D4A843]/70 normal-case font-normal">{H.vatFormula}</span></label>
                           <input
                             type="number"
                             step="0.01"
@@ -2322,7 +2320,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                         </div>
 
                         <div className="space-y-2">
-                          <label className="text-xs font-black text-gray-400 uppercase">本次确认销售金额 (AED) <span className="text-[#CBA85C]/70 normal-case font-normal">自动</span></label>
+                          <label className="text-xs font-black text-gray-400 uppercase">{H.confirmedAmountAed} <span className="text-[#CBA85C]/70 normal-case font-normal">{H.auto}</span></label>
                           <input
                             type="number"
                             step="0.01"
@@ -2337,7 +2335,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                       {/* Row 2: 实收金额 + 备注 */}
                       <div className="grid grid-cols-2 gap-6 mb-8">
                         <div className="space-y-2">
-                          <label className="text-xs font-black text-gray-400 uppercase">本次实收金额 (AED) <span className="text-red-400 normal-case font-normal">必须 &gt; 0</span></label>
+                          <label className="text-xs font-black text-gray-400 uppercase">{H.receivedThisTimeAed} <span className="text-red-400 normal-case font-normal">{H.mustBePositive}</span></label>
                           <input
                             type="number"
                             step="0.01"
@@ -2349,13 +2347,13 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                         </div>
 
                         <div className="space-y-2">
-                          <label className="text-xs font-black text-gray-400 uppercase">备注</label>
+                          <label className="text-xs font-black text-gray-400 uppercase">{H.notes}</label>
                           <input
                             type="text"
                             value={setForm.memo}
                             onChange={e => setSetForm(prev => ({ ...prev, memo: e.target.value }))}
                             className="w-full p-4 bg-white border border-[#CBA85C]/20 rounded-2xl font-bold text-sm outline-none focus:border-[#CBA85C]"
-                            placeholder="本次结算备注（可选）"
+                            placeholder={H.settlementNotesPlaceholder}
                           />
                         </div>
                       </div>
@@ -2375,7 +2373,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                         onClick={handleAddSettlement}
                         className="w-full py-5 bg-[#080D1E] text-white rounded-2xl font-black uppercase text-xs tracking-wide shadow-lg hover:bg-[#CBA85C] transition-all active:scale-95 flex items-center justify-center gap-3"
                       >
-                        <Save className="w-4 h-4" /> 新增结算记录
+                        <Save className="w-4 h-4" /> {H.addSettlement}
                       </button>
                     </div>
 
@@ -2383,13 +2381,13 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                       <table className="w-full text-left">
                         <thead className="bg-gray-50 text-xs font-black text-gray-400 uppercase tracking-wide border-b">
                           <tr>
-                            <th className="px-6 py-4">录入时间</th>
-                            <th className="px-6 py-4">结算商品</th>
-                            <th className="px-6 py-4">数量</th>
-                            <th className="px-6 py-4 text-right">含税单价</th>
-                            <th className="px-6 py-4 text-right">确认金额 (AED)</th>
-                            <th className="px-6 py-4 text-right">实收金额 (AED)</th>
-                            <th className="px-6 py-4">备注</th>
+                            <th className="px-6 py-4">{H.colEnteredAt}</th>
+                            <th className="px-6 py-4">{H.colItem}</th>
+                            <th className="px-6 py-4">{H.colQty}</th>
+                            <th className="px-6 py-4 text-right">{H.colPriceIncVat}</th>
+                            <th className="px-6 py-4 text-right">{H.colConfirmedAed}</th>
+                            <th className="px-6 py-4 text-right">{H.colReceivedAed}</th>
+                            <th className="px-6 py-4">{H.colNotes}</th>
                             <th className="px-6 py-4"></th>
                           </tr>
                         </thead>
@@ -2397,7 +2395,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                         <tbody className="divide-y divide-gray-50">
                           {(orderSettlements || []).map(s => {
                             const itemMatch = safeStr(s.memo).match(/\[ITEM: (.*?) \| (?:PRICE|EXCL):.*?\]/);
-                            const itemName = itemMatch ? itemMatch[1] : '未知商品';
+                            const itemName = itemMatch ? itemMatch[1] : H.unknownItem;
                             const displayMemo = safeStr(s.memo).replace(/\[ITEM:.*?\]/, '').trim();
                             const inclPrice = (s as any).tax_inclusive_price ?? roundTo2(((s as any).unit_price ?? 0) * 1.05);
 
@@ -2407,7 +2405,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                                   {s.created_at ? (new Date(s.created_at).toLocaleDateString() + ' ' + new Date(s.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) : '--'}
                                 </td>
                                 <td className="px-6 py-4 uppercase text-[#080D1E] truncate max-w-[150px]">{itemName}</td>
-                                <td className="px-6 py-4">{s.sold_qty} 件</td>
+                                <td className="px-6 py-4">{H.pcs(s.sold_qty)}</td>
                                 <td className="px-6 py-4 text-right font-mono text-[#D4A843]">{inclPrice.toFixed(2)}</td>
                                 <td className="px-6 py-4 text-right font-mono">{(s.amount ?? 0).toFixed(2)}</td>
                                 <td className="px-6 py-4 text-right font-mono text-[#3F7D58] font-black">{(s.paid_amount ?? 0).toFixed(2)}</td>
@@ -2415,11 +2413,11 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                                 <td className="px-6 py-4">
                                   {!s.voided && (settlDelConfirm === s.id ? (
                                     <div className="flex items-center gap-1">
-                                      <button onClick={() => handleVoidSettlement(s.id)} className="px-2 py-1 bg-red-500 text-white rounded text-xs font-black">确认作废</button>
-                                      <button onClick={() => setSettlDelConfirm(null)} className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-black">取消</button>
+                                      <button onClick={() => handleVoidSettlement(s.id)} className="px-2 py-1 bg-red-500 text-white rounded text-xs font-black">{H.confirmVoid}</button>
+                                      <button onClick={() => setSettlDelConfirm(null)} className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-black">{H.cancel}</button>
                                     </div>
                                   ) : (
-                                    <button onClick={() => setSettlDelConfirm(s.id)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="作废此结算记录">
+                                    <button onClick={() => setSettlDelConfirm(s.id)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title={H.voidSettlement}>
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
                                   ))}
@@ -2431,7 +2429,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                           {(orderSettlements || []).length === 0 && (
                             <tr>
                               <td colSpan={7} className="py-12 text-center text-gray-400 text-xs font-black tracking-wide">
-                                暂无结算记录 — 客户卖出并收到款后，在上方录入
+                                {H.noSettlements}
                               </td>
                             </tr>
                           )}
@@ -2449,12 +2447,12 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
               <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[6000] flex items-center justify-center p-8 animate-in zoom-in-95" data-no-pdf="true">
                 <div className="bg-white p-12 rounded-[50px] shadow-2xl max-w-lg w-full border-2 border-[#D4A843]/20">
                   <h3 className="text-sm font-black text-[#D4A843] uppercase tracking-widest mb-10 flex items-center gap-3">
-                    <RefreshCw className="w-5 h-5" /> 订单冲账 / Create Adjustment
+                    <RefreshCw className="w-5 h-5" /> {H.createAdjustment}
                   </h3>
 
                   <div className="space-y-8">
                     <div className="space-y-3">
-                      <label className="text-xs font-black text-gray-400 uppercase tracking-wide ml-4">冲账金额 (正数, 将自动转负)</label>
+                      <label className="text-xs font-black text-gray-400 uppercase tracking-wide ml-4">{H.adjAmount}</label>
                       <input
                         type="number"
                         step="0.01"
@@ -2467,25 +2465,25 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                     </div>
 
                     <div className="space-y-3">
-                      <label className="text-xs font-black text-gray-400 uppercase tracking-wide ml-4">冲账原因 / Reason</label>
+                      <label className="text-xs font-black text-gray-400 uppercase tracking-wide ml-4">{H.adjReason}</label>
                       <input
                         type="text"
                         value={adjReason}
                         onChange={e => setAdjReason(e.target.value)}
                         className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-[28px] font-bold text-sm outline-none focus:border-[#D4A843] shadow-inner transition-all"
-                        placeholder="退货、价格调整、重复收款..."
+                        placeholder={H.adjReasonPlaceholder}
                       />
                     </div>
 
                     <div className="space-y-3">
-                      <label className="text-xs font-black text-gray-400 uppercase tracking-wide ml-4">结算状态</label>
+                      <label className="text-xs font-black text-gray-400 uppercase tracking-wide ml-4">{H.settlementStatus}</label>
                       <select
                         value={adjStatus}
                         onChange={e => setAdjStatus(e.target.value as any)}
                         className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-[28px] font-black text-xs uppercase tracking-widest outline-none focus:border-[#D4A843] appearance-none shadow-inner cursor-pointer"
                       >
-                        <option value="PENDING">PENDING (挂账，进入应收)</option>
-                        <option value="PAID">PAID (直接平账，不进应收)</option>
+                        <option value="PENDING">{H.adjPending}</option>
+                        <option value="PAID">{H.adjPaid}</option>
                       </select>
                     </div>
 
@@ -2494,13 +2492,13 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                         onClick={() => { setShowAdjForm(false); setAdjAmount(''); }}
                         className="py-5 bg-gray-100 text-gray-400 rounded-[24px] font-black uppercase text-xs tracking-wide hover:bg-gray-200 transition-all"
                       >
-                        取消
+                        {H.cancel}
                       </button>
                       <button
                         onClick={handleCreateAdjustment}
                         className="py-5 bg-[#D4A843] text-white rounded-[24px] font-black uppercase text-xs tracking-wide shadow-xl hover:bg-black transition-all"
                       >
-                        确认创建冲账单
+                        {H.confirmCreateAdj}
                       </button>
                     </div>
                   </div>
@@ -2532,14 +2530,14 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                       }}
                       className="px-6 py-5 bg-[#D4A843]/15 text-[#D4A843] rounded-[28px] font-black uppercase text-xs tracking-wide hover:bg-[#D4A843]/25 transition-all flex items-center gap-3"
                     >
-                      <RefreshCw className="w-4 h-4" /> 冲账
+                      <RefreshCw className="w-4 h-4" /> {H.adjust}
                     </button>
 
                     <button
                       onClick={() => handleVoidOrder(selectedOrder.id)}
                       className="px-6 py-5 bg-red-50 text-red-500 rounded-[28px] font-black uppercase text-xs tracking-wide hover:bg-red-600 hover:text-white transition-all flex items-center gap-3"
                     >
-                      <Ban className="w-4 h-4" /> 作废
+                      <Ban className="w-4 h-4" /> {H.void}
                     </button>
                   </>
                 )}
@@ -2564,11 +2562,11 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
               <CreditCard className="w-10 h-10 text-[#3F7D58]" />
             </div>
 
-            <h3 className="text-sm font-black text-[#080D1E] uppercase tracking-[0.3em] mb-10 text-center">登记收款金额</h3>
+            <h3 className="text-sm font-black text-[#080D1E] uppercase tracking-[0.3em] mb-10 text-center">{H.recordPaymentTitle}</h3>
 
             <div className="space-y-8">
               <div className="space-y-3">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-wide ml-4">核销金额 (AED)</label>
+                <label className="text-xs font-black text-gray-400 uppercase tracking-wide ml-4">{H.settleAmountAed}</label>
                 <input
                   id="pay-amount-ar"
                   type="number"
@@ -2589,7 +2587,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                   onClick={() => { setShowPaymentModal(null); setPaymentMethodValue(emptyPaymentMethodValue()); }}
                   className="py-5 bg-gray-100 text-gray-400 rounded-[24px] font-black uppercase text-xs tracking-wide hover:bg-gray-200 transition-all"
                 >
-                  取消
+                  {H.cancel}
                 </button>
 
                 <button
@@ -2601,7 +2599,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                   }}
                   className="py-5 bg-[#3F7D58] text-white rounded-[24px] font-black uppercase text-xs tracking-wide shadow-xl hover:bg-black transition-all disabled:opacity-40"
                 >
-                  确认核销
+                  {H.confirmSettle}
                 </button>
               </div>
             </div>

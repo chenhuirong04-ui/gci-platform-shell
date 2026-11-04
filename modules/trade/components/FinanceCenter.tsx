@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LayoutGrid, Landmark, ArrowLeftRight, FileStack, Receipt, Layers, BookOpenCheck } from 'lucide-react';
 import { colors } from '@gci/design-system';
+import { useI18n } from '@gci/i18n';
 import FinanceTracker from './FinanceTracker';
 import CashFlowDashboard from './CashFlowDashboard';
 import AccountsPayable from './AccountsPayable';
@@ -29,17 +30,18 @@ interface FinanceCenterProps {
   subTabKey?: string;
 }
 
-const SUB_TABS: { id: FinanceSubTab; label: string; icon: React.ElementType }[] = [
-  { id: 'overview', label: '财务总览', icon: LayoutGrid },
-  { id: 'accounts', label: '银行账户', icon: Landmark },
-  { id: 'cashflow', label: '资金流水', icon: ArrowLeftRight },
-  { id: 'ap', label: '应付账款', icon: FileStack },
-  { id: 'invoice', label: '发票管理', icon: Receipt },
-  { id: 'profitability', label: '项目与客户利润', icon: Layers },
-  { id: 'bookkeeping', label: '记账与对账', icon: BookOpenCheck },
+const SUB_TABS: { id: FinanceSubTab; icon: React.ElementType }[] = [
+  { id: 'overview', icon: LayoutGrid },
+  { id: 'accounts', icon: Landmark },
+  { id: 'cashflow', icon: ArrowLeftRight },
+  { id: 'ap', icon: FileStack },
+  { id: 'invoice', icon: Receipt },
+  { id: 'profitability', icon: Layers },
+  { id: 'bookkeeping', icon: BookOpenCheck },
 ];
 
 export default function FinanceCenter({ initialSubTab }: FinanceCenterProps) {
+  const { dict } = useI18n();
   const [activeSubTab, setActiveSubTab] = useState<FinanceSubTab>(initialSubTab || 'overview');
 
   // Deep-link switch (sidebar/AI capability links to /trade?tab=finance or
@@ -66,7 +68,7 @@ export default function FinanceCenter({ initialSubTab }: FinanceCenterProps) {
               style={isActive ? { background: colors.bgBase } : undefined}
             >
               <Icon className="w-4 h-4" />
-              {tab.label}
+              {dict.trade.finance.tabs[tab.id]}
             </button>
           );
         })}

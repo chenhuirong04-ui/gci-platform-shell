@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Save } from 'lucide-react';
 import { roundTo2 } from '../services/currencyUtils';
+import { useI18n } from '@gci/i18n';
 import { supplierPaymentsService } from '../services/supplierPaymentsService';
 import {
   PaymentMethodFields, emptyPaymentMethodValue, type PaymentMethodFormValue,
@@ -22,6 +23,7 @@ interface SupplierPaymentModalProps {
  * OUT rules are not reimplemented here.
  */
 export default function SupplierPaymentModal({ payable, accounts, onClose, onSuccess }: SupplierPaymentModalProps) {
+  const A = useI18n().dict.trade.ap;
   const [amount, setAmount] = useState(String(payable.outstanding_amount));
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [referenceNo, setReferenceNo] = useState('');
@@ -33,8 +35,8 @@ export default function SupplierPaymentModal({ payable, accounts, onClose, onSuc
   const overOutstanding = amtNum > payable.outstanding_amount + 0.005;
 
   const submit = async () => {
-    if (amtNum <= 0) { alert('⚠️ 付款金额必须大于 0。'); return; }
-    if (overOutstanding) { alert(`⚠️ 本次付款金额不能大于未付余额 AED ${payable.outstanding_amount.toFixed(2)}。`); return; }
+    if (amtNum <= 0) { alert(A.errPayPositive); return; }
+    if (overOutstanding) { alert(A.errOverOutstanding(payable.outstanding_amount.toFixed(2))); return; }
     setSubmitting(true);
     try {
       await supplierPaymentsService.create({
@@ -50,7 +52,7 @@ export default function SupplierPaymentModal({ payable, accounts, onClose, onSuc
       onSuccess();
       onClose();
     } catch (e: any) {
-      alert(`⚠️ ${e?.message || '付款失败，请重试。'}`);
+      alert(`⚠️ ${e?.message || A.errPayFailed}`);
     } finally {
       setSubmitting(false);
     }
@@ -61,7 +63,7 @@ export default function SupplierPaymentModal({ payable, accounts, onClose, onSuc
       <div className="bg-white w-full max-w-xl rounded-[40px] overflow-hidden flex flex-col shadow-2xl max-h-[90dvh]">
         <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
           <div>
-            <h3 className="text-sm font-black text-gray-800 uppercase tracking-widest">供应商付款 / Supplier Payment</h3>
+            <h3 className="text-sm font-black text-gray-800 uppercase tracking-widest">{A.modalTitle}</h3>
             <p className="text-xs font-bold text-gray-400 mt-1">{payable.supplier_name} — {payable.invoice_no || payable.reference_no || payable.id.slice(0, 8)}</p>
           </div>
           <button onClick={onClose} className="p-3 hover:bg-red-50 text-gray-300 hover:text-red-500 rounded-full transition-all">
@@ -72,17 +74,17 @@ export default function SupplierPaymentModal({ payable, accounts, onClose, onSuc
         <div className="flex-1 min-h-0 overflow-y-auto p-8 space-y-5">
           <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-2xl">
             <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">应付金额</p>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{A.colAmount}</p>
               <p className="text-lg font-black font-mono text-gray-700">AED {payable.amount.toFixed(2)}</p>
             </div>
             <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">未付余额</p>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{A.unpaidBalance}</p>
               <p className="text-lg font-black font-mono text-[#E0846A]">AED {payable.outstanding_amount.toFixed(2)}</p>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">本次付款金额 (AED)</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{A.payAmountAed}</label>
             <input
               type="number"
               step="0.01"
@@ -91,7 +93,7 @@ export default function SupplierPaymentModal({ payable, accounts, onClose, onSuc
               className={`w-full p-4 border rounded-xl outline-none font-black font-mono text-lg ${overOutstanding ? 'border-red-400 text-red-500' : 'border-gray-300 focus:border-[#CBA85C] text-gray-700'}`}
             />
             {overOutstanding && (
-              <p className="text-[11px] text-red-500 font-bold px-1">⚠️ 不能大于未付余额 AED {payable.outstanding_amount.toFixed(2)}</p>
+              <p className="text-[11px] text-red-500 font-bold px-1">{A.overOutstandingHint(payable.outstanding_amount.toFixed(2))}</p>
             )}
           </div>
 
@@ -108,7 +110,7 @@ export default function SupplierPaymentModal({ payable, accounts, onClose, onSuc
           <PaymentMethodFields value={pmValue} onChange={setPmValue} accounts={accounts} type="out" />
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Reference No / 单据参考号（可选）</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{A.referenceNoOptional2}</label>
             <input
               type="text"
               value={referenceNo}
@@ -118,7 +120,7 @@ export default function SupplierPaymentModal({ payable, accounts, onClose, onSuc
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">备注（可选）</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{A.notesOptional}</label>
             <input
               type="text"
               value={notes}
@@ -134,7 +136,7 @@ export default function SupplierPaymentModal({ payable, accounts, onClose, onSuc
             disabled={submitting || overOutstanding || amtNum <= 0}
             className="w-full py-5 bg-[#080D1E] text-white rounded-2xl font-black uppercase text-xs tracking-wide shadow-lg hover:bg-[#CBA85C] transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-40"
           >
-            <Save className="w-4 h-4" /> {submitting ? '提交中…' : '确认付款'}
+            <Save className="w-4 h-4" /> {submitting ? A.submitting : A.confirmPay}
           </button>
         </div>
       </div>

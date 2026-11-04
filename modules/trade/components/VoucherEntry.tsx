@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useI18n } from '@gci/i18n';
 import { Upload, Check, FileClock } from 'lucide-react';
 import { bankAccountsService } from '../services/bankAccountsService';
 import { listSuppliers } from '../../suppliers/lib/suppliersCloud';
@@ -27,6 +28,8 @@ interface ParsedVoucherFields {
 }
 
 export default function VoucherEntry() {
+  const { dict } = useI18n();
+  const B = dict.trade.books;
   const [direction, setDirection] = useState<Direction>('out');
   const [context, setContext] = useState<PaymentContext>('BANK_TRANSFER');
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
@@ -79,7 +82,7 @@ export default function VoucherEntry() {
         body: JSON.stringify({ mimeType, data: base64 }),
       });
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error || 'AI 解析失败');
+      if (!data.ok) throw new Error(data.error || B.errAiParse);
       const pf: ParsedVoucherFields = data.fields || {};
       setFields(pf);
       setPurposeNote(pf.description || '');
@@ -95,7 +98,7 @@ export default function VoucherEntry() {
         if (match) { setCpSelection({ ...emptyCustomerProjectSelection(), customerId: match.id, customerName: match.customer_name }); setLinkMode('customer'); }
       }
     } catch (e: any) {
-      setParseError(e?.message || '解析失败，可手动填写。');
+      setParseError(e?.message || B.errParseManual);
     } finally {
       setParsing(false);
     }
@@ -111,8 +114,8 @@ export default function VoucherEntry() {
 
   const submitAsPaid = async () => {
     if (!file) return;
-    if (!category) { alert('⚠️ 请选择科目分类。'); return; }
-    if (!fields.amount || fields.amount <= 0) { alert('⚠️ 金额无效，请手动填写。'); return; }
+    if (!category) { alert(B.errSelectCategory2); return; }
+    if (!fields.amount || fields.amount <= 0) { alert(B.errAmountInvalid); return; }
     setSubmitting(true);
     try {
       const { path, error } = await uploadFinanceFile('vouchers', file);
@@ -158,7 +161,7 @@ export default function VoucherEntry() {
       if (voucher) await financeVoucherService.update(voucher.id, { status: 'confirmed', resulting_transaction_ref: txn.id });
       setDone('transaction');
     } catch (e: any) {
-      alert(`⚠️ 入账失败：${e?.message || '请重试'}`);
+      alert(B.errPost(e?.message || B.retry));
     } finally {
       setSubmitting(false);
     }
@@ -166,7 +169,7 @@ export default function VoucherEntry() {
 
   const submitAsPayable = async () => {
     if (!file || !selectedSupplier) return;
-    if (!fields.amount || fields.amount <= 0) { alert('⚠️ 金额无效，请手动填写。'); return; }
+    if (!fields.amount || fields.amount <= 0) { alert(B.errAmountInvalid); return; }
     setSubmitting(true);
     try {
       const { path, error } = await uploadFinanceFile('vouchers', file);
@@ -197,12 +200,12 @@ export default function VoucherEntry() {
         invoiceNo: fields.invoice_no,
         notes: purposeNote,
       });
-      if (!payable) throw new Error('创建应付账款失败');
+      if (!payable) throw new Error(B.errCreatePayable);
 
       if (voucher) await financeVoucherService.update(voucher.id, { status: 'confirmed', resulting_payable_id: payable.id });
       setDone('payable');
     } catch (e: any) {
-      alert(`⚠️ 生成应付失败：${e?.message || '请重试'}`);
+      alert(B.errGenPayable(e?.message || B.retry));
     } finally {
       setSubmitting(false);
     }
@@ -215,12 +218,12 @@ export default function VoucherEntry() {
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">凭证类型 / Voucher Type</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{B.voucherType}</label>
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => setDirection('in')} className={`p-3 rounded-xl text-xs font-black uppercase tracking-widest ${direction === 'in' ? 'bg-[#3F7D58] text-white' : 'bg-gray-100 text-gray-400'}`}>收入凭证 / In</button>
-              <button onClick={() => setDirection('out')} className={`p-3 rounded-xl text-xs font-black uppercase tracking-widest ${direction === 'out' ? 'bg-[#A85D45] text-white' : 'bg-gray-100 text-gray-400'}`}>支出凭证 / Out</button>
+              <button onClick={() => setDirection('in')} className={`p-3 rounded-xl text-xs font-black uppercase tracking-widest ${direction === 'in' ? 'bg-[#3F7D58] text-white' : 'bg-gray-100 text-gray-400'}`}>{B.voucherIn}</button>
+              <button onClick={() => setDirection('out')} className={`p-3 rounded-xl text-xs font-black uppercase tracking-widest ${direction === 'out' ? 'bg-[#A85D45] text-white' : 'bg-gray-100 text-gray-400'}`}>{B.voucherOut}</button>
             </div>
           </div>
           <div className="space-y-1.5">
@@ -237,16 +240,16 @@ export default function VoucherEntry() {
           <div className="space-y-1.5">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Bank Account</label>
             <select value={bankAccountId} onChange={e => setBankAccountId(e.target.value)} className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700 text-sm">
-              <option value="">选择账户…</option>
+              <option value="">{B.selectAccount}</option>
               {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
             </select>
           </div>
         )}
 
         <div className="space-y-1.5">
-          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">上传发票 / 小票 / 付款截图 / 收款截图</label>
+          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{B.uploadVoucher}</label>
           <input ref={fileRef} type="file" accept="application/pdf,image/*" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} disabled={parsing} className="text-sm" />
-          {parsing && <p className="text-xs font-black text-[#CBA85C] uppercase flex items-center gap-1.5 pt-1"><FileClock className="w-3.5 h-3.5" /> AI 解析中…</p>}
+          {parsing && <p className="text-xs font-black text-[#CBA85C] uppercase flex items-center gap-1.5 pt-1"><FileClock className="w-3.5 h-3.5" /> {B.aiParsing}</p>}
           {parseError && <p className="text-xs font-bold text-red-500 pt-1">{parseError}</p>}
         </div>
       </div>
@@ -273,30 +276,30 @@ export default function VoucherEntry() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">用途 / 备注 / Purpose</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{B.purpose}</label>
             <input value={purposeNote} onChange={e => setPurposeNote(e.target.value)} className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">科目 Category *</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{B.category}</label>
               <select value={category} onChange={e => setCategory(e.target.value)} className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700">
-                <option value="">选择分类…</option>
-                {categoryOptions.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                <option value="">{B.selectCategory}</option>
+                {categoryOptions.map(c => <option key={c.value} value={c.value}>{dict.trade.categories[c.value] ?? c.label}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Subcategory（可选）</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{B.subcategoryOptional}</label>
               <input value={subcategory} onChange={e => setSubcategory(e.target.value)} className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700" />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">关联 Link（可选）</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{B.linkOptional}</label>
             <div className="grid grid-cols-3 gap-2">
               {(['none', 'customer', 'supplier'] as const).map(m => (
                 <button key={m} onClick={() => setLinkMode(m)} className={`p-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${linkMode === m ? 'bg-[#080D1E] text-white' : 'bg-gray-100 text-gray-400'}`}>
-                  {m === 'none' ? '不关联' : m === 'customer' ? '客户/项目' : '供应商'}
+                  {m === 'none' ? B.linkNone : m === 'customer' ? B.linkCustomer : B.linkSupplier}
                 </button>
               ))}
             </div>
@@ -310,7 +313,7 @@ export default function VoucherEntry() {
               <input
                 value={selectedSupplier ? selectedSupplier.supplier_name_display : supplierQuery}
                 onChange={e => { setSupplierQuery(e.target.value); setSelectedSupplier(null); }}
-                placeholder="搜索供应商名称…"
+                placeholder={B.searchSupplier}
                 className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
               />
               {!selectedSupplier && supplierQuery.trim() && filteredSuppliers.length > 0 && (
@@ -324,7 +327,7 @@ export default function VoucherEntry() {
               )}
               {direction === 'out' && selectedSupplier && (
                 <div className="pt-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Due Date（未付款时使用，可选）</label>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{B.dueDateUnpaid}</label>
                   <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono mt-1" />
                 </div>
               )}
@@ -333,11 +336,11 @@ export default function VoucherEntry() {
 
           <div className="flex gap-3 pt-2">
             <button onClick={submitAsPaid} disabled={submitting} className="flex-1 flex items-center justify-center gap-2 py-4 rounded-xl bg-[#080D1E] text-white font-black uppercase text-xs tracking-widest disabled:opacity-40">
-              <Check className="w-4 h-4" /> {submitting ? '处理中…' : '已付款 → 生成正式账'}
+              <Check className="w-4 h-4" /> {submitting ? B.processing : B.paidToLedger}
             </button>
             {direction === 'out' && linkMode === 'supplier' && selectedSupplier && (
               <button onClick={submitAsPayable} disabled={submitting} className="flex-1 flex items-center justify-center gap-2 py-4 rounded-xl bg-gray-100 text-gray-700 font-black uppercase text-xs tracking-widest disabled:opacity-40">
-                <Upload className="w-4 h-4" /> {submitting ? '处理中…' : '未付款 → 生成应付账款'}
+                <Upload className="w-4 h-4" /> {submitting ? B.processing : B.unpaidToPayable}
               </button>
             )}
           </div>
@@ -346,8 +349,8 @@ export default function VoucherEntry() {
 
       {done && (
         <div className="bg-[#3F7D58]/5 border border-[#3F7D58]/20 rounded-2xl p-6 flex items-center justify-between">
-          <p className="text-sm font-bold text-[#3F7D58]">{done === 'transaction' ? '已生成正式 transaction。' : '已生成供应商应付账款（Payable）。'}</p>
-          <button onClick={reset} className="px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-600 text-xs font-black uppercase">继续录入下一笔</button>
+          <p className="text-sm font-bold text-[#3F7D58]">{done === 'transaction' ? B.doneTransaction : B.donePayable}</p>
+          <button onClick={reset} className="px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-600 text-xs font-black uppercase">{B.nextEntry}</button>
         </div>
       )}
     </div>

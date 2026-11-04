@@ -9,6 +9,7 @@ import { roundTo2 } from '../services/currencyUtils';
 import { persistence } from '../services/persistenceService';
 import { cloudDb } from '../services/cloudDb'; // ✅ NEW: Supabase
 import { colors } from '@gci/design-system';
+import { useI18n } from '@gci/i18n';
 
 const GOLD = colors.goldBase;
 const NAVY = colors.bgBase;
@@ -26,6 +27,7 @@ interface CashFlowEntry {
 }
 
 const CashFlowDashboard: React.FC = () => {
+  const L = useI18n().dict.trade.finance;
   const [activeView, setActiveView] = useState<'daily' | 'monthly'>('daily');
   const [flows, setFlows] = useState<CashFlowEntry[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -195,7 +197,7 @@ const CashFlowDashboard: React.FC = () => {
   return (
     <div className="flex flex-col gap-8 animate-in fade-in duration-500 pb-20">
       {/* FINANCE 分区页面标题 */}
-      <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>资金流水</h1>
+      <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>{L.cashflowTitle}</h1>
       {/* Header Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm relative overflow-hidden group">

@@ -8,6 +8,7 @@ import { OrderRecord, OrderItemRecord } from '../types';
 import { roundTo2 } from '../services/currencyUtils';
 import { persistence } from '../services/persistenceService';
 import { colors } from '@gci/design-system';
+import { useI18n } from '@gci/i18n';
 
 const GOLD = colors.goldBase;
 const NAVY = colors.bgBase;
@@ -24,6 +25,9 @@ const readLS = (k: string): any[] => {
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 const SalesDashboard: React.FC = () => {
+  const { lang, dict } = useI18n();
+  const t = dict.trade.sales;
+  const zh = lang === 'zh';
   const [orders,      setOrders]      = useState<OrderRecord[]>([]);
   const [orderItems,  setOrderItems]  = useState<OrderItemRecord[]>([]);
   const [consign,     setConsign]     = useState<any[]>([]);
@@ -214,7 +218,7 @@ const SalesDashboard: React.FC = () => {
       {/* ── Page Header ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-2xl font-black uppercase tracking-widest" style={{ color: NAVY }}>经营看板</h2>
+          <h2 className="text-2xl font-black uppercase tracking-widest" style={{ color: NAVY }}>{t.title}</h2>
           <p className="text-xs text-gray-400 font-bold mt-0.5 uppercase tracking-widest">
             Business Analytics · v2 · {lastRefresh.toLocaleTimeString()}
           </p>
@@ -223,32 +227,32 @@ const SalesDashboard: React.FC = () => {
           onClick={load}
           className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-black uppercase tracking-widest text-gray-500 hover:text-slate-700 hover:border-slate-300 transition-all shadow-sm"
         >
-          <RefreshCw className="w-3.5 h-3.5" />刷新数据
+          <RefreshCw className="w-3.5 h-3.5" />{t.refresh}
         </button>
       </div>
 
       {/* ══ Row 1 — KPI Cards (4) ════════════════════════════════════════ */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KpiCard label="本月营业额"   sub="REVENUE THIS MONTH"   value={`AED ${fmt(kpi.monthRevenue)}`}   icon={<TrendingUp  className="w-5 h-5" />} c="indigo"  />
-        <KpiCard label="本月已收款"   sub="COLLECTED THIS MONTH" value={`AED ${fmt(kpi.monthPaid)}`}      icon={<CheckCircle className="w-5 h-5" />} c="emerald" />
-        <KpiCard label="应收账款总额" sub="TOTAL OUTSTANDING"    value={`AED ${fmt(kpi.allOutstanding)}`} icon={<AlertTriangle className="w-5 h-5" />}
+        <KpiCard label={t.kpiRevenue}   sub={zh ? 'REVENUE THIS MONTH' : ''}   value={`AED ${fmt(kpi.monthRevenue)}`}   icon={<TrendingUp  className="w-5 h-5" />} c="indigo"  />
+        <KpiCard label={t.kpiCollected}   sub={zh ? 'COLLECTED THIS MONTH' : ''} value={`AED ${fmt(kpi.monthPaid)}`}      icon={<CheckCircle className="w-5 h-5" />} c="emerald" />
+        <KpiCard label={t.kpiOutstanding} sub={zh ? 'TOTAL OUTSTANDING' : ''}    value={`AED ${fmt(kpi.allOutstanding)}`} icon={<AlertTriangle className="w-5 h-5" />}
           c={kpi.allOutstanding > 0 ? 'amber' : 'emerald'} />
-        <KpiCard label="本月订单数"   sub="ORDERS THIS MONTH"    value={`${kpi.monthOrders} 单`}          icon={<Hash        className="w-5 h-5" />} c="violet"  />
+        <KpiCard label={t.kpiOrders}   sub={zh ? 'ORDERS THIS MONTH' : ''}    value={t.orders(kpi.monthOrders)}          icon={<Hash        className="w-5 h-5" />} c="violet"  />
       </div>
 
       {/* ══ Row 2 — 本月经营拆解 ════════════════════════════════════════ */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <SecHead icon={<Layers className="w-4 h-4" />} title="本月经营拆解" sub="MONTHLY BUSINESS BREAKDOWN" />
+        <SecHead icon={<Layers className="w-4 h-4" />} title={t.breakdownTitle} sub={zh ? 'MONTHLY BUSINESS BREAKDOWN' : ''} />
         <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          <BreakCard label="Direct Sale"  sub="本月直销"   value={`AED ${fmt(breakdown.directAmt)}`}
+          <BreakCard label={t.directSale}  sub={zh ? '本月直销' : ''}   value={`AED ${fmt(breakdown.directAmt)}`}
             pct={kpi.monthRevenue > 0 ? breakdown.directAmt  / kpi.monthRevenue : 0} barClass="bg-[#080D1E]" />
-          <BreakCard label="Consignment"  sub="本月寄售"   value={`AED ${fmt(breakdown.consignAmt)}`}
+          <BreakCard label={t.consignment}  sub={zh ? '本月寄售' : ''}   value={`AED ${fmt(breakdown.consignAmt)}`}
             pct={kpi.monthRevenue > 0 ? breakdown.consignAmt / kpi.monthRevenue : 0} barClass="bg-slate-400" />
-          <BreakCard label="已收款"       sub="COLLECTED"  value={`AED ${fmt(breakdown.collected)}`}
+          <BreakCard label={t.collected}       sub={zh ? 'COLLECTED' : ''}  value={`AED ${fmt(breakdown.collected)}`}
             pct={kpi.monthRevenue > 0 ? breakdown.collected  / kpi.monthRevenue : 0} barClass="bg-[#6FBF8E]" />
-          <BreakCard label="未收款"       sub="UNCOLLECTED" value={`AED ${fmt(breakdown.unpaid)}`}
+          <BreakCard label={t.uncollected}       sub={zh ? 'UNCOLLECTED' : ''} value={`AED ${fmt(breakdown.unpaid)}`}
             pct={kpi.monthRevenue > 0 ? breakdown.unpaid     / kpi.monthRevenue : 0} barClass="bg-[#D4A843]" />
-          <BreakCard label="逾期应收"     sub="OVERDUE AR"  value={`AED ${fmt(breakdown.overdueAmt)}`}
+          <BreakCard label={t.overdueAr}     sub={zh ? 'OVERDUE AR' : ''}  value={`AED ${fmt(breakdown.overdueAmt)}`}
             pct={kpi.allOutstanding > 0 ? breakdown.overdueAmt / kpi.allOutstanding : 0}
             barClass="bg-[#E0846A]" alert={breakdown.overdueAmt > 0} />
         </div>
@@ -256,25 +260,25 @@ const SalesDashboard: React.FC = () => {
 
       {/* ══ Row 3 — 销售渠道占比 ════════════════════════════════════════ */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <SecHead icon={<PieChart className="w-4 h-4" />} title="销售渠道占比" sub="SALES CHANNEL MIX · BY SALES AMOUNT" />
+        <SecHead icon={<PieChart className="w-4 h-4" />} title={t.channelTitle} sub={zh ? 'SALES CHANNEL MIX · BY SALES AMOUNT' : ''} />
         <div className="p-6 space-y-5">
           <ChannelBar
-            label="Consignment / 寄售" count={channelMix.consign.count}
+            label={t.channelConsign} countLabel={t.orders} count={channelMix.consign.count}
             total={channelMix.consign.total} pct={channelMix.consign.pct}
             barClass="bg-slate-400" dotClass="bg-slate-400"
           />
           <ChannelBar
-            label="Direct / Other" subTag="渠道待录入" count={channelMix.other.count}
+            label={t.channelOther} subTag={t.channelPending} countLabel={t.orders} count={channelMix.other.count}
             total={channelMix.other.total} pct={channelMix.other.pct}
             barClass="bg-[#080D1E]" dotClass="bg-[#080D1E]"
           />
           <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
-            <span className="text-xs font-black uppercase tracking-widest text-gray-400">合计 · All Orders</span>
+            <span className="text-xs font-black uppercase tracking-widest text-gray-400">{t.totalAll}</span>
             <span className="text-xl font-black font-mono text-[#080D1E]">AED {fmt(channelMix.grand)}</span>
           </div>
           <p className="text-xs text-gray-400 font-semibold leading-relaxed">
-            ℹ 当前订单未设 salesChannel 字段。Consignment 按 transactionMode 识别，其余统一归为 Other。
-            录入渠道字段后（超市 / 批发商 / 电商 / 项目客户等）将自动细分。
+            {t.channelNote1}
+            {t.channelNote2}
           </p>
         </div>
       </div>
@@ -283,13 +287,13 @@ const SalesDashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <SecHead icon={<Users className="w-4 h-4" />} title="客户销售排行 Top 10" sub="CUSTOMER SALES RANKING · ALL TIME" />
+          <SecHead icon={<Users className="w-4 h-4" />} title={t.customerRank} sub={zh ? 'CUSTOMER SALES RANKING · ALL TIME' : ''} />
           <div className="p-5 space-y-3">
             {topCustomers.length === 0
-              ? <EmptyState text="暂无客户销售数据 · No Data" />
+              ? <EmptyState text={t.noCustomerSales} />
               : topCustomers.map((c, i) => (
                 <RankRow key={c.name} rank={i + 1} label={c.name}
-                  sub={`${c.count} 单`} value={`AED ${fmt(c.total)}`}
+                  sub={t.orders(c.count)} value={`AED ${fmt(c.total)}`}
                   pct={c.total / maxCust} barClass="bg-[#080D1E]" />
               ))
             }
@@ -297,10 +301,10 @@ const SalesDashboard: React.FC = () => {
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <SecHead icon={<Package className="w-4 h-4" />} title="产品销售排行 Top 10" sub="PRODUCT SALES RANKING · ALL TIME" />
+          <SecHead icon={<Package className="w-4 h-4" />} title={t.productRank} sub={zh ? 'PRODUCT SALES RANKING · ALL TIME' : ''} />
           <div className="p-5 space-y-3">
             {topProducts.length === 0
-              ? <EmptyState text="暂无产品销售数据 · No Data" />
+              ? <EmptyState text={t.noProductSales} />
               : topProducts.map((p, i) => (
                 <RankRow key={p.name + i} rank={i + 1} label={p.name}
                   sub={`Qty: ${p.qty}`} value={`AED ${fmt(p.total)}`}
@@ -318,12 +322,12 @@ const SalesDashboard: React.FC = () => {
         {/* 逾期应收 */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <SecHead icon={<Clock className="w-4 h-4" />}
-            title={`逾期应收 (${overdueList.length})`}
-            sub="OVERDUE RECEIVABLES · DUE DATE PASSED"
+            title={t.overdueTitle(overdueList.length)}
+            sub={zh ? 'OVERDUE RECEIVABLES · DUE DATE PASSED' : ''}
             accentRed={overdueList.length > 0} />
           <div className="p-5 space-y-2 max-h-80 overflow-y-auto">
             {overdueList.length === 0 ? (
-              <EmptyState text="暂无逾期应收 · All Clear" icon="✅" green />
+              <EmptyState text={t.noOverdue} icon="✅" green />
             ) : (
               overdueList.map(o => (
                 <div key={o.id} className="flex items-center justify-between p-3.5 rounded-xl bg-[#FBF1EE] border border-[#E0846A]/20">
@@ -333,7 +337,7 @@ const SalesDashboard: React.FC = () => {
                   </div>
                   <div className="text-right shrink-0 ml-3">
                     <div className="text-sm font-black font-mono text-[#A85D45]">AED {fmt(Number(o.outstandingAmount) || 0)}</div>
-                    <div className="text-xs font-bold text-[#C17F66] mt-0.5">+{o.diffDays}d 逾期</div>
+                    <div className="text-xs font-bold text-[#C17F66] mt-0.5">{t.overdueDays(o.diffDays)}</div>
                   </div>
                 </div>
               ))
@@ -344,15 +348,15 @@ const SalesDashboard: React.FC = () => {
         {/* 客户应收排行 */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <SecHead icon={<DollarSign className="w-4 h-4" />}
-            title="客户应收排行"
-            sub="CUSTOMER OUTSTANDING RANKING"
+            title={t.custOutstanding}
+            sub={zh ? 'CUSTOMER OUTSTANDING RANKING' : ''}
             accentRed={custOutstanding.length > 0} />
           <div className="p-5 space-y-3">
             {custOutstanding.length === 0
-              ? <EmptyState text="暂无应收账款 · All Settled" icon="✅" green />
+              ? <EmptyState text={t.noOutstanding} icon="✅" green />
               : custOutstanding.map((c, i) => (
                 <RankRow key={c.name} rank={i + 1} label={c.name}
-                  sub={`${c.count} 单未结`} value={`AED ${fmt(c.outstanding)}`}
+                  sub={t.unsettledOrders(c.count)} value={`AED ${fmt(c.outstanding)}`}
                   pct={c.outstanding / maxOut} barClass="bg-[#D4A843]" />
               ))
             }
@@ -363,7 +367,7 @@ const SalesDashboard: React.FC = () => {
 
       {/* ══ Row 6 — 销售模式表现 ═════════════════════════════════════════ */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <SecHead icon={<BarChart3 className="w-4 h-4" />} title="销售模式表现" sub="SALES MODE PERFORMANCE · ALL ORDERS" />
+        <SecHead icon={<BarChart3 className="w-4 h-4" />} title={t.modeTitle} sub={zh ? 'SALES MODE PERFORMANCE · ALL ORDERS' : ''} />
         <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-5">
 
           {/* Direct Sale */}
@@ -376,8 +380,8 @@ const SalesDashboard: React.FC = () => {
               AED {fmt(modePerf.direct.total)}
             </div>
             <div className="flex gap-4 text-xs font-bold text-gray-500">
-              <span>{modePerf.direct.count} 单</span>
-              <span>占比 {modePerf.direct.pct}%</span>
+              <span>{t.orders(modePerf.direct.count)}</span>
+              <span>{t.share(modePerf.direct.pct)}</span>
             </div>
             <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
               <div className="h-full bg-[#080D1E] rounded-full transition-all"
@@ -390,14 +394,14 @@ const SalesDashboard: React.FC = () => {
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full bg-slate-400" />
               <span className="text-sm font-black uppercase tracking-widest text-slate-700">Consignment</span>
-              <span className="text-xs font-bold text-slate-400">SO 记录</span>
+              <span className="text-xs font-bold text-slate-400">{t.soRecords}</span>
             </div>
             <div className="text-[28px] font-black font-mono text-slate-700 leading-tight">
               AED {fmt(modePerf.consign.total)}
             </div>
             <div className="flex gap-4 text-xs font-bold text-slate-400">
-              <span>{modePerf.consign.count} 单</span>
-              <span>占比 {modePerf.consign.pct}%</span>
+              <span>{t.orders(modePerf.consign.count)}</span>
+              <span>{t.share(modePerf.consign.pct)}</span>
             </div>
             <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
               <div className="h-full bg-slate-400 rounded-full transition-all"
@@ -409,25 +413,25 @@ const SalesDashboard: React.FC = () => {
           <div className="bg-[#D4A843]/10 rounded-2xl p-5 border border-[#D4A843]/20 space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
               <div className="w-2.5 h-2.5 rounded-full bg-[#D4A843]" />
-              <span className="text-sm font-black uppercase tracking-widest text-[#8A6B2A]">寄售台账</span>
-              <span className="text-xs font-bold text-[#D4A843]/70 uppercase">Consignment Ledger</span>
+              <span className="text-sm font-black uppercase tracking-widest text-[#8A6B2A]">{t.ledgerTitle}</span>
+              {zh && <span className="text-xs font-bold text-[#D4A843]/70 uppercase">Consignment Ledger</span>}
             </div>
             <div className="space-y-2.5">
               <div className="flex justify-between items-center">
-                <span className="text-xs font-black uppercase tracking-wide text-[#D4A843]">寄售总额</span>
+                <span className="text-xs font-black uppercase tracking-wide text-[#D4A843]">{t.ledgerTotal}</span>
                 <span className="text-sm font-black font-mono text-[#8A6B2A]">AED {fmt(modePerf.ledger.total)}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs font-black uppercase tracking-wide text-[#3F7D58]">已结算</span>
+                <span className="text-xs font-black uppercase tracking-wide text-[#3F7D58]">{t.settled}</span>
                 <span className="text-sm font-black font-mono text-[#2d5c40]">AED {fmt(modePerf.ledger.settled)}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs font-black uppercase tracking-wide text-[#E0846A]">未结算</span>
+                <span className="text-xs font-black uppercase tracking-wide text-[#E0846A]">{t.unsettled}</span>
                 <span className="text-sm font-black font-mono text-[#A85D45]">AED {fmt(modePerf.ledger.unsettled)}</span>
               </div>
               <div className="flex justify-between items-center pt-2 border-t border-[#D4A843]/20">
-                <span className="text-xs font-black uppercase tracking-wide text-gray-400">台账记录</span>
-                <span className="text-sm font-black text-gray-600">{modePerf.ledger.count} 条</span>
+                <span className="text-xs font-black uppercase tracking-wide text-gray-400">{t.ledgerRecords}</span>
+                <span className="text-sm font-black text-gray-600">{t.entries(modePerf.ledger.count)}</span>
               </div>
             </div>
           </div>
@@ -467,7 +471,7 @@ const KpiCard: React.FC<{
     <div className={`${s.bg} rounded-2xl p-5 shadow-sm border ${s.border}`}>
       <div className={`inline-flex p-2.5 rounded-xl ${s.iconBg} ${s.icon}`}>{icon}</div>
       <div className="mt-4">
-        <div className="text-xs font-black uppercase tracking-widest text-gray-400">{sub}</div>
+        {sub && <div className="text-xs font-black uppercase tracking-widest text-gray-400">{sub}</div>}
         <div className="text-sm font-black uppercase tracking-wide text-gray-600 mt-0.5">{label}</div>
         <div className={`text-[28px] font-black font-mono mt-2 leading-tight ${s.val}`}>{value}</div>
       </div>
@@ -483,7 +487,7 @@ const SecHead: React.FC<{
     <div style={{ color: accentRed ? colors.statusDanger : GOLD }}>{icon}</div>
     <div>
       <div className="text-base font-black uppercase tracking-widest" style={{ color: accentRed ? colors.statusDanger : '#374151' }}>{title}</div>
-      <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-0.5">{sub}</div>
+      {sub && <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-0.5">{sub}</div>}
     </div>
   </div>
 );
@@ -493,7 +497,7 @@ const BreakCard: React.FC<{
   label: string; sub: string; value: string; pct: number; barClass: string; alert?: boolean;
 }> = ({ label, sub, value, pct, barClass, alert }) => (
   <div className={`rounded-xl p-4 border ${alert ? 'bg-[#FBF1EE] border-[#E0846A]/20' : 'bg-gray-50 border-gray-100'}`}>
-    <div className="text-xs font-black uppercase tracking-wide text-gray-400 mb-0.5">{sub}</div>
+    {sub && <div className="text-xs font-black uppercase tracking-wide text-gray-400 mb-0.5">{sub}</div>}
     <div className={`text-sm font-black uppercase ${alert ? 'text-[#A85D45]' : 'text-gray-700'} mb-2`}>{label}</div>
     <div className={`text-lg font-black font-mono ${alert ? 'text-[#A85D45]' : 'text-[#080D1E]'} leading-tight mb-3`}>{value}</div>
     <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
@@ -506,8 +510,8 @@ const BreakCard: React.FC<{
 
 // Channel Bar (Row 3)
 const ChannelBar: React.FC<{
-  label: string; subTag?: string; count: number; total: number; pct: number; barClass: string; dotClass: string;
-}> = ({ label, subTag, count, total, pct, barClass, dotClass }) => (
+  label: string; subTag?: string; countLabel: (n: number) => string; count: number; total: number; pct: number; barClass: string; dotClass: string;
+}> = ({ label, subTag, countLabel, count, total, pct, barClass, dotClass }) => (
   <div className="space-y-2">
     <div className="flex justify-between items-center flex-wrap gap-2">
       <div className="flex items-center gap-2 flex-wrap">
@@ -518,7 +522,7 @@ const ChannelBar: React.FC<{
             {subTag}
           </span>
         )}
-        <span className="text-xs font-bold text-gray-400">{count} 单</span>
+        <span className="text-xs font-bold text-gray-400">{countLabel(count)}</span>
       </div>
       <div className="flex items-center gap-2">
         <span className="text-sm font-black font-mono text-gray-700">

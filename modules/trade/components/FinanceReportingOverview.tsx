@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, TrendingDown, Wallet, Landmark, FileStack, Receipt, Trophy } from 'lucide-react';
 import { roundTo2 } from '../services/currencyUtils';
+import { useI18n } from '@gci/i18n';
 import { persistence } from '../services/persistenceService';
 import { cloudDb } from '../services/cloudDb';
 import { bankAccountsService } from '../services/bankAccountsService';
@@ -46,11 +47,11 @@ interface RankRow {
   hasId: boolean;
 }
 
-function rankBy(rows: TransactionRecord[], idField: 'customer_id' | 'supplier_id', nameField: 'customer' | 'supplier'): RankRow[] {
+function rankBy(rows: TransactionRecord[], idField: 'customer_id' | 'supplier_id', nameField: 'customer' | 'supplier', unnamed: string): RankRow[] {
   const map = new Map<string, RankRow>();
   for (const t of rows) {
     const id = t[idField];
-    const name = t[nameField] || '(未命名)';
+    const name = t[nameField] || unnamed;
     const key = id || `name:${name}`;
     const existing = map.get(key);
     if (existing) {
@@ -63,6 +64,8 @@ function rankBy(rows: TransactionRecord[], idField: 'customer_id' | 'supplier_id
 }
 
 export default function FinanceReportingOverview() {
+  const { dict } = useI18n();
+  const L = dict.trade.finance;
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
@@ -174,12 +177,12 @@ export default function FinanceReportingOverview() {
   // injection or an inter-account transfer should never inflate a
   // customer's/supplier's ranking.
   const topCustomers = useMemo(
-    () => rankBy(monthTxns.filter(t => t.type === 'in' && isOperatingIncomeCategory(classifyTransaction(t))), 'customer_id', 'customer'),
-    [monthTxns]
+    () => rankBy(monthTxns.filter(t => t.type === 'in' && isOperatingIncomeCategory(classifyTransaction(t))), 'customer_id', 'customer', L.unnamed),
+    [monthTxns, L]
   );
   const topSuppliers = useMemo(
-    () => rankBy(monthTxns.filter(t => t.type === 'out' && isOperatingExpenseCategory(classifyTransaction(t)) && (t.supplier_id || t.ref_type === 'SUPPLIER_PAYMENT')), 'supplier_id', 'supplier'),
-    [monthTxns]
+    () => rankBy(monthTxns.filter(t => t.type === 'out' && isOperatingExpenseCategory(classifyTransaction(t)) && (t.supplier_id || t.ref_type === 'SUPPLIER_PAYMENT')), 'supplier_id', 'supplier', L.unnamed),
+    [monthTxns, L]
   );
 
   if (loading) {
@@ -189,7 +192,7 @@ export default function FinanceReportingOverview() {
   return (
     <div className="flex flex-col gap-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>财务总览</h1>
+        <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>{L.overviewTitle}</h1>
         <select
           value={month}
           onChange={e => setMonth(e.target.value)}
@@ -202,30 +205,30 @@ export default function FinanceReportingOverview() {
       {/* Top stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5 text-[#3F7D58]" /> 本月经营现金流入</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5 text-[#3F7D58]" /> {L.cashInMonth}</p>
           <p className="text-xl font-black font-mono text-[#3F7D58]">+{monthOperatingInflow.toFixed(2)}</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><TrendingDown className="w-3.5 h-3.5 text-[#E0846A]" /> 本月经营现金流出</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><TrendingDown className="w-3.5 h-3.5 text-[#E0846A]" /> {L.cashOutMonth}</p>
           <p className="text-xl font-black font-mono text-[#E0846A]">-{monthOperatingOutflow.toFixed(2)}</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">净经营现金流</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{L.netCash}</p>
           <p className={`text-xl font-black font-mono ${monthNetOperating >= 0 ? 'text-gray-800' : 'text-[#E0846A]'}`}>{monthNetOperating >= 0 ? '+' : ''}{monthNetOperating.toFixed(2)}</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5" /> AR / 应收</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5" /> {L.ar}</p>
           <p className="text-xl font-black font-mono text-gray-800">{ar.toFixed(2)}</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><FileStack className="w-3.5 h-3.5" /> AP / 应付</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><FileStack className="w-3.5 h-3.5" /> {L.ap}</p>
           <p className="text-xl font-black font-mono text-gray-800">{ap.toFixed(2)}</p>
         </div>
       </div>
 
       {/* Bank balances */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Landmark className="w-4 h-4 text-[#CBA85C]" /> 银行账户余额 / Bank Balances</h3>
+        <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Landmark className="w-4 h-4 text-[#CBA85C]" /> {L.bankBalances}</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {accounts.map(a => (
             <div key={a.id} className="p-4 bg-gray-50 rounded-xl">
@@ -239,11 +242,11 @@ export default function FinanceReportingOverview() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="font-black text-gray-800 uppercase text-xs tracking-widest mb-4">收入分类汇总 / Income by Category</h3>
+          <h3 className="font-black text-gray-800 uppercase text-xs tracking-widest mb-4">{L.incomeByCat}</h3>
           <div className="space-y-2">
             {incomeBreakdown.map(([cat, amt]) => (
               <div key={cat} className="flex items-center justify-between text-sm">
-                <span className="font-bold text-gray-600">{categoryLabel(cat)}</span>
+                <span className="font-bold text-gray-600">{dict.trade.categories[cat] ?? categoryLabel(cat)}</span>
                 <span className="font-mono font-black text-[#3F7D58]">{amt.toFixed(2)}</span>
               </div>
             ))}
@@ -251,11 +254,11 @@ export default function FinanceReportingOverview() {
           </div>
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="font-black text-gray-800 uppercase text-xs tracking-widest mb-4">支出分类汇总 / Expense by Category</h3>
+          <h3 className="font-black text-gray-800 uppercase text-xs tracking-widest mb-4">{L.expenseByCat}</h3>
           <div className="space-y-2">
             {expenseBreakdown.map(([cat, amt]) => (
               <div key={cat} className="flex items-center justify-between text-sm">
-                <span className="font-bold text-gray-600">{categoryLabel(cat)}</span>
+                <span className="font-bold text-gray-600">{dict.trade.categories[cat] ?? categoryLabel(cat)}</span>
                 <span className="font-mono font-black text-[#E0846A]">{amt.toFixed(2)}</span>
               </div>
             ))}
@@ -266,11 +269,11 @@ export default function FinanceReportingOverview() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Trophy className="w-4 h-4 text-[#CBA85C]" /> 客户回款排行 / Top Customers</h3>
+          <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Trophy className="w-4 h-4 text-[#CBA85C]" /> {L.topCustomersCollected}</h3>
           <div className="space-y-2">
             {topCustomers.map((r, i) => (
               <div key={r.key} className="flex items-center justify-between text-sm">
-                <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-[9px] text-gray-300 ml-1">Legacy / 未关联ID</span>}</span>
+                <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-[9px] text-gray-300 ml-1">{L.legacyNoId}</span>}</span>
                 <span className="font-mono font-black text-gray-800">{r.amount.toFixed(2)}</span>
               </div>
             ))}
@@ -278,11 +281,11 @@ export default function FinanceReportingOverview() {
           </div>
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Wallet className="w-4 h-4 text-[#CBA85C]" /> 供应商付款排行 / Top Suppliers</h3>
+          <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Wallet className="w-4 h-4 text-[#CBA85C]" /> {L.topSuppliers}</h3>
           <div className="space-y-2">
             {topSuppliers.map((r, i) => (
               <div key={r.key} className="flex items-center justify-between text-sm">
-                <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-[9px] text-gray-300 ml-1">Legacy / 未关联ID</span>}</span>
+                <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-[9px] text-gray-300 ml-1">{L.legacyNoId}</span>}</span>
                 <span className="font-mono font-black text-gray-800">{r.amount.toFixed(2)}</span>
               </div>
             ))}

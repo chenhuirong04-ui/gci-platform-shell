@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useI18n } from '@gci/i18n';
 import {
   TrendingUp, TrendingDown, DollarSign, Trash2, Calendar, FileText, PlusCircle,
   Building2, User, Wallet, Lock, Landmark, Plus, X, CreditCard, FileDown
@@ -43,6 +44,8 @@ const ACCOUNT_ICON: Record<BankAccount['account_type'], React.ElementType> = {
 
 const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
   const { can } = useAuth();
+  const { dict } = useI18n();
+  const F = dict.trade.tracker;
 
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
@@ -185,7 +188,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
           <div className="space-y-2">
             <h2 className="text-xl font-black text-[#080D1E] uppercase tracking-tighter">Private Area</h2>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-              你的账号没有财务权限，请联系管理员开通 “finance” 权限
+              {F.noPermission}
             </p>
           </div>
           <button
@@ -251,14 +254,14 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
     // match the button actually clicked (an Income category can't be
     // submitted via the Expense button and vice versa) — same
     // cross-check pattern as the CHEQUE direction guard right below.
-    if (!category) { alert('⚠️ 请选择分类 Category。'); return; }
+    if (!category) { alert(F.errSelectCategory); return; }
     // INTERNAL_TRANSFER is the one bidirectional category (2026-09-15) —
     // a transfer between the company's own accounts is recorded as two
     // ordinary manual entries, one 'out' on the source account and one
     // 'in' on the destination account, both tagged INTERNAL_TRANSFER — so
     // it skips the normal income/expense direction cross-check entirely.
     if (!isTransferCategory(category) && isIncomeCategory(category) !== (type === 'in')) {
-      alert(`⚠️ 「${category}」是${isIncomeCategory(category) ? '收入' : '支出'}分类，请点击对应的 ${isIncomeCategory(category) ? 'Income' : 'Expense'} 按钮提交。`);
+      alert(F.errCategoryDirection(dict.trade.categories[category] ?? category, isIncomeCategory(category)));
       return;
     }
 
@@ -266,11 +269,11 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
     // (it decides Deposited To vs Issued From) — the clicked button must
     // agree, or the record would end up with the wrong cheque fields.
     if (paymentMethodValue.payment_method === 'CHEQUE' && chequeDirection !== type) {
-      alert(`⚠️ 这张支票是「${chequeDirection === 'in' ? '收款支票 In' : '付款支票 Out'}」，请点击对应的 ${chequeDirection === 'in' ? 'Income' : 'Expense'} 按钮提交。`);
+      alert(F.errChequeDirection(chequeDirection === 'in'));
       return;
     }
 
-    const syncError = validatePaymentMethodValue(paymentMethodValue, type);
+    const syncError = validatePaymentMethodValue(paymentMethodValue, type, dict.trade.pm);
     if (syncError) { alert(`⚠️ ${syncError}`); return; }
 
     let cashAccountId: string | null = null;
@@ -335,11 +338,11 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
     if (status === 'CLEARED') {
       if (isOut) {
         if (!t.issued_from_bank_account_id) {
-          alert('⚠️ 该支票缺少开票账户 (Issued From)，无法标记为已清算。');
+          alert(F.errNoIssuedFrom);
           return;
         }
       } else if (!depositAccountId) {
-        alert('⚠️ 标记为 Cleared 时必须选择存入哪个银行账户。');
+        alert(F.errNoDepositedTo);
         return;
       }
     }
@@ -393,7 +396,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
       setShowAddAccount(false);
       setNewAcc(emptyNewAccount);
     } catch (e: any) {
-      alert(`创建账户失败：${e?.message || '未知错误'}`);
+      alert(F.errCreateAccount(e?.message || F.unknownError));
     } finally {
       setSavingAccount(false);
     }
@@ -409,7 +412,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
 
   const handleExportAllCorporate = async () => {
     if (activeCorporateAccounts.length === 0) {
-      alert('没有可导出的 Corporate 账户（需要 account_type=Corporate 且 is_active）。');
+      alert(F.errNoCorporate);
       return;
     }
     setExportingAll(true);
@@ -419,7 +422,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
         .filter((el): el is HTMLDivElement => !!el);
       await exportElementsToPdf(els, `GCI_Corporate_Bank_Details_${new Date().toISOString().slice(0, 10)}.pdf`, { scale: 2 });
     } catch (e: any) {
-      alert(`导出失败：${e?.message || '未知错误'}`);
+      alert(F.errExport(e?.message || F.unknownError));
     } finally {
       setExportingAll(false);
     }
@@ -432,24 +435,24 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
   return (
     <div className="h-full flex flex-col gap-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>财务账</h1>
+        <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>{F.title}</h1>
         <div className="flex items-center gap-2">
           {activeCorporateAccounts.length > 0 && (
             <button
               onClick={handleExportAllCorporate}
               disabled={exportingAll}
               className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-[11px] font-black uppercase tracking-widest hover:border-[#CBA85C] transition-all disabled:opacity-40"
-              title="导出全部 Corporate 账户的银行信息（Cash/Personal/Other 不包含）"
+              title={F.exportAllTitle}
             >
               <FileDown className="w-4 h-4" />
-              {exportingAll ? '导出中...' : 'Export All Corporate Accounts'}
+              {exportingAll ? F.exporting : 'Export All Corporate Accounts'}
             </button>
           )}
           <button
             onClick={() => setShowAddAccount(true)}
             className="flex items-center gap-2 px-4 py-2 bg-[#080D1E] text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-[#CBA85C] transition-all"
           >
-            <Plus className="w-4 h-4" /> 新增账户
+            <Plus className="w-4 h-4" /> {F.newAccount}
           </button>
         </div>
       </div>
@@ -467,19 +470,19 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
       {/* Top summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">总银行余额</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{F.totalBank}</p>
           <p className="text-xl font-black font-mono text-gray-800">AED {stats.bankTotal.toFixed(2)}</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Cash 余额</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{F.cashBalance}</p>
           <p className="text-xl font-black font-mono text-gray-800">AED {stats.cashTotal.toFixed(2)}</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">本月收款</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{F.collectedMonth}</p>
           <p className="text-xl font-black font-mono text-[#3F7D58]">+{stats.monthIncome.toFixed(2)}</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">本月付款</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{F.paidMonth}</p>
           <p className="text-xl font-black font-mono text-[#E0846A]">-{stats.monthExpense.toFixed(2)}</p>
         </div>
       </div>
@@ -487,8 +490,8 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
       {accounts.length === 0 ? (
         <div className="bg-white p-12 rounded-2xl border border-gray-100 shadow-sm text-center space-y-4">
           <Landmark className="w-10 h-10 text-gray-300 mx-auto" />
-          <p className="text-sm font-black text-gray-500">还没有任何银行账户</p>
-          <p className="text-xs text-gray-400">点右上角「新增账户」先建一个对公/对私/现金账户，才能开始记流水</p>
+          <p className="text-sm font-black text-gray-500">{F.noAccounts}</p>
+          <p className="text-xs text-gray-400">{F.noAccountsHint}</p>
         </div>
       ) : (
         <>
@@ -520,7 +523,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
           {pendingCheques.length > 0 && (
             <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
               <div className="p-6 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-                <span className="font-black text-gray-800 uppercase text-xs tracking-[0.2em]">待清算支票 / Pending Cheques</span>
+                <span className="font-black text-gray-800 uppercase text-xs tracking-[0.2em]">{F.pendingCheques}</span>
                 <span className="text-[10px] px-3 py-1 bg-white border border-gray-200 rounded-full text-gray-600 font-black tracking-widest">{pendingCheques.length}</span>
               </div>
               <div className="divide-y divide-gray-50">
@@ -533,13 +536,13 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                         <div>
                           <p className="text-sm font-bold text-gray-700">
                             <span className={`inline-block px-2 py-0.5 mr-2 rounded-md text-[9px] font-black uppercase tracking-widest align-middle ${isOut ? 'bg-[#A85D45]/10 text-[#A85D45]' : 'bg-[#3F7D58]/10 text-[#3F7D58]'}`}>
-                              {isOut ? '付款 OUT' : '收款 IN'}
+                              {isOut ? F.paymentOut : F.receiptIn}
                             </span>
                             {t.note} — <span className="font-mono">{t.cheque_bank}</span> #{t.cheque_number}
                           </p>
                           <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">
                             {t.date} · {t.cheque_date} · AED {(t.cheque_amount ?? t.amount).toFixed(2)}
-                            {isOut && (issuedFromAccount ? ` · Issued From ${issuedFromAccount.account_name}` : ' · ⚠️ 缺少 Issued From 账户')}
+                            {isOut && (issuedFromAccount ? ` · Issued From ${issuedFromAccount.account_name}` : F.missingIssuedFrom)}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -554,19 +557,19 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                             }}
                             className="px-4 py-2 rounded-xl bg-[#3F7D58] text-white text-[10px] font-black uppercase tracking-widest hover:bg-[#2d5c40]"
                           >
-                            标记已清算
+                            {F.markCleared}
                           </button>
                           <button
                             onClick={() => markChequeStatus(t, 'BOUNCED')}
                             className="px-4 py-2 rounded-xl bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-widest hover:bg-gray-200"
                           >
-                            退票
+                            {F.bounced}
                           </button>
                           <button
                             onClick={() => markChequeStatus(t, 'CANCELLED')}
                             className="px-4 py-2 rounded-xl bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-widest hover:bg-gray-200"
                           >
-                            作废
+                            {F.void}
                           </button>
                         </div>
                       </div>
@@ -577,7 +580,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                             value={clearingDepositAccount}
                             onChange={e => setClearingDepositAccount(e.target.value)}
                           >
-                            <option value="">选择存入账户 Deposited To…</option>
+                            <option value="">{F.selectDepositedTo}</option>
                             {bankTransferEligible(accounts).map(a => (
                               <option key={a.id} value={a.id}>{a.account_name}{a.bank_name ? ' · ' + a.bank_name : ''} · {a.currency}</option>
                             ))}
@@ -590,7 +593,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                             disabled={!clearingDepositAccount}
                             className="px-5 py-3 rounded-xl bg-[#080D1E] text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
                           >
-                            确认
+                            {F.confirm}
                           </button>
                         </div>
                       )}
@@ -641,7 +644,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                     onClick={() => setShowBankDetailsFor(activeAccount)}
                     className="mt-6 w-full flex items-center justify-center gap-2 py-3.5 rounded-xl border border-gray-200 text-gray-700 font-black text-[10px] uppercase tracking-widest hover:border-[#CBA85C] hover:text-[#CBA85C] transition-all"
                   >
-                    <CreditCard className="w-4 h-4" /> 银行信息 / Bank Details
+                    <CreditCard className="w-4 h-4" /> {F.bankDetails}
                   </button>
                 )}
               </div>
@@ -664,30 +667,30 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                       one of the two submit buttons below — addTransaction()
                       cross-checks the pick against whichever was clicked. */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Category / 分类 *</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{F.category}</label>
                     <select
                       className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700"
                       value={category}
                       onChange={e => setCategory(e.target.value)}
                     >
-                      <option value="">选择分类…</option>
-                      <optgroup label="收入 Income">
-                        {INCOME_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      <option value="">{F.selectCategory}</option>
+                      <optgroup label={F.groupIncome}>
+                        {INCOME_CATEGORIES.map(c => <option key={c.value} value={c.value}>{dict.trade.categories[c.value] ?? c.label}</option>)}
                       </optgroup>
-                      <optgroup label="非经营流入 Non-Operating（仅 Income 按钮）">
-                        {NON_OPERATING_INFLOW_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      <optgroup label={F.groupNonOperating}>
+                        {NON_OPERATING_INFLOW_CATEGORIES.map(c => <option key={c.value} value={c.value}>{dict.trade.categories[c.value] ?? c.label}</option>)}
                       </optgroup>
-                      <optgroup label="转账 Transfer（Income/Expense 均可）">
-                        {TRANSFER_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      <optgroup label={F.groupTransfer}>
+                        {TRANSFER_CATEGORIES.map(c => <option key={c.value} value={c.value}>{dict.trade.categories[c.value] ?? c.label}</option>)}
                       </optgroup>
-                      <optgroup label="支出 Expense">
-                        {MANUAL_EXPENSE_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      <optgroup label={F.groupExpense}>
+                        {MANUAL_EXPENSE_CATEGORIES.map(c => <option key={c.value} value={c.value}>{dict.trade.categories[c.value] ?? c.label}</option>)}
                       </optgroup>
                     </select>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Subcategory / 子分类（可选）</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{F.subcategoryOptional}</label>
                     <input
                       type="text"
                       className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
@@ -700,7 +703,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                       real supplier, never both (a manual entry is either
                       sales-adjacent or supplier-adjacent). */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">关联 Link（可选）</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{F.linkOptional}</label>
                     <div className="grid grid-cols-3 gap-2">
                       {(['none', 'customer', 'supplier'] as const).map(m => (
                         <button
@@ -709,7 +712,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                           onClick={() => setLinkMode(m)}
                           className={`p-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${linkMode === m ? 'bg-[#080D1E] text-white' : 'bg-gray-100 text-gray-400'}`}
                         >
-                          {m === 'none' ? '不关联' : m === 'customer' ? '客户/项目' : '供应商'}
+                          {m === 'none' ? F.linkNone : m === 'customer' ? F.linkCustomer : F.linkSupplier}
                         </button>
                       ))}
                     </div>
@@ -721,11 +724,11 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
 
                   {linkMode === 'supplier' && (
                     <div className="space-y-1.5 relative">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Supplier / 供应商</label>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{F.supplier}</label>
                       <input
                         type="text"
                         className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
-                        placeholder="搜索供应商名称…"
+                        placeholder={F.searchSupplier}
                         value={selectedSupplier ? selectedSupplier.supplier_name_display : supplierQuery}
                         onChange={e => { setSupplierQuery(e.target.value); setSelectedSupplier(null); }}
                       />
@@ -754,21 +757,21 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                       actually moved. */}
                   {paymentMethodValue.payment_method === 'CHEQUE' && (
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cheque Direction / 支票方向</label>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{F.chequeDirection}</label>
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"
                           onClick={() => setChequeDirection('in')}
                           className={`p-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${chequeDirection === 'in' ? 'bg-[#3F7D58] text-white' : 'bg-gray-100 text-gray-400'}`}
                         >
-                          收款支票 / In
+                          {F.chequeIn}
                         </button>
                         <button
                           type="button"
                           onClick={() => setChequeDirection('out')}
                           className={`p-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${chequeDirection === 'out' ? 'bg-[#A85D45] text-white' : 'bg-gray-100 text-gray-400'}`}
                         >
-                          付款支票 / Out
+                          {F.chequeOut}
                         </button>
                       </div>
                     </div>
@@ -927,7 +930,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
           >
             {/* Header — fixed, never scrolls */}
             <div className="shrink-0 flex items-center justify-between px-10 pt-10 pb-6">
-              <h3 className="text-sm font-black text-[#080D1E] uppercase tracking-[0.2em]">新增银行账户</h3>
+              <h3 className="text-sm font-black text-[#080D1E] uppercase tracking-[0.2em]">{F.newAccountTitle}</h3>
               <button onClick={() => { setShowAddAccount(false); setNewAcc(emptyNewAccount); }} className="text-gray-300 hover:text-gray-600 shrink-0">
                 <X className="w-5 h-5" />
               </button>
@@ -943,7 +946,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
             <div className="flex-1 min-h-0 overflow-y-auto px-10">
             <div className="space-y-5 pb-8">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">账户名称</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{F.accountName}</label>
                 <input
                   type="text"
                   className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
@@ -955,7 +958,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
 
               {newAcc.account_type !== 'Cash' && (
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">账户持有人</label>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{F.accountHolder}</label>
                   <input
                     type="text"
                     className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
@@ -967,15 +970,15 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
               )}
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">账户类型</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{F.accountType}</label>
                 <select
                   className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
                   value={newAcc.account_type}
                   onChange={e => setNewAccField('account_type', e.target.value)}
                 >
-                  <option value="Corporate">Corporate (对公)</option>
-                  <option value="Personal">Personal (对私)</option>
-                  <option value="Cash">Cash (现金)</option>
+                  <option value="Corporate">{F.typeCorporate}</option>
+                  <option value="Personal">{F.typePersonal}</option>
+                  <option value="Cash">{F.typeCash}</option>
                   <option value="Other">Other</option>
                 </select>
               </div>
@@ -983,7 +986,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
               {newAcc.account_type !== 'Cash' && (
                 <>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">银行名称</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{F.bankName}</label>
                     <input
                       type="text"
                       className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
@@ -993,7 +996,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Account Number / 账号</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{F.accountNumber}</label>
                     <input
                       type="text"
                       className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono"
@@ -1057,7 +1060,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
               )}
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Opening Balance（可选，默认 0）</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{F.openingBalance}</label>
                 <input
                   type="number"
                   step="0.01"
@@ -1077,7 +1080,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                 disabled={!newAcc.account_name.trim() || savingAccount}
                 className="w-full py-4 rounded-[20px] bg-[#080D1E] text-white font-black text-[10px] uppercase disabled:opacity-40"
               >
-                {savingAccount ? '创建中...' : '创建账户'}
+                {savingAccount ? F.creating : F.createAccount}
               </button>
             </div>
           </div>

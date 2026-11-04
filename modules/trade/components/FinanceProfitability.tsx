@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Layers, Trophy, Users, Wallet, AlertTriangle } from 'lucide-react';
 import { roundTo2 } from '../services/currencyUtils';
+import { useI18n } from '@gci/i18n';
 import { persistence } from '../services/persistenceService';
 import { cloudDb } from '../services/cloudDb';
 import { supplierPayablesService } from '../services/supplierPayablesService';
@@ -87,6 +88,7 @@ interface SupplierRow {
 }
 
 export default function FinanceProfitability() {
+  const L = useI18n().dict.trade.finance;
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
   const [orders, setOrders] = useState<OrderRecord[]>([]);
@@ -185,7 +187,7 @@ export default function FinanceProfitability() {
       const grossProfit = roundTo2(v.revenue - v.directCost);
       return {
         key: pid,
-        projectName: proj?.name || `(项目 ${pid.slice(0, 8)})`,
+        projectName: proj?.name || L.projectFallback(pid.slice(0, 8)),
         customerName: (proj && customerNameById.get(proj.customerId)) || '—',
         revenue: v.revenue,
         directCost: v.directCost,
@@ -201,7 +203,7 @@ export default function FinanceProfitability() {
       const gp = roundTo2(legacyRevenue - legacyCost);
       rows.push({
         key: '__legacy__',
-        projectName: 'Legacy / 未关联项目',
+        projectName: L.legacyProject,
         customerName: '—',
         revenue: legacyRevenue,
         directCost: legacyCost,
@@ -214,7 +216,7 @@ export default function FinanceProfitability() {
     }
 
     return rows.sort((a, b) => b.revenue - a.revenue);
-  }, [periodTxns, projectById, customerNameById, orders]);
+  }, [periodTxns, projectById, customerNameById, orders, L]);
 
   const realProjectRows = projectRows.filter(r => !r.isLegacy);
   const projectDirectCostIncomplete = realProjectRows.some(r => r.revenue > 0 && r.directCost === 0);
@@ -230,7 +232,7 @@ export default function FinanceProfitability() {
     for (const t of periodTxns) {
       if (t.type !== 'in' || !isOperatingIncomeCategory(classifyTransaction(t))) continue;
       const id = t.customer_id;
-      const name = (id && customerNameById.get(id)) || t.customer || '(未命名)';
+      const name = (id && customerNameById.get(id)) || t.customer || L.unnamed;
       const key = id || `name:${name}`;
       const existing = map.get(key);
       if (existing) existing.revenue = roundTo2(existing.revenue + t.amount);
@@ -247,7 +249,7 @@ export default function FinanceProfitability() {
         : 0;
       return { key, name: v.name, hasId: v.hasId, revenue: v.revenue, collected: v.revenue, ar, projectCount };
     }).sort((a, b) => b.revenue - a.revenue);
-  }, [periodTxns, customerNameById, orders]);
+  }, [periodTxns, customerNameById, orders, L]);
 
   // AR-by-customer is a current snapshot, not period-scoped — every real
   // customer with any outstanding order balance, regardless of whether they
@@ -259,10 +261,10 @@ export default function FinanceProfitability() {
       map.set(o.crmCustomerId, roundTo2((map.get(o.crmCustomerId) || 0) + (o.outstandingAmount || 0)));
     }
     return Array.from(map.entries())
-      .map(([id, ar]) => ({ key: id, name: customerNameById.get(id) || `(客户 ${id.slice(0, 8)})`, hasId: true, revenue: 0, collected: 0, ar, projectCount: 0 }))
+      .map(([id, ar]) => ({ key: id, name: customerNameById.get(id) || L.customerFallback(id.slice(0, 8)), hasId: true, revenue: 0, collected: 0, ar, projectCount: 0 }))
       .filter(r => r.ar > 0)
       .sort((a, b) => b.ar - a.ar);
-  }, [orders, customerNameById]);
+  }, [orders, customerNameById, L]);
 
   // ── Supplier dimension ─────────────────────────────────────────────────
   const supplierRows = useMemo<SupplierRow[]>(() => {
@@ -270,7 +272,7 @@ export default function FinanceProfitability() {
     for (const t of periodTxns) {
       if (t.type !== 'out' || !isOperatingExpenseCategory(classifyTransaction(t))) continue;
       const id = resolveSupplierId(t);
-      const name = (id && supplierNameById.get(id)) || t.supplier || '(未命名)';
+      const name = (id && supplierNameById.get(id)) || t.supplier || L.unnamed;
       const key = id || `name:${name}`;
       const existing = map.get(key);
       if (existing) existing.paid = roundTo2(existing.paid + t.amount);
@@ -285,18 +287,18 @@ export default function FinanceProfitability() {
       return { key, name: v.name, hasId: v.hasId, paid: v.paid, ap };
     }).sort((a, b) => b.paid - a.paid);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodTxns, supplierNameById, payables, supplierIdByPaymentId]);
+  }, [periodTxns, supplierNameById, payables, supplierIdByPaymentId, L]);
 
   if (loading) {
     return <div className="h-[calc(100vh-250px)] flex items-center justify-center text-gray-300 text-xs font-black uppercase tracking-widest">Loading...</div>;
   }
 
-  const periodLabel = period === 'this_month' ? '本月' : period === 'last_month' ? '上月' : period === 'custom' ? customMonth : '全部历史';
+  const periodLabel = period === 'this_month' ? L.periodThisMonth : period === 'last_month' ? L.periodLastMonth : period === 'custom' ? customMonth : L.periodAll;
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>项目与客户利润 / Profitability</h1>
+        <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>{L.profitTitle}</h1>
         <div className="flex items-center gap-2">
           {(['this_month', 'last_month', 'custom', 'all_time'] as Period[]).map(p => (
             <button
@@ -304,7 +306,7 @@ export default function FinanceProfitability() {
               onClick={() => setPeriod(p)}
               className={`px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${period === p ? 'bg-[#080D1E] text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
             >
-              {p === 'this_month' ? '本月' : p === 'last_month' ? '上月' : p === 'custom' ? '自定义月份' : '全部历史'}
+              {p === 'this_month' ? L.periodThisMonth : p === 'last_month' ? L.periodLastMonth : p === 'custom' ? L.periodCustom : L.periodAll}
             </button>
           ))}
           {period === 'custom' && (
@@ -323,7 +325,7 @@ export default function FinanceProfitability() {
         <div className="bg-[#CBA85C]/10 border border-[#CBA85C]/30 rounded-2xl p-4 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-[#8A6D2F] shrink-0 mt-0.5" />
           <p className="text-xs font-bold text-[#8A6D2F]">
-            项目直接成本数据尚未完整归集 / Direct cost data incomplete — 供应商付款（Supplier Payment）目前不携带 project_id，只有手工记账时主动关联项目的支出才会计入下面的"项目直接支出"。以下毛利率可能被高估，仅供参考，不代表真实项目盈亏。
+            {L.costWarning}
           </p>
         </div>
       )}
@@ -331,26 +333,26 @@ export default function FinanceProfitability() {
       {/* Top KPI — sums of the Project Profitability table below (real projects only, excludes Legacy) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{periodLabel}项目经营收入</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{L.projectRevenue(periodLabel)}</p>
           <p className="text-xl font-black font-mono text-[#3F7D58]">+{periodProjectRevenue.toFixed(2)}</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{periodLabel}项目直接支出</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{L.projectCost(periodLabel)}</p>
           <p className="text-xl font-black font-mono text-[#E0846A]">-{periodProjectCost.toFixed(2)}</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">毛利 / Gross Profit</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{L.grossProfit}</p>
           <p className={`text-xl font-black font-mono ${periodProjectGrossProfit >= 0 ? 'text-gray-800' : 'text-[#E0846A]'}`}>{periodProjectGrossProfit.toFixed(2)}</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">毛利率 / Gross Margin</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{L.grossMargin}</p>
           <p className="text-xl font-black font-mono text-gray-800">{periodProjectMargin === null ? '—' : `${periodProjectMargin.toFixed(1)}%`}</p>
         </div>
       </div>
 
       {/* Project profitability */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Layers className="w-4 h-4 text-[#CBA85C]" /> 项目利润排行 / Project Profitability</h3>
+        <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Layers className="w-4 h-4 text-[#CBA85C]" /> {L.projectRank}</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
@@ -361,8 +363,8 @@ export default function FinanceProfitability() {
                 <th className="py-2 pr-4 text-right">Direct Cost</th>
                 <th className="py-2 pr-4 text-right">Gross Profit</th>
                 <th className="py-2 pr-4 text-right">Margin</th>
-                <th className="py-2 pr-4 text-right">收款</th>
-                <th className="py-2 text-right">未收款</th>
+                <th className="py-2 pr-4 text-right">{L.colCollected}</th>
+                <th className="py-2 text-right">{L.colOutstanding}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -388,11 +390,11 @@ export default function FinanceProfitability() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Trophy className="w-4 h-4 text-[#CBA85C]" /> 客户收入排行 / Top Customers</h3>
+          <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Trophy className="w-4 h-4 text-[#CBA85C]" /> {L.topCustomersRevenue}</h3>
           <div className="space-y-2">
             {customerRows.map((r, i) => (
               <div key={r.key} className="flex items-center justify-between text-sm gap-2">
-                <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-[9px] text-gray-300 ml-1">Legacy / 未关联ID</span>}</span>
+                <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-[9px] text-gray-300 ml-1">{L.legacyNoId}</span>}</span>
                 <span className="font-mono font-black text-gray-800 shrink-0">{r.revenue.toFixed(2)}</span>
               </div>
             ))}
@@ -400,7 +402,7 @@ export default function FinanceProfitability() {
           </div>
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Users className="w-4 h-4 text-[#CBA85C]" /> 客户未收款 / AR by Customer（当前，不受时间筛选影响）</h3>
+          <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Users className="w-4 h-4 text-[#CBA85C]" /> {L.arByCustomer}</h3>
           <div className="space-y-2">
             {customerArRows.map((r, i) => (
               <div key={r.key} className="flex items-center justify-between text-sm gap-2">
@@ -414,13 +416,13 @@ export default function FinanceProfitability() {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Wallet className="w-4 h-4 text-[#CBA85C]" /> 供应商付款排行 / Top Suppliers</h3>
+        <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Wallet className="w-4 h-4 text-[#CBA85C]" /> {L.topSuppliers}</h3>
         <div className="space-y-2">
           {supplierRows.map((r, i) => (
             <div key={r.key} className="flex items-center justify-between text-sm gap-2">
-              <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-[9px] text-gray-300 ml-1">Legacy / 未关联ID</span>}</span>
+              <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-[9px] text-gray-300 ml-1">{L.legacyNoId}</span>}</span>
               <span className="flex items-center gap-4 shrink-0">
-                <span className="font-mono font-black text-gray-800">已付 {r.paid.toFixed(2)}</span>
+                <span className="font-mono font-black text-gray-800">{L.paid(r.paid.toFixed(2))}</span>
                 {r.ap > 0 && <span className="font-mono font-black text-[#E0846A]">AP {r.ap.toFixed(2)}</span>}
               </span>
             </div>

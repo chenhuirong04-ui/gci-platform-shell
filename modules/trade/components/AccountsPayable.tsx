@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Lock, Plus, AlertTriangle, Clock, Save } from 'lucide-react';
 import { roundTo2 } from '../services/currencyUtils';
+import { useI18n } from '@gci/i18n';
 import { bankAccountsService } from '../services/bankAccountsService';
 import { supplierPayablesService } from '../services/supplierPayablesService';
 import { supplierPaymentsService } from '../services/supplierPaymentsService';
@@ -25,6 +26,7 @@ function daysUntil(dateStr?: string): number | null {
 }
 
 const AccountsPayable: React.FC = () => {
+  const A = useI18n().dict.trade.ap;
   const { can } = useAuth();
 
   const [payables, setPayables] = useState<SupplierPayable[]>([]);
@@ -107,9 +109,9 @@ const AccountsPayable: React.FC = () => {
   };
 
   const submitNewPayable = async () => {
-    if (!selectedSupplier?.id) { alert('⚠️ 请选择供应商。'); return; }
+    if (!selectedSupplier?.id) { alert(A.errSelectSupplier); return; }
     const amt = Number(npAmount);
-    if (!amt || amt <= 0) { alert('⚠️ 应付金额必须大于 0。'); return; }
+    if (!amt || amt <= 0) { alert(A.errAmountPositive); return; }
     setSavingPayable(true);
     try {
       await supplierPayablesService.create({
@@ -125,7 +127,7 @@ const AccountsPayable: React.FC = () => {
       setShowNewPayable(false);
       await loadAll();
     } catch (e: any) {
-      alert(`⚠️ ${e?.message || '新增应付失败，请重试。'}`);
+      alert(`⚠️ ${e?.message || A.errCreateFailed}`);
     } finally {
       setSavingPayable(false);
     }
@@ -136,17 +138,17 @@ const AccountsPayable: React.FC = () => {
       await supplierPaymentsService.markChequeStatus(payment, status);
       await loadAll();
     } catch (e: any) {
-      alert(`⚠️ ${e?.message || '操作失败，请重试。'}`);
+      alert(`⚠️ ${e?.message || A.errActionFailed}`);
     }
   };
 
   const handleCancelPayable = async (payable: SupplierPayable) => {
-    if (!confirm(`确认作废这笔应付账款吗？（${payable.supplier_name} — AED ${payable.amount.toFixed(2)}）`)) return;
+    if (!confirm(A.confirmCancel(payable.supplier_name, payable.amount.toFixed(2)))) return;
     try {
       await supplierPayablesService.cancel(payable.id);
       await loadAll();
     } catch (e: any) {
-      alert(`⚠️ ${e?.message || '作废失败，请重试。'}`);
+      alert(`⚠️ ${e?.message || A.errCancelFailed}`);
     }
   };
 
@@ -158,7 +160,7 @@ const AccountsPayable: React.FC = () => {
             <Lock className="w-10 h-10" />
           </div>
           <h3 className="text-lg font-black text-gray-800">PRIVATE AREA</h3>
-          <p className="text-sm text-gray-400">你的账号没有财务权限，请联系管理员开通 "finance" 权限</p>
+          <p className="text-sm text-gray-400">{A.noPermission}</p>
         </div>
       </div>
     );
@@ -167,44 +169,44 @@ const AccountsPayable: React.FC = () => {
   return (
     <div className="flex flex-col gap-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>应付账款 / Accounts Payable</h1>
+        <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>{A.title}</h1>
         <button
           onClick={() => setShowNewPayable(v => !v)}
           className="flex items-center gap-2 px-5 py-3 rounded-xl bg-[#080D1E] text-white text-xs font-black uppercase tracking-widest hover:bg-[#CBA85C] transition-all"
         >
-          <Plus className="w-4 h-4" /> 新增应付
+          <Plus className="w-4 h-4" /> {A.newPayable}
         </button>
       </div>
 
       {/* KPI row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">总应付 / Total Outstanding</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{A.totalOutstanding}</p>
           <p className="text-2xl font-black font-mono text-gray-800">AED {kpi.totalOutstanding.toFixed(2)}</p>
         </div>
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5 text-[#E0846A]" /> 已逾期 / Overdue</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5 text-[#E0846A]" /> {A.overdue}</p>
           <p className="text-2xl font-black font-mono text-[#E0846A]">AED {kpi.overdueAmount.toFixed(2)}</p>
-          <p className="text-[11px] text-gray-400 font-bold mt-1">{kpi.overdueCount} 笔</p>
+          <p className="text-[11px] text-gray-400 font-bold mt-1">{A.count(kpi.overdueCount)}</p>
         </div>
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-[#CBA85C]" /> 7天内到期 / Due Soon</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-[#CBA85C]" /> {A.dueSoon}</p>
           <p className="text-2xl font-black font-mono text-[#CBA85C]">AED {kpi.dueSoonAmount.toFixed(2)}</p>
-          <p className="text-[11px] text-gray-400 font-bold mt-1">{kpi.dueSoonCount} 笔</p>
+          <p className="text-[11px] text-gray-400 font-bold mt-1">{A.count(kpi.dueSoonCount)}</p>
         </div>
       </div>
 
       {/* New payable form */}
       {showNewPayable && (
         <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm space-y-5">
-          <h3 className="text-sm font-black text-gray-800 uppercase tracking-widest">新增应付 / New Payable</h3>
+          <h3 className="text-sm font-black text-gray-800 uppercase tracking-widest">{A.newPayableTitle}</h3>
           <div className="space-y-1.5 relative">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">供应商 / Supplier</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{A.supplier}</label>
             <input
               type="text"
               value={selectedSupplier ? selectedSupplier.supplier_name_display : supplierQuery}
               onChange={e => { setSelectedSupplier(null); setSupplierQuery(e.target.value); }}
-              placeholder="搜索供应商名称…"
+              placeholder={A.searchSupplier}
               className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
             />
             {!selectedSupplier && supplierQuery.trim() && filteredSuppliers.length > 0 && (
@@ -224,26 +226,26 @@ const AccountsPayable: React.FC = () => {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Invoice No（可选）</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{A.invoiceNoOptional}</label>
               <input value={npInvoiceNo} onChange={e => setNpInvoiceNo(e.target.value)} className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Reference No（可选）</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{A.referenceNoOptional}</label>
               <input value={npReferenceNo} onChange={e => setNpReferenceNo(e.target.value)} className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">应付金额 (AED)</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{A.amountAed}</label>
               <input type="number" step="0.01" value={npAmount} onChange={e => setNpAmount(e.target.value)} className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-black font-mono text-gray-700" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">到期日（可选）</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{A.dueDateOptional}</label>
               <input type="date" value={npDueDate} onChange={e => setNpDueDate(e.target.value)} className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono" />
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">备注（可选）</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{A.notesOptional}</label>
             <input value={npNotes} onChange={e => setNpNotes(e.target.value)} className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700" />
           </div>
           <div className="flex gap-3">
@@ -252,13 +254,13 @@ const AccountsPayable: React.FC = () => {
               disabled={savingPayable}
               className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#080D1E] text-white text-xs font-black uppercase tracking-widest hover:bg-[#CBA85C] transition-all disabled:opacity-40"
             >
-              <Save className="w-4 h-4" /> {savingPayable ? '保存中…' : '保存'}
+              <Save className="w-4 h-4" /> {savingPayable ? A.saving : A.save}
             </button>
             <button
               onClick={() => { resetNewPayableForm(); setShowNewPayable(false); }}
               className="px-6 py-3 rounded-xl bg-gray-100 text-gray-500 text-xs font-black uppercase tracking-widest hover:bg-gray-200 transition-all"
             >
-              取消
+              {A.cancel}
             </button>
           </div>
         </div>
@@ -268,7 +270,7 @@ const AccountsPayable: React.FC = () => {
       {pendingCheques.length > 0 && (
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-            <span className="font-black text-gray-800 uppercase text-xs tracking-[0.2em]">待清算支票 / Pending Cheques</span>
+            <span className="font-black text-gray-800 uppercase text-xs tracking-[0.2em]">{A.pendingCheques}</span>
             <span className="text-[10px] px-3 py-1 bg-white border border-gray-200 rounded-full text-gray-600 font-black tracking-widest">{pendingCheques.length}</span>
           </div>
           <div className="divide-y divide-gray-50">
@@ -278,18 +280,18 @@ const AccountsPayable: React.FC = () => {
                 <div key={p.id} className="p-6 flex items-center justify-between flex-wrap gap-3">
                   <div>
                     <p className="text-sm font-bold text-gray-700">
-                      <span className="inline-block px-2 py-0.5 mr-2 rounded-md text-[9px] font-black uppercase tracking-widest align-middle bg-[#A85D45]/10 text-[#A85D45]">付款 OUT</span>
+                      <span className="inline-block px-2 py-0.5 mr-2 rounded-md text-[9px] font-black uppercase tracking-widest align-middle bg-[#A85D45]/10 text-[#A85D45]">{A.paymentOut}</span>
                       {p.supplier_name} — <span className="font-mono">{p.cheque_bank}</span> #{p.cheque_number}
                     </p>
                     <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">
                       {p.payment_date} · {p.cheque_date} · AED {(p.cheque_amount ?? p.amount).toFixed(2)}
-                      {issuedFrom ? ` · Issued From ${issuedFrom.account_name}` : ' · ⚠️ 缺少 Issued From 账户'}
+                      {issuedFrom ? ` · Issued From ${issuedFrom.account_name}` : A.missingIssuedFrom}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => handleChequeAction(p, 'CLEARED')} className="px-4 py-2 rounded-xl bg-[#3F7D58] text-white text-[10px] font-black uppercase tracking-widest hover:bg-[#2d5c40]">标记已清算</button>
-                    <button onClick={() => handleChequeAction(p, 'BOUNCED')} className="px-4 py-2 rounded-xl bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-widest hover:bg-gray-200">退票</button>
-                    <button onClick={() => handleChequeAction(p, 'CANCELLED')} className="px-4 py-2 rounded-xl bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-widest hover:bg-gray-200">作废</button>
+                    <button onClick={() => handleChequeAction(p, 'CLEARED')} className="px-4 py-2 rounded-xl bg-[#3F7D58] text-white text-[10px] font-black uppercase tracking-widest hover:bg-[#2d5c40]">{A.markCleared}</button>
+                    <button onClick={() => handleChequeAction(p, 'BOUNCED')} className="px-4 py-2 rounded-xl bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-widest hover:bg-gray-200">{A.bounced}</button>
+                    <button onClick={() => handleChequeAction(p, 'CANCELLED')} className="px-4 py-2 rounded-xl bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-widest hover:bg-gray-200">{A.void}</button>
                   </div>
                 </div>
               );
@@ -304,13 +306,13 @@ const AccountsPayable: React.FC = () => {
           onClick={() => setHistoryView('payables')}
           className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all ${historyView === 'payables' ? 'bg-[#080D1E] text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
         >
-          应付列表
+          {A.payablesList}
         </button>
         <button
           onClick={() => setHistoryView('history')}
           className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all ${historyView === 'history' ? 'bg-[#080D1E] text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
         >
-          付款记录 / Payment History
+          {A.paymentHistory}
         </button>
       </div>
 
@@ -319,22 +321,22 @@ const AccountsPayable: React.FC = () => {
           <table className="w-full text-left">
             <thead className="bg-gray-50 text-xs font-black text-gray-400 uppercase tracking-wide border-b">
               <tr>
-                <th className="px-6 py-4">供应商</th>
-                <th className="px-6 py-4">单据号</th>
-                <th className="px-6 py-4 text-right">应付金额</th>
-                <th className="px-6 py-4 text-right">已付</th>
-                <th className="px-6 py-4 text-right">未付</th>
-                <th className="px-6 py-4">到期日</th>
-                <th className="px-6 py-4">状态</th>
-                <th className="px-6 py-4 text-right">操作</th>
+                <th className="px-6 py-4">{A.colSupplier}</th>
+                <th className="px-6 py-4">{A.colDocNo}</th>
+                <th className="px-6 py-4 text-right">{A.colAmount}</th>
+                <th className="px-6 py-4 text-right">{A.colPaid}</th>
+                <th className="px-6 py-4 text-right">{A.colUnpaid}</th>
+                <th className="px-6 py-4">{A.colDueDate}</th>
+                <th className="px-6 py-4">{A.colStatus}</th>
+                <th className="px-6 py-4 text-right">{A.colActions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {loading && (
-                <tr><td colSpan={8} className="px-6 py-10 text-center text-gray-400 text-sm">加载中…</td></tr>
+                <tr><td colSpan={8} className="px-6 py-10 text-center text-gray-400 text-sm">{A.loading}</td></tr>
               )}
               {!loading && payables.length === 0 && (
-                <tr><td colSpan={8} className="px-6 py-10 text-center text-gray-400 text-sm">暂无应付账款</td></tr>
+                <tr><td colSpan={8} className="px-6 py-10 text-center text-gray-400 text-sm">{A.noPayables}</td></tr>
               )}
               {!loading && payables.map(p => {
                 const d = daysUntil(p.due_date);
@@ -359,14 +361,14 @@ const AccountsPayable: React.FC = () => {
                           onClick={() => setPayingPayable(p)}
                           className="px-4 py-2 rounded-xl bg-[#080D1E] text-white text-[10px] font-black uppercase tracking-widest hover:bg-[#CBA85C] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                         >
-                          付款
+                          {A.pay}
                         </button>
                         {canCancel && (
                           <button
                             onClick={() => handleCancelPayable(p)}
                             className="px-4 py-2 rounded-xl bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-widest hover:bg-gray-200 transition-all"
                           >
-                            作废
+                            {A.void}
                           </button>
                         )}
                       </div>
@@ -382,16 +384,16 @@ const AccountsPayable: React.FC = () => {
           <table className="w-full text-left">
             <thead className="bg-gray-50 text-xs font-black text-gray-400 uppercase tracking-wide border-b">
               <tr>
-                <th className="px-6 py-4">日期</th>
-                <th className="px-6 py-4">供应商</th>
-                <th className="px-6 py-4">方式</th>
-                <th className="px-6 py-4 text-right">金额</th>
-                <th className="px-6 py-4">备注</th>
+                <th className="px-6 py-4">{A.colDate}</th>
+                <th className="px-6 py-4">{A.colSupplier}</th>
+                <th className="px-6 py-4">{A.colMethod}</th>
+                <th className="px-6 py-4 text-right">{A.colPayAmount}</th>
+                <th className="px-6 py-4">{A.colNotes}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {payments.length === 0 && (
-                <tr><td colSpan={5} className="px-6 py-10 text-center text-gray-400 text-sm">暂无付款记录</td></tr>
+                <tr><td colSpan={5} className="px-6 py-10 text-center text-gray-400 text-sm">{A.noPayments}</td></tr>
               )}
               {payments.map(p => (
                 <tr key={p.id} className="hover:bg-gray-50/50">
