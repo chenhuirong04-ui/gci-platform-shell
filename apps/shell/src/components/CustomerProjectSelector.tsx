@@ -71,7 +71,7 @@ interface CustomerProjectSelectorProps {
 }
 
 const inputCls = 'w-full p-3 border border-gray-300 rounded-lg outline-none focus:border-[#CBA85C] text-sm font-bold text-gray-700 bg-white min-w-0';
-const labelCls = 'text-[10px] font-black text-gray-400 uppercase tracking-widest';
+const labelCls = 'text-xs font-semibold text-slate-600';
 
 function selectionFrom(c: CrmCustomer, contact: CrmContact | null): CustomerProjectSelection {
   return {
@@ -260,12 +260,12 @@ export function CustomerProjectSelector({ value, onChange, requireProject, allow
         </div>
 
         {showCreateLink && !value.customerId && (
-          <button type="button" onClick={openModal} className="text-[11px] font-black text-[#B8960C] hover:text-[#8A6D1F] px-1">{cp.createLink}</button>
+          <button type="button" onClick={openModal} className="text-xs font-bold text-[#7A5F2A] hover:text-[#5E4920] px-1">{cp.createLink}</button>
         )}
 
         {showDropdown && (
           <div className="absolute z-20 mt-1 w-full max-h-72 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl">
-            {searching && results.length === 0 && <div className="px-4 py-3 text-xs text-gray-400">{cp.searching}</div>}
+            {searching && results.length === 0 && <div className="px-4 py-3 text-xs text-slate-600">{cp.searching}</div>}
             {results.map(({ customer: c, contact }) => (
               <button
                 key={c.id}
@@ -279,17 +279,17 @@ export function CustomerProjectSelector({ value, onChange, requireProject, allow
                     <span className="font-bold text-gray-800 text-sm truncate">{c.customer_name}</span>
                     {isUnregisteredLead(c) && <span className="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 shrink-0">{cp.leadBadge}</span>}
                   </span>
-                  <span className="block text-[11px] text-gray-400 truncate">{detail(c, contact) || '—'}</span>
+                  <span className="block text-[11px] text-slate-600 truncate">{detail(c, contact) || '—'}</span>
                 </span>
               </button>
             ))}
             {noResultsForQuery && (
               <>
-                <div className="px-4 py-2 text-[11px] text-gray-400">{cp.noMatch}</div>
+                <div className="px-4 py-2 text-[11px] text-slate-600">{cp.noMatch}</div>
                 <button
                   type="button"
                   onClick={openModal}
-                  className="w-full text-left px-4 py-3 hover:bg-[#CBA85C]/5 text-[#B8960C] font-black text-xs flex items-center gap-2 border-t border-gray-100"
+                  className="w-full text-left px-4 py-3 hover:bg-[#0C1B3A]/5 text-[#7A5F2A] font-bold text-xs flex items-center gap-2 border-t border-gray-100"
                 >
                   <Plus className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">{cp.createNew.replace('{name}', query.trim())}</span>
                 </button>
@@ -300,7 +300,7 @@ export function CustomerProjectSelector({ value, onChange, requireProject, allow
       </div>
 
       {value.customerId && (
-        <div className="mt-2 px-1 text-[11px] text-gray-500 space-y-1">
+        <div className="mt-2 px-1 text-[11px] text-slate-600 space-y-1">
           <p>
             {cp.contactLine}：{value.contactName || '—'} · {value.phone || value.whatsapp || value.email || cp.noPhone}
             {value.country ? ` · ${value.country}` : ''}
@@ -309,8 +309,8 @@ export function CustomerProjectSelector({ value, onChange, requireProject, allow
             <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
               <span className="text-[11px] font-black text-amber-700">⚠ {cp.leadBadge}</span>
               <span className="flex-1" />
-              <button type="button" disabled={converting} onClick={makeFormal} className="px-2.5 py-1 rounded-md bg-[#080D1E] text-white text-[10px] font-black uppercase tracking-wide disabled:opacity-50">{cp.makeFormal}</button>
-              <button type="button" onClick={clearCustomer} className="px-2.5 py-1 rounded-md bg-white border border-gray-300 text-gray-600 text-[10px] font-black uppercase tracking-wide">{cp.rebind}</button>
+              <button type="button" disabled={converting} onClick={makeFormal} className="px-2.5 py-1 rounded-md bg-[#080D1E] text-white text-xs font-semibold uppercase tracking-wide disabled:opacity-50">{cp.makeFormal}</button>
+              <button type="button" onClick={clearCustomer} className="px-2.5 py-1 rounded-md bg-white border border-gray-300 text-gray-600 text-xs font-semibold uppercase tracking-wide">{cp.rebind}</button>
             </div>
           )}
         </div>
@@ -322,7 +322,7 @@ export function CustomerProjectSelector({ value, onChange, requireProject, allow
             {cp.project} {requireProject && <span className="text-[#CBA85C]">*</span>}
           </label>
           {projects.length === 0 && !showQuickCreateProject && (
-            <p className="text-[11px] text-gray-400 px-1">{cp.noProjects}</p>
+            <p className="text-[11px] text-slate-600 px-1">{cp.noProjects}</p>
           )}
           {projects.length > 0 && (
             <select
@@ -335,22 +335,22 @@ export function CustomerProjectSelector({ value, onChange, requireProject, allow
             </select>
           )}
           {!showQuickCreateProject ? (
-            <button type="button" onClick={() => setShowQuickCreateProject(true)} className="text-[11px] font-black text-[#CBA85C] hover:text-[#B8960C] flex items-center gap-1 px-1 pt-1">
+            <button type="button" onClick={() => setShowQuickCreateProject(true)} className="text-xs font-bold text-[#7A5F2A] hover:text-[#5E4920] flex items-center gap-1 px-1 pt-1">
               <Plus className="w-3 h-3" /> {cp.newProject}
             </button>
           ) : (
             <div className="flex gap-2 pt-1">
               <input value={qpName} onChange={e => setQpName(e.target.value)} placeholder={cp.projectName} className={`${inputCls} flex-1`} />
-              <button type="button" disabled={creatingProject} onClick={submitQuickCreateProject} className="px-4 py-2 rounded-lg bg-[#080D1E] text-white text-[10px] font-black uppercase tracking-wide disabled:opacity-50">
+              <button type="button" disabled={creatingProject} onClick={submitQuickCreateProject} className="px-4 py-2 rounded-lg bg-[#080D1E] text-white text-xs font-semibold uppercase tracking-wide disabled:opacity-50">
                 {creatingProject ? cp.creating : cp.createShort}
               </button>
-              <button type="button" onClick={() => { setShowQuickCreateProject(false); setQpName(''); }} className="px-3 py-2 rounded-lg bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-widest hover:bg-gray-200">
+              <button type="button" onClick={() => { setShowQuickCreateProject(false); setQpName(''); }} className="px-3 py-2 rounded-lg bg-gray-100 text-slate-600 text-xs font-semibold uppercase tracking-widest hover:bg-gray-200">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
           )}
           {requireProject && !value.projectId && (
-            <p className="text-[11px] text-gray-500 px-1 pt-1">{cp.projectRequired}</p>
+            <p className="text-[11px] text-slate-600 px-1 pt-1">{cp.projectRequired}</p>
           )}
         </div>
       )}

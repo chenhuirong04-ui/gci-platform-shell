@@ -24,7 +24,7 @@ export const StepIndicator: React.FC<StepIndicatorProps> = ({ current }) => {
     { id: 5, label: s.sendToTrade },
   ];
   return (
-    <nav aria-label="Quotation steps" className="w-full h-[52px] mb-3 flex items-center gap-1 px-2 sm:px-3 rounded-xl bg-[#080D1E]/[0.04] border border-[#080D1E]/10 overflow-hidden">
+    <nav aria-label="Quotation steps" className="w-full h-[52px] mb-3 flex items-center gap-1 px-2 sm:px-3 rounded-[10px] bg-[#080D1E]/[0.04] border border-[#080D1E]/10 overflow-hidden">
       {STEPS.map((step, idx) => {
         const done = current > step.id;
         const active = current === step.id;
@@ -32,12 +32,12 @@ export const StepIndicator: React.FC<StepIndicatorProps> = ({ current }) => {
           <React.Fragment key={step.id}>
             <div
               aria-current={active ? 'step' : undefined}
-              className={`flex items-center gap-2 h-9 px-2.5 sm:px-3 rounded-lg min-w-0 transition-colors ${active ? 'bg-[#080D1E] text-[#E8C96A] shadow-sm' : done ? 'text-[#A8842F]' : 'text-[#080D1E]/35'}`}
+              className={`flex items-center gap-2 h-9 px-2.5 sm:px-3 rounded-lg min-w-0 transition-colors ${active ? 'bg-[#080D1E] text-[#E8C96A] shadow-sm' : done ? 'text-[#A8842F]' : 'text-slate-600'}`}
             >
-              <span className={`w-5 h-5 shrink-0 rounded-full flex items-center justify-center text-[10px] font-black ${active ? 'bg-[#CBA85C] text-[#080D1E]' : done ? 'bg-[#CBA85C]/25 text-[#A8842F]' : 'bg-[#080D1E]/8 text-[#080D1E]/40'}`}>
+              <span className={`w-5 h-5 shrink-0 rounded-full flex items-center justify-center text-xs font-bold ${active ? 'bg-[#CBA85C] text-[#080D1E]' : done ? 'bg-[#CBA85C]/25 text-[#A8842F]' : 'bg-[#080D1E]/8 text-slate-600'}`}>
                 {done ? '✓' : String(step.id).padStart(2, '0')}
               </span>
-              <span className={`text-[10px] sm:text-[11px] font-black uppercase tracking-wide truncate ${active ? 'inline' : 'hidden md:inline'}`}>{step.label}</span>
+              <span className={`text-xs sm:text-xs font-bold truncate ${active ? 'inline' : 'hidden md:inline'}`}>{step.label}</span>
             </div>
             {idx < STEPS.length - 1 && <div className={`h-px flex-1 min-w-[6px] ${done ? 'bg-[#CBA85C]' : 'bg-[#080D1E]/12'}`} />}
           </React.Fragment>

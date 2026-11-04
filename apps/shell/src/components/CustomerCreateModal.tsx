@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useI18n } from '@gci/i18n';
+import { workspaceFontFamily } from '@gci/design-system';
 import { quickCreateCustomer, DuplicateCustomerError } from '../lib/crmProjects';
 import { BUSINESS_LINES, CRM_STAGES, type CrmCustomer, type CrmContact } from '../lib/crmSupabase';
 import { parseTradeLicense, licenseToFormPatch, archiveTradeLicense, LICENSE_ACCEPT, type TradeLicenseFields } from '../lib/crmTradeLicense';
@@ -29,12 +30,13 @@ interface CustomerCreateModalProps {
   onUseExisting: (existing: CrmCustomer) => void;
 }
 
-const inputCls = 'w-full p-3 border border-gray-300 rounded-lg outline-none focus:border-[#CBA85C] text-sm font-bold text-gray-700 bg-white min-w-0';
-const labelCls = 'text-[10px] font-black text-gray-400 uppercase tracking-widest';
+const inputCls = 'w-full p-3 border border-gray-300 rounded-lg outline-none focus:border-[#A07F3C] text-sm font-bold text-gray-700 bg-white min-w-0';
+const labelCls = 'text-xs font-semibold text-slate-600';
 const emptyForm = { name: '', country: '', contactName: '', mobile: '', whatsapp: '', email: '', type: '', source: '', businessLine: '', stage: '' };
 
 export function CustomerCreateModal({ open, initialName = '', allowLead = false, extended = false, onClose, onCreated, onUseExisting }: CustomerCreateModalProps) {
-  const { dict } = useI18n();
+  const { dict, lang } = useI18n();
+  const en = lang === 'en';
   const cp = dict.quotation.customerPicker;
   const [form, setForm] = useState(emptyForm);
   const [creating, setCreating] = useState(false);
@@ -65,9 +67,9 @@ export function CustomerCreateModal({ open, initialName = '', allowLead = false,
       const fields = await parseTradeLicense(file);
       setLicFields(fields);
       setForm((f) => ({ ...f, ...licenseToFormPatch(fields, f) }));
-      setLicMsg('已识别并填入表单，请核对后保存');
+      setLicMsg(en ? 'Recognised and filled in — please review before saving.' : '已识别并填入表单，请核对后保存');
     } catch (e: any) {
-      setLicMsg(`识别失败：${e?.message || ''}（可继续手工填写）`);
+      setLicMsg(en ? `Recognition failed: ${e?.message || ''} (you can continue filling in manually)` : `识别失败：${e?.message || ''}（可继续手工填写）`);
     } finally {
       setLicBusy(false);
     }
@@ -112,25 +114,25 @@ export function CustomerCreateModal({ open, initialName = '', allowLead = false,
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={extended ? cp.formalTitle : cp.modalTitle}>
-      <div className="absolute inset-0 bg-slate-900/60" onClick={() => !creating && onClose()} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto p-5 sm:p-6 space-y-4">
+    <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 max-sm:p-0 max-sm:items-start max-sm:overflow-y-auto" style={{ fontFamily: workspaceFontFamily }} role="dialog" aria-modal="true" aria-label={extended ? cp.formalTitle : cp.modalTitle}>
+      <div className="absolute inset-0 bg-[rgba(8,13,30,0.5)]" onClick={() => !creating && onClose()} />
+      <div className="relative bg-white rounded-[14px] shadow-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto p-5 sm:p-6 space-y-4 max-sm:min-h-full max-sm:max-w-none max-sm:max-h-none max-sm:rounded-none">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-black text-gray-800">{extended ? cp.formalTitle : cp.modalTitle}</h3>
-          <button type="button" onClick={() => !creating && onClose()} className="p-1.5 text-gray-400 hover:text-gray-700" aria-label={cp.cancel}><X className="w-4 h-4" /></button>
+          <h3 className="text-base font-bold text-[#0C1B3A]">{extended ? cp.formalTitle : cp.modalTitle}</h3>
+          <button type="button" onClick={() => !creating && onClose()} className="p-1.5 text-slate-600 hover:text-gray-700" aria-label={cp.cancel}><X className="w-4 h-4" /></button>
         </div>
 
         {extended && (
-          <div className="p-3 rounded-lg border border-dashed border-[#CBA85C] bg-[#FBF7EC] space-y-2">
+          <div className="p-3 rounded-lg border border-dashed border-[#A07F3C] bg-[#FBF7EC] space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <label className="px-3 py-1.5 rounded-md bg-[#080D1E] text-white text-[11px] font-black cursor-pointer">
-                {licBusy ? 'AI 识别中…' : '上传营业执照识别'}
+              <label className="px-3 py-1.5 rounded-md bg-[#080D1E] text-white text-xs font-bold cursor-pointer">
+                {licBusy ? (en ? 'AI reading…' : 'AI 识别中…') : (en ? 'Upload trade licence' : '上传营业执照识别')}
                 <input type="file" accept={LICENSE_ACCEPT} className="hidden" disabled={licBusy || creating}
-                  aria-label="上传营业执照识别" onChange={(e) => { pickLicense(e.target.files?.[0] || null); e.target.value = ''; }} />
+                  aria-label={en ? 'Upload trade licence' : '上传营业执照识别'} onChange={(e) => { pickLicense(e.target.files?.[0] || null); e.target.value = ''; }} />
               </label>
-              <span className="text-[11px] text-gray-500 min-w-0 truncate">{licFile ? licFile.name : '可选：AI 读取营业执照并预填公司信息'}</span>
+              <span className="text-xs text-slate-600 min-w-0 truncate">{licFile ? licFile.name : (en ? 'Optional: AI reads the trade licence and pre-fills company details' : '可选：AI 读取营业执照并预填公司信息')}</span>
             </div>
-            {licMsg && <p className={`text-[11px] font-bold ${licFields ? 'text-emerald-700' : 'text-[#B45309]'}`}>{licMsg}</p>}
+            {licMsg && <p className={`text-xs font-bold ${licFields ? 'text-emerald-700' : 'text-[#B45309]'}`}>{licMsg}</p>}
             {licFields && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div className="space-y-1"><label className={labelCls}>执照号码</label><input aria-label="执照号码" value={licFields.license_number || ''} onChange={e => setLic('license_number', e.target.value)} className={inputCls} /></div>
@@ -142,7 +144,7 @@ export function CustomerCreateModal({ open, initialName = '', allowLead = false,
         )}
 
         <div className="space-y-1">
-          <label className={labelCls}>{cp.name} <span className="text-[#CBA85C]">*</span></label>
+          <label className={labelCls}>{cp.name} <span className="text-[#C53030]">*</span></label>
           <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={inputCls} autoFocus />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -184,21 +186,21 @@ export function CustomerCreateModal({ open, initialName = '', allowLead = false,
         {duplicate && (
           <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 flex flex-wrap items-center gap-2">
             <span className="text-xs font-bold text-amber-800 flex-1 min-w-0">{cp.dupTitle.replace('{name}', duplicate.customer_name)}</span>
-            <button type="button" onClick={() => onUseExisting(duplicate)} className="px-3 py-1.5 rounded-md bg-[#080D1E] text-white text-[10px] font-black uppercase tracking-wide">{cp.dupUse}</button>
+            <button type="button" onClick={() => onUseExisting(duplicate)} className="px-3 py-1.5 rounded-md bg-[#080D1E] text-white text-xs font-bold uppercase tracking-wide">{cp.dupUse}</button>
           </div>
         )}
         {formError && <p className="text-xs font-bold text-[#E0846A]">{formError}</p>}
 
         <div className="flex flex-wrap gap-2 pt-1">
-          <button type="button" disabled={creating || licBusy} onClick={() => submit(false)} className="px-4 py-2.5 rounded-lg bg-[#080D1E] text-white text-[11px] font-black uppercase tracking-wide disabled:opacity-50">
+          <button type="button" disabled={creating || licBusy} onClick={() => submit(false)} className="px-4 py-2.5 rounded-lg bg-[#080D1E] text-white text-xs font-bold uppercase tracking-wide disabled:opacity-50">
             {creating ? cp.creating : extended ? cp.save : cp.create}
           </button>
           {allowLead && (
-            <button type="button" disabled={creating} onClick={() => submit(true)} className="px-4 py-2.5 rounded-lg bg-white border border-[#CBA85C] text-[#8A6D1F] text-[11px] font-black tracking-wide disabled:opacity-50">
+            <button type="button" disabled={creating} onClick={() => submit(true)} className="px-4 py-2.5 rounded-lg bg-white border border-[#A07F3C] text-[#7A5F2A] text-xs font-bold tracking-wide disabled:opacity-50">
               {cp.createLead}
             </button>
           )}
-          <button type="button" disabled={creating} onClick={onClose} className="px-4 py-2.5 rounded-lg bg-gray-100 text-gray-500 text-[11px] font-black uppercase tracking-wide">
+          <button type="button" disabled={creating} onClick={onClose} className="px-4 py-2.5 rounded-lg bg-gray-100 text-slate-600 text-xs font-bold uppercase tracking-wide">
             {cp.cancel}
           </button>
         </div>

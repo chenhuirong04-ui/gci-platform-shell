@@ -27,6 +27,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
+import { ModalPortal, workspaceFontFamily } from '@gci/design-system';
 
 /* =========================
    ErrorBoundary（避免白屏）
@@ -49,16 +50,16 @@ class ErrorBoundary extends React.Component<
     if (this.state.hasError) {
       return (
         <div className="min-h-screen bg-[#F8FAFC] p-6">
-          <div className="max-w-3xl mx-auto bg-white border border-red-200 rounded-2xl p-6">
-            <div className="text-xl font-black text-red-600">页面出错（已拦截，避免白屏）</div>
+          <div className="max-w-3xl mx-auto bg-white border border-red-200 rounded-[10px] p-6">
+            <div className="text-xl font-bold text-red-600">页面出错（已拦截，避免白屏）</div>
             <div className="mt-2 text-sm text-slate-600">
               把下面这段错误截图发我，我可以直接定位是哪一行。
             </div>
-            <pre className="mt-4 text-xs bg-slate-900 text-slate-100 p-4 rounded-xl overflow-auto">
+            <pre className="mt-4 text-xs bg-slate-900 text-slate-100 p-4 rounded-[10px] overflow-auto">
 {String(this.state.error?.stack || this.state.error || 'Unknown error')}
             </pre>
             <button
-              className="mt-4 px-4 py-2 rounded-xl text-white font-black"
+              className="mt-4 px-4 py-2 rounded-md text-white font-bold"
               style={{ backgroundColor: '#0F172A' }}
               onClick={() => location.reload()}
             >
@@ -915,7 +916,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
       ? 'bg-emerald-700 border-emerald-600'
       : toast?.type === 'error'
       ? 'bg-rose-700 border-rose-600'
-      : 'bg-[#0D1E35] border-[#1E3A5F]';
+      : 'bg-[#FFFFFF] border-[#1E3A5F]';
 
   // V1 nav consolidation: control/dashboard/project/history used to be four
   // flat, equally-weighted tabs, but they all read the same underlying
@@ -950,19 +951,19 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
   }
 
   return (
-    <div className="min-h-screen font-sans pb-36" style={{ background: '#0A1628', color: '#E8F0FF' }}>
+    <div className="min-h-screen pb-36" style={{ background: '#F5F6FA', color: '#0C1B3A', fontFamily: workspaceFontFamily }}>
       {/* Existing tabbed UI stays mounted (just hidden) while on the
           standalone customer workspace route, so its internal search /
           filter / scroll state survives the round trip without a new
           global store. */}
       <div style={{ display: isOnStandaloneRoute ? 'none' : undefined }}>
-      <nav className="no-print sticky top-0 z-[90] px-3" style={{ background: '#0D1E35', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+      <nav className="no-print sticky top-[var(--header-h)] z-20 px-3" style={{ background: '#FFFFFF', borderBottom: '1px solid rgba(12,27,58,0.1)' }}>
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 py-2.5">
           <div className="flex items-center overflow-x-auto gap-1.5">
             {topGroups.map(group => (
               <React.Fragment key={group.id}>
                 {group.id === 'internal' && (
-                  <div className="w-px h-5 mx-1.5 shrink-0" style={{ background: 'rgba(255,255,255,0.10)' }} />
+                  <div className="w-px h-5 mx-1.5 shrink-0" style={{ background: 'rgba(12,27,58,0.10)' }} />
                 )}
                 <button
                   onClick={() => {
@@ -972,10 +973,10 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
                       setActiveTab(group.id);
                     }
                   }}
-                  className="shrink-0 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all"
+                  className="shrink-0 px-4 py-2 rounded-md text-xs font-bold whitespace-nowrap transition-all"
                   style={group.active
-                    ? { backgroundColor: '#B8960C', color: '#fff' }
-                    : { background: 'rgba(255,255,255,0.06)', color: '#7A9CC5' }}
+                    ? { color: '#0C1B3A', fontWeight: 700, borderBottom: '2px solid #A07F3C', borderRadius: 0 }
+                    : { color: '#475569', fontWeight: 500, borderBottom: '2px solid transparent', borderRadius: 0 }}
                 >
                   {group.label}
                 </button>
@@ -990,10 +991,10 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className="shrink-0 px-3.5 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all"
+                  className="shrink-0 px-3.5 py-1.5 rounded-md text-xs font-bold whitespace-nowrap transition-all"
                   style={activeTab === tab.id
-                    ? { background: 'rgba(203,168,92,0.16)', color: '#E2C988', border: '1px solid rgba(203,168,92,0.3)' }
-                    : { background: 'transparent', color: '#5B7092', border: '1px solid transparent' }}
+                    ? { background: 'rgba(203,168,92,0.16)', color: '#7A5F2A', border: '1px solid rgba(203,168,92,0.3)' }
+                    : { background: 'transparent', color: '#475569', border: '1px solid transparent' }}
                 >
                   {tab.label}
                 </button>
@@ -1002,8 +1003,8 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
             {!demoMode && (
               <button
                 onClick={() => setIntakeModalOpen(true)}
-                className="shrink-0 px-3.5 py-1.5 rounded-lg text-[11px] font-black whitespace-nowrap transition-all"
-                style={{ background: '#B8960C', color: '#fff' }}
+                className="shrink-0 px-3.5 py-1.5 rounded-md text-xs font-bold whitespace-nowrap transition-all"
+                style={{ background: '#080D1E', color: '#fff' }}
               >
                 ＋ 新增客户 / 业务
               </button>
@@ -1017,8 +1018,8 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
         {activeTab === 'control' && demoMode && (
           <div className="space-y-6" data-testid="demo-control-center">
             <div>
-              <div className="text-2xl font-black">客户执行总览</div>
-              <div className="mt-1 text-sm text-[#7A9CC5]">全部为虚构演示数据 · 刷新后恢复初始状态</div>
+              <div className="text-2xl font-bold">客户执行总览</div>
+              <div className="mt-1 text-sm text-[#475569]">全部为虚构演示数据 · 刷新后恢复初始状态</div>
             </div>
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
               {[
@@ -1027,22 +1028,22 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
                 ['A级重点客户', normalizedTasks.filter(t => t.priority === 'A').length],
                 ['等待确认', normalizedTasks.filter(t => t.tradeStatus === '已报价待确认').length],
               ].map(([label, value]) => (
-                <div key={String(label)} className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                  <div className="text-xs font-bold text-[#7A9CC5]">{label}</div>
-                  <div className="mt-2 text-3xl font-black text-[#D4AF37]">{value}</div>
+                <div key={String(label)} className="rounded-[10px] border border-white/10 bg-white/5 p-5">
+                  <div className="text-xs font-bold text-[#475569]">{label}</div>
+                  <div className="mt-2 text-3xl font-bold text-[#7A5F2A]">{value}</div>
                 </div>
               ))}
             </div>
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+            <div className="rounded-[10px] border border-white/10 bg-white/5 p-5">
               <div className="mb-4 flex items-center justify-between">
-                <div className="font-black">行动中心 · 待跟进客户</div>
-                <button onClick={() => setActiveTab('dashboard')} className="rounded-xl bg-[#B8960C] px-4 py-2 text-xs font-black text-white">查看客户列表</button>
+                <div className="font-bold">行动中心 · 待跟进客户</div>
+                <button onClick={() => setActiveTab('dashboard')} className="rounded-md bg-[#7A5F2A] px-4 py-2 text-xs font-bold text-white">查看客户列表</button>
               </div>
               <div className="space-y-2">
                 {normalizedTasks.slice(0, 4).map(task => (
-                  <button key={task.id} onClick={() => { setActiveTab('dashboard'); setSelectedTask(task); setDetailOpen(true); }} className="flex w-full items-center justify-between rounded-2xl bg-[#0D1E35] px-4 py-3 text-left">
-                    <span><span className="font-bold text-white">{task.clientName}</span><span className="ml-3 text-xs text-[#7A9CC5]">{task.suggestedAction}</span></span>
-                    <span className="text-xs font-bold text-[#D4AF37]">{task.owner} · {task.nextFollowUpAt.slice(0, 10)}</span>
+                  <button key={task.id} onClick={() => { setActiveTab('dashboard'); setSelectedTask(task); setDetailOpen(true); }} className="flex w-full items-center justify-between rounded-md bg-[#FFFFFF] px-4 py-3 text-left">
+                    <span><span className="font-bold text-white">{task.clientName}</span><span className="ml-3 text-xs text-[#475569]">{task.suggestedAction}</span></span>
+                    <span className="text-xs font-bold text-[#7A5F2A]">{task.owner} · {task.nextFollowUpAt.slice(0, 10)}</span>
                   </button>
                 ))}
               </div>
@@ -1064,8 +1065,8 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
         {activeTab === 'comms' && (
           <div className="space-y-5">
             <div>
-              <h2 className="text-2xl font-black" style={{ color: '#E8F0FF' }}>沟通记录</h2>
-              <p className="text-sm font-medium mt-0.5" style={{ color: '#7A9CC5' }}>直接读取 Follow-up Log · 新增记录请使用右上角"新增客户 / 业务"</p>
+              <h2 className="text-2xl font-bold" style={{ color: '#0C1B3A' }}>沟通记录</h2>
+              <p className="text-sm font-medium mt-0.5" style={{ color: '#475569' }}>直接读取 Follow-up Log · 新增记录请使用右上角"新增客户 / 业务"</p>
             </div>
 
             <FollowUpQueue
@@ -1083,12 +1084,12 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
                 <button
                   data-testid="demo-ai-open"
                   onClick={() => setDemoAiOpen(true)}
-                  className="w-full rounded-2xl border border-[#B8960C]/40 bg-[#B8960C]/10 px-5 py-4 text-sm font-black text-[#D4AF37]"
+                  className="w-full rounded-md border border-[#7A5F2A]/40 bg-[#7A5F2A]/10 px-5 py-4 text-sm font-bold text-[#7A5F2A]"
                 >
                   打开 AI 客户助手 · {selectedTask.clientName}
                 </button>
               ) : (
-                <div className="w-full rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-sm font-bold text-center" style={{ color: '#7A9CC5' }}>
+                <div className="w-full rounded-[10px] border border-white/10 bg-white/5 px-5 py-4 text-sm font-bold text-center" style={{ color: '#475569' }}>
                   请先在列表中选择客户，再打开 AI 助手
                 </div>
               )
@@ -1113,8 +1114,8 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
           <div className="space-y-3">
             <button
               onClick={() => setShowProjectKanban(false)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all"
-              style={{ background: 'rgba(255,255,255,0.06)', color: '#7A9CC5' }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all"
+              style={{ background: 'rgba(12,27,58,0.06)', color: '#475569' }}
             >
               ← 返回业务列表
             </button>
@@ -1225,11 +1226,11 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
       />
 
       {demoMode && demoAiOpen && selectedTask && (
-        <div data-testid="demo-ai-panel" className="fixed inset-0 z-[4000] overflow-y-auto bg-slate-950/80 p-6 backdrop-blur-sm">
-          <div className="mx-auto max-w-2xl">
+        <ModalPortal><div data-testid="demo-ai-panel" className="fixed inset-0 z-[1100] overflow-y-auto bg-[rgba(8,13,30,0.5)] p-4 max-sm:p-0 max-sm:items-start max-sm:overflow-y-auto">
+          <div className="mx-auto max-w-2xl rounded-[14px] max-sm:w-full max-sm:min-h-full max-sm:my-0 max-sm:max-w-none max-sm:max-h-none max-sm:rounded-none">
             <div className="mb-3 flex items-center justify-between text-white">
               <div className="flex items-center gap-3">
-                <div className="font-black">AI 客户助手 · {selectedTask.clientName}</div>
+                <div className="font-bold">AI 客户助手 · {selectedTask.clientName}</div>
                 {navIdx >= 0 && (
                   <span className="text-xs font-bold text-white/40">{navIdx + 1} / {navTotal}</span>
                 )}
@@ -1238,22 +1239,22 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
                 <button
                   onClick={goPrev}
                   disabled={!hasPrev}
-                  className="flex items-center gap-1 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/20"
+                  className="flex items-center gap-1 rounded-md bg-white/10 px-3 py-2 text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/20"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />上一位
                 </button>
                 <button
                   onClick={goNext}
                   disabled={!hasNext}
-                  className="flex items-center gap-1 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/20"
+                  className="flex items-center gap-1 rounded-md bg-white/10 px-3 py-2 text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/20"
                 >
                   下一位<ChevronRight className="w-3.5 h-3.5" />
                 </button>
-                <button onClick={() => setDemoAiOpen(false)} className="rounded-xl bg-white/10 px-4 py-2 text-xs font-bold hover:bg-white/20">关闭</button>
+                <button onClick={() => setDemoAiOpen(false)} className="rounded-md bg-white/10 px-4 py-2 text-xs font-bold hover:bg-white/20">关闭</button>
               </div>
             </div>
             {navNotInFilter && (
-              <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-bold text-amber-400">
+              <div className="mb-3 rounded-[10px] border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-bold text-amber-700">
                 当前客户不在列表筛选结果内，上一位 / 下一位按当前筛选条件定位
               </div>
             )}
@@ -1266,7 +1267,7 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
               }}
             />
           </div>
-        </div>
+        </div></ModalPortal>
       )}
 
       {selectedTask && detailOpen && activeTab !== 'dashboard' && activeTab !== 'comms' && (
@@ -1282,13 +1283,13 @@ function CrmInner({ initialTab, demoMode = false }: { initialTab?: CrmTab; demoM
 
       {toast && (
         <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[3000] animate-fadeIn">
-          <div className={`px-8 py-4 rounded-3xl shadow-2xl flex items-center gap-3 border text-white ${toastClass}`}>
+          <div className={`px-8 py-4 rounded-[10px] shadow-2xl flex items-center gap-3 border text-white ${toastClass}`}>
             {toast.type === 'success' ? (
               <CheckCircle2 className="w-5 h-5" />
             ) : (
               <AlertCircle className="w-5 h-5" />
             )}
-            <span className="text-sm font-black">{toast.msg}</span>
+            <span className="text-sm font-bold">{toast.msg}</span>
           </div>
         </div>
       )}

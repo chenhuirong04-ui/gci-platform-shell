@@ -9,6 +9,15 @@ import { CustomerDocumentManager } from '../../../../../modules/business-solutio
 import { ComplianceItemManager } from '../../../../../modules/business-solutions/components/ComplianceItemManager';
 import { PersonManager } from '../../../../../modules/business-solutions/components/PersonManager';
 import { crmOwnerKey } from '../../../../../modules/business-solutions/lib/bsCloud';
+import { useI18n } from '@gci/i18n';
+
+// i18n: English for this page's fixed UI text (database values are never translated).
+const EN: Record<string, string> = {
+  "证照已识别并保存到合规事项": "Licence recognised and saved to Compliance"
+};
+// Per-instance translator: each component builds its own from its language context.
+const makeTx = (lang: 'zh' | 'en') => (zh: string): string => (lang === 'en' ? EN[zh] ?? zh : zh);
+
 
 export type CrmFilesTab = 'documents' | 'compliance' | 'persons';
 
@@ -22,6 +31,8 @@ interface Props {
 type DocInfo = { documentId: string; documentType: string; documentName: string; parsed: Record<string, unknown> };
 
 export function CrmCustomerFiles({ crmCustomerId, customerName, tab, onTabChange }: Props) {
+  const LANG = useI18n().lang;
+  const tx = makeTx(LANG);
   const ownerKey = crmOwnerKey(crmCustomerId);
   const [complianceReloadKey, setComplianceReloadKey] = useState(0);
   const [complianceSavedMsg, setComplianceSavedMsg] = useState<string | null>(null);
@@ -31,7 +42,7 @@ export function CrmCustomerFiles({ crmCustomerId, customerName, tab, onTabChange
   useEffect(() => { setPersonPrefill(null); setComplianceSavedMsg(null); }, [crmCustomerId]);
 
   return (
-    <div className="bg-white rounded-2xl p-4 text-gray-800" style={{ colorScheme: 'light' }}>
+    <div className="bg-white rounded-[10px] p-4 text-gray-800" style={{ colorScheme: 'light' }}>
       {tab === 'documents' && (
         <CustomerDocumentManager
           key={ownerKey}
@@ -40,7 +51,7 @@ export function CrmCustomerFiles({ crmCustomerId, customerName, tab, onTabChange
           lang="zh"
           onCreateComplianceItem={() => {
             setComplianceReloadKey((k) => k + 1);
-            setComplianceSavedMsg('证照已识别并保存到合规事项');
+            setComplianceSavedMsg(tx('证照已识别并保存到合规事项'));
             onTabChange('compliance');
           }}
           onCreatePerson={(info) => {
