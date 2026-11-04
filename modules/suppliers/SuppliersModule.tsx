@@ -7,7 +7,11 @@ import SupplierForm from './components/SupplierForm';
 import SupplierDetail from './components/SupplierDetail';
 import NotionImportPage from './components/NotionImportPage';
 import SupplierCleanupPage from './components/SupplierCleanupPage';
-import { workspace } from '@gci/design-system';
+import { workspace, fontSizes, fonts } from '@gci/design-system';
+
+// Design System V1: Latin text in Space Grotesk; CJK has no glyphs there and
+// falls through to Noto Sans SC. Codes / amounts opt into fonts.mono locally.
+const UI_FONT = `'Space Grotesk', ${fonts.body}`;
 
 const GOLD = '#C9A84C';
 const NAVY = '#0c1b3a';
@@ -50,7 +54,7 @@ export default function SuppliersModule() {
   }, []);
 
   return (
-    <div translate="no" className="notranslate" style={{ minHeight: '100vh', background: workspace.surfacePage }}>
+    <div translate="no" className="notranslate" style={{ minHeight: '100vh', background: workspace.surfacePage, fontFamily: UI_FONT }}>
 
       {/* ── Top secondary navigation ─────────────────────────────────── */}
       <div style={{ background: '#fff', borderBottom: `1px solid ${workspace.border}`, display: 'flex', alignItems: 'center', paddingLeft: 16, overflowX: 'auto' }}>
@@ -63,7 +67,7 @@ export default function SuppliersModule() {
             }}
             style={{
               padding: '12px 18px',
-              fontSize: 13,
+              fontSize: fontSizes.sm,
               fontWeight: topTab === key ? 700 : 500,
               color: topTab === key ? NAVY : '#475569',
               border: 'none',
@@ -134,8 +138,8 @@ export default function SuppliersModule() {
 
       {/* DOCS tab */}
       {topTab === 'docs' && (
-        <div style={{ padding: '48px 32px', textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>📁</div>
+        <div style={{ padding: '48px 32px', textAlign: 'center', color: '#94a3b8', fontSize: fontSizes.md }}>
+          <div style={{ fontSize: fontSizes.display, marginBottom: 12 }}>📁</div>
           <div style={{ fontWeight: 700, color: '#475569', marginBottom: 6 }}>{dict.suppliers.module.docsTitle}</div>
           <div>{dict.suppliers.module.docsDesc}</div>
         </div>
@@ -143,8 +147,8 @@ export default function SuppliersModule() {
 
       {/* QUOTES tab */}
       {topTab === 'quotes' && (
-        <div style={{ padding: '48px 32px', textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>📋</div>
+        <div style={{ padding: '48px 32px', textAlign: 'center', color: '#94a3b8', fontSize: fontSizes.md }}>
+          <div style={{ fontSize: fontSizes.display, marginBottom: 12 }}>📋</div>
           <div style={{ fontWeight: 700, color: '#475569', marginBottom: 6 }}>{dict.suppliers.module.quotesTitle}</div>
           <div>{dict.suppliers.module.quotesDesc}</div>
         </div>

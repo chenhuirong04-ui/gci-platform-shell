@@ -4,7 +4,7 @@ import type { Supplier, SupplierType, SupplierStatus, SupplierRating, DocumentTy
 import { createSupplier, generateShortCode, updateSupplier } from '../lib/suppliersCloud';
 import { createDocument, moveStorageFile, resolveStorageBucket } from '../lib/documentsCloud';
 import { getStatusLabel, getDocTypeLabel, getSupplierTypeLabel } from '../lib/labelMaps';
-import { workspace } from '@gci/design-system';
+import { workspace, fontSizes } from '@gci/design-system';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const GOLD    = '#C9A84C';
@@ -15,18 +15,18 @@ const CBORDER = workspace.border;
 const INP: React.CSSProperties = {
   display: 'block', width: '100%', boxSizing: 'border-box',
   padding: '11px 14px', borderRadius: 10, border: '1.5px solid #b0bec5',
-  fontSize: 15, color: '#0F172A', background: '#fff', outline: 'none',
+  fontSize: fontSizes.md, color: '#0F172A', background: '#fff', outline: 'none',
 };
 const SEL: React.CSSProperties = { ...INP, cursor: 'pointer' };
 const LBL: React.CSSProperties = {
-  display: 'block', fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 6,
+  display: 'block', fontSize: fontSizes.sm, fontWeight: 600, color: '#334155', marginBottom: 6,
 };
 const CARD: React.CSSProperties = {
   background: '#fff', borderRadius: 24, padding: 28,
   border: `1px solid ${CBORDER}`, boxShadow: '0 1px 4px rgba(12,27,58,0.06)',
 };
 const SEC: React.CSSProperties = {
-  fontSize: 10, fontWeight: 900, color: GOLD,
+  fontSize: fontSizes.xs, fontWeight: 900, color: GOLD,
   textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 20,
 };
 const R2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 };
@@ -393,7 +393,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
   return (
     <div style={{ background: BG, minHeight: '100vh' }}>
       <div style={{ padding: '24px 28px 64px', maxWidth: 1200, margin: '0 auto' }}>
-        <button onClick={onCancel} style={{ fontSize: 12, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 18 }}>
+        <button onClick={onCancel} style={{ fontSize: fontSizes.xs, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 18 }}>
           {c0.back}
         </button>
 
@@ -404,10 +404,10 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
 
             {/* Title card */}
             <div style={CARD}>
-              <h2 style={{ fontSize: 20, fontWeight: 800, color: NAVY, margin: '0 0 4px' }}>
+              <h2 style={{ fontSize: fontSizes.xl, fontWeight: 800, color: NAVY, margin: '0 0 4px' }}>
                 {isEdit ? t.titleEdit : t.titleNew}
               </h2>
-              <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
+              <p style={{ fontSize: fontSizes.sm, color: '#64748b', margin: 0 }}>
                 {isEdit ? t.subtitleEdit : t.subtitleNew}
               </p>
             </div>
@@ -418,8 +418,8 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                 <div style={{ height: 4, background: `linear-gradient(90deg, ${NAVY}, ${GOLD})`, margin: '-28px -28px 24px', borderRadius: '24px 24px 0 0' }} />
                 <div style={{ marginBottom: 16 }}>
                   <div style={{ ...SEC, marginBottom: 4 }}>{t.aiSectionLabel}</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: NAVY }}>{t.aiUploadTitle}</div>
-                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                  <div style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY }}>{t.aiUploadTitle}</div>
+                  <div style={{ fontSize: fontSizes.xs, color: '#64748b', marginTop: 2 }}>
                     {t.aiUploadDesc}
                   </div>
                 </div>
@@ -430,7 +430,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                       <button key={idx}
                         onClick={() => { setPendingBtn(idx); fileRef.current?.click(); }}
                         style={{
-                          padding: '10px 18px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                          padding: '10px 18px', borderRadius: 10, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer',
                           background: idx === 0 ? NAVY : '#fff',
                           color: idx === 0 ? '#fff' : NAVY,
                           border: idx === 0 ? 'none' : `1.5px solid ${CBORDER}`,
@@ -448,7 +448,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                 {uploadStage === 'failed' && !uploadedFile && (
                   <div>
                     <Alert type="error">{uploadError || t.uploadFailedRetry}</Alert>
-                    <button onClick={resetUpload} style={{ marginTop: 10, fontSize: 13, color: NAVY, background: 'none', border: `1px solid ${CBORDER}`, borderRadius: 8, padding: '6px 14px', cursor: 'pointer' }}>{t.reselectFile}</button>
+                    <button onClick={resetUpload} style={{ marginTop: 10, fontSize: fontSizes.sm, color: NAVY, background: 'none', border: `1px solid ${CBORDER}`, borderRadius: 8, padding: '6px 14px', cursor: 'pointer' }}>{t.reselectFile}</button>
                   </div>
                 )}
 
@@ -469,8 +469,8 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                           : <Alert type="ok">{t.aiDoneNoData}</Alert>
                     }
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 12, color: '#64748b' }}>📎 {uploadedFile.origName} · {getDocTypeLabel(uploadedFile.docType, lang)}</span>
-                      <button onClick={resetUpload} style={{ fontSize: 12, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>{t.reupload}</button>
+                      <span style={{ fontSize: fontSizes.xs, color: '#64748b' }}>📎 {uploadedFile.origName} · {getDocTypeLabel(uploadedFile.docType, lang)}</span>
+                      <button onClick={resetUpload} style={{ fontSize: fontSizes.xs, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>{t.reupload}</button>
                     </div>
                   </div>
                 )}
@@ -481,7 +481,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
             {!isEdit && showLicenseEdit && (
               <div style={{ ...CARD, border: `1.5px solid ${GOLD}50`, background: '#fffdf6' }}>
                 <div style={SEC}>{t.licenseConfirmTitle}</div>
-                <div style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>
+                <div style={{ fontSize: fontSizes.xs, color: '#64748b', marginBottom: 16 }}>
                   {t.licenseConfirmDesc}
                 </div>
 
@@ -521,7 +521,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                     onChange={e => setL('business_activities', e.target.value)} />
                 </FLD>
 
-                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 12, lineHeight: 1.6 }}>
+                <div style={{ fontSize: fontSizes.xs, color: '#94a3b8', marginTop: 12, lineHeight: 1.6 }}>
                   {t.writeRuleNote}
                 </div>
               </div>
@@ -531,7 +531,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
             {!isEdit && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ flex: 1, height: 1, background: CBORDER }} />
-                <span style={{ fontSize: 12, color: '#94a3b8', whiteSpace: 'nowrap', fontWeight: 600 }}>
+                <span style={{ fontSize: fontSizes.xs, color: '#94a3b8', whiteSpace: 'nowrap', fontWeight: 600 }}>
                   {uploadedFile ? t.dividerWithFile : t.dividerNoFile}
                 </span>
                 <div style={{ flex: 1, height: 1, background: CBORDER }} />
@@ -571,7 +571,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                   <input style={{ ...INP, ...aiInp(aiFilledKeys.has('established_year')) }} value={form.established_year} onChange={e => setF('established_year', e.target.value)} placeholder="2010" />
                 </FLD>
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#334155', fontWeight: 600 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: fontSizes.sm, color: '#334155', fontWeight: 600 }}>
                 <input type="checkbox" checked={form.is_preferred} onChange={e => setF('is_preferred', e.target.checked)} style={{ width: 16, height: 16 }} />
                 {t.preferredCheckbox}
               </label>
@@ -642,20 +642,20 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                 style={{
                   flex: 1, padding: '13px 0', borderRadius: 10, border: 'none',
                   background: savingDisabled ? '#94a3b8' : NAVY,
-                  color: '#fff', fontSize: 15, fontWeight: 700,
+                  color: '#fff', fontSize: fontSizes.md, fontWeight: 700,
                   cursor: savingDisabled ? 'not-allowed' : 'pointer',
                 }}>
                 {saving ? t.saving
                   : uploadedFile ? t.saveWithFile
                   : isEdit ? t.saveEdit : t.saveNew}
               </button>
-              <button onClick={onCancel} style={{ padding: '13px 28px', borderRadius: 10, border: `1.5px solid ${CBORDER}`, background: '#fff', color: '#475569', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={onCancel} style={{ padding: '13px 28px', borderRadius: 10, border: `1.5px solid ${CBORDER}`, background: '#fff', color: '#475569', fontSize: fontSizes.md, fontWeight: 600, cursor: 'pointer' }}>
                 {t.cancel}
               </button>
             </div>
 
             {aiFilledKeys.size > 0 && (
-              <div style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center' }}>
+              <div style={{ fontSize: fontSizes.xs, color: '#94a3b8', textAlign: 'center' }}>
                 {t.aiHighlightNote}
               </div>
             )}
@@ -667,7 +667,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
               <div style={SEC}>{t.completenessTitle}</div>
 
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: fontSizes.sm }}>
                   <span style={{ color: '#334155', fontWeight: 600 }}>{t.overallProgress}</span>
                   <span style={{ color: NAVY, fontWeight: 700 }}>{pct}%</span>
                 </div>
@@ -678,8 +678,8 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {checks.map(({ label, done }) => (
-                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                    <span style={{ color: done ? '#16a34a' : '#cbd5e1', fontSize: 15, flexShrink: 0 }}>{done ? '✓' : '○'}</span>
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: fontSizes.sm }}>
+                    <span style={{ color: done ? '#16a34a' : '#cbd5e1', fontSize: fontSizes.lg, flexShrink: 0 }}>{done ? '✓' : '○'}</span>
                     <span style={{ color: done ? '#334155' : '#94a3b8' }}>{label}</span>
                   </div>
                 ))}
@@ -688,7 +688,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
               {/* License detail preview */}
               {showLicenseEdit && (
                 <div style={{ borderTop: `1px solid ${CBORDER}`, paddingTop: 16 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+                  <div style={{ fontSize: fontSizes.xs, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
                     {t.licensePreviewTitle}
                   </div>
                   {([
@@ -700,18 +700,18 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                     [t.expires, licenseFields.expire_date],
                     [t.vat, licenseFields.vat_number],
                   ] as [string, string][]).filter(([, v]) => v).map(([l, v]) => (
-                    <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 5 }}>
+                    <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: fontSizes.xs, marginBottom: 5 }}>
                       <span style={{ color: '#94a3b8' }}>{l}</span>
                       <span style={{ color: '#334155', fontWeight: 600, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span>
                     </div>
                   ))}
-                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 8 }}>{t.savedToNote}</div>
+                  <div style={{ fontSize: fontSizes.xs, color: '#94a3b8', marginTop: 8 }}>{t.savedToNote}</div>
                 </div>
               )}
 
               {!uploadedFile && !isEdit && (
                 <div style={{ borderTop: `1px solid ${CBORDER}`, paddingTop: 14 }}>
-                  <div style={{ background: `${GOLD}15`, borderRadius: 10, padding: '12px 14px', fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
+                  <div style={{ background: `${GOLD}15`, borderRadius: 10, padding: '12px 14px', fontSize: fontSizes.xs, color: '#92400e', lineHeight: 1.6 }}>
                     {t.noFileTip}
                   </div>
                 </div>
@@ -719,9 +719,9 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
 
               {uploadedFile && (
                 <div style={{ borderTop: `1px solid ${CBORDER}`, paddingTop: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 8 }}>{t.afterSaveOrderTitle}</div>
+                  <div style={{ fontSize: fontSizes.xs, fontWeight: 700, color: '#64748b', marginBottom: 8 }}>{t.afterSaveOrderTitle}</div>
                   {t.afterSaveSteps.map((s, i) => (
-                    <div key={i} style={{ fontSize: 11, color: '#334155', marginBottom: 4 }}>{s}</div>
+                    <div key={i} style={{ fontSize: fontSizes.xs, color: '#334155', marginBottom: 4 }}>{s}</div>
                   ))}
                 </div>
               )}
@@ -750,9 +750,9 @@ function aiInp(isAi: boolean): React.CSSProperties {
 function Spinner({ label, sub, icon = '⬆' }: { label: string; sub: string; icon?: string }) {
   return (
     <div style={{ padding: '20px 0', textAlign: 'center' }}>
-      <div style={{ fontSize: 24, marginBottom: 8 }}>{icon}</div>
-      <div style={{ fontSize: 14, fontWeight: 700, color: NAVY, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 12, color: '#64748b' }}>{sub}</div>
+      <div style={{ fontSize: fontSizes.xxl, marginBottom: 8 }}>{icon}</div>
+      <div style={{ fontSize: fontSizes.md, fontWeight: 700, color: NAVY, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: fontSizes.xs, color: '#64748b' }}>{sub}</div>
     </div>
   );
 }
@@ -761,7 +761,7 @@ function Alert({ type, children, style: extra }: { type: 'ok' | 'warn' | 'error'
   const map = { ok: ['#f0fdf4', '#bbf7d0', '#166534'], warn: ['#fef3c7', '#fde68a', '#92400e'], error: ['#fee2e2', '#fca5a5', '#991b1b'] };
   const [bg, border, color] = map[type];
   return (
-    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: '10px 14px', fontSize: 13, color, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', ...extra }}>
+    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: '10px 14px', fontSize: fontSizes.sm, color, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', ...extra }}>
       {children}
     </div>
   );
@@ -771,7 +771,7 @@ function ConfBadge({ v }: { v: string }) {
   const { dict } = useI18n();
   const isHigh = v === 'high';
   return (
-    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, fontWeight: 700,
+    <span style={{ fontSize: fontSizes.xs, padding: '2px 8px', borderRadius: 999, fontWeight: 700,
       background: isHigh ? '#dcfce7' : '#fef9ec', color: isHigh ? '#166534' : '#92400e' }}>
       {dict.suppliers.form.confidence(v)}
     </span>

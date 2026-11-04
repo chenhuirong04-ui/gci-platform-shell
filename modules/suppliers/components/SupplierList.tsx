@@ -5,7 +5,7 @@ import {
   listSuppliersPage, searchSuppliersPage, listFilterOptions, countLegacySuppliers,
   type PagedSuppliers,
 } from '../lib/suppliersCloud';
-import { workspace } from '@gci/design-system';
+import { workspace, fontSizes, fonts } from '@gci/design-system';
 import { getCountryLabel, getCategoryLabel, getStatusLabel, getSupplierTypeLabel } from '../lib/labelMaps';
 
 const GOLD = '#C9A84C';
@@ -136,7 +136,7 @@ export default function SupplierList({ onSelect, onNew, onCleanup, initialFilter
           value={searchQ}
           onChange={e => handleSearch(e.target.value)}
           placeholder={t.searchPlaceholder}
-          style={{ flex: 1, minWidth: 200, padding: '9px 14px', borderRadius: 10, border: `1.5px solid #b0bec5`, fontSize: 14, color: NAVY, outline: 'none', background: '#fff' }}
+          style={{ flex: 1, minWidth: 200, padding: '9px 14px', borderRadius: 10, border: `1.5px solid #b0bec5`, fontSize: fontSizes.md, color: NAVY, outline: 'none', background: '#fff' }}
         />
         <Sel value={filters.supplier_type} onChange={v => filt('supplier_type', v)} placeholder={t.allTypes}>
           {SUPPLIER_TYPES.map(ty => <option key={ty} value={ty}>{getSupplierTypeLabel(ty, lang)}</option>)}
@@ -158,28 +158,28 @@ export default function SupplierList({ onSelect, onNew, onCleanup, initialFilter
         </Sel>
         <button
           onClick={onCleanup}
-          style={{ padding: '9px 16px', borderRadius: 10, background: '#fff', color: NAVY, border: `1.5px solid ${GOLD}`, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          style={{ padding: '9px 16px', borderRadius: 10, background: '#fff', color: NAVY, border: `1.5px solid ${GOLD}`, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
           {t.dashboard}
         </button>
         {view === 'current' ? (
           <button
             onClick={() => switchView('legacy')}
-            style={{ padding: '9px 16px', borderRadius: 10, background: workspace.surfaceSubtle, color: '#64748b', border: `1.5px solid ${CARD_BORDER}`, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            style={{ padding: '9px 16px', borderRadius: 10, background: workspace.surfaceSubtle, color: '#64748b', border: `1.5px solid ${CARD_BORDER}`, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             📁 {t.legacyDatabase(legacyCount ?? 0)}
           </button>
         ) : (
           <button
             onClick={() => switchView('current')}
-            style={{ padding: '9px 16px', borderRadius: 10, background: '#fff', color: NAVY, border: `1.5px solid ${GOLD}`, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            style={{ padding: '9px 16px', borderRadius: 10, background: '#fff', color: NAVY, border: `1.5px solid ${GOLD}`, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             {t.backToCurrent}
           </button>
         )}
         <button
           onClick={onNew}
-          style={{ padding: '9px 20px', borderRadius: 10, background: NAVY, color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          style={{ padding: '9px 20px', borderRadius: 10, background: NAVY, color: '#fff', border: 'none', fontSize: fontSizes.md, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
           {t.addSupplier}
         </button>
@@ -187,13 +187,13 @@ export default function SupplierList({ onSelect, onNew, onCleanup, initialFilter
 
       {/* Legacy mode banner */}
       {view === 'legacy' && (
-        <div style={{ padding: '8px 24px', background: '#FEF3C7', borderBottom: '1px solid #FDE68A', fontSize: 12, fontWeight: 700, color: '#92400E' }}>
+        <div style={{ padding: '8px 24px', background: '#FEF3C7', borderBottom: '1px solid #FDE68A', fontSize: fontSizes.xs, fontWeight: 700, color: '#92400E' }}>
           📁 {t.legacyBadge}
         </div>
       )}
 
       {/* Count info */}
-      <div style={{ padding: '12px 24px', fontSize: 12, color: '#94a3b8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 16 }}>
+      <div style={{ padding: '12px 24px', fontSize: fontSizes.xs, color: '#94a3b8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 16 }}>
         {loading ? dict.suppliers.common.loading : (
           <>
             <span>{t.totalLabel(total)}</span>
@@ -209,12 +209,12 @@ export default function SupplierList({ onSelect, onNew, onCleanup, initialFilter
       {/* Table card */}
       <div style={{ flex: 1, padding: '0 24px 8px' }}>
         {!loading && items.length === 0 ? (
-          <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${CARD_BORDER}`, textAlign: 'center', padding: '80px 0', color: '#94a3b8', fontSize: 14 }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>🏭</div>
+          <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${CARD_BORDER}`, textAlign: 'center', padding: '80px 0', color: '#94a3b8', fontSize: fontSizes.md }}>
+            <div style={{ fontSize: fontSizes.display, marginBottom: 12 }}>🏭</div>
             {view === 'current' && !searchQ && total === 0 ? (
               <div>
                 {t.noCurrentSuppliers(legacyCount ?? 0).map((line: string, i: number) => (
-                  <div key={i} style={{ marginTop: i > 0 ? 6 : 0, fontSize: i === 0 ? 15 : 13, fontWeight: i === 0 ? 700 : 400, color: i === 0 ? '#475569' : '#94a3b8' }}>
+                  <div key={i} style={{ marginTop: i > 0 ? 6 : 0, fontSize: i === 0 ? fontSizes.lg : fontSizes.sm, fontWeight: i === 0 ? 700 : 400, color: i === 0 ? '#475569' : '#94a3b8' }}>
                     {line}
                   </div>
                 ))}
@@ -224,7 +224,7 @@ export default function SupplierList({ onSelect, onNew, onCleanup, initialFilter
                 <div>{t.foundInLegacyHint(searchQ)}</div>
                 <button
                   onClick={() => switchView('legacy')}
-                  style={{ marginTop: 14, padding: '9px 18px', borderRadius: 10, background: NAVY, color: '#fff', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                  style={{ marginTop: 14, padding: '9px 18px', borderRadius: 10, background: NAVY, color: '#fff', border: 'none', fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
                 >
                   {t.viewInLegacyDatabase}
                 </button>
@@ -234,11 +234,11 @@ export default function SupplierList({ onSelect, onNew, onCleanup, initialFilter
         ) : (
           <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${CARD_BORDER}`, overflow: 'hidden', boxShadow: '0 1px 4px rgba(12,27,58,0.06)' }}>
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fontSizes.sm }}>
                 <thead>
                   <tr style={{ background: workspace.surfaceSubtle }}>
                     {[t.colName, t.colCode, t.colType, t.colCountry, t.colRating, t.colStatus, t.colUsed, ''].map(h => (
-                      <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap' }}>{h}</th>
+                      <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: fontSizes.xs, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -256,27 +256,27 @@ export default function SupplierList({ onSelect, onNew, onCleanup, initialFilter
                         <td style={{ padding: '13px 14px', fontWeight: 700, color: NAVY, maxWidth: 220 }}>
                           <div translate="no" className="notranslate" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.supplier_name_display}</div>
                           {(s.name_cn || s.name_en) && (
-                            <div translate="no" className="notranslate" style={{ fontSize: 11, color: '#94a3b8', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name_cn || s.name_en}</div>
+                            <div translate="no" className="notranslate" style={{ fontSize: fontSizes.xs, color: '#94a3b8', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name_cn || s.name_en}</div>
                           )}
                         </td>
-                        <td style={{ padding: '13px 14px', color: '#64748b', fontSize: 12 }}>{s.short_code}</td>
+                        <td style={{ padding: '13px 14px', color: '#64748b', fontSize: fontSizes.xs, fontFamily: fonts.mono }}>{s.short_code}</td>
                         <td style={{ padding: '13px 14px', color: '#475569' }}>{s.supplier_type ? getSupplierTypeLabel(s.supplier_type, lang) : dict.suppliers.common.notSet}</td>
                         <td style={{ padding: '13px 14px', color: '#475569' }}>{s.country || dict.suppliers.common.notSet}</td>
                         <td style={{ padding: '13px 14px' }}>
                           <span style={{ fontWeight: 800, color: RATING_COLOR[s.current_rating ?? 'B'] ?? '#475569' }}>{s.current_rating || dict.suppliers.common.notSet}</span>
                         </td>
                         <td style={{ padding: '13px 14px' }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: st.bg, color: st.text }}>
+                          <span style={{ fontSize: fontSizes.xs, fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: st.bg, color: st.text }}>
                             {getStatusLabel(s.status ?? 'active', lang)}
                           </span>
                         </td>
                         <td style={{ padding: '13px 14px', textAlign: 'center' }}>
-                          {s.is_preferred ? <span style={{ color: GOLD, fontSize: 16 }}>★</span> : <span style={{ color: '#e2e8f0' }}>—</span>}
+                          {s.is_preferred ? <span style={{ color: GOLD, fontSize: fontSizes.lg }}>★</span> : <span style={{ color: '#e2e8f0' }}>—</span>}
                         </td>
                         <td style={{ padding: '13px 14px' }}>
                           <button
                             onClick={e => { e.stopPropagation(); onSelect(s); }}
-                            style={{ fontSize: 12, fontWeight: 600, color: NAVY, background: 'none', border: `1px solid ${CARD_BORDER}`, borderRadius: 8, padding: '5px 12px', cursor: 'pointer' }}
+                            style={{ fontSize: fontSizes.xs, fontWeight: 600, color: NAVY, background: 'none', border: `1px solid ${CARD_BORDER}`, borderRadius: 8, padding: '5px 12px', cursor: 'pointer' }}
                           >
                             {t.viewDetails}
                           </button>
@@ -297,7 +297,7 @@ export default function SupplierList({ onSelect, onNew, onCleanup, initialFilter
           <button
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page <= 1 || loading}
-            style={{ padding: '7px 16px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: page <= 1 ? workspace.surfaceSubtle : '#fff', color: page <= 1 ? '#b0bec5' : NAVY, fontWeight: 600, fontSize: 13, cursor: page <= 1 ? 'default' : 'pointer' }}
+            style={{ padding: '7px 16px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: page <= 1 ? workspace.surfaceSubtle : '#fff', color: page <= 1 ? '#b0bec5' : NAVY, fontWeight: 600, fontSize: fontSizes.sm, cursor: page <= 1 ? 'default' : 'pointer' }}
           >
             {t.prevPage}
           </button>
@@ -305,14 +305,14 @@ export default function SupplierList({ onSelect, onNew, onCleanup, initialFilter
           {/* Page number pills — show at most 7 pages */}
           {pageNumbers(page, totalPages).map((n, i) =>
             n === '…' ? (
-              <span key={`ellipsis-${i}`} style={{ color: '#b0bec5', fontSize: 13, padding: '0 4px' }}>…</span>
+              <span key={`ellipsis-${i}`} style={{ color: '#b0bec5', fontSize: fontSizes.sm, padding: '0 4px' }}>…</span>
             ) : (
               <button
                 key={n}
                 onClick={() => setPage(Number(n))}
                 disabled={loading}
                 style={{
-                  padding: '7px 13px', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                  padding: '7px 13px', borderRadius: 8, fontWeight: 600, fontSize: fontSizes.sm, cursor: 'pointer',
                   border: n === page ? 'none' : `1px solid ${CARD_BORDER}`,
                   background: n === page ? NAVY : '#fff',
                   color: n === page ? '#fff' : NAVY,
@@ -326,21 +326,21 @@ export default function SupplierList({ onSelect, onNew, onCleanup, initialFilter
           <button
             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
             disabled={page >= totalPages || loading}
-            style={{ padding: '7px 16px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: page >= totalPages ? workspace.surfaceSubtle : '#fff', color: page >= totalPages ? '#b0bec5' : NAVY, fontWeight: 600, fontSize: 13, cursor: page >= totalPages ? 'default' : 'pointer' }}
+            style={{ padding: '7px 16px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: page >= totalPages ? workspace.surfaceSubtle : '#fff', color: page >= totalPages ? '#b0bec5' : NAVY, fontWeight: 600, fontSize: fontSizes.sm, cursor: page >= totalPages ? 'default' : 'pointer' }}
           >
             {t.nextPage}
           </button>
 
-          <span style={{ color: '#b0bec5', fontSize: 13, marginLeft: 8 }}>{t.perPage}</span>
+          <span style={{ color: '#b0bec5', fontSize: fontSizes.sm, marginLeft: 8 }}>{t.perPage}</span>
           <select
             value={pageSize}
             onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
-            style={{ padding: '7px 10px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, fontSize: 13, color: NAVY, background: '#fff', cursor: 'pointer' }}
+            style={{ padding: '7px 10px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, fontSize: fontSizes.sm, color: NAVY, background: '#fff', cursor: 'pointer' }}
           >
             {PAGE_SIZES.map(n => <option key={n} value={n}>{n}</option>)}
           </select>
 
-          <span style={{ color: '#b0bec5', fontSize: 13, marginLeft: 4 }}>
+          <span style={{ color: '#b0bec5', fontSize: fontSizes.sm, marginLeft: 4 }}>
             {t.jumpTo}
           </span>
           <input
@@ -359,9 +359,9 @@ export default function SupplierList({ onSelect, onNew, onCleanup, initialFilter
                 if (!isNaN(v)) setPage(Math.max(1, Math.min(totalPages, v)));
               }
             }}
-            style={{ width: 56, padding: '7px 8px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, fontSize: 13, color: NAVY, textAlign: 'center' }}
+            style={{ width: 56, padding: '7px 8px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, fontSize: fontSizes.sm, color: NAVY, textAlign: 'center' }}
           />
-          {lang === 'zh' && <span style={{ color: '#b0bec5', fontSize: 13 }}>页</span>}
+          {lang === 'zh' && <span style={{ color: '#b0bec5', fontSize: fontSizes.sm }}>页</span>}
         </div>
       )}
     </div>
@@ -387,7 +387,7 @@ function Sel({ value, onChange, placeholder, children }: {
     <select
       value={value}
       onChange={e => onChange(e.target.value)}
-      style={{ padding: '9px 12px', borderRadius: 10, border: '1.5px solid #b0bec5', fontSize: 13, color: value ? '#0c1b3a' : '#94a3b8', background: '#fff', outline: 'none', cursor: 'pointer' }}
+      style={{ padding: '9px 12px', borderRadius: 10, border: '1.5px solid #b0bec5', fontSize: fontSizes.sm, color: value ? '#0c1b3a' : '#94a3b8', background: '#fff', outline: 'none', cursor: 'pointer' }}
     >
       <option value="">{placeholder}</option>
       {children}

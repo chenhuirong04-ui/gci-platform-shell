@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useI18n } from '@gci/i18n';
-import { workspace } from '@gci/design-system';
+import { workspace, fontSizes } from '@gci/design-system';
 
 const GOLD = '#C9A84C';
 const NAVY = '#0c1b3a';
@@ -74,8 +74,8 @@ interface Props {
 function StatCard({ label, value, color }: { label: string; value: number; color?: string }) {
   return (
     <div style={{ background: '#fff', border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: '14px 18px', minWidth: 100 }}>
-      <div style={{ fontSize: 22, fontWeight: 800, color: color ?? NAVY }}>{value}</div>
-      <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, marginTop: 2 }}>{label}</div>
+      <div style={{ fontSize: fontSizes.xxl, fontWeight: 800, color: color ?? NAVY }}>{value}</div>
+      <div style={{ fontSize: fontSizes.xs, color: '#94a3b8', fontWeight: 600, marginTop: 2 }}>{label}</div>
     </div>
   );
 }
@@ -90,7 +90,7 @@ function StatusBadge({ status }: { status: ImportStatus }) {
   };
   const s = map[status];
   return (
-    <span style={{ background: s.bg, color: s.text, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
+    <span style={{ background: s.bg, color: s.text, fontSize: fontSizes.xs, fontWeight: 700, padding: '2px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
       {s.label}
     </span>
   );
@@ -268,13 +268,13 @@ export default function NotionImportPage({ onBack }: Props) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <button
           onClick={onBack}
-          style={{ padding: '7px 14px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, fontSize: 13, cursor: 'pointer', fontWeight: 600 }}
+          style={{ padding: '7px 14px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, fontSize: fontSizes.sm, cursor: 'pointer', fontWeight: 600 }}
         >
           ← {t.backToList}
         </button>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: NAVY }}>{t.title}</div>
-          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{t.subtitle}</div>
+          <div style={{ fontSize: fontSizes.xl, fontWeight: 800, color: NAVY }}>{t.title}</div>
+          <div style={{ fontSize: fontSizes.xs, color: '#94a3b8', marginTop: 2 }}>{t.subtitle}</div>
         </div>
       </div>
 
@@ -282,18 +282,18 @@ export default function NotionImportPage({ onBack }: Props) {
       {phase === 'idle' && (
         <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${CARD_BORDER}`, padding: '48px', textAlign: 'center' }}>
           {error && (
-            <div style={{ background: '#fee2e2', color: '#991b1b', borderRadius: 10, padding: '10px 16px', marginBottom: 20, fontSize: 13 }}>
+            <div style={{ background: '#fee2e2', color: '#991b1b', borderRadius: 10, padding: '10px 16px', marginBottom: 20, fontSize: fontSizes.sm }}>
               {error}
             </div>
           )}
-          <div style={{ fontSize: 32, marginBottom: 12 }}>📥</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: NAVY, marginBottom: 6 }}>{t.idleTitle}</div>
-          <div style={{ fontSize: 13, color: '#64748b', marginBottom: 24, maxWidth: 400, margin: '0 auto 24px' }}>
+          <div style={{ fontSize: fontSizes.display, marginBottom: 12 }}>📥</div>
+          <div style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY, marginBottom: 6 }}>{t.idleTitle}</div>
+          <div style={{ fontSize: fontSizes.sm, color: '#64748b', marginBottom: 24, maxWidth: 400, margin: '0 auto 24px' }}>
             {t.idleDesc}
           </div>
           <button
             onClick={loadPreview}
-            style={{ padding: '11px 32px', borderRadius: 10, background: NAVY, color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+            style={{ padding: '11px 32px', borderRadius: 10, background: NAVY, color: '#fff', border: 'none', fontSize: fontSizes.md, fontWeight: 700, cursor: 'pointer' }}
           >
             {t.loadBtn}
           </button>
@@ -303,7 +303,7 @@ export default function NotionImportPage({ onBack }: Props) {
       {/* Loading */}
       {phase === 'loading' && (
         <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${CARD_BORDER}`, padding: '48px', textAlign: 'center' }}>
-          <div style={{ fontSize: 13, color: '#64748b' }}>{t.loadingText}</div>
+          <div style={{ fontSize: fontSizes.sm, color: '#64748b' }}>{t.loadingText}</div>
           <div style={{ marginTop: 16, height: 4, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
             <div style={{ height: '100%', background: GOLD, width: '60%', animation: 'pulse 1.5s ease-in-out infinite' }} />
           </div>
@@ -314,7 +314,7 @@ export default function NotionImportPage({ onBack }: Props) {
       {(phase === 'preview' || phase === 'done') && stats && (
         <>
           {/* Preview section title */}
-          <div style={{ fontSize: 14, fontWeight: 800, color: NAVY, marginBottom: 10 }}>{t.previewSectionTitle}</div>
+          <div style={{ fontSize: fontSizes.md, fontWeight: 800, color: NAVY, marginBottom: 10 }}>{t.previewSectionTitle}</div>
 
           {/* Stats row */}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -337,7 +337,7 @@ export default function NotionImportPage({ onBack }: Props) {
                 style={{
                   padding: '5px 12px', borderRadius: 8, border: `1.5px solid ${filterStatus === s ? NAVY : CARD_BORDER}`,
                   background: filterStatus === s ? NAVY : '#fff', color: filterStatus === s ? '#fff' : '#475569',
-                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  fontSize: fontSizes.xs, fontWeight: 600, cursor: 'pointer',
                 }}
               >
                 {s === 'all' ? t.filterAll : s === 'new' ? t.filterNew : s === 'exists' ? t.filterExists : t.filterDuplicate}
@@ -346,7 +346,7 @@ export default function NotionImportPage({ onBack }: Props) {
             <select
               value={filterCountry}
               onChange={e => setFilterCountry(e.target.value)}
-              style={{ padding: '5px 10px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, fontSize: 12, color: NAVY }}
+              style={{ padding: '5px 10px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, fontSize: fontSizes.xs, color: NAVY }}
             >
               <option value="">{t.allCountries}</option>
               {countries.map(c => <option key={c} value={c}>{c}</option>)}
@@ -354,16 +354,16 @@ export default function NotionImportPage({ onBack }: Props) {
             <select
               value={filterCategory}
               onChange={e => setFilterCategory(e.target.value)}
-              style={{ padding: '5px 10px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, fontSize: 12, color: NAVY }}
+              style={{ padding: '5px 10px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, fontSize: fontSizes.xs, color: NAVY }}
             >
               <option value="">{t.allCategories}</option>
               {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-            <label style={{ fontSize: 12, color: '#475569', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+            <label style={{ fontSize: fontSizes.xs, color: '#475569', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
               <input type="checkbox" checked={filterPreferred} onChange={e => setFilterPreferred(e.target.checked)} />
               {t.preferredOnly}
             </label>
-            <div style={{ marginLeft: 'auto', fontSize: 12, color: '#94a3b8' }}>
+            <div style={{ marginLeft: 'auto', fontSize: fontSizes.xs, color: '#94a3b8' }}>
               {t.selectedCount(selected.size)}
             </div>
           </div>
@@ -371,11 +371,11 @@ export default function NotionImportPage({ onBack }: Props) {
           {/* Table */}
           <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${CARD_BORDER}`, overflow: 'hidden', marginBottom: 16 }}>
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fontSizes.sm }}>
                 <thead>
                   <tr style={{ background: workspace.surfaceSubtle }}>
                     <th style={{ padding: '10px 14px', textAlign: 'left', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontWeight: 700, color: '#64748b', fontSize: fontSizes.xs, textTransform: 'uppercase' }}>
                         <input
                           type="checkbox"
                           checked={selectableInView > 0 && selectedInView === selectableInView}
@@ -385,7 +385,7 @@ export default function NotionImportPage({ onBack }: Props) {
                       </label>
                     </th>
                     {[t.colName, t.colCode, t.colType, t.colLocation, t.colCategory, t.colContact, t.colCert, t.colAttachment, t.colStatus, t.colAction].map(h => (
-                      <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap' }}>
+                      <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: fontSizes.xs, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap' }}>
                         {h}
                       </th>
                     ))}
@@ -417,44 +417,44 @@ export default function NotionImportPage({ onBack }: Props) {
                         </td>
                         <td style={{ padding: '10px 12px', fontWeight: 700, color: NAVY, maxWidth: 200 }}>
                           <div>{item.name}</div>
-                          {item.isPreferred && <span style={{ fontSize: 10, color: GOLD, fontWeight: 700 }}>★ {t.preferredTag}</span>}
+                          {item.isPreferred && <span style={{ fontSize: fontSizes.xs, color: GOLD, fontWeight: 700 }}>★ {t.preferredTag}</span>}
                         </td>
-                        <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 12 }}>{item.supplierCode || '—'}</td>
-                        <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 12 }}>{item.supplierType || '—'}</td>
-                        <td style={{ padding: '10px 12px', fontSize: 12 }}>
+                        <td style={{ padding: '10px 12px', color: '#64748b', fontSize: fontSizes.xs }}>{item.supplierCode || '—'}</td>
+                        <td style={{ padding: '10px 12px', color: '#64748b', fontSize: fontSizes.xs }}>{item.supplierType || '—'}</td>
+                        <td style={{ padding: '10px 12px', fontSize: fontSizes.xs }}>
                           {item.country
                             ? <>{item.country}{item.city ? ` · ${item.city}` : ''}</>
                             : <span style={{ color: '#94a3b8' }}>{item.countryRaw || '—'}</span>
                           }
                         </td>
-                        <td style={{ padding: '10px 12px', fontSize: 11, maxWidth: 160 }}>
+                        <td style={{ padding: '10px 12px', fontSize: fontSizes.xs, maxWidth: 160 }}>
                           {item.categories.length > 0
                             ? item.categories.slice(0, 3).join(', ') + (item.categories.length > 3 ? `+${item.categories.length - 3}` : '')
                             : <span style={{ color: '#94a3b8' }}>—</span>
                           }
                         </td>
-                        <td style={{ padding: '10px 12px', fontSize: 12 }}>
+                        <td style={{ padding: '10px 12px', fontSize: fontSizes.xs }}>
                           {item.contactName || <span style={{ color: '#94a3b8' }}>—</span>}
                           {(item.whatsapp || item.wechat || item.email) && (
-                            <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>
+                            <div style={{ fontSize: fontSizes.xs, color: '#94a3b8', marginTop: 2 }}>
                               {item.whatsapp && `WA: ${item.whatsapp.slice(0, 12)}`}
                               {item.wechat && `WX: ${item.wechat.slice(0, 12)}`}
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: '10px 12px', fontSize: 11, color: '#64748b' }}>
+                        <td style={{ padding: '10px 12px', fontSize: fontSizes.xs, color: '#64748b' }}>
                           {item.certificates.length > 0 ? item.certificates.slice(0, 2).join(', ') : '—'}
                         </td>
-                        <td style={{ padding: '10px 12px', fontSize: 12, textAlign: 'center' }}>
+                        <td style={{ padding: '10px 12px', fontSize: fontSizes.xs, textAlign: 'center' }}>
                           {item.attachmentCount > 0
-                            ? <span style={{ background: '#f0f9ff', color: '#0369a1', borderRadius: 6, padding: '2px 7px', fontSize: 11, fontWeight: 700 }}>{item.attachmentCount}</span>
+                            ? <span style={{ background: '#f0f9ff', color: '#0369a1', borderRadius: 6, padding: '2px 7px', fontSize: fontSizes.xs, fontWeight: 700 }}>{item.attachmentCount}</span>
                             : <span style={{ color: '#94a3b8' }}>0</span>
                           }
                         </td>
                         <td style={{ padding: '10px 12px' }}>
                           <StatusBadge status={item.importStatus} />
                           {isDup && item.duplicateReason && (
-                            <div style={{ fontSize: 10, color: '#92400e', marginTop: 2 }}>{item.duplicateReason}</div>
+                            <div style={{ fontSize: fontSizes.xs, color: '#92400e', marginTop: 2 }}>{item.duplicateReason}</div>
                           )}
                         </td>
                         <td style={{ padding: '10px 12px', minWidth: 120 }}>
@@ -462,13 +462,13 @@ export default function NotionImportPage({ onBack }: Props) {
                             <div style={{ display: 'flex', gap: 4 }}>
                               <button
                                 onClick={() => setDupAction(item.notionPageId, 'skip')}
-                                style={{ padding: '3px 8px', borderRadius: 6, border: `1px solid ${dupAction === 'skip' ? '#dc2626' : CARD_BORDER}`, background: dupAction === 'skip' ? '#fee2e2' : '#fff', color: dupAction === 'skip' ? '#dc2626' : '#475569', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                                style={{ padding: '3px 8px', borderRadius: 6, border: `1px solid ${dupAction === 'skip' ? '#dc2626' : CARD_BORDER}`, background: dupAction === 'skip' ? '#fee2e2' : '#fff', color: dupAction === 'skip' ? '#dc2626' : '#475569', fontSize: fontSizes.xs, cursor: 'pointer', fontWeight: 600 }}
                               >
                                 {t.dupSkip}
                               </button>
                               <button
                                 onClick={() => setDupAction(item.notionPageId, 'create_new')}
-                                style={{ padding: '3px 8px', borderRadius: 6, border: `1px solid ${dupAction === 'create_new' ? GOLD : CARD_BORDER}`, background: dupAction === 'create_new' ? '#fef9ec' : '#fff', color: dupAction === 'create_new' ? '#92400e' : '#475569', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                                style={{ padding: '3px 8px', borderRadius: 6, border: `1px solid ${dupAction === 'create_new' ? GOLD : CARD_BORDER}`, background: dupAction === 'create_new' ? '#fef9ec' : '#fff', color: dupAction === 'create_new' ? '#92400e' : '#475569', fontSize: fontSizes.xs, cursor: 'pointer', fontWeight: 600 }}
                               >
                                 {t.dupCreateNew}
                               </button>
@@ -480,7 +480,7 @@ export default function NotionImportPage({ onBack }: Props) {
                   })}
                   {filteredItems.length === 0 && (
                     <tr>
-                      <td colSpan={11} style={{ padding: '40px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                      <td colSpan={11} style={{ padding: '40px', textAlign: 'center', color: '#94a3b8', fontSize: fontSizes.sm }}>
                         {t.noRecordsForFilter}
                       </td>
                     </tr>
@@ -493,20 +493,20 @@ export default function NotionImportPage({ onBack }: Props) {
           {/* Action bar */}
           {phase === 'preview' && (
             <div style={{ background: '#fff', border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ fontSize: 13, color: '#475569' }}>
+              <div style={{ fontSize: fontSizes.sm, color: '#475569' }}>
                 {t.batchInfo(selected.size, Math.ceil(selected.size / 5))}
               </div>
               <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
                 <button
                   onClick={loadPreview}
-                  style={{ padding: '9px 18px', borderRadius: 10, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                  style={{ padding: '9px 18px', borderRadius: 10, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, fontSize: fontSizes.sm, fontWeight: 600, cursor: 'pointer' }}
                 >
                   {t.reload}
                 </button>
                 <button
                   onClick={runImport}
                   disabled={selected.size === 0}
-                  style={{ padding: '9px 24px', borderRadius: 10, background: selected.size === 0 ? '#94a3b8' : NAVY, color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: selected.size === 0 ? 'not-allowed' : 'pointer' }}
+                  style={{ padding: '9px 24px', borderRadius: 10, background: selected.size === 0 ? '#94a3b8' : NAVY, color: '#fff', border: 'none', fontSize: fontSizes.md, fontWeight: 700, cursor: selected.size === 0 ? 'not-allowed' : 'pointer' }}
                 >
                   {t.importSelected(selected.size)}
                 </button>
@@ -519,20 +519,20 @@ export default function NotionImportPage({ onBack }: Props) {
       {/* Importing progress */}
       {phase === 'importing' && (
         <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${CARD_BORDER}`, padding: '32px' }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: NAVY, marginBottom: 12 }}>
+          <div style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY, marginBottom: 12 }}>
             {t.importingProgress(importProgress, importTotal)}
           </div>
           <div style={{ height: 8, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden', marginBottom: 20 }}>
             <div style={{ height: '100%', background: GOLD, width: `${importTotal > 0 ? (importProgress / importTotal) * 100 : 0}%`, transition: 'width 0.4s ease', borderRadius: 4 }} />
           </div>
-          <div style={{ fontSize: 12, color: '#64748b' }}>{t.importingNote}</div>
+          <div style={{ fontSize: fontSizes.xs, color: '#64748b' }}>{t.importingNote}</div>
         </div>
       )}
 
       {/* Done — Report */}
       {phase === 'done' && (
         <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${CARD_BORDER}`, padding: '24px', marginTop: 16 }}>
-          <div style={{ fontSize: 16, fontWeight: 800, color: NAVY, marginBottom: 16 }}>{t.reportTitle}</div>
+          <div style={{ fontSize: fontSizes.lg, fontWeight: 800, color: NAVY, marginBottom: 16 }}>{t.reportTitle}</div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
             <StatCard label={t.reportCreated} value={reportCreated} color="#166534" />
             <StatCard label={t.reportSkipped} value={reportSkipped} color="#475569" />
@@ -544,11 +544,11 @@ export default function NotionImportPage({ onBack }: Props) {
           </div>
 
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fontSizes.xs }}>
               <thead>
                 <tr style={{ background: workspace.surfaceSubtle }}>
                   {[t.reportColName, t.reportColResult, t.reportColContacts, t.reportColCerts, t.reportColDocs, t.reportColWarnings].map(h => (
-                    <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, borderBottom: `1px solid ${CARD_BORDER}` }}>{h}</th>
+                    <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: fontSizes.xs, borderBottom: `1px solid ${CARD_BORDER}` }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -558,18 +558,18 @@ export default function NotionImportPage({ onBack }: Props) {
                     <td style={{ padding: '8px 12px', fontWeight: 600, color: NAVY }}>{r.supplierName || r.notionPageId.slice(0, 8)}</td>
                     <td style={{ padding: '8px 12px' }}>
                       <span style={{
-                        fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
+                        fontSize: fontSizes.xs, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
                         background: r.result === 'created' ? '#dcfce7' : r.result === 'skipped' ? '#f1f5f9' : '#fee2e2',
                         color: r.result === 'created' ? '#166534' : r.result === 'skipped' ? '#475569' : '#991b1b',
                       }}>
                         {r.result === 'created' ? t.resultCreated : r.result === 'skipped' ? t.resultSkipped : t.resultFailed}
                       </span>
-                      {r.error && <div style={{ fontSize: 10, color: '#dc2626', marginTop: 2 }}>{r.error}</div>}
+                      {r.error && <div style={{ fontSize: fontSizes.xs, color: '#dc2626', marginTop: 2 }}>{r.error}</div>}
                     </td>
                     <td style={{ padding: '8px 12px', textAlign: 'center' }}>{r.contactsCreated || '—'}</td>
                     <td style={{ padding: '8px 12px', textAlign: 'center' }}>{r.certsCreated || '—'}</td>
                     <td style={{ padding: '8px 12px', textAlign: 'center' }}>{r.docsCreated || '—'}</td>
-                    <td style={{ padding: '8px 12px', fontSize: 11, color: '#64748b', maxWidth: 260 }}>
+                    <td style={{ padding: '8px 12px', fontSize: fontSizes.xs, color: '#64748b', maxWidth: 260 }}>
                       {r.warnings.length > 0 ? r.warnings.join(' / ') : '—'}
                     </td>
                   </tr>
@@ -581,13 +581,13 @@ export default function NotionImportPage({ onBack }: Props) {
           <div style={{ marginTop: 20, display: 'flex', gap: 10 }}>
             <button
               onClick={onBack}
-              style={{ padding: '9px 20px', borderRadius: 10, background: NAVY, color: '#fff', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+              style={{ padding: '9px 20px', borderRadius: 10, background: NAVY, color: '#fff', border: 'none', fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
             >
               {t.backToList}
             </button>
             <button
               onClick={loadPreview}
-              style={{ padding: '9px 18px', borderRadius: 10, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              style={{ padding: '9px 18px', borderRadius: 10, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, fontSize: fontSizes.sm, fontWeight: 600, cursor: 'pointer' }}
             >
               {t.reloadNotion}
             </button>

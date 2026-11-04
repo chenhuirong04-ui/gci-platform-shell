@@ -1,7 +1,7 @@
 import React from 'react';
 import { useI18n } from '@gci/i18n';
 import { getCategoryLabel } from '../lib/labelMaps';
-import { workspace } from '@gci/design-system';
+import { workspace, fontSizes } from '@gci/design-system';
 
 const NAVY = '#0c1b3a';
 const GOLD = '#C9A84C';
@@ -43,12 +43,12 @@ export default function CategoryDistributionChart({ data, selectedCategory, onSe
   return (
     <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${CARD_BORDER}`, padding: '20px 24px', boxShadow: '0 1px 4px rgba(12,27,58,0.05)' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
-        <div style={{ fontWeight: 700, fontSize: 14, color: NAVY }}>{t.chartByCategoryTitle}</div>
-        <div style={{ fontSize: 12, color: '#64748b' }}>
+        <div style={{ fontWeight: 700, fontSize: fontSizes.md, color: NAVY }}>{t.chartByCategoryTitle}</div>
+        <div style={{ fontSize: fontSizes.xs, color: '#64748b' }}>
           {t.uncategorized} <strong style={{ color: '#e53e3e' }}>{data.noCategory}</strong>
         </div>
       </div>
-      <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 14 }}>
+      <div style={{ fontSize: fontSizes.xs, color: '#94a3b8', marginBottom: 14 }}>
         {t.categoryNote}
       </div>
 
@@ -67,7 +67,7 @@ export default function CategoryDistributionChart({ data, selectedCategory, onSe
               onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
             >
               {/* Label — display only, filter key stays as DB value */}
-              <div style={{ width: 130, textAlign: 'right', fontSize: 12, fontWeight: isSelected ? 700 : 500, color: isSelected ? NAVY : '#475569', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              <div style={{ width: 130, textAlign: 'right', fontSize: fontSizes.xs, fontWeight: isSelected ? 700 : 500, color: isSelected ? NAVY : '#475569', whiteSpace: 'nowrap', flexShrink: 0 }}>
                 {bar.isUnclassified ? t.uncategorized : getCategoryLabel(bar.category, lang)}
               </div>
 
@@ -86,7 +86,7 @@ export default function CategoryDistributionChart({ data, selectedCategory, onSe
               </div>
 
               {/* Count */}
-              <div style={{ width: 36, fontSize: 12, fontWeight: 700, color: isSelected ? NAVY : '#64748b', textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ width: 36, fontSize: fontSizes.xs, fontWeight: 700, color: isSelected ? NAVY : '#64748b', textAlign: 'right', flexShrink: 0 }}>
                 {bar.count}
               </div>
             </div>
@@ -98,7 +98,7 @@ export default function CategoryDistributionChart({ data, selectedCategory, onSe
         <div style={{ marginTop: 12, textAlign: 'right' }}>
           <button
             onClick={() => onSelect(null)}
-            style={{ fontSize: 11, color: GOLD, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+            style={{ fontSize: fontSizes.xs, color: GOLD, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
           >
             {t.clearCategoryFilter}
           </button>

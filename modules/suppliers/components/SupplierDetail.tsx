@@ -10,7 +10,7 @@ import DocumentCenter from './DocumentCenter';
 import CertificationManager from './CertificationManager';
 import QuoteHistory from './QuoteHistory';
 import RatingNotes from './RatingNotes';
-import { workspace } from '@gci/design-system';
+import { workspace, fontSizes, fonts } from '@gci/design-system';
 
 // ── Design tokens (matches Business Solutions module) ─────────────────────────
 const GOLD = '#C9A84C';
@@ -60,12 +60,12 @@ export default function SupplierDetail({ supplierId, onBack, onEdit }: Props) {
 
   if (loading) return (
     <div style={{ background: PAGE_BG, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <span style={{ color: '#94a3b8', fontSize: 14 }}>{dict.suppliers.common.loading}</span>
+      <span style={{ color: '#94a3b8', fontSize: fontSizes.md }}>{dict.suppliers.common.loading}</span>
     </div>
   );
   if (!supplier) return (
     <div style={{ background: PAGE_BG, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <span style={{ color: '#dc2626', fontSize: 14 }}>{t.notFound}</span>
+      <span style={{ color: '#dc2626', fontSize: fontSizes.md }}>{t.notFound}</span>
     </div>
   );
 
@@ -76,7 +76,7 @@ export default function SupplierDetail({ supplierId, onBack, onEdit }: Props) {
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 28px 48px' }}>
 
         {/* Back */}
-        <button onClick={onBack} style={{ fontSize: 12, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 16 }}>
+        <button onClick={onBack} style={{ fontSize: fontSizes.xs, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 16 }}>
           {dict.suppliers.common.back}
         </button>
 
@@ -89,15 +89,15 @@ export default function SupplierDetail({ supplierId, onBack, onEdit }: Props) {
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
-                  <h1 translate="no" className="notranslate" style={{ fontSize: 22, fontWeight: 800, color: NAVY, margin: 0 }}>{supplier.supplier_name_display}</h1>
-                  {supplier.is_preferred && <span style={{ fontSize: 16 }} title={t.preferredTitle}>⭐</span>}
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: NAVY + '14', color: NAVY }}>{supplier.supplier_type ? getSupplierTypeLabel(supplier.supplier_type, lang) : dict.suppliers.common.notSet}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: statusStyle.bg, color: statusStyle.text }}>
+                  <h1 translate="no" className="notranslate" style={{ fontSize: fontSizes.xxl, fontWeight: 800, color: NAVY, margin: 0 }}>{supplier.supplier_name_display}</h1>
+                  {supplier.is_preferred && <span style={{ fontSize: fontSizes.lg }} title={t.preferredTitle}>⭐</span>}
+                  <span style={{ fontSize: fontSizes.xs, fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: NAVY + '14', color: NAVY }}>{supplier.supplier_type ? getSupplierTypeLabel(supplier.supplier_type, lang) : dict.suppliers.common.notSet}</span>
+                  <span style={{ fontSize: fontSizes.xs, fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: statusStyle.bg, color: statusStyle.text }}>
                     {getStatusLabel(supplier.status ?? 'active', lang)}
                   </span>
                 </div>
-                <div style={{ fontSize: 12, color: '#64748b', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  {supplier.short_code && <span>#{supplier.short_code}</span>}
+                <div style={{ fontSize: fontSizes.xs, color: '#64748b', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  {supplier.short_code && <span style={{ fontFamily: fonts.mono }}>#{supplier.short_code}</span>}
                   {supplier.country && <span>🌍 {[supplier.country, supplier.city].filter(Boolean).join(', ')}</span>}
                   {supplier.current_rating && <span style={{ fontWeight: 700, color: supplier.current_rating === 'A' ? '#16a34a' : supplier.current_rating === 'D' ? '#dc2626' : NAVY }}>{t.ratingLabel(supplier.current_rating)}</span>}
                   {supplier.internal_owner && <span>{t.ownerLabel(supplier.internal_owner)}</span>}
@@ -105,7 +105,7 @@ export default function SupplierDetail({ supplierId, onBack, onEdit }: Props) {
               </div>
               <button
                 onClick={() => onEdit(supplier)}
-                style={{ padding: '9px 20px', background: GOLD, color: NAVY, border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0 }}
+                style={{ padding: '9px 20px', background: GOLD, color: NAVY, border: 'none', borderRadius: 10, fontWeight: 700, fontSize: fontSizes.sm, cursor: 'pointer', flexShrink: 0 }}
               >
                 {t.editProfile}
               </button>
@@ -115,7 +115,7 @@ export default function SupplierDetail({ supplierId, onBack, onEdit }: Props) {
 
         {/* ── Quick actions ────────────────────────────────────────────── */}
         <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${CARD_BORDER}`, padding: '14px 20px', marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', boxShadow: '0 1px 4px rgba(12,27,58,0.04)' }}>
-          <span style={{ fontSize: 10, fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginRight: 4 }}>{t.quickActionsLabel}</span>
+          <span style={{ fontSize: fontSizes.xs, fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginRight: 4 }}>{t.quickActionsLabel}</span>
           {[
             { label: t.qaUploadLicense, tab: 'documents' as TabKey },
             { label: t.qaUploadCert, tab: 'certifications' as TabKey },
@@ -129,7 +129,7 @@ export default function SupplierDetail({ supplierId, onBack, onEdit }: Props) {
               style={{
                 padding: '7px 14px', borderRadius: 8,
                 background: workspace.surfaceSubtle, border: `1px solid ${CARD_BORDER}`,
-                fontSize: 12, fontWeight: 600, color: NAVY, cursor: 'pointer',
+                fontSize: fontSizes.xs, fontWeight: 600, color: NAVY, cursor: 'pointer',
                 transition: 'background .12s',
               }}
               onMouseEnter={e => (e.currentTarget.style.background = `${GOLD}20`)}
@@ -149,7 +149,7 @@ export default function SupplierDetail({ supplierId, onBack, onEdit }: Props) {
                 key={tb.key}
                 onClick={() => setTab(tb.key)}
                 style={{
-                  padding: '12px 18px', fontSize: 13, fontWeight: tab === tb.key ? 700 : 500,
+                  padding: '12px 18px', fontSize: fontSizes.sm, fontWeight: tab === tb.key ? 700 : 500,
                   color: tab === tb.key ? NAVY : '#475569',
                   border: 'none', borderBottom: tab === tb.key ? `2px solid ${GOLD}` : '2px solid transparent',
                   background: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
@@ -167,9 +167,9 @@ export default function SupplierDetail({ supplierId, onBack, onEdit }: Props) {
             {tab === 'contacts' && <ContactManager supplierId={supplierId} />}
             {tab === 'products' && (
               <div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 16, paddingBottom: 10, borderBottom: `1px solid ${CARD_BORDER}` }}>{t.productsLabel}</div>
+                <div style={{ fontSize: fontSizes.xs, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 16, paddingBottom: 10, borderBottom: `1px solid ${CARD_BORDER}` }}>{t.productsLabel}</div>
                 <ProductManager supplierId={supplierId} />
-                <div style={{ fontSize: 12, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '24px 0 16px', paddingBottom: 10, borderBottom: `1px solid ${CARD_BORDER}` }}>{t.servicesLabel}</div>
+                <div style={{ fontSize: fontSizes.xs, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '24px 0 16px', paddingBottom: 10, borderBottom: `1px solid ${CARD_BORDER}` }}>{t.servicesLabel}</div>
                 <ServiceManager supplierId={supplierId} />
               </div>
             )}
@@ -189,9 +189,9 @@ function OverviewTab({ supplier }: { supplier: Supplier }) {
   const { dict } = useI18n();
   const o = dict.suppliers.detail.overview;
   const notSet = dict.suppliers.common.notSet;
-  const LBL_S: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 };
+  const LBL_S: React.CSSProperties = { fontSize: fontSizes.xs, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 };
   const ROW = ({ label, value }: { label: string; value?: string | null }) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, fontSize: 13 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, fontSize: fontSizes.sm }}>
       <span style={{ color: '#64748b' }}>{label}</span>
       <span style={{ color: NAVY, fontWeight: 600, textAlign: 'right', maxWidth: '60%' }}>{value || notSet}</span>
     </div>
@@ -215,7 +215,7 @@ function OverviewTab({ supplier }: { supplier: Supplier }) {
           <ROW label={o.website} value={supplier.website} />
         </Card>
         <Card title={o.internalNotes}>
-          <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+          <div style={{ fontSize: fontSizes.sm, color: '#475569', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
             {supplier.notes || <span style={{ color: '#cbd5e1' }}>{o.noNotes}</span>}
           </div>
         </Card>
@@ -225,10 +225,10 @@ function OverviewTab({ supplier }: { supplier: Supplier }) {
           {supplier.product_categories?.length
             ? <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {supplier.product_categories.map(c => (
-                  <span key={c} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 999, background: NAVY + '12', color: NAVY, fontWeight: 600 }}>{c}</span>
+                  <span key={c} style={{ fontSize: fontSizes.xs, padding: '4px 10px', borderRadius: 999, background: NAVY + '12', color: NAVY, fontWeight: 600 }}>{c}</span>
                 ))}
               </div>
-            : <span style={{ color: '#cbd5e1', fontSize: 13 }}>{o.noCategories}</span>
+            : <span style={{ color: '#cbd5e1', fontSize: fontSizes.sm }}>{o.noCategories}</span>
           }
         </Card>
         <Card title={o.cooperation}>

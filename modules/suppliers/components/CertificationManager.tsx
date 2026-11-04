@@ -5,7 +5,7 @@ import { getCertStatusLabel } from '../lib/labelMaps';
 import {
   createCertification, deleteCertification, listCertifications, updateCertification,
 } from '../lib/certificationsCloud';
-import { workspace } from '@gci/design-system';
+import { workspace, fontSizes } from '@gci/design-system';
 import { listDocuments } from '../lib/documentsCloud';
 import CertificationUploader from './CertificationUploader';
 
@@ -13,8 +13,8 @@ const NAVY = '#0c1b3a';
 const BORDER = workspace.border;
 const T2 = '#334155';
 const T3 = '#94a3b8';
-const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #b0bec5', fontSize: 14, color: '#0F172A', background: '#fff', outline: 'none' };
-const LBL: React.CSSProperties = { display: 'block', fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 6 };
+const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #b0bec5', fontSize: fontSizes.md, color: '#0F172A', background: '#fff', outline: 'none' };
+const LBL: React.CSSProperties = { display: 'block', fontSize: fontSizes.sm, fontWeight: 600, color: '#334155', marginBottom: 6 };
 
 const STATUS_COLOR: Record<CertificationStatus, { bg: string; text: string }> = {
   available:            { bg: '#dcfce7', text: '#166534' },
@@ -86,7 +86,7 @@ export default function CertificationManager({ supplierId }: Props) {
   if (showUploader) {
     return (
       <div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: NAVY, marginBottom: 16 }}>{t.uploaderTitle}</div>
+        <div style={{ fontSize: fontSizes.md, fontWeight: 700, color: NAVY, marginBottom: 16 }}>{t.uploaderTitle}</div>
         <CertificationUploader
           supplierId={supplierId}
           onSaved={() => { setShowUploader(false); load(); }}
@@ -100,23 +100,23 @@ export default function CertificationManager({ supplierId }: Props) {
     <div>
       {/* Primary upload action */}
       <div style={{ background: '#fffbf0', border: `1.5px dashed #C9A84C`, borderRadius: 10, padding: '14px 20px', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t.quickUpload}</span>
+        <span style={{ fontSize: fontSizes.xs, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t.quickUpload}</span>
         <button
           onClick={() => setShowUploader(true)}
-          style={{ padding: '9px 18px', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+          style={{ padding: '9px 18px', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
         >
           {t.uploadBtn}
         </button>
         <button
           onClick={() => setEdit(EMPTY(supplierId))}
-          style={{ padding: '9px 18px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, fontSize: 13, fontWeight: 600, color: NAVY, cursor: 'pointer' }}
+          style={{ padding: '9px 18px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, fontSize: fontSizes.sm, fontWeight: 600, color: NAVY, cursor: 'pointer' }}
         >
           {t.manualAdd}
         </button>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ fontSize: 13, color: T2 }}>{t.count(certs.length)}</span>
+        <span style={{ fontSize: fontSizes.sm, color: T2 }}>{t.count(certs.length)}</span>
       </div>
 
       {loading ? <div style={{ color: T3, textAlign: 'center', padding: 40 }}>{c0.loading}</div>
@@ -132,26 +132,26 @@ export default function CertificationManager({ supplierId }: Props) {
               <div key={cert.id} style={{ background: '#f8fafc', border: `1px solid ${BORDER}`, borderRadius: 10, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontWeight: 700, color: NAVY, fontSize: 14 }}>{cert.certification_type}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: st.bg, color: st.text }}>
+                    <span style={{ fontWeight: 700, color: NAVY, fontSize: fontSizes.md }}>{cert.certification_type}</span>
+                    <span style={{ fontSize: fontSizes.xs, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: st.bg, color: st.text }}>
                       {getCertStatusLabel(cert.status ?? 'pending_verification', lang)}
                     </span>
                   </div>
-                  <div style={{ fontSize: 12, color: T2 }}>
+                  <div style={{ fontSize: fontSizes.xs, color: T2 }}>
                     {[cert.issuing_body, cert.market_scope && t.applicableTo(cert.market_scope)].filter(Boolean).join(' · ')}
                   </div>
-                  <div style={{ fontSize: 11, color: T3, marginTop: 3, display: 'flex', gap: 10 }}>
+                  <div style={{ fontSize: fontSizes.xs, color: T3, marginTop: 3, display: 'flex', gap: 10 }}>
                     {cert.certification_number && <span>{t.certNumber(cert.certification_number)}</span>}
                     {cert.expire_date && <span style={{ color: expColor || T3, fontWeight: expColor ? 700 : undefined }}>{t.expireDate(cert.expire_date)}{expColor && ' ⚠'}</span>}
                     {cert.id && docCountMap[cert.id] ? <span>{t.fileCount(docCountMap[cert.id])}</span> : null}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button onClick={() => setEdit({ ...cert })} style={{ fontSize: 12, color: NAVY, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.edit}</button>
+                  <button onClick={() => setEdit({ ...cert })} style={{ fontSize: fontSizes.xs, color: NAVY, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.edit}</button>
                   {deleteId === cert.id
-                    ? <><button onClick={async () => { await deleteCertification(cert.id!); setDeleteId(null); load(); }} style={{ fontSize: 12, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.confirm}</button>
-                        <button onClick={() => setDeleteId(null)} style={{ fontSize: 12, color: T2, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.cancel}</button></>
-                    : <button onClick={() => setDeleteId(cert.id!)} style={{ fontSize: 12, color: '#dc2626', background: 'none', border: `1px solid #fca5a5`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.delete}</button>
+                    ? <><button onClick={async () => { await deleteCertification(cert.id!); setDeleteId(null); load(); }} style={{ fontSize: fontSizes.xs, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.confirm}</button>
+                        <button onClick={() => setDeleteId(null)} style={{ fontSize: fontSizes.xs, color: T2, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.cancel}</button></>
+                    : <button onClick={() => setDeleteId(cert.id!)} style={{ fontSize: fontSizes.xs, color: '#dc2626', background: 'none', border: `1px solid #fca5a5`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.delete}</button>
                   }
                 </div>
               </div>
@@ -163,7 +163,7 @@ export default function CertificationManager({ supplierId }: Props) {
       {edit && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => { if (e.target === e.currentTarget) setEdit(null); }}>
           <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 540, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: NAVY }}>{edit.id ? t.modalEdit : t.modalNew}</div>
+            <div style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY }}>{edit.id ? t.modalEdit : t.modalNew}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <F label={t.fType}>
                 <select style={INP} value={edit.certification_type ?? ''} onChange={e => setEdit(v => ({ ...v!, certification_type: e.target.value }))}>

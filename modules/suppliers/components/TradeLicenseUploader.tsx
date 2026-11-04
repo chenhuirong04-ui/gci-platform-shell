@@ -10,6 +10,7 @@ import { useI18n } from '@gci/i18n';
 import type { Supplier } from '../types';
 import { uploadSupplierFile, createDocument } from '../lib/documentsCloud';
 import { updateSupplier } from '../lib/suppliersCloud';
+import { fontSizes } from '@gci/design-system';
 
 const NAVY = '#0B1F44';
 const GOLD = '#C9A84C';
@@ -19,10 +20,10 @@ const T3 = '#6b7280';
 const INP: React.CSSProperties = {
   display: 'block', width: '100%', boxSizing: 'border-box',
   padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${BORDER}`,
-  fontSize: 13, color: NAVY, background: '#fff', outline: 'none',
+  fontSize: fontSizes.sm, color: NAVY, background: '#fff', outline: 'none',
 };
 const LBL: React.CSSProperties = {
-  display: 'block', fontSize: 11, fontWeight: 700, color: T2,
+  display: 'block', fontSize: fontSizes.xs, fontWeight: 700, color: T2,
   marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em',
 };
 
@@ -167,11 +168,11 @@ export default function TradeLicenseUploader({ supplier, onSaved, onCancel }: Pr
             transition: 'background .15s',
           }}
         >
-          <div style={{ fontSize: 32, marginBottom: 10 }}>📄</div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: NAVY, marginBottom: 6 }}>
+          <div style={{ fontSize: fontSizes.display, marginBottom: 10 }}>📄</div>
+          <div style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY, marginBottom: 6 }}>
             {t.dropTitle}
           </div>
-          <div style={{ fontSize: 12, color: T3 }}>
+          <div style={{ fontSize: fontSizes.xs, color: T3 }}>
             {u.dropSupport}
           </div>
           <input
@@ -183,7 +184,7 @@ export default function TradeLicenseUploader({ supplier, onSaved, onCancel }: Pr
           />
         </div>
         <div style={{ marginTop: 16, textAlign: 'right' }}>
-          <button onClick={onCancel} style={{ fontSize: 13, color: T3, background: 'none', border: 'none', cursor: 'pointer' }}>{c0.cancel}</button>
+          <button onClick={onCancel} style={{ fontSize: fontSizes.sm, color: T3, background: 'none', border: 'none', cursor: 'pointer' }}>{c0.cancel}</button>
         </div>
       </div>
     );
@@ -194,8 +195,8 @@ export default function TradeLicenseUploader({ supplier, onSaved, onCancel }: Pr
     return (
       <div style={{ padding: '60px 0', textAlign: 'center' }}>
         <div style={{ fontSize: 28, marginBottom: 16, animation: 'spin 1s linear infinite' }}>⟳</div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: NAVY, marginBottom: 6 }}>{u.parsingTitle}</div>
-        <div style={{ fontSize: 12, color: T3 }}>{t.parsingSub}</div>
+        <div style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY, marginBottom: 6 }}>{u.parsingTitle}</div>
+        <div style={{ fontSize: fontSizes.xs, color: T3 }}>{t.parsingSub}</div>
       </div>
     );
   }
@@ -205,7 +206,7 @@ export default function TradeLicenseUploader({ supplier, onSaved, onCancel }: Pr
     return (
       <div style={{ padding: '60px 0', textAlign: 'center' }}>
         <div style={{ fontSize: 28, marginBottom: 16 }}>⬆</div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: NAVY }}>{u.savingTitle}</div>
+        <div style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY }}>{u.savingTitle}</div>
       </div>
     );
   }
@@ -214,8 +215,8 @@ export default function TradeLicenseUploader({ supplier, onSaved, onCancel }: Pr
   if (stage === 'done') {
     return (
       <div style={{ padding: '60px 0', textAlign: 'center' }}>
-        <div style={{ fontSize: 32, marginBottom: 12, color: '#16a34a' }}>✓</div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: NAVY }}>{t.done}</div>
+        <div style={{ fontSize: fontSizes.display, marginBottom: 12, color: '#16a34a' }}>✓</div>
+        <div style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY }}>{t.done}</div>
       </div>
     );
   }
@@ -228,14 +229,14 @@ export default function TradeLicenseUploader({ supplier, onSaved, onCancel }: Pr
     <div>
       {/* Parse status banner */}
       {parseError ? (
-        <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#92400e' }}>
+        <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: fontSizes.sm, color: '#92400e' }}>
           {u.parseErrorBanner(parseError)}
         </div>
       ) : (
-        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#166534', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: fontSizes.sm, color: '#166534', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>{u.parseOkBanner(parseModel)}</span>
           {confidence && (
-            <span style={{ fontWeight: 700, fontSize: 12, padding: '2px 8px', borderRadius: 999,
+            <span style={{ fontWeight: 700, fontSize: fontSizes.xs, padding: '2px 8px', borderRadius: 999,
               background: confidence === 'high' ? '#dcfce7' : confidence === 'medium' ? '#fef9ec' : '#fee2e2',
               color: confidence === 'high' ? '#166534' : confidence === 'medium' ? '#92400e' : '#991b1b',
             }}>{u.confidenceLabel(confidence)}</span>
@@ -243,7 +244,7 @@ export default function TradeLicenseUploader({ supplier, onSaved, onCancel }: Pr
         </div>
       )}
 
-      <div style={{ fontSize: 12, color: T3, marginBottom: 12 }}>{u.fileLabel(file?.name ?? '')}</div>
+      <div style={{ fontSize: fontSizes.xs, color: T3, marginBottom: 12 }}>{u.fileLabel(file?.name ?? '')}</div>
 
       {/* Editable fields */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
@@ -298,7 +299,7 @@ export default function TradeLicenseUploader({ supplier, onSaved, onCancel }: Pr
       </div>
 
       {saveError && (
-        <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', marginTop: 12, fontSize: 13, color: '#991b1b' }}>
+        <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', marginTop: 12, fontSize: fontSizes.sm, color: '#991b1b' }}>
           ✗ {saveError}
         </div>
       )}
@@ -306,19 +307,19 @@ export default function TradeLicenseUploader({ supplier, onSaved, onCancel }: Pr
       <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
         <button
           onClick={handleSave}
-          style={{ flex: 1, padding: '11px 0', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+          style={{ flex: 1, padding: '11px 0', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: fontSizes.md, cursor: 'pointer' }}
         >
           {u.confirmSave}
         </button>
         <button
           onClick={() => fileRef.current?.click()}
-          style={{ padding: '11px 16px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T2, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+          style={{ padding: '11px 16px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T2, fontSize: fontSizes.sm, fontWeight: 600, cursor: 'pointer' }}
         >
           {u.reupload}
         </button>
         <button
           onClick={onCancel}
-          style={{ padding: '11px 16px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T3, fontSize: 13, cursor: 'pointer' }}
+          style={{ padding: '11px 16px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T3, fontSize: fontSizes.sm, cursor: 'pointer' }}
         >
           {c0.cancel}
         </button>
@@ -330,7 +331,7 @@ export default function TradeLicenseUploader({ supplier, onSaved, onCancel }: Pr
           onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }}
         />
       </div>
-      <div style={{ marginTop: 10, fontSize: 11, color: T3 }}>
+      <div style={{ marginTop: 10, fontSize: fontSizes.xs, color: T3 }}>
         {u.aiHighlightNote}
       </div>
     </div>
