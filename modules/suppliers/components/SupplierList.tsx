@@ -5,11 +5,12 @@ import {
   listSuppliersPage, searchSuppliersPage, listFilterOptions, countLegacySuppliers,
   type PagedSuppliers,
 } from '../lib/suppliersCloud';
+import { workspace } from '@gci/design-system';
 import { getCountryLabel, getCategoryLabel, getStatusLabel, getSupplierTypeLabel } from '../lib/labelMaps';
 
 const GOLD = '#C9A84C';
 const NAVY = '#0c1b3a';
-const CARD_BORDER = '#e8e0d0';
+const CARD_BORDER = workspace.border;
 
 const RATING_COLOR: Record<string, string> = { A: '#16a34a', B: '#2563eb', C: '#d97706', D: '#dc2626' };
 const STATUS_COLOR: Record<string, { bg: string; text: string }> = {
@@ -128,7 +129,7 @@ export default function SupplierList({ onSelect, onNew, onCleanup, initialFilter
   const toItem = Math.min(page * pageSize, total);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 49px)', background: '#f5f3ef' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 49px)', background: workspace.surfacePage }}>
       {/* Toolbar */}
       <div style={{ background: '#fff', borderBottom: `1px solid ${CARD_BORDER}`, padding: '14px 24px', display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
         <input
@@ -164,7 +165,7 @@ export default function SupplierList({ onSelect, onNew, onCleanup, initialFilter
         {view === 'current' ? (
           <button
             onClick={() => switchView('legacy')}
-            style={{ padding: '9px 16px', borderRadius: 10, background: '#f5f3ef', color: '#64748b', border: `1.5px solid ${CARD_BORDER}`, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            style={{ padding: '9px 16px', borderRadius: 10, background: workspace.surfaceSubtle, color: '#64748b', border: `1.5px solid ${CARD_BORDER}`, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             📁 {t.legacyDatabase(legacyCount ?? 0)}
           </button>
@@ -235,7 +236,7 @@ export default function SupplierList({ onSelect, onNew, onCleanup, initialFilter
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
-                  <tr style={{ background: '#f5f3ef' }}>
+                  <tr style={{ background: workspace.surfaceSubtle }}>
                     {[t.colName, t.colCode, t.colType, t.colCountry, t.colRating, t.colStatus, t.colUsed, ''].map(h => (
                       <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
@@ -296,7 +297,7 @@ export default function SupplierList({ onSelect, onNew, onCleanup, initialFilter
           <button
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page <= 1 || loading}
-            style={{ padding: '7px 16px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: page <= 1 ? '#f5f3ef' : '#fff', color: page <= 1 ? '#b0bec5' : NAVY, fontWeight: 600, fontSize: 13, cursor: page <= 1 ? 'default' : 'pointer' }}
+            style={{ padding: '7px 16px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: page <= 1 ? workspace.surfaceSubtle : '#fff', color: page <= 1 ? '#b0bec5' : NAVY, fontWeight: 600, fontSize: 13, cursor: page <= 1 ? 'default' : 'pointer' }}
           >
             {t.prevPage}
           </button>
@@ -325,7 +326,7 @@ export default function SupplierList({ onSelect, onNew, onCleanup, initialFilter
           <button
             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
             disabled={page >= totalPages || loading}
-            style={{ padding: '7px 16px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: page >= totalPages ? '#f5f3ef' : '#fff', color: page >= totalPages ? '#b0bec5' : NAVY, fontWeight: 600, fontSize: 13, cursor: page >= totalPages ? 'default' : 'pointer' }}
+            style={{ padding: '7px 16px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: page >= totalPages ? workspace.surfaceSubtle : '#fff', color: page >= totalPages ? '#b0bec5' : NAVY, fontWeight: 600, fontSize: 13, cursor: page >= totalPages ? 'default' : 'pointer' }}
           >
             {t.nextPage}
           </button>

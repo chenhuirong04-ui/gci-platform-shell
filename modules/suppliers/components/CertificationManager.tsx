@@ -5,11 +5,12 @@ import { getCertStatusLabel } from '../lib/labelMaps';
 import {
   createCertification, deleteCertification, listCertifications, updateCertification,
 } from '../lib/certificationsCloud';
+import { workspace } from '@gci/design-system';
 import { listDocuments } from '../lib/documentsCloud';
 import CertificationUploader from './CertificationUploader';
 
 const NAVY = '#0c1b3a';
-const BORDER = '#e8e0d0';
+const BORDER = workspace.border;
 const T2 = '#334155';
 const T3 = '#94a3b8';
 const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #b0bec5', fontSize: 14, color: '#0F172A', background: '#fff', outline: 'none' };

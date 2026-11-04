@@ -7,6 +7,7 @@ import SupplierForm from './components/SupplierForm';
 import SupplierDetail from './components/SupplierDetail';
 import NotionImportPage from './components/NotionImportPage';
 import SupplierCleanupPage from './components/SupplierCleanupPage';
+import { workspace } from '@gci/design-system';
 
 const GOLD = '#C9A84C';
 const NAVY = '#0c1b3a';
@@ -49,10 +50,10 @@ export default function SuppliersModule() {
   }, []);
 
   return (
-    <div translate="no" className="notranslate" style={{ minHeight: '100vh', background: '#f5f3ef' }}>
+    <div translate="no" className="notranslate" style={{ minHeight: '100vh', background: workspace.surfacePage }}>
 
       {/* ── Top secondary navigation ─────────────────────────────────── */}
-      <div style={{ background: '#fff', borderBottom: '1px solid #e8e0d0', display: 'flex', alignItems: 'center', paddingLeft: 16, overflowX: 'auto' }}>
+      <div style={{ background: '#fff', borderBottom: `1px solid ${workspace.border}`, display: 'flex', alignItems: 'center', paddingLeft: 16, overflowX: 'auto' }}>
         {TOP_TABS.map(({ key, label }) => (
           <button
             key={key}
