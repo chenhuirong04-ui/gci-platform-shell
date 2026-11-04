@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { useI18n } from '@gci/i18n';
 import type { Supplier, SupplierRating } from '../types';
 import { updateSupplier } from '../lib/suppliersCloud';
-import { fontSizes } from '@gci/design-system';
+import { workspace, fontSizes } from '@gci/design-system';
 
-const NAVY = '#0B1F44';
-const GOLD = '#C9A84C';
+const NAVY = workspace.textPrimary;
+const GOLD = workspace.accent;
 const BORDER = '#e2e8f0';
 const T2 = '#374151';
 const T3 = '#6b7280';
@@ -59,7 +59,7 @@ export default function RatingNotes({ supplier, onUpdated }: Props) {
             style={{
               flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 800, fontSize: fontSizes.lg, cursor: 'pointer',
               border: rating === r ? `2px solid ${GOLD}` : `1.5px solid ${BORDER}`,
-              background: rating === r ? NAVY : '#fff',
+              background: rating === r ? workspace.actionPrimaryBg : '#fff',
               color: rating === r ? GOLD : T2,
             }}
           >
@@ -93,7 +93,7 @@ export default function RatingNotes({ supplier, onUpdated }: Props) {
       <button
         onClick={handleSave}
         disabled={saving}
-        style={{ padding: '10px 32px', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: fontSizes.md, cursor: 'pointer' }}
+        style={{ padding: '10px 32px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: fontSizes.md, cursor: 'pointer' }}
       >
         {saving ? dict.suppliers.common.saving : saved ? dict.suppliers.common.saved : t.save}
       </button>

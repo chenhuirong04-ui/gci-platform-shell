@@ -10,10 +10,10 @@ import { useI18n } from '@gci/i18n';
 import type { Supplier } from '../types';
 import { uploadSupplierFile, createDocument } from '../lib/documentsCloud';
 import { updateSupplier } from '../lib/suppliersCloud';
-import { fontSizes } from '@gci/design-system';
+import { workspace, fontSizes } from '@gci/design-system';
 
-const NAVY = '#0B1F44';
-const GOLD = '#C9A84C';
+const NAVY = workspace.textPrimary;
+const GOLD = workspace.accent;
 const BORDER = '#CBD5E1';
 const T2 = '#374151';
 const T3 = '#6b7280';
@@ -307,7 +307,7 @@ export default function TradeLicenseUploader({ supplier, onSaved, onCancel }: Pr
       <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
         <button
           onClick={handleSave}
-          style={{ flex: 1, padding: '11px 0', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: fontSizes.md, cursor: 'pointer' }}
+          style={{ flex: 1, padding: '11px 0', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: fontSizes.md, cursor: 'pointer' }}
         >
           {u.confirmSave}
         </button>

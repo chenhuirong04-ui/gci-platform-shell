@@ -5,8 +5,10 @@ import CategoryDistributionChart from './CategoryDistributionChart';
 import { getCountryLabel, getCategoryLabel } from '../lib/labelMaps';
 import { workspace, fontSizes, fonts } from '@gci/design-system';
 
-const GOLD = '#C9A84C';
-const NAVY = '#0c1b3a';
+// Progress bars and decorative gradients keep the original gold.
+const CHART_GOLD = '#C9A84C';
+const GOLD = workspace.accent;
+const NAVY = workspace.textPrimary;
 const CARD_BORDER = workspace.border;
 
 const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3000' : '';
@@ -318,7 +320,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
     return (
       <div style={{ padding: '80px 32px', textAlign: 'center' }}>
         <div style={{ color: '#dc2626', fontWeight: 700, marginBottom: 12 }}>{t.loadFailed(error)}</div>
-        <button onClick={load} style={{ padding: '8px 20px', borderRadius: 8, background: NAVY, color: '#fff', border: 'none', cursor: 'pointer' }}>{t.retry}</button>
+        <button onClick={load} style={{ padding: '8px 20px', borderRadius: 8, background: workspace.actionPrimaryBg, color: '#fff', border: 'none', cursor: 'pointer' }}>{t.retry}</button>
       </div>
     );
   }
@@ -457,7 +459,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                           <td style={{ padding: '11px 14px', color: '#475569' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                               <div style={{ width: 48, height: 5, background: '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
-                                <div style={{ width: `${row.percentage}%`, height: '100%', background: GOLD, borderRadius: 3 }} />
+                                <div style={{ width: `${row.percentage}%`, height: '100%', background: CHART_GOLD, borderRadius: 3 }} />
                               </div>
                               <span>{row.percentage}%</span>
                             </div>
@@ -612,8 +614,8 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                       onClick={() => toggleFlag(chip.key)}
                       style={{
                         fontSize: fontSizes.xs, padding: '5px 12px', borderRadius: 20,
-                        border: `1.5px solid ${active ? NAVY : CARD_BORDER}`,
-                        background: active ? NAVY : '#fff',
+                        border: `1.5px solid ${active ? workspace.actionPrimaryBg : CARD_BORDER}`,
+                        background: active ? workspace.actionPrimaryBg : '#fff',
                         color: active ? '#fff' : '#475569',
                         cursor: 'pointer', fontWeight: active ? 700 : 500,
                         transition: 'all .15s',

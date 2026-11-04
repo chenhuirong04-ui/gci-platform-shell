@@ -8,8 +8,8 @@ import {
 import { workspace, fontSizes, fonts } from '@gci/design-system';
 import { getCountryLabel, getCategoryLabel, getStatusLabel, getSupplierTypeLabel } from '../lib/labelMaps';
 
-const GOLD = '#C9A84C';
-const NAVY = '#0c1b3a';
+const GOLD = workspace.accent;
+const NAVY = workspace.textPrimary;
 const CARD_BORDER = workspace.border;
 
 const RATING_COLOR: Record<string, string> = { A: '#16a34a', B: '#2563eb', C: '#d97706', D: '#dc2626' };
@@ -179,7 +179,7 @@ export default function SupplierList({ onSelect, onNew, onCleanup, initialFilter
         )}
         <button
           onClick={onNew}
-          style={{ padding: '9px 20px', borderRadius: 10, background: NAVY, color: '#fff', border: 'none', fontSize: fontSizes.md, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          style={{ padding: '9px 20px', borderRadius: 10, background: workspace.actionPrimaryBg, color: '#fff', border: 'none', fontSize: fontSizes.md, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
           {t.addSupplier}
         </button>
@@ -224,7 +224,7 @@ export default function SupplierList({ onSelect, onNew, onCleanup, initialFilter
                 <div>{t.foundInLegacyHint(searchQ)}</div>
                 <button
                   onClick={() => switchView('legacy')}
-                  style={{ marginTop: 14, padding: '9px 18px', borderRadius: 10, background: NAVY, color: '#fff', border: 'none', fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
+                  style={{ marginTop: 14, padding: '9px 18px', borderRadius: 10, background: workspace.actionPrimaryBg, color: '#fff', border: 'none', fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
                 >
                   {t.viewInLegacyDatabase}
                 </button>
@@ -314,7 +314,7 @@ export default function SupplierList({ onSelect, onNew, onCleanup, initialFilter
                 style={{
                   padding: '7px 13px', borderRadius: 8, fontWeight: 600, fontSize: fontSizes.sm, cursor: 'pointer',
                   border: n === page ? 'none' : `1px solid ${CARD_BORDER}`,
-                  background: n === page ? NAVY : '#fff',
+                  background: n === page ? workspace.actionPrimaryBg : '#fff',
                   color: n === page ? '#fff' : NAVY,
                 }}
               >
@@ -387,7 +387,7 @@ function Sel({ value, onChange, placeholder, children }: {
     <select
       value={value}
       onChange={e => onChange(e.target.value)}
-      style={{ padding: '9px 12px', borderRadius: 10, border: '1.5px solid #b0bec5', fontSize: fontSizes.sm, color: value ? '#0c1b3a' : '#94a3b8', background: '#fff', outline: 'none', cursor: 'pointer' }}
+      style={{ padding: '9px 12px', borderRadius: 10, border: '1.5px solid #b0bec5', fontSize: fontSizes.sm, color: value ? workspace.textPrimary : '#94a3b8', background: '#fff', outline: 'none', cursor: 'pointer' }}
     >
       <option value="">{placeholder}</option>
       {children}

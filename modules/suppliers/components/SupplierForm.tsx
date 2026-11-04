@@ -7,8 +7,10 @@ import { getStatusLabel, getDocTypeLabel, getSupplierTypeLabel } from '../lib/la
 import { workspace, fontSizes } from '@gci/design-system';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
-const GOLD    = '#C9A84C';
-const NAVY    = '#0c1b3a';
+// Progress bars and decorative gradients keep the original gold.
+const CHART_GOLD = '#C9A84C';
+const GOLD    = workspace.accent;
+const NAVY    = workspace.textPrimary;
 const BG      = workspace.surfacePage;
 const CBORDER = workspace.border;
 
@@ -415,7 +417,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
             {/* ── AI Upload card (new only) ─────────────────────────────────── */}
             {!isEdit && (
               <div style={{ ...CARD, border: uploadedFile ? `1.5px solid ${GOLD}60` : `1.5px solid ${NAVY}25` }}>
-                <div style={{ height: 4, background: `linear-gradient(90deg, ${NAVY}, ${GOLD})`, margin: '-28px -28px 24px', borderRadius: '24px 24px 0 0' }} />
+                <div style={{ height: 4, background: `linear-gradient(90deg, ${NAVY}, ${CHART_GOLD})`, margin: '-28px -28px 24px', borderRadius: '24px 24px 0 0' }} />
                 <div style={{ marginBottom: 16 }}>
                   <div style={{ ...SEC, marginBottom: 4 }}>{t.aiSectionLabel}</div>
                   <div style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY }}>{t.aiUploadTitle}</div>
@@ -431,7 +433,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                         onClick={() => { setPendingBtn(idx); fileRef.current?.click(); }}
                         style={{
                           padding: '10px 18px', borderRadius: 10, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer',
-                          background: idx === 0 ? NAVY : '#fff',
+                          background: idx === 0 ? workspace.actionPrimaryBg : '#fff',
                           color: idx === 0 ? '#fff' : NAVY,
                           border: idx === 0 ? 'none' : `1.5px solid ${CBORDER}`,
                         }}
@@ -641,7 +643,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
               <button onClick={handleSave} disabled={savingDisabled}
                 style={{
                   flex: 1, padding: '13px 0', borderRadius: 10, border: 'none',
-                  background: savingDisabled ? '#94a3b8' : NAVY,
+                  background: savingDisabled ? '#94a3b8' : workspace.actionPrimaryBg,
                   color: '#fff', fontSize: fontSizes.md, fontWeight: 700,
                   cursor: savingDisabled ? 'not-allowed' : 'pointer',
                 }}>
@@ -672,7 +674,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                   <span style={{ color: NAVY, fontWeight: 700 }}>{pct}%</span>
                 </div>
                 <div style={{ height: 6, borderRadius: 99, background: '#e8e0d0', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', borderRadius: 99, background: pct === 100 ? '#16a34a' : GOLD, width: `${pct}%`, transition: 'width .3s' }} />
+                  <div style={{ height: '100%', borderRadius: 99, background: pct === 100 ? '#16a34a' : CHART_GOLD, width: `${pct}%`, transition: 'width .3s' }} />
                 </div>
               </div>
 

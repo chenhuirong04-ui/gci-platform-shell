@@ -13,8 +13,10 @@ import RatingNotes from './RatingNotes';
 import { workspace, fontSizes, fonts } from '@gci/design-system';
 
 // ── Design tokens (matches Business Solutions module) ─────────────────────────
-const GOLD = '#C9A84C';
-const NAVY = '#0c1b3a';
+// Progress bars and decorative gradients keep the original gold.
+const CHART_GOLD = '#C9A84C';
+const GOLD = workspace.accent;
+const NAVY = workspace.textPrimary;
 const PAGE_BG = workspace.surfacePage;
 const CARD_BORDER = workspace.border;
 
@@ -83,7 +85,7 @@ export default function SupplierDetail({ supplierId, onBack, onEdit }: Props) {
         {/* ── Header card ─────────────────────────────────────────────── */}
         <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${CARD_BORDER}`, boxShadow: '0 1px 4px rgba(12,27,58,0.06)', marginBottom: 16, overflow: 'hidden' }}>
           {/* Accent line */}
-          <div style={{ height: 4, background: `linear-gradient(90deg, ${NAVY} 0%, ${GOLD} 100%)` }} />
+          <div style={{ height: 4, background: `linear-gradient(90deg, ${NAVY} 0%, ${CHART_GOLD} 100%)` }} />
 
           <div style={{ padding: '20px 28px' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
@@ -105,7 +107,7 @@ export default function SupplierDetail({ supplierId, onBack, onEdit }: Props) {
               </div>
               <button
                 onClick={() => onEdit(supplier)}
-                style={{ padding: '9px 20px', background: GOLD, color: NAVY, border: 'none', borderRadius: 10, fontWeight: 700, fontSize: fontSizes.sm, cursor: 'pointer', flexShrink: 0 }}
+                style={{ padding: '9px 20px', background: workspace.actionPrimaryBg, color: workspace.actionPrimaryText, border: 'none', borderRadius: 10, fontWeight: 700, fontSize: fontSizes.sm, cursor: 'pointer', flexShrink: 0 }}
               >
                 {t.editProfile}
               </button>
