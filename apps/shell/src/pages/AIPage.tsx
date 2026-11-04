@@ -2,6 +2,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { DailyWorkbench } from '../components/DailyWorkbench';
 import { useSearchParams } from 'react-router-dom';
+import { AgentChat } from '../components/ai/AgentChat';
 import { colors } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
 import { InvoiceAssistantPanel } from '../components/invoice/InvoiceAssistantPanel';
@@ -3426,6 +3427,7 @@ function AIAgentTab() {
   );
   return (
     <div>
+      <AgentChat />
       <SectionLabel text={dict.ai.agent.sectionLabel} />
       <Card style={{ marginBottom: 20 }}>
         <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.7, margin: 0 }}>
