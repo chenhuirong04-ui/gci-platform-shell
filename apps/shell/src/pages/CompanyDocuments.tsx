@@ -6,7 +6,7 @@
 // canUpload/isAdmin checks here are convenience only.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { colors } from '@gci/design-system';
+import { useI18n } from '@gci/i18n';
 import { useAuth } from '../contexts/AuthContext';
 import { AccountVault } from '../components/AccountVault';
 import {
@@ -16,6 +16,87 @@ import {
   confirmAIDocument,
   type CompanyDocument, type CompanyDocumentCategory, type AIDocumentFields,
 } from '../lib/companyDocumentsService';
+import { workspaceFontFamily } from '@gci/design-system';
+
+// i18n: English for this page's fixed UI text (database values are never translated).
+// LANG is set from the language context by the page component on every render.
+let LANG: 'zh' | 'en' = 'zh';
+const EN: Record<string, string> = {
+  "确认删除文件《": "Delete file “",
+  "》？此操作不可恢复。": "”? This cannot be undone.",
+  "AI 建议：": "AI suggestion: ",
+  "（当前分类库中没有，可新建或手动选择）": "(not in the category list yet — create it or choose manually)",
+  "✓ 已识别": "✓ Recognised",
+  "⚠ 待复核": "⚠ Needs review",
+  "✕ 识别失败": "✕ Recognition failed",
+  "识别中…": "Recognising…",
+  "待识别": "Not recognised yet",
+  "请输入分类名称": "Please enter a category name",
+  "该分类已存在": "This category already exists",
+  "保存失败，请重试": "Save failed, please try again",
+  "请选择文件": "Please choose a file",
+  "请选择分类": "Please choose a category",
+  "请填写文件名称": "Please enter a file name",
+  "无法读取原文件": "Could not read the original file",
+  "生成链接失败": "Could not create the link",
+  "返回": "Back",
+  "公司文件": "Company Documents",
+  "上传文件": "Upload File",
+  "账号与登录": "Accounts & Logins",
+  "全部分类": "All categories",
+  "搜索文件名…": "Search file name…",
+  "全部到期状态": "All expiry states",
+  "已过期": "Expired",
+  "即将到期(30天)": "Expiring (30 days)",
+  "无到期日": "No expiry date",
+  "处理方式": "Handling",
+  "智能识别并提醒": "Recognise & remind",
+  "证照类：营业执照、CIC、保险、车辆证件…": "Licences: trade licence, CIC, insurance, vehicle papers…",
+  "仅保存归档": "Archive only",
+  "合同、内部文件、留底资料…（默认）": "Contracts, internal files, records… (default)",
+  "点击选择文件，或拖拽文件到此处上传（PDF/JPG/PNG 自动识别）": "Click to choose a file, or drag it here (PDF/JPG/PNG are recognised automatically)",
+  "点击选择文件，或拖拽文件到此处上传": "Click to choose a file, or drag it here",
+  "— 选择分类 —": "— Choose category —",
+  "+ 新建分类": "+ New category",
+  "新分类名称": "New category name",
+  "保存中…": "Saving…",
+  "保存": "Save",
+  "取消": "Cancel",
+  "文件名称": "File name",
+  "到期日期（可选）": "Expiry date (optional)",
+  "说明 / 备注": "Description / notes",
+  "上传中…": "Uploading…",
+  "上传": "Upload",
+  "正在识别文件…": "Recognising file…",
+  "AI 正在读取文件内容，通常几秒钟": "AI is reading the file — this usually takes a few seconds",
+  "AI 识别结果": "AI recognition result",
+  "置信度": "Confidence",
+  "（建议人工核对）": "(please double-check)",
+  "AI 识别失败，请手动填写": "AI recognition failed — please fill in manually",
+  "文件类型": "Document type",
+  "建议分类": "Suggested category",
+  "公司名称": "Company name",
+  "证件号": "Licence / ID no.",
+  "签发日期": "Issue date",
+  "到期日期": "Expiry date",
+  "签发机构": "Issuing authority",
+  "摘要": "Summary",
+  "确认并保存": "Confirm & save",
+  "重新识别": "Recognise again",
+  "加载中…": "Loading…",
+  "没有符合条件的文件": "No matching files",
+  "文件名": "File name",
+  "分类": "Category",
+  "说明": "Description",
+  "上传人": "Uploaded by",
+  "上传时间": "Uploaded at",
+  "查看": "View",
+  "下载": "Download",
+  "AI 识别": "AI recognise",
+  "删除": "Delete"
+};
+const tx = (zh: string): string => (LANG === 'en' ? EN[zh] ?? zh : zh);
+
 
 const ADD_CATEGORY_VALUE = '__add_new__';
 
@@ -55,18 +136,18 @@ const EMPTY_REVIEW: ReviewFormState = {
   issue_date: '', expiry_date: '', issuing_authority: '', ai_summary: '', notes: '',
 };
 
-const GOLD = '#CBA85C';
-const RED = '#E0846A';
-const AMBER = '#D4A843';
-const MUTED = '#7A8494';
-const CARD = 'rgba(255,255,255,0.025)';
-const BORD = 'rgba(255,255,255,0.07)';
+const GOLD = '#7A5F2A';
+const RED = '#C53030';
+const AMBER = '#B45309';
+const MUTED = '#475569';
+const CARD = '#FFFFFF';
+const BORD = 'rgba(12,27,58,0.07)';
 
 type ExpiryFilter = 'all' | 'expired' | 'soon' | 'none';
 
 const inputSt: React.CSSProperties = {
-  padding: '8px 12px', borderRadius: 8, fontSize: 13, background: 'rgba(255,255,255,0.04)',
-  border: `1px solid ${BORD}`, color: colors.textPrimary,
+  padding: '8px 12px', borderRadius: 8, fontSize: 13, background: 'rgba(12,27,58,0.04)',
+  border: `1px solid ${BORD}`, color: '#0C1B3A',
 };
 
 // Scoped to this page only (className below is unique to it) — native <select> popups ignore
@@ -75,15 +156,15 @@ const inputSt: React.CSSProperties = {
 // other module's <select>. Same scoped-CSS-via-<style> convention already used by
 // InvoicePreview.tsx (INVOICE_SCOPED_CSS).
 const COMPANY_DOCUMENTS_SELECT_CSS = `
-.gci-cd-select { color-scheme: dark; }
+.gci-cd-select { color-scheme: light; }
 .gci-cd-select option {
-  background-color: #0F1830;
-  color: #F0EAD2;
+  background-color: #FFFFFF;
+  color: #0C1B3A;
 }
 .gci-cd-select option:checked,
 .gci-cd-select option:hover,
 .gci-cd-select option:focus {
-  background-color: #CBA85C;
+  background-color: #7A5F2A;
   color: #1A1206;
 }
 `;
@@ -100,11 +181,11 @@ function formatBytes(n: number | null): string {
 // touched by AI" (no badge) from an actual recognition outcome.
 function aiStatusBadge(status: string | null, isZh: boolean): { label: string; color: string } | null {
   switch (status) {
-    case 'completed': return { label: isZh ? '✓ 已识别' : '✓ Recognized', color: '#6FBF8E' };
-    case 'needs_review': return { label: isZh ? '⚠ 待复核' : '⚠ Needs Review', color: '#D4A843' };
-    case 'failed': return { label: isZh ? '✕ 识别失败' : '✕ Failed', color: '#E0846A' };
-    case 'processing': return { label: isZh ? '识别中…' : 'Recognizing…', color: '#7A8494' };
-    case 'pending': return { label: isZh ? '待识别' : 'Pending', color: '#7A8494' };
+    case 'completed': return { label: isZh ? tx('✓ 已识别') : '✓ Recognized', color: '#15803D' };
+    case 'needs_review': return { label: isZh ? tx('⚠ 待复核') : '⚠ Needs Review', color: '#B45309' };
+    case 'failed': return { label: isZh ? tx('✕ 识别失败') : '✕ Failed', color: '#C53030' };
+    case 'processing': return { label: isZh ? tx('识别中…') : 'Recognizing…', color: '#475569' };
+    case 'pending': return { label: isZh ? tx('待识别') : 'Pending', color: '#475569' };
     default: return null;
   }
 }
@@ -127,6 +208,7 @@ interface UploadFormState {
 const EMPTY_UPLOAD: UploadFormState = { file: null, category: '', document_name: '', expiry_date: '', notes: '' };
 
 export function CompanyDocuments() {
+  LANG = useI18n().lang; // keep tx() in sync with the language toggle
   const navigate = useNavigate();
   const { profile } = useAuth();
   // Mirrors public.is_active_admin() (role_label='Admin' AND is_active=true) — AuthContext's own
@@ -224,7 +306,7 @@ export function CompanyDocuments() {
 
   const saveNewCategory = async () => {
     const trimmed = newCategoryName.trim();
-    if (!trimmed) { setNewCategoryError(isZh ? '请输入分类名称' : 'Category name is required'); return; }
+    if (!trimmed) { setNewCategoryError(isZh ? tx('请输入分类名称') : 'Category name is required'); return; }
     setSavingCategory(true);
     setNewCategoryError('');
     const res = await createDocumentCategory(trimmed);
@@ -232,8 +314,8 @@ export function CompanyDocuments() {
     if (!res.ok) {
       setNewCategoryError(
         res.error === 'duplicate'
-          ? (isZh ? '该分类已存在' : 'This category already exists')
-          : (isZh ? '保存失败，请重试' : 'Failed to save, please retry'),
+          ? (isZh ? tx('该分类已存在') : 'This category already exists')
+          : (isZh ? tx('保存失败，请重试') : 'Failed to save, please retry'),
       );
       return;
     }
@@ -337,9 +419,9 @@ export function CompanyDocuments() {
   };
 
   const submitUpload = async () => {
-    if (!uploadForm.file) { setUploadError(isZh ? '请选择文件' : 'Please choose a file'); return; }
-    if (!uploadForm.category) { setUploadError(isZh ? '请选择分类' : 'Please choose a category'); return; }
-    if (!uploadForm.document_name.trim()) { setUploadError(isZh ? '请填写文件名称' : 'Document name is required'); return; }
+    if (!uploadForm.file) { setUploadError(isZh ? tx('请选择文件') : 'Please choose a file'); return; }
+    if (!uploadForm.category) { setUploadError(isZh ? tx('请选择分类') : 'Please choose a category'); return; }
+    if (!uploadForm.document_name.trim()) { setUploadError(isZh ? tx('请填写文件名称') : 'Document name is required'); return; }
     setUploading(true);
     setUploadError('');
     const { error: uploadErr } = await uploadCompanyDocument({
@@ -372,7 +454,7 @@ export function CompanyDocuments() {
     if (!file) {
       file = await fetchStoredFileForAI(aiDocument);
       if (!file) {
-        setAiError(isZh ? '无法读取原文件' : 'Could not read the original file');
+        setAiError(isZh ? tx('无法读取原文件') : 'Could not read the original file');
         setAiStage('manual');
         return;
       }
@@ -422,7 +504,7 @@ export function CompanyDocuments() {
     const file = await fetchStoredFileForAI(doc);
     setRowAiBusy(null);
     if (!file) {
-      setAiError(isZh ? '无法读取原文件' : 'Could not read the original file');
+      setAiError(isZh ? tx('无法读取原文件') : 'Could not read the original file');
       setReviewForm({
         category: doc.category, document_name: doc.document_name, document_type: '', company_name: '',
         document_number: '', issue_date: '', expiry_date: doc.expiry_date || '', issuing_authority: '',
@@ -449,8 +531,8 @@ export function CompanyDocuments() {
 
   const handleConfirmSave = async () => {
     if (!aiDocument) return;
-    if (!reviewForm.category) { setAiError(isZh ? '请选择分类' : 'Please choose a category'); return; }
-    if (!reviewForm.document_name.trim()) { setAiError(isZh ? '请填写文件名称' : 'Document name is required'); return; }
+    if (!reviewForm.category) { setAiError(isZh ? tx('请选择分类') : 'Please choose a category'); return; }
+    if (!reviewForm.document_name.trim()) { setAiError(isZh ? tx('请填写文件名称') : 'Document name is required'); return; }
     setSavingReview(true);
     setAiError('');
     const { error } = await confirmAIDocument(aiDocument.id, {
@@ -476,7 +558,7 @@ export function CompanyDocuments() {
     setRowError(prev => ({ ...prev, [doc.id]: '' }));
     const url = await getCompanyDocumentSignedUrl(doc.storage_path);
     setBusyId(null);
-    if (!url) { setRowError(prev => ({ ...prev, [doc.id]: isZh ? '生成链接失败' : 'Failed to generate link' })); return; }
+    if (!url) { setRowError(prev => ({ ...prev, [doc.id]: isZh ? tx('生成链接失败') : 'Failed to generate link' })); return; }
     window.open(url, '_blank');
   };
 
@@ -485,7 +567,7 @@ export function CompanyDocuments() {
     setRowError(prev => ({ ...prev, [doc.id]: '' }));
     const url = await getCompanyDocumentSignedUrl(doc.storage_path);
     setBusyId(null);
-    if (!url) { setRowError(prev => ({ ...prev, [doc.id]: isZh ? '生成链接失败' : 'Failed to generate link' })); return; }
+    if (!url) { setRowError(prev => ({ ...prev, [doc.id]: isZh ? tx('生成链接失败') : 'Failed to generate link' })); return; }
     const a = document.createElement('a');
     a.href = url;
     a.download = doc.file_name;
@@ -495,7 +577,7 @@ export function CompanyDocuments() {
   };
 
   const handleDelete = async (doc: CompanyDocument) => {
-    if (!window.confirm(isZh ? `确认删除文件《${doc.document_name}》？此操作不可恢复。` : `Delete "${doc.document_name}"? This cannot be undone.`)) return;
+    if (!window.confirm(isZh ? `${tx('确认删除文件《')}${doc.document_name}${tx('》？此操作不可恢复。')}` : `Delete "${doc.document_name}"? This cannot be undone.`)) return;
     setBusyId(doc.id);
     const { error: delErr } = await deleteCompanyDocument(doc.id, doc.storage_path);
     setBusyId(null);
@@ -511,35 +593,36 @@ export function CompanyDocuments() {
   };
 
   return (
+    <div style={{ background: '#F5F6FA', minHeight: 'calc(100vh - var(--header-h))', color: '#0C1B3A', fontFamily: workspaceFontFamily }}>
     <div style={{ maxWidth: 1180, margin: '0 auto', padding: '40px 32px 80px' }}>
       <style dangerouslySetInnerHTML={{ __html: COMPANY_DOCUMENTS_SELECT_CSS }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
-        <button onClick={() => navigate('/')} style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 13, cursor: 'pointer' }}>
-          ← {isZh ? '返回' : 'Back'}
+        <button onClick={() => navigate('/')} style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(12,27,58,0.05)', border: '1px solid rgba(12,27,58,0.12)', color: MUTED, fontSize: 13, cursor: 'pointer' }}>
+          ← {isZh ? tx('返回') : 'Back'}
         </button>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: colors.textPrimary, margin: 0, fontFamily: "'Space Grotesk',sans-serif", flex: 1 }}>
-          {isZh ? '公司文件' : 'Company Documents'}
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#0C1B3A', margin: 0, fontFamily: "'Space Grotesk',sans-serif", flex: 1 }}>
+          {isZh ? tx('公司文件') : 'Company Documents'}
         </h1>
         {canUpload && outerTab === 'documents' && (
-          <button onClick={openUpload} style={{ padding: '9px 18px', borderRadius: 10, fontSize: 13.5, fontWeight: 600, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#B8935A)`, color: '#1A1206', border: 'none' }}>
-            {isZh ? '上传文件' : 'Upload File'}
+          <button onClick={openUpload} style={{ padding: '9px 18px', borderRadius: 10, fontSize: 13.5, fontWeight: 600, cursor: 'pointer', background: '#080D1E', color: '#FFFFFF', border: 'none' }}>
+            {isZh ? tx('上传文件') : 'Upload File'}
           </button>
         )}
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
         {([
-          { key: 'documents' as const, label: isZh ? '公司文件' : 'Documents' },
-          { key: 'accessVault' as const, label: isZh ? '账号与登录' : 'Accounts & Logins' },
+          { key: 'documents' as const, label: isZh ? tx('公司文件') : 'Documents' },
+          { key: 'accessVault' as const, label: isZh ? tx('账号与登录') : 'Accounts & Logins' },
         ]).map((t) => (
           <button
             key={t.key}
             onClick={() => setOuterTab(t.key)}
             style={{
               padding: '8px 16px', borderRadius: 9, fontSize: 12.5, cursor: 'pointer',
-              background: outerTab === t.key ? `linear-gradient(135deg,${GOLD},#E2C988)` : 'rgba(255,255,255,0.04)',
+              background: outerTab === t.key ? '#080D1E' : 'rgba(12,27,58,0.04)',
               border: `1px solid ${outerTab === t.key ? 'transparent' : BORD}`,
-              color: outerTab === t.key ? '#080D1E' : MUTED,
+              color: outerTab === t.key ? '#FFFFFF' : MUTED,
               fontWeight: outerTab === t.key ? 700 : 400,
             }}
           >
@@ -556,28 +639,28 @@ export function CompanyDocuments() {
       {/* Filters */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
         <select className="gci-cd-select" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={inputSt}>
-          <option value="">{isZh ? '全部分类' : 'All Categories'}</option>
+          <option value="">{isZh ? tx('全部分类') : 'All Categories'}</option>
           {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
         </select>
         <input
-          placeholder={isZh ? '搜索文件名…' : 'Search file name…'}
+          placeholder={isZh ? tx('搜索文件名…') : 'Search file name…'}
           value={search}
           onChange={e => setSearch(e.target.value)}
           style={{ ...inputSt, minWidth: 220 }}
         />
         <div style={{ display: 'flex', gap: 6 }}>
           {([
-            ['all', isZh ? '全部到期状态' : 'All Expiry'],
-            ['expired', isZh ? '已过期' : 'Expired'],
-            ['soon', isZh ? '即将到期(30天)' : 'Expiring Soon (30d)'],
-            ['none', isZh ? '无到期日' : 'No Expiry'],
+            ['all', isZh ? tx('全部到期状态') : 'All Expiry'],
+            ['expired', isZh ? tx('已过期') : 'Expired'],
+            ['soon', isZh ? tx('即将到期(30天)') : 'Expiring Soon (30d)'],
+            ['none', isZh ? tx('无到期日') : 'No Expiry'],
           ] as [ExpiryFilter, string][]).map(([key, label]) => (
             <button
               key={key}
               onClick={() => setExpiryFilter(key)}
               style={{
                 padding: '6px 12px', borderRadius: 20, fontSize: 11.5, cursor: 'pointer',
-                background: expiryFilter === key ? 'rgba(203,168,92,0.16)' : 'rgba(255,255,255,0.04)',
+                background: expiryFilter === key ? 'rgba(203,168,92,0.16)' : 'rgba(12,27,58,0.04)',
                 border: `1px solid ${expiryFilter === key ? 'rgba(203,168,92,0.5)' : BORD}`,
                 color: expiryFilter === key ? GOLD : MUTED, fontWeight: expiryFilter === key ? 700 : 400,
               }}
@@ -592,34 +675,34 @@ export function CompanyDocuments() {
       {canUpload && showUpload && aiStage === 'idle' && (
         <div style={{ padding: 16, marginBottom: 16, background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, display: 'grid', gap: 10 }}>
           <div>
-            <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 6 }}>{isZh ? '处理方式' : 'Processing Mode'}</label>
+            <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 6 }}>{isZh ? tx('处理方式') : 'Processing Mode'}</label>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 onClick={() => setProcessingMode('smart')}
                 style={{
                   flex: 1, padding: '9px 12px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', textAlign: 'left',
-                  background: processingMode === 'smart' ? 'rgba(203,168,92,0.14)' : 'rgba(255,255,255,0.03)',
+                  background: processingMode === 'smart' ? 'rgba(203,168,92,0.14)' : 'rgba(12,27,58,0.03)',
                   border: `1.5px solid ${processingMode === 'smart' ? GOLD : BORD}`,
                   color: processingMode === 'smart' ? GOLD : MUTED,
                 }}
               >
-                ✦ {isZh ? '智能识别并提醒' : 'Smart Extract & Remind'}
+                ✦ {isZh ? tx('智能识别并提醒') : 'Smart Extract & Remind'}
                 <div style={{ fontSize: 10.5, fontWeight: 400, marginTop: 2, color: MUTED }}>
-                  {isZh ? '证照类：营业执照、CIC、保险、车辆证件…' : 'Licenses, CIC, insurance, vehicle docs…'}
+                  {isZh ? tx('证照类：营业执照、CIC、保险、车辆证件…') : 'Licenses, CIC, insurance, vehicle docs…'}
                 </div>
               </button>
               <button
                 onClick={() => setProcessingMode('archive')}
                 style={{
                   flex: 1, padding: '9px 12px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', textAlign: 'left',
-                  background: processingMode === 'archive' ? 'rgba(203,168,92,0.14)' : 'rgba(255,255,255,0.03)',
+                  background: processingMode === 'archive' ? 'rgba(203,168,92,0.14)' : 'rgba(12,27,58,0.03)',
                   border: `1.5px solid ${processingMode === 'archive' ? GOLD : BORD}`,
                   color: processingMode === 'archive' ? GOLD : MUTED,
                 }}
               >
-                {isZh ? '仅保存归档' : 'Save Only'}
+                {isZh ? tx('仅保存归档') : 'Save Only'}
                 <div style={{ fontSize: 10.5, fontWeight: 400, marginTop: 2, color: MUTED }}>
-                  {isZh ? '合同、内部文件、留底资料…（默认）' : 'Contracts, internal files, references… (default)'}
+                  {isZh ? tx('合同、内部文件、留底资料…（默认）') : 'Contracts, internal files, references… (default)'}
                 </div>
               </button>
             </div>
@@ -636,8 +719,8 @@ export function CompanyDocuments() {
             }}
           >
             {uploadForm.file ? uploadForm.file.name : processingMode === 'smart'
-              ? (isZh ? '点击选择文件，或拖拽文件到此处上传（PDF/JPG/PNG 自动识别）' : 'Click to choose a file, or drag & drop it here (PDF/JPG/PNG auto-recognized)')
-              : (isZh ? '点击选择文件，或拖拽文件到此处上传' : 'Click to choose a file, or drag & drop it here')}
+              ? (isZh ? tx('点击选择文件，或拖拽文件到此处上传（PDF/JPG/PNG 自动识别）') : 'Click to choose a file, or drag & drop it here (PDF/JPG/PNG auto-recognized)')
+              : (isZh ? tx('点击选择文件，或拖拽文件到此处上传') : 'Click to choose a file, or drag & drop it here')}
             <input
               ref={fileInputRef} type="file" style={{ display: 'none' }}
               onChange={e => acceptFile(e.target.files?.[0])}
@@ -646,15 +729,15 @@ export function CompanyDocuments() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}>
             <div>
               <select className="gci-cd-select" value={uploadForm.category} onChange={e => handleCategorySelect(e.target.value)} style={{ ...inputSt, width: '100%' }}>
-                <option value="">{isZh ? '— 选择分类 —' : '— Select Category —'}</option>
+                <option value="">{isZh ? tx('— 选择分类 —') : '— Select Category —'}</option>
                 {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                <option value={ADD_CATEGORY_VALUE}>{isZh ? '+ 新建分类' : '+ Add Category'}</option>
+                <option value={ADD_CATEGORY_VALUE}>{isZh ? tx('+ 新建分类') : '+ Add Category'}</option>
               </select>
               {addingCategory && (
                 <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
                   <input
                     autoFocus
-                    placeholder={isZh ? '新分类名称' : 'New category name'}
+                    placeholder={isZh ? tx('新分类名称') : 'New category name'}
                     value={newCategoryName}
                     onChange={e => setNewCategoryName(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') saveNewCategory(); }}
@@ -663,32 +746,32 @@ export function CompanyDocuments() {
                   <button
                     disabled={savingCategory}
                     onClick={saveNewCategory}
-                    style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#B8935A)`, color: '#1A1206', border: 'none' }}
+                    style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: '#080D1E', color: '#FFFFFF', border: 'none' }}
                   >
-                    {savingCategory ? (isZh ? '保存中…' : 'Saving…') : (isZh ? '保存' : 'Save')}
+                    {savingCategory ? (isZh ? tx('保存中…') : 'Saving…') : (isZh ? tx('保存') : 'Save')}
                   </button>
                   <button
                     onClick={() => { setAddingCategory(false); setNewCategoryName(''); setNewCategoryError(''); }}
-                    style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}
+                    style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: 'rgba(12,27,58,0.04)', border: `1px solid ${BORD}`, color: MUTED }}
                   >
-                    {isZh ? '取消' : 'Cancel'}
+                    {isZh ? tx('取消') : 'Cancel'}
                   </button>
                 </div>
               )}
               {newCategoryError && <div style={{ fontSize: 11, color: RED, marginTop: 4 }}>{newCategoryError}</div>}
             </div>
             <input
-              placeholder={isZh ? '文件名称' : 'Document Name'}
+              placeholder={isZh ? tx('文件名称') : 'Document Name'}
               value={uploadForm.document_name}
               onChange={e => setUploadForm(f => ({ ...f, document_name: e.target.value }))}
               style={inputSt}
             />
             <div>
-              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '到期日期（可选）' : 'Expiry Date (optional)'}</label>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? tx('到期日期（可选）') : 'Expiry Date (optional)'}</label>
               <input type="date" value={uploadForm.expiry_date} onChange={e => setUploadForm(f => ({ ...f, expiry_date: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
             </div>
             <input
-              placeholder={isZh ? '说明 / 备注' : 'Notes'}
+              placeholder={isZh ? tx('说明 / 备注') : 'Notes'}
               value={uploadForm.notes}
               onChange={e => setUploadForm(f => ({ ...f, notes: e.target.value }))}
               style={inputSt}
@@ -697,12 +780,12 @@ export function CompanyDocuments() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
               disabled={uploading} onClick={submitUpload}
-              style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#B8935A)`, color: '#1A1206', border: 'none' }}
+              style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: '#080D1E', color: '#FFFFFF', border: 'none' }}
             >
-              {uploading ? (isZh ? '上传中…' : 'Uploading…') : (isZh ? '上传' : 'Upload')}
+              {uploading ? (isZh ? tx('上传中…') : 'Uploading…') : (isZh ? tx('上传') : 'Upload')}
             </button>
-            <button onClick={closeUpload} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
-              {isZh ? '取消' : 'Cancel'}
+            <button onClick={closeUpload} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: 'rgba(12,27,58,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+              {isZh ? tx('取消') : 'Cancel'}
             </button>
             {uploadError && <span style={{ fontSize: 12, color: RED }}>{uploadError}</span>}
           </div>
@@ -712,8 +795,8 @@ export function CompanyDocuments() {
       {/* AI recognizing */}
       {canUpload && showUpload && aiStage === 'recognizing' && (
         <div style={{ padding: 28, marginBottom: 16, background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, textAlign: 'center' }}>
-          <div style={{ fontSize: 13, color: GOLD, fontWeight: 600 }}>{isZh ? '正在识别文件…' : 'Recognizing file…'}</div>
-          <div style={{ fontSize: 11.5, color: MUTED, marginTop: 6 }}>{isZh ? 'AI 正在读取文件内容，通常几秒钟' : 'AI is reading the file — usually a few seconds'}</div>
+          <div style={{ fontSize: 13, color: GOLD, fontWeight: 600 }}>{isZh ? tx('正在识别文件…') : 'Recognizing file…'}</div>
+          <div style={{ fontSize: 11.5, color: MUTED, marginTop: 6 }}>{isZh ? tx('AI 正在读取文件内容，通常几秒钟') : 'AI is reading the file — usually a few seconds'}</div>
         </div>
       )}
 
@@ -722,54 +805,54 @@ export function CompanyDocuments() {
         <div style={{ padding: 16, marginBottom: 16, background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, display: 'grid', gap: 10 }}>
           {aiStage === 'review' ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: GOLD }}>{isZh ? 'AI 识别结果' : 'AI Recognition Result'}</span>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: GOLD }}>{isZh ? tx('AI 识别结果') : 'AI Recognition Result'}</span>
               {aiFields?.confidence !== null && aiFields?.confidence !== undefined && (
                 <span style={{ fontSize: 10.5, color: aiFields.confidence < 0.5 ? AMBER : MUTED }}>
-                  {isZh ? '置信度' : 'Confidence'}: {Math.round(aiFields.confidence * 100)}%
-                  {aiFields.confidence < 0.5 ? (isZh ? '（建议人工核对）' : ' (please double-check)') : ''}
+                  {isZh ? tx('置信度') : 'Confidence'}: {Math.round(aiFields.confidence * 100)}%
+                  {aiFields.confidence < 0.5 ? (isZh ? tx('（建议人工核对）') : ' (please double-check)') : ''}
                 </span>
               )}
             </div>
           ) : (
             <div style={{ fontSize: 12.5, fontWeight: 700, color: AMBER }}>
-              {isZh ? 'AI 识别失败，请手动填写' : 'AI recognition failed — please fill in manually'}
+              {isZh ? tx('AI 识别失败，请手动填写') : 'AI recognition failed — please fill in manually'}
               {aiError && <span style={{ fontSize: 11, color: MUTED, fontWeight: 400, marginLeft: 8 }}>({aiError})</span>}
             </div>
           )}
 
           {aiFields?.summary && (
-            <div style={{ fontSize: 12, color: colors.textSecondary, background: 'rgba(203,168,92,0.06)', borderRadius: 8, padding: '8px 12px' }}>
+            <div style={{ fontSize: 12, color: '#475569', background: 'rgba(203,168,92,0.06)', borderRadius: 8, padding: '8px 12px' }}>
               {aiFields.summary}
             </div>
           )}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}>
             <div>
-              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '文件类型' : 'Document Type'}</label>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? tx('文件类型') : 'Document Type'}</label>
               <input
-                placeholder={isZh ? '文件类型' : 'Document Type'}
+                placeholder={isZh ? tx('文件类型') : 'Document Type'}
                 value={reviewForm.document_type}
                 onChange={e => setReviewForm(f => ({ ...f, document_type: e.target.value }))}
                 style={{ ...inputSt, width: '100%' }}
               />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '建议分类' : 'Suggested Category'}</label>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? tx('建议分类') : 'Suggested Category'}</label>
               <select className="gci-cd-select" value={reviewForm.category} onChange={e => handleCategorySelect(e.target.value)} style={{ ...inputSt, width: '100%' }}>
-                <option value="">{isZh ? '— 选择分类 —' : '— Select Category —'}</option>
+                <option value="">{isZh ? tx('— 选择分类 —') : '— Select Category —'}</option>
                 {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                <option value={ADD_CATEGORY_VALUE}>{isZh ? '+ 新建分类' : '+ Add Category'}</option>
+                <option value={ADD_CATEGORY_VALUE}>{isZh ? tx('+ 新建分类') : '+ Add Category'}</option>
               </select>
               {aiFields?.suggested_category && !categories.some(c => c.name.toLowerCase() === (aiFields.suggested_category || '').toLowerCase()) && (
                 <div style={{ fontSize: 10.5, color: AMBER, marginTop: 4 }}>
-                  {isZh ? `AI 建议：${aiFields.suggested_category}（当前分类库中没有，可新建或手动选择）` : `AI suggests: ${aiFields.suggested_category} (not in the category list yet — add it or pick manually)`}
+                  {isZh ? `${tx('AI 建议：')}${aiFields.suggested_category}${tx('（当前分类库中没有，可新建或手动选择）')}` : `AI suggests: ${aiFields.suggested_category} (not in the category list yet — add it or pick manually)`}
                 </div>
               )}
               {addingCategory && (
                 <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
                   <input
                     autoFocus
-                    placeholder={isZh ? '新分类名称' : 'New category name'}
+                    placeholder={isZh ? tx('新分类名称') : 'New category name'}
                     value={newCategoryName}
                     onChange={e => setNewCategoryName(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') saveNewCategory(); }}
@@ -778,50 +861,50 @@ export function CompanyDocuments() {
                   <button
                     disabled={savingCategory}
                     onClick={saveNewCategory}
-                    style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#B8935A)`, color: '#1A1206', border: 'none' }}
+                    style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: '#080D1E', color: '#FFFFFF', border: 'none' }}
                   >
-                    {savingCategory ? (isZh ? '保存中…' : 'Saving…') : (isZh ? '保存' : 'Save')}
+                    {savingCategory ? (isZh ? tx('保存中…') : 'Saving…') : (isZh ? tx('保存') : 'Save')}
                   </button>
                   <button
                     onClick={() => { setAddingCategory(false); setNewCategoryName(''); setNewCategoryError(''); }}
-                    style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}
+                    style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer', background: 'rgba(12,27,58,0.04)', border: `1px solid ${BORD}`, color: MUTED }}
                   >
-                    {isZh ? '取消' : 'Cancel'}
+                    {isZh ? tx('取消') : 'Cancel'}
                   </button>
                 </div>
               )}
               {newCategoryError && <div style={{ fontSize: 11, color: RED, marginTop: 4 }}>{newCategoryError}</div>}
             </div>
             <div>
-              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '公司名称' : 'Company Name'}</label>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? tx('公司名称') : 'Company Name'}</label>
               <input value={reviewForm.company_name} onChange={e => setReviewForm(f => ({ ...f, company_name: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '证件号' : 'Document No.'}</label>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? tx('证件号') : 'Document No.'}</label>
               <input value={reviewForm.document_number} onChange={e => setReviewForm(f => ({ ...f, document_number: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '签发日期' : 'Issue Date'}</label>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? tx('签发日期') : 'Issue Date'}</label>
               <input type="date" value={reviewForm.issue_date} onChange={e => setReviewForm(f => ({ ...f, issue_date: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '到期日期' : 'Expiry Date'}</label>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? tx('到期日期') : 'Expiry Date'}</label>
               <input type="date" value={reviewForm.expiry_date} onChange={e => setReviewForm(f => ({ ...f, expiry_date: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '签发机构' : 'Issuing Authority'}</label>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? tx('签发机构') : 'Issuing Authority'}</label>
               <input value={reviewForm.issuing_authority} onChange={e => setReviewForm(f => ({ ...f, issuing_authority: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '文件名称' : 'Document Name'}</label>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? tx('文件名称') : 'Document Name'}</label>
               <input value={reviewForm.document_name} onChange={e => setReviewForm(f => ({ ...f, document_name: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '摘要' : 'Summary'}</label>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? tx('摘要') : 'Summary'}</label>
               <input value={reviewForm.ai_summary} onChange={e => setReviewForm(f => ({ ...f, ai_summary: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? '说明 / 备注' : 'Notes'}</label>
+              <label style={{ fontSize: 11, color: MUTED, display: 'block', marginBottom: 4 }}>{isZh ? tx('说明 / 备注') : 'Notes'}</label>
               <input value={reviewForm.notes} onChange={e => setReviewForm(f => ({ ...f, notes: e.target.value }))} style={{ ...inputSt, width: '100%' }} />
             </div>
           </div>
@@ -829,18 +912,18 @@ export function CompanyDocuments() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <button
               disabled={savingReview} onClick={handleConfirmSave}
-              style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#B8935A)`, color: '#1A1206', border: 'none' }}
+              style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: '#080D1E', color: '#FFFFFF', border: 'none' }}
             >
-              {savingReview ? (isZh ? '保存中…' : 'Saving…') : (isZh ? '确认并保存' : 'Confirm & Save')}
+              {savingReview ? (isZh ? tx('保存中…') : 'Saving…') : (isZh ? tx('确认并保存') : 'Confirm & Save')}
             </button>
             <button
               onClick={handleReRecognize}
-              style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}
+              style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: 'rgba(12,27,58,0.04)', border: `1px solid ${BORD}`, color: MUTED }}
             >
-              {isZh ? '重新识别' : 'Re-recognize'}
+              {isZh ? tx('重新识别') : 'Re-recognize'}
             </button>
-            <button onClick={closeUpload} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
-              {isZh ? '取消' : 'Cancel'}
+            <button onClick={closeUpload} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: 'rgba(12,27,58,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+              {isZh ? tx('取消') : 'Cancel'}
             </button>
             {aiStage === 'review' && aiError && <span style={{ fontSize: 12, color: RED }}>{aiError}</span>}
           </div>
@@ -848,10 +931,10 @@ export function CompanyDocuments() {
       )}
 
       {error && <div style={{ padding: '12px 16px', background: 'rgba(224,132,106,0.08)', border: `1px solid ${RED}40`, borderRadius: 10, color: RED, fontSize: 13, marginBottom: 16 }}>{error}</div>}
-      {!docs && !error && <div style={{ color: MUTED, fontSize: 13 }}>{isZh ? '加载中…' : 'Loading…'}</div>}
+      {!docs && !error && <div style={{ color: MUTED, fontSize: 13 }}>{isZh ? tx('加载中…') : 'Loading…'}</div>}
       {docs && filtered.length === 0 && (
         <div style={{ padding: '36px 24px', textAlign: 'center', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: MUTED }}>{isZh ? '没有符合条件的文件' : 'No documents match this view'}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: MUTED }}>{isZh ? tx('没有符合条件的文件') : 'No documents match this view'}</div>
         </div>
       )}
 
@@ -859,10 +942,10 @@ export function CompanyDocuments() {
         <div style={{ border: `1px solid ${BORD}`, borderRadius: 14, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
+              <tr style={{ background: 'rgba(12,27,58,0.03)' }}>
                 {[
-                  isZh ? '文件名' : 'File Name', isZh ? '分类' : 'Category', isZh ? '说明' : 'Notes',
-                  isZh ? '上传人' : 'Uploaded By', isZh ? '上传时间' : 'Uploaded At', isZh ? '到期日期' : 'Expiry Date', '',
+                  isZh ? tx('文件名') : 'File Name', isZh ? tx('分类') : 'Category', isZh ? tx('说明') : 'Notes',
+                  isZh ? tx('上传人') : 'Uploaded By', isZh ? tx('上传时间') : 'Uploaded At', isZh ? tx('到期日期') : 'Expiry Date', '',
                 ].map((h, i) => (
                   <th key={i} style={{ textAlign: 'left', fontSize: 10, letterSpacing: '0.1em', color: MUTED, padding: '12px 16px', borderBottom: `1px solid ${BORD}`, textTransform: 'uppercase' }}>{h}</th>
                 ))}
@@ -871,7 +954,7 @@ export function CompanyDocuments() {
             <tbody>
               {filtered.map(doc => (
                 <tr key={doc.id} style={{ opacity: busyId === doc.id ? 0.5 : 1 }}>
-                  <td style={{ fontSize: 13, fontWeight: 600, color: colors.textPrimary, padding: '12px 16px', borderBottom: `1px solid ${BORD}` }}>
+                  <td style={{ fontSize: 13, fontWeight: 600, color: '#0C1B3A', padding: '12px 16px', borderBottom: `1px solid ${BORD}` }}>
                     {doc.document_name}
                     <div style={{ fontSize: 10.5, color: MUTED, fontWeight: 400, marginTop: 2 }}>{doc.file_name} · {formatBytes(doc.file_size)}</div>
                     {aiStatusBadge(doc.ai_status, isZh) && (
@@ -880,34 +963,34 @@ export function CompanyDocuments() {
                       </div>
                     )}
                   </td>
-                  <td style={{ fontSize: 12, color: colors.textSecondary, padding: '12px 16px', borderBottom: `1px solid ${BORD}` }}>{doc.category}</td>
-                  <td style={{ fontSize: 12, color: colors.textSecondary, padding: '12px 16px', borderBottom: `1px solid ${BORD}`, maxWidth: 220 }}>{doc.notes || '—'}</td>
-                  <td style={{ fontSize: 12, color: colors.textSecondary, padding: '12px 16px', borderBottom: `1px solid ${BORD}` }}>
+                  <td style={{ fontSize: 12, color: '#475569', padding: '12px 16px', borderBottom: `1px solid ${BORD}` }}>{doc.category}</td>
+                  <td style={{ fontSize: 12, color: '#475569', padding: '12px 16px', borderBottom: `1px solid ${BORD}`, maxWidth: 220 }}>{doc.notes || '—'}</td>
+                  <td style={{ fontSize: 12, color: '#475569', padding: '12px 16px', borderBottom: `1px solid ${BORD}` }}>
                     {(doc.uploaded_by && userNames[doc.uploaded_by]) || '—'}
                   </td>
-                  <td style={{ fontSize: 12, color: colors.textSecondary, padding: '12px 16px', borderBottom: `1px solid ${BORD}` }}>{new Date(doc.uploaded_at).toLocaleString()}</td>
+                  <td style={{ fontSize: 12, color: '#475569', padding: '12px 16px', borderBottom: `1px solid ${BORD}` }}>{new Date(doc.uploaded_at).toLocaleString()}</td>
                   <td style={{ fontSize: 12, padding: '12px 16px', borderBottom: `1px solid ${BORD}` }}>{expiryBadge(doc.expiry_date)}</td>
                   <td style={{ padding: '12px 16px', borderBottom: `1px solid ${BORD}` }}>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <button disabled={busyId === doc.id} onClick={() => handleView(doc)} title={isZh ? '查看' : 'View'} style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
-                        {isZh ? '查看' : 'View'}
+                      <button disabled={busyId === doc.id} onClick={() => handleView(doc)} title={isZh ? tx('查看') : 'View'} style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(12,27,58,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+                        {isZh ? tx('查看') : 'View'}
                       </button>
-                      <button disabled={busyId === doc.id} onClick={() => handleDownload(doc)} title={isZh ? '下载' : 'Download'} style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
-                        {isZh ? '下载' : 'Download'}
+                      <button disabled={busyId === doc.id} onClick={() => handleDownload(doc)} title={isZh ? tx('下载') : 'Download'} style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(12,27,58,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>
+                        {isZh ? tx('下载') : 'Download'}
                       </button>
                       {canUpload && AI_SUPPORTED_MIME.includes(doc.mime_type || '') && (isAdmin || isLili || doc.uploaded_by === profile?.id) && (
                         <button
                           disabled={rowAiBusy === doc.id}
                           onClick={() => openReviewForExistingDoc(doc)}
-                          title={isZh ? 'AI 识别' : 'AI Recognize'}
+                          title={isZh ? tx('AI 识别') : 'AI Recognize'}
                           style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(203,168,92,0.1)', border: `1px solid ${GOLD}40`, color: GOLD }}
                         >
-                          {rowAiBusy === doc.id ? (isZh ? '识别中…' : '…') : (isZh ? 'AI 识别' : 'AI Recognize')}
+                          {rowAiBusy === doc.id ? (isZh ? tx('识别中…') : '…') : (isZh ? tx('AI 识别') : 'AI Recognize')}
                         </button>
                       )}
                       {isAdmin && (
-                        <button disabled={busyId === doc.id} onClick={() => handleDelete(doc)} title={isZh ? '删除' : 'Delete'} style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(224,132,106,0.1)', border: `1px solid ${RED}40`, color: RED }}>
-                          {isZh ? '删除' : 'Delete'}
+                        <button disabled={busyId === doc.id} onClick={() => handleDelete(doc)} title={isZh ? tx('删除') : 'Delete'} style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(224,132,106,0.1)', border: `1px solid ${RED}40`, color: RED }}>
+                          {isZh ? tx('删除') : 'Delete'}
                         </button>
                       )}
                       {rowError[doc.id] && <span style={{ fontSize: 10.5, color: RED }}>{rowError[doc.id]}</span>}
@@ -920,6 +1003,7 @@ export function CompanyDocuments() {
         </div>
       )}
       </>)}
+    </div>
     </div>
   );
 }

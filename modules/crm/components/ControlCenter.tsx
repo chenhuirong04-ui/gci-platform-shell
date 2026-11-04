@@ -4,7 +4,7 @@ import {
   Calendar, AlertTriangle, Briefcase,
   ChevronLeft, ChevronRight, TrendingUp, Users, MessageSquare, X
 } from 'lucide-react';
-import { PageHeader, StatCard } from '@gci/design-system';
+import { PageHeader, StatCard, ModalPortal } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
 // CRM Legacy cleanup (2026-09) — "最近更新的业务/最近新增客户/最近新增沟通" now
 // read the real Supabase CRM (crm_customers/crm_followups) instead of the
@@ -24,13 +24,13 @@ import {
 // crmSupabase import above.
 import { listAllProjects } from '../../../apps/shell/src/lib/crmProjects';
 
-const GOLD = '#B8960C';
-const NAVY = '#0F172A';
-const CARD   = '#0F1E35';
-const CARD2  = '#162A45';
-const BORDER = 'rgba(255,255,255,0.09)';
-const T1     = '#E8F0FF';
-const T2     = '#7A9CC5';
+const GOLD = '#7A5F2A';
+const NAVY = '#FFFFFF'; // V1 light workspace: modal panel surface
+const CARD   = '#FFFFFF';
+const CARD2  = '#F8F9FB';
+const BORDER = 'rgba(12,27,58,0.09)';
+const T1     = '#0C1B3A';
+const T2     = '#475569';
 const PAGE_SIZE = 20;
 
 type AllListKey = 'businesses' | 'pending' | 'followups';
@@ -55,7 +55,7 @@ function SectionHeader({ icon, title, color = T1 }: {
   return (
     <div className="flex items-center gap-2 mb-3">
       <div style={{ color: GOLD }}>{icon}</div>
-      <h2 className="font-mono-label text-sm font-black uppercase tracking-widest" style={{ color }}>{title}</h2>
+      <h2 className="font-mono-label text-sm font-bold " style={{ color }}>{title}</h2>
     </div>
   );
 }
@@ -72,7 +72,7 @@ function RealCrmRow({ name, sub, dateLabel, onClick }: { name: string; sub: stri
   return (
     <button
       onClick={onClick}
-      className="w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-colors mb-2"
+      className="w-full text-left flex items-center justify-between px-4 py-3 rounded-md transition-colors mb-2"
       style={{ background: CARD2, border: `1px solid ${BORDER}` }}
       onMouseEnter={e => (e.currentTarget.style.background = 'rgba(184,150,12,0.08)')}
       onMouseLeave={e => (e.currentTarget.style.background = CARD2)}
@@ -80,12 +80,12 @@ function RealCrmRow({ name, sub, dateLabel, onClick }: { name: string; sub: stri
       <div className="flex items-center gap-3 min-w-0">
         <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: GOLD }} />
         <div className="min-w-0">
-          <div className="text-sm font-black truncate" style={{ color: T1 }}>{name}</div>
+          <div className="text-sm font-bold truncate" style={{ color: T1 }}>{name}</div>
           {sub && <div className="text-xs truncate mt-0.5" style={{ color: T2 }}>{sub}</div>}
         </div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-        {dateLabel && <span className="text-[10px] font-bold" style={{ color: T2 }}>{dateLabel}</span>}
+        {dateLabel && <span className="text-xs font-bold" style={{ color: T2 }}>{dateLabel}</span>}
         <ChevronRight className="w-3.5 h-3.5" style={{ color: T2 }} />
       </div>
     </button>
@@ -220,7 +220,7 @@ export default function ControlCenter() {
     <div className="space-y-8" style={{ color: T1 }}>
 
       {/* Header — shared PageHeader (GCI Design System V1 pilot) */}
-      <PageHeader title={ct.pageTitle} eyebrow={nowLabel} className="[&>h1]:!text-white" />
+      <PageHeader title={ct.pageTitle} eyebrow={nowLabel} className="[&>p:first-of-type]:!text-[#7A5F2A]" />
 
       {/* Business Overview stats (V1) — asset-first framing: how many
           customers/projects exist and what changed recently.
@@ -234,28 +234,28 @@ export default function ControlCenter() {
           this cleanup removes. Hidden, not zeroed, until crm_projects (or a
           successor field) actually has a real classification to show. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
-          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewCustomers}</div>
-          <div className="text-2xl font-black mt-1" style={{ color: T1 }}>{customerTotal === null ? '—' : customerTotal}</div>
+        <div className="rounded-[10px] px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
+          <div className="text-xs font-bold " style={{ color: T2 }}>{ct.overviewCustomers}</div>
+          <div className="text-2xl font-bold mt-1" style={{ color: T1 }}>{customerTotal === null ? '—' : customerTotal}</div>
         </div>
-        <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
-          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewBusinesses}</div>
-          <div className="text-2xl font-black mt-1" style={{ color: T1 }}>{projectTotal === null ? '—' : projectTotal}</div>
+        <div className="rounded-[10px] px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
+          <div className="text-xs font-bold " style={{ color: T2 }}>{ct.overviewBusinesses}</div>
+          <div className="text-2xl font-bold mt-1" style={{ color: T1 }}>{projectTotal === null ? '—' : projectTotal}</div>
         </div>
-        <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
-          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewNew7}</div>
-          <div className="text-2xl font-black mt-1" style={{ color: GOLD }}>{newCustomers7d === null ? '—' : newCustomers7d}</div>
+        <div className="rounded-[10px] px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
+          <div className="text-xs font-bold " style={{ color: T2 }}>{ct.overviewNew7}</div>
+          <div className="text-2xl font-bold mt-1" style={{ color: GOLD }}>{newCustomers7d === null ? '—' : newCustomers7d}</div>
         </div>
-        <div className="rounded-xl px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
-          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T2 }}>{ct.overviewActive30}</div>
-          <div className="text-2xl font-black mt-1" style={{ color: GOLD }}>{activeCustomers30d === null ? '—' : activeCustomers30d}</div>
+        <div className="rounded-[10px] px-4 py-3" style={{ backgroundColor: CARD, border: `1px solid ${BORDER}` }}>
+          <div className="text-xs font-bold " style={{ color: T2 }}>{ct.overviewActive30}</div>
+          <div className="text-2xl font-bold mt-1" style={{ color: GOLD }}>{activeCustomers30d === null ? '—' : activeCustomers30d}</div>
         </div>
       </div>
 
       {/* Recent activity — three compact lists so "最近有多少项目/客户/沟通"
           is answerable at a glance without opening another tab. */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="rounded-[18px] border p-5 shadow-sm flex flex-col" style={{ backgroundColor: CARD, borderColor: BORDER }}>
+        <div className="rounded-[10px] border p-5 shadow-sm flex flex-col" style={{ backgroundColor: CARD, borderColor: BORDER }}>
           <SectionHeader icon={<Briefcase className="w-4 h-4" />} title={ct.recentBusinessesTitle} />
           <div className="flex-1">
             {recentUpdated === null
@@ -272,9 +272,9 @@ export default function ControlCenter() {
                     />
                   ))}
           </div>
-          <button onClick={() => void openAll('businesses')} className="mt-2 w-full border-t pt-3 text-right text-xs font-black transition-colors" style={{ borderColor: BORDER, color: GOLD }}>{ct.viewAll}</button>
+          <button onClick={() => void openAll('businesses')} className="mt-2 w-full border-t pt-3 text-right text-xs font-bold transition-colors" style={{ borderColor: BORDER, color: GOLD }}>{ct.viewAll}</button>
         </div>
-        <div className="rounded-[18px] border p-5 shadow-sm flex flex-col" style={{ backgroundColor: CARD, borderColor: BORDER }}>
+        <div className="rounded-[10px] border p-5 shadow-sm flex flex-col" style={{ backgroundColor: CARD, borderColor: BORDER }}>
           <SectionHeader icon={<Users className="w-4 h-4" />} title={ct.recentCustomersTitle} />
           <div className="flex-1">
             {pendingItems === null
@@ -291,9 +291,9 @@ export default function ControlCenter() {
                     />
                   ))}
           </div>
-          <button onClick={() => void openAll('pending')} className="mt-2 w-full border-t pt-3 text-right text-xs font-black transition-colors" style={{ borderColor: BORDER, color: GOLD }}>{ct.viewAll}</button>
+          <button onClick={() => void openAll('pending')} className="mt-2 w-full border-t pt-3 text-right text-xs font-bold transition-colors" style={{ borderColor: BORDER, color: GOLD }}>{ct.viewAll}</button>
         </div>
-        <div className="rounded-[18px] border p-5 shadow-sm flex flex-col" style={{ backgroundColor: CARD, borderColor: BORDER }}>
+        <div className="rounded-[10px] border p-5 shadow-sm flex flex-col" style={{ backgroundColor: CARD, borderColor: BORDER }}>
           <SectionHeader icon={<MessageSquare className="w-4 h-4" />} title={ct.recentCommsTitle} />
           <div className="flex-1">
             {recentFollowups === null
@@ -310,25 +310,25 @@ export default function ControlCenter() {
                     />
                   ))}
           </div>
-          <button onClick={() => void openAll('followups')} className="mt-2 w-full border-t pt-3 text-right text-xs font-black transition-colors" style={{ borderColor: BORDER, color: GOLD }}>{ct.viewAll}</button>
+          <button onClick={() => void openAll('followups')} className="mt-2 w-full border-t pt-3 text-right text-xs font-bold transition-colors" style={{ borderColor: BORDER, color: GOLD }}>{ct.viewAll}</button>
         </div>
       </div>
 
       {allList && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={allTitle}>
-          <button className="absolute inset-0 bg-black/70" aria-label={ct.close} onClick={() => setAllList(null)} />
-          <div className="relative z-10 flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-[20px] border shadow-2xl" style={{ background: NAVY, borderColor: 'rgba(203,168,92,0.35)' }}>
+        <ModalPortal><div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 max-sm:p-0 max-sm:items-start max-sm:overflow-y-auto" role="dialog" aria-modal="true" aria-label={allTitle}>
+          <button className="absolute inset-0 bg-[rgba(8,13,30,0.5)]" aria-label={ct.close} onClick={() => setAllList(null)} />
+          <div className="relative z-10 flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-[14px] border shadow-2xl max-sm:min-h-full max-sm:max-h-none max-sm:rounded-none" style={{ background: NAVY, borderColor: 'rgba(203,168,92,0.35)' }}>
             <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: BORDER }}>
               <div>
-                <h2 className="text-base font-black" style={{ color: T1 }}>{allTitle}</h2>
-                {!allLoading && !allError && <p className="mt-1 text-[11px] font-bold" style={{ color: T2 }}>{ct.totalRecords.replace('{count}', String(allRows.length))}</p>}
+                <h2 className="text-base font-bold" style={{ color: T1 }}>{allTitle}</h2>
+                {!allLoading && !allError && <p className="mt-1 text-xs font-bold" style={{ color: T2 }}>{ct.totalRecords.replace('{count}', String(allRows.length))}</p>}
               </div>
-              <button onClick={() => setAllList(null)} className="rounded-lg p-2" aria-label={ct.close} style={{ color: T2 }}><X className="h-5 w-5" /></button>
+              <button onClick={() => setAllList(null)} className="rounded-md p-2" aria-label={ct.close} style={{ color: T2 }}><X className="h-5 w-5" /></button>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
               {allLoading && <div className="py-10 text-center text-sm font-bold" style={{ color: T2 }}>{lang === 'zh' ? '加载中…' : 'Loading…'}</div>}
-              {allError && <div className="py-10 text-center text-sm font-bold" style={{ color: '#E0846A' }}>{ct.loadError}</div>}
+              {allError && <div className="py-10 text-center text-sm font-bold" style={{ color: '#C53030' }}>{ct.loadError}</div>}
               {!allLoading && !allError && allPageRows.length === 0 && <div className="py-10 text-center text-sm font-bold" style={{ color: T2 }}>{allList === 'pending' ? ct.noPendingItems : ct.noRecentItems}</div>}
               {!allLoading && !allError && allPageRows.map(row => {
                 if (allList === 'businesses') {
@@ -346,21 +346,21 @@ export default function ControlCenter() {
 
             {!allLoading && !allError && allRows.length > 0 && (
               <div className="flex items-center justify-between gap-3 border-t px-5 py-4" style={{ borderColor: BORDER }}>
-                <button disabled={allPage === 1} onClick={() => setAllPage(page => Math.max(1, page - 1))} className="flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-30" style={{ color: GOLD, border: `1px solid ${BORDER}` }}><ChevronLeft className="h-3.5 w-3.5" />{ct.previousPage}</button>
-                <span className="text-[11px] font-bold" style={{ color: T2 }}>{ct.pageOf.replace('{page}', String(allPage)).replace('{total}', String(allPageCount))}</span>
-                <button disabled={allPage === allPageCount} onClick={() => setAllPage(page => Math.min(allPageCount, page + 1))} className="flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-black disabled:cursor-not-allowed disabled:opacity-30" style={{ color: GOLD, border: `1px solid ${BORDER}` }}>{ct.nextPage}<ChevronRight className="h-3.5 w-3.5" /></button>
+                <button disabled={allPage === 1} onClick={() => setAllPage(page => Math.max(1, page - 1))} className="flex items-center gap-1 rounded-md px-3 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-30" style={{ color: GOLD, border: `1px solid ${BORDER}` }}><ChevronLeft className="h-3.5 w-3.5" />{ct.previousPage}</button>
+                <span className="text-xs font-bold" style={{ color: T2 }}>{ct.pageOf.replace('{page}', String(allPage)).replace('{total}', String(allPageCount))}</span>
+                <button disabled={allPage === allPageCount} onClick={() => setAllPage(page => Math.min(allPageCount, page + 1))} className="flex items-center gap-1 rounded-md px-3 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-30" style={{ color: GOLD, border: `1px solid ${BORDER}` }}>{ct.nextPage}<ChevronRight className="h-3.5 w-3.5" /></button>
               </div>
             )}
           </div>
-        </div>
+        </div></ModalPortal>
       )}
 
       {/* Task-oriented KPIs — kept, but now secondary to the overview above */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard icon={<Calendar className="w-5 h-5" />}      label={ct.kpiFollowupsToday} value={todayFollowupsReal} color="#8FA6D4" />
         <StatCard icon={<TrendingUp className="w-5 h-5" />}    label={ct.kpiHighPriority}   value={highPriorityReal}   color={GOLD} />
-        <StatCard icon={<Briefcase className="w-5 h-5" />}     label={ct.kpiActiveProjects} value={activeProjectsReal} color="#6FBF8E" />
-        <StatCard icon={<AlertTriangle className="w-5 h-5" />} label={ct.kpiOverdueRisk}    value={overdueReal}        color="#E0846A" />
+        <StatCard icon={<Briefcase className="w-5 h-5" />}     label={ct.kpiActiveProjects} value={activeProjectsReal} color="#15803D" />
+        <StatCard icon={<AlertTriangle className="w-5 h-5" />} label={ct.kpiOverdueRisk}    value={overdueReal}        color="#C53030" />
       </div>
 
       {/* 优先级分布 / 项目类型占比 / 客户阶段大图表 / AI Action Center — removed

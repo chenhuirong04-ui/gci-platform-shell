@@ -3,7 +3,6 @@
 // GIA (Business Assistant) stays as the natural-language assistant entry, not the only one.
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { colors } from '@gci/design-system';
 import {
   getCustomerDirectory, getTodaysFollowups, getOverdueFollowups, setCustomerActive,
   setCustomerPrimaryType, updateCustomerStage, updateCustomerNextFollowUp, crmDate, CRM_STAGES,
@@ -13,14 +12,70 @@ import { CustomerCreateModal } from '../components/CustomerCreateModal';
 import { CrmFollowupModal, type FollowupTarget } from '../components/crm/CrmFollowupModal';
 import { CrmCustomerDrawer } from '../components/crm/CrmCustomerDrawer';
 import { nextFollowUpDateForSave } from '../lib/crmDateInput';
+import { useI18n } from '@gci/i18n';
+import { workspaceFontFamily } from '@gci/design-system';
 
-const GOLD = '#CBA85C';
-const RED = '#E0846A';
-const GREEN = '#6FBF8E';
-const MUTED = '#7A8494';
-const TEXT = colors.textPrimary;
-const CARD = 'rgba(255,255,255,0.025)';
-const BORD = 'rgba(255,255,255,0.07)';
+// i18n: English for this page's fixed UI text (database values are never translated).
+// LANG is set from the language context by the page component on every render.
+let LANG: 'zh' | 'en' = 'zh';
+const EN: Record<string, string> = {
+  "客户名录": "Customer Directory",
+  "今日跟进": "Today's Follow-ups",
+  "逾期跟进": "Overdue Follow-ups",
+  "已停用客户": "Inactive Customers",
+  "全部客户": "All Customers",
+  "项目客户": "Project Customers",
+  "批发 / 小贸易": "Wholesale / Small Trade",
+  "服务类": "Services",
+  "项目客户 (Project)": "Project",
+  "批发 / 小贸易 (Wholesale & Small Trade)": "Wholesale & Small Trade",
+  "服务类 (Services)": "Services",
+  "未分类 (Unclassified)": "Unclassified",
+  "查看客户档案：": "View customer profile: ",
+  "已新增客户「": "Customer added: ",
+  "没有匹配该客户类型的记录。": "No records match this customer type.",
+  "没有已停用的客户。": "No inactive customers.",
+  "暂无记录。": "No records yet.",
+  "客户/公司": "Customer / Company",
+  "联系人": "Contact",
+  "国家": "Country",
+  "业务线": "Business Line",
+  "客户类型": "Customer Type",
+  "阶段": "Stage",
+  "最近沟通": "Last Contact",
+  "下次跟进": "Next Follow-up",
+  "负责人": "Owner",
+  "操作": "Actions",
+  "恢复中…": "Restoring…",
+  "恢复客户": "Restore",
+  "跟进已保存": "Follow-up saved",
+  "查看客户档案": "View customer profile",
+  "修改客户阶段": "Change customer stage",
+  "修改下次跟进日期": "Change next follow-up date",
+  "← 返回": "← Back",
+  "客户与项目 CRM 工作台": "Customers & Projects · CRM Workspace",
+  "正式客户库 · 客户 / 联系人 / 跟进 / 项目": "Customer database · Customers / Contacts / Follow-ups / Projects",
+  "+ 新增客户": "+ New Customer",
+  "+ 记录跟进": "+ Log Follow-up",
+  "GIA 智能助手": "GIA Assistant",
+  "加载中…": "Loading…",
+  "读取失败:": "Load failed: ",
+  "查看档案 ›": "View profile ›",
+  "逾期": "Overdue ",
+  "天": "d",
+  "详情": "Details",
+  "+ 跟进": "+ Follow-up"
+};
+const tx = (zh: string): string => (LANG === 'en' ? EN[zh] ?? zh : zh);
+
+
+const GOLD = '#7A5F2A';
+const RED = '#C53030';
+const GREEN = '#15803D';
+const MUTED = '#475569';
+const TEXT = '#0C1B3A';
+const CARD = '#FFFFFF';
+const BORD = 'rgba(12,27,58,0.07)';
 
 type ViewKey = 'directory' | 'today' | 'overdue' | 'archived';
 
@@ -61,6 +116,7 @@ function fmtDate(d: string | null): string {
 }
 
 export function CrmCustomers() {
+  LANG = useI18n().lang; // keep tx() in sync with the language toggle
   const navigate = useNavigate();
   const [view, setView] = useState<ViewKey>('directory');
   const [rows, setRows] = useState<CrmCustomerWithContact[] | CrmOverdueCustomer[]>([]);
@@ -179,38 +235,39 @@ export function CrmCustomers() {
   }
 
   return (
+    <div style={{ background: '#F5F6FA', minHeight: 'calc(100vh - var(--header-h))', color: '#0C1B3A', fontFamily: workspaceFontFamily }}>
     <div style={{ maxWidth: 1400, margin: '0 auto', padding: '28px 28px 40px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18, flexWrap: 'wrap' }}>
         <button
           onClick={() => navigate('/')}
-          style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: MUTED, fontSize: 13, cursor: 'pointer' }}
+          style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(12,27,58,0.05)', border: '1px solid rgba(12,27,58,0.12)', color: MUTED, fontSize: 13, cursor: 'pointer' }}
         >
-          ← 返回
+          {tx('← 返回')}
         </button>
         <div style={{ minWidth: 0 }}>
           <h1 style={{ fontSize: 20, fontWeight: 700, color: TEXT, margin: 0, fontFamily: "'Space Grotesk',sans-serif" }}>
-            客户与项目 CRM 工作台
+            {tx('客户与项目 CRM 工作台')}
           </h1>
-          <div style={{ fontSize: 11.5, color: MUTED, marginTop: 3 }}>正式客户库 · 客户 / 联系人 / 跟进 / 项目</div>
+          <div style={{ fontSize: 11.5, color: MUTED, marginTop: 3 }}>{tx('正式客户库 · 客户 / 联系人 / 跟进 / 项目')}</div>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             onClick={() => setCreateOpen(true)}
-            style={{ padding: '9px 16px', borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#E2C988)`, border: 'none', color: '#080D1E' }}
+            style={{ padding: '9px 16px', borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', background: '#080D1E', border: 'none', color: '#FFFFFF' }}
           >
-            + 新增客户
+            {tx('+ 新增客户')}
           </button>
           <button
             onClick={() => openFollowup(null)}
             style={{ padding: '9px 16px', borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', background: 'rgba(203,168,92,0.14)', border: `1px solid ${GOLD}`, color: GOLD }}
           >
-            + 记录跟进
+            {tx('+ 记录跟进')}
           </button>
           <button
             onClick={() => openGia()}
-            style={{ padding: '9px 16px', borderRadius: 9, fontSize: 12.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: MUTED }}
+            style={{ padding: '9px 16px', borderRadius: 9, fontSize: 12.5, cursor: 'pointer', background: 'rgba(12,27,58,0.05)', border: `1px solid ${BORD}`, color: MUTED }}
           >
-            GIA 智能助手
+            {tx('GIA 智能助手')}
           </button>
         </div>
       </div>
@@ -222,48 +279,48 @@ export function CrmCustomers() {
         <div role="alert" style={{ marginBottom: 14, padding: '9px 14px', borderRadius: 9, background: 'rgba(224,132,106,0.1)', border: '1px solid rgba(224,132,106,0.35)', color: RED, fontSize: 12.5 }}>{actionError}</div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
         {VIEWS.map((v) => (
           <button
             key={v.key}
             onClick={() => setView(v.key)}
             style={{
               padding: '8px 16px', borderRadius: 9, fontSize: 12.5, cursor: 'pointer',
-              background: view === v.key ? `linear-gradient(135deg,${GOLD},#E2C988)` : 'rgba(255,255,255,0.04)',
+              background: view === v.key ? '#080D1E' : 'rgba(12,27,58,0.04)',
               border: `1px solid ${view === v.key ? 'transparent' : BORD}`,
-              color: view === v.key ? '#080D1E' : MUTED,
+              color: view === v.key ? '#FFFFFF' : MUTED,
               fontWeight: view === v.key ? 700 : 400,
             }}
           >
-            {v.label}
+            {tx(v.label)}
           </button>
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
         {TYPE_FILTERS.map((f) => (
           <button
             key={f.key}
             onClick={() => setTypeFilter(f.key)}
             style={{
               padding: '6px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer',
-              background: typeFilter === f.key ? 'rgba(203,168,92,0.18)' : 'rgba(255,255,255,0.03)',
+              background: typeFilter === f.key ? 'rgba(203,168,92,0.18)' : 'rgba(12,27,58,0.03)',
               border: `1px solid ${typeFilter === f.key ? GOLD : BORD}`,
               color: typeFilter === f.key ? GOLD : MUTED,
               fontWeight: typeFilter === f.key ? 700 : 400,
             }}
           >
-            {f.label}
+            {tx(f.label)}
           </button>
         ))}
       </div>
 
-      {loading && <div style={{ fontSize: 13, color: MUTED }}>加载中…</div>}
-      {error && <div style={{ fontSize: 13, color: RED }}>读取失败:{error}</div>}
+      {loading && <div style={{ fontSize: 13, color: MUTED }}>{tx('加载中…')}</div>}
+      {error && <div style={{ fontSize: 13, color: RED }}>{tx('读取失败:')}{error}</div>}
 
       {!loading && !error && filteredRows.length === 0 && (
         <div style={{ padding: '18px 20px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, fontSize: 13, color: MUTED }}>
-          {rows.length > 0 ? '没有匹配该客户类型的记录。' : (view === 'archived' ? '没有已停用的客户。' : '暂无记录。')}
+          {rows.length > 0 ? tx('没有匹配该客户类型的记录。') : (view === 'archived' ? tx('没有已停用的客户。') : tx('暂无记录。'))}
         </div>
       )}
 
@@ -271,9 +328,9 @@ export function CrmCustomers() {
         <div style={{ background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead>
-              <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
-                {['客户/公司', '联系人', '国家', '业务线', '客户类型', '阶段', '最近沟通', '下次跟进', 'Next Action', '负责人', '操作'].map((h) => (
-                  <th key={h} style={{ textAlign: 'left', padding: '10px 14px', color: GOLD, fontWeight: 700, fontSize: 10.5, letterSpacing: '0.04em', borderBottom: `1px solid ${BORD}` }}>{h}</th>
+              <tr style={{ background: 'rgba(12,27,58,0.03)' }}>
+                {[tx('客户/公司'), tx('联系人'), tx('国家'), tx('业务线'), tx('客户类型'), tx('阶段'), tx('最近沟通'), tx('下次跟进'), (LANG === 'en' ? 'Next Action' : '下一步行动'), tx('负责人'), tx('操作')].map((h) => (
+                  <th key={h} style={{ textAlign: 'left', padding: '10px 14px', color: GOLD, fontWeight: 700, fontSize: 12, letterSpacing: '0.04em', whiteSpace: 'nowrap', borderBottom: `1px solid ${BORD}` }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -283,7 +340,7 @@ export function CrmCustomers() {
                   key={r.id}
                   onClick={() => setDrawerRow(r)}
                   style={{ cursor: 'pointer', borderBottom: `1px solid ${BORD}` }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(12,27,58,0.03)')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 >
                   {/* The name is the visible "open profile" entry — the 详情 button sits in the last column, off-screen on a laptop-width table. */}
@@ -291,12 +348,12 @@ export function CrmCustomers() {
                     <button
                       type="button"
                       onClick={() => setDrawerRow(r)}
-                      title="查看客户档案"
-                      aria-label={`查看客户档案：${r.customer_name}`}
+                      title={tx('查看客户档案')}
+                      aria-label={`${tx('查看客户档案：')}${r.customer_name}`}
                       style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', color: TEXT, fontWeight: 600, fontSize: 12.5, fontFamily: 'inherit' }}
                     >
                       <span style={{ textDecoration: 'underline', textDecorationColor: 'rgba(203,168,92,0.5)', textUnderlineOffset: 3 }}>{r.customer_name}</span>
-                      <span style={{ display: 'block', fontSize: 10.5, fontWeight: 400, color: GOLD, marginTop: 2 }}>查看档案 ›</span>
+                      <span style={{ display: 'block', fontSize: 10.5, fontWeight: 400, color: GOLD, marginTop: 2 }}>{tx('查看档案 ›')}</span>
                     </button>
                   </td>
                   <td style={{ padding: '10px 14px', color: MUTED }}>{view === 'today' || view === 'overdue' ? (primaryContact(r) ?? '—') : primaryContact(r)}</td>
@@ -309,24 +366,24 @@ export function CrmCustomers() {
                       onChange={(e) => handleTypeChange(r.id, e.target.value)}
                       style={{
                         padding: '4px 8px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer',
-                        background: r.customer_primary_type ? 'rgba(203,168,92,0.1)' : 'rgba(255,255,255,0.04)',
+                        background: r.customer_primary_type ? 'rgba(203,168,92,0.1)' : 'rgba(12,27,58,0.04)',
                         border: `1px solid ${r.customer_primary_type ? GOLD : BORD}`,
                         color: r.customer_primary_type ? GOLD : MUTED,
                       }}
                     >
-                      <option value="">{UNCLASSIFIED_LABEL}</option>
-                      <option value="project">{PRIMARY_TYPE_LABEL.project}</option>
-                      <option value="trade">{PRIMARY_TYPE_LABEL.trade}</option>
-                      <option value="services">{PRIMARY_TYPE_LABEL.services}</option>
+                      <option value="">{tx(UNCLASSIFIED_LABEL)}</option>
+                      <option value="project">{tx(PRIMARY_TYPE_LABEL.project)}</option>
+                      <option value="trade">{tx(PRIMARY_TYPE_LABEL.trade)}</option>
+                      <option value="services">{tx(PRIMARY_TYPE_LABEL.services)}</option>
                     </select>
                   </td>
                   <td style={{ padding: '10px 14px' }} onClick={(e) => e.stopPropagation()}>
                     <select
-                      aria-label="修改客户阶段"
+                      aria-label={tx('修改客户阶段')}
                       value={r.status || ''}
                       disabled={rowBusy === r.id || view === 'archived'}
                       onChange={(e) => handleStage(r.id, e.target.value)}
-                      style={{ padding: '4px 8px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: r.status ? TEXT : MUTED }}
+                      style={{ padding: '4px 8px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(12,27,58,0.04)', border: `1px solid ${BORD}`, color: r.status ? TEXT : MUTED }}
                     >
                       {!r.status && <option value="">—</option>}
                       {(r.status && !CRM_STAGES.includes(r.status) ? [r.status, ...CRM_STAGES] : CRM_STAGES).map((s: string) => <option key={s} value={s}>{s}</option>)}
@@ -336,16 +393,16 @@ export function CrmCustomers() {
                   <td style={{ padding: '10px 14px', color: view === 'overdue' ? RED : MUTED, whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
                     <input
                       key={`${r.id}:${r.next_follow_up_at || ''}`}
-                      aria-label="修改下次跟进日期"
+                      aria-label={tx('修改下次跟进日期')}
                       type="date"
                       defaultValue={r.next_follow_up_at || ''}
                       min={crmDate(1)}
                       disabled={rowBusy === r.id || view === 'archived'}
                       onBlur={(e) => handleNextDateBlur(r.id, r.next_follow_up_at || null, e.currentTarget.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                      style={{ padding: '3px 6px', borderRadius: 7, fontSize: 11.5, background: 'rgba(255,255,255,0.04)', border: `1px solid ${view === 'overdue' ? RED : BORD}`, color: view === 'overdue' ? RED : MUTED, colorScheme: 'dark' }}
+                      style={{ padding: '3px 6px', borderRadius: 7, fontSize: 11.5, background: 'rgba(12,27,58,0.04)', border: `1px solid ${view === 'overdue' ? RED : BORD}`, color: view === 'overdue' ? RED : MUTED, colorScheme: 'dark' }}
                     />
-                    {view === 'overdue' && r.overdueDays ? <span style={{ marginLeft: 6, fontSize: 11 }}>逾期{r.overdueDays}天</span> : null}
+                    {view === 'overdue' && r.overdueDays ? <span style={{ marginLeft: 6, fontSize: 11 }}>{tx('逾期')}{r.overdueDays}{tx('天')}</span> : null}
                   </td>
                   <td style={{ padding: '10px 14px', color: MUTED, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.next_action || '—'}</td>
                   <td style={{ padding: '10px 14px', color: MUTED }}>{r.owner || '—'}</td>
@@ -354,15 +411,15 @@ export function CrmCustomers() {
                       <>
                         <button
                           onClick={() => setDrawerRow(r)}
-                          style={{ padding: '4px 10px', borderRadius: 7, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT, marginRight: 6 }}
+                          style={{ padding: '4px 10px', borderRadius: 7, fontSize: 11, cursor: 'pointer', background: 'rgba(12,27,58,0.05)', border: `1px solid ${BORD}`, color: TEXT, marginRight: 6 }}
                         >
-                          详情
+                          {tx('详情')}
                         </button>
                         <button
                           onClick={() => openFollowup({ id: r.id, customer_name: r.customer_name })}
                           style={{ padding: '4px 10px', borderRadius: 7, fontSize: 11, cursor: 'pointer', background: 'rgba(203,168,92,0.12)', border: `1px solid ${GOLD}`, color: GOLD }}
                         >
-                          + 跟进
+                          {tx('+ 跟进')}
                         </button>
                       </>
                     )}
@@ -372,7 +429,7 @@ export function CrmCustomers() {
                         onClick={(e) => { e.stopPropagation(); handleRestore(r.id); }}
                         style={{ padding: '4px 10px', borderRadius: 7, fontSize: 11, cursor: 'pointer', background: 'rgba(111,191,142,0.14)', border: '1px solid rgba(111,191,142,0.4)', color: GREEN }}
                       >
-                        {restoreBusy === r.id ? '恢复中…' : '恢复客户'}
+                        {restoreBusy === r.id ? tx('恢复中…') : tx('恢复客户')}
                       </button>
                     )}
                   </td>
@@ -389,7 +446,7 @@ export function CrmCustomers() {
         onClose={() => setCreateOpen(false)}
         onCreated={(c, _contact, notice) => {
           setCreateOpen(false);
-          flash(notice || `已新增客户「${c.customer_name}」`);
+          flash(notice || (LANG === 'en' ? `Customer added: ${c.customer_name}` : `已新增客户「${c.customer_name}」`));
           if (view !== 'directory') setView('directory'); else load();
         }}
         onUseExisting={(existing) => {
@@ -404,7 +461,7 @@ export function CrmCustomers() {
         onClose={() => setFollowupOpen(false)}
         onSaved={(customerId) => {
           setFollowupOpen(false);
-          flash('跟进已保存');
+          flash(tx('跟进已保存'));
           load();
           setDrawerReload((n) => n + 1);
           // keep an open detail panel in sync with the customer's new last/next follow-up
@@ -423,6 +480,7 @@ export function CrmCustomers() {
         onAddFollowup={(c) => openFollowup({ id: c.id, customer_name: c.customer_name })}
         onOpenGia={(c) => openGia(c.customer_name)}
       />
+    </div>
     </div>
   );
 }

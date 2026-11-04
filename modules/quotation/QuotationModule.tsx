@@ -158,6 +158,7 @@ import {
   CabinetModule,
   ModularCabinetConfiguration
 } from './constants';
+import { ModalPortal, workspaceFontFamily } from '@gci/design-system';
 
 const CHAIR_STEPS = [
   { id: 'dimensions', title: 'Size', icon: Ruler },
@@ -1766,20 +1767,20 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       <>
       {/* SUPPLY CHAIN 分区页面标题 */}
       <h1 className="text-2xl font-semibold mb-2" style={{ fontFamily: "'Space Grotesk',sans-serif", color: '#0C1B3A' }}>服务报价</h1>
-      <div className="flex items-center gap-2 text-[12px] font-black uppercase tracking-widest flex-wrap">
-        <button onClick={() => setAppMode('landing')} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">
+      <div className="flex items-center gap-2 text-[12px] font-bold flex-wrap">
+        <button onClick={() => setAppMode('landing')} className="text-slate-600 hover:text-[#7A5F2A] transition-colors">
           Workflow Home
         </button>
-        <span className="text-[#0C1B3A]/20">›</span>
+        <span className="text-slate-600">›</span>
         {svcView === 'list' ? (
-          <span className="text-[#C9A84C]">Service Quote</span>
+          <span className="text-[#7A5F2A]">Service Quote</span>
         ) : (
-          <button onClick={() => setSvcView('list')} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">Service Quote</button>
+          <button onClick={() => setSvcView('list')} className="text-slate-600 hover:text-[#7A5F2A] transition-colors">Service Quote</button>
         )}
         {trail && (
           <>
-            <span className="text-[#0C1B3A]/20">›</span>
-            <span className="text-[#C9A84C]">{trail}</span>
+            <span className="text-slate-600">›</span>
+            <span className="text-[#7A5F2A]">{trail}</span>
           </>
         )}
       </div>
@@ -1793,17 +1794,17 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           <SvcBreadcrumb />
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-serif italic text-[#0C1B3A]">Service Quotes 服务报价</h2>
-              <p className="text-[11px] text-[#0C1B3A]/50 mt-1">企业服务 · 出海服务 · 项目服务 · 海外仓 · 供应链 · AI数字化（与库存/SKU/成本无关）</p>
+              <h2 className="text-2xl italic text-[#0C1B3A]">Service Quotes 服务报价</h2>
+              <p className="text-xs text-slate-600 mt-1">企业服务 · 出海服务 · 项目服务 · 海外仓 · 供应链 · AI数字化（与库存/SKU/成本无关）</p>
             </div>
             <div className="flex gap-3">
               <button onClick={() => { svcLoadCatalog(); setSvcView('catalog'); }}
-                className="px-5 py-3 rounded-[16px] text-[11px] font-black uppercase tracking-widest border border-[#0C1B3A]/15 text-[#0C1B3A]/60 hover:border-[#C9A84C] hover:text-[#0C1B3A] transition-all">
+                className="px-5 py-3 rounded-md text-xs font-bold border border-[#0C1B3A]/15 text-slate-600 hover:border-[#C9A84C] hover:text-[#0C1B3A] transition-all">
                 Manage Catalog
               </button>
               <button
                 onClick={startNewQuote}
-                className="px-6 py-3 rounded-[16px] text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg"
+                className="px-6 py-3 rounded-md text-xs font-bold flex items-center gap-2 shadow-lg"
                 style={{ backgroundColor: '#0C1B3A', color: '#C9A84C' }}
               >
                 <Plus className="w-4 h-4" /> New Service Quote
@@ -1811,9 +1812,9 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             </div>
           </div>
 
-          <div className="bg-white rounded-[24px] border border-[#0C1B3A]/8 overflow-hidden shadow-sm">
+          <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 overflow-hidden shadow-sm">
             {svcQuotes.length === 0 ? (
-              <div className="p-16 text-center text-[#0C1B3A]/30 text-[12px]">
+              <div className="p-16 text-center text-slate-600 text-[12px]">
                 No service quotes yet. Click "New Service Quote" to start. 暂无服务报价，点击上方按钮新建。
               </div>
             ) : (
@@ -1821,13 +1822,13 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                 {svcQuotes.map(sq => (
                   <div key={sq.id} className="flex items-center justify-between px-6 py-4 hover:bg-[#0C1B3A]/2 transition-colors">
                     <div>
-                      <p className="text-[13px] font-black text-[#0C1B3A]">{sq.quote_no} · {sq.customer_name}</p>
-                      <p className="text-[11px] text-[#0C1B3A]/40 mt-0.5">{sq.quote_date} · {sq.currency} {sq.total_amount.toFixed(2)} · <span className="uppercase font-bold">{sq.status}</span></p>
+                      <p className="text-[13px] font-bold text-[#0C1B3A]">{sq.quote_no} · {sq.customer_name}</p>
+                      <p className="text-xs text-slate-600 mt-0.5">{sq.quote_date} · {sq.currency} {sq.total_amount.toFixed(2)} · <span className=" font-bold">{sq.status}</span></p>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => handleOpenServiceQuote(sq, false)} className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider border border-[#0C1B3A]/15 text-[#0C1B3A]/60 hover:border-[#C9A84C] hover:text-[#0C1B3A] transition-all">Open</button>
-                      <button onClick={() => handleOpenServiceQuote(sq, true)} className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider border border-[#0C1B3A]/15 text-[#0C1B3A]/60 hover:border-[#C9A84C] hover:text-[#0C1B3A] transition-all">Duplicate</button>
-                      <button onClick={() => sq.id && handleDeleteServiceQuote(sq.id)} className="px-3 py-2 rounded-xl text-[#0C1B3A]/20 hover:text-red-400 transition-colors"><X className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => handleOpenServiceQuote(sq, false)} className="px-4 py-2 rounded-md text-xs font-bold border border-[#0C1B3A]/15 text-slate-600 hover:border-[#C9A84C] hover:text-[#0C1B3A] transition-all">Open</button>
+                      <button onClick={() => handleOpenServiceQuote(sq, true)} className="px-4 py-2 rounded-md text-xs font-bold border border-[#0C1B3A]/15 text-slate-600 hover:border-[#C9A84C] hover:text-[#0C1B3A] transition-all">Duplicate</button>
+                      <button onClick={() => sq.id && handleDeleteServiceQuote(sq.id)} className="px-3 py-2 rounded-md text-slate-600 hover:text-red-600 transition-colors"><X className="w-3.5 h-3.5" /></button>
                     </div>
                   </div>
                 ))}
@@ -1844,9 +1845,9 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
         <div className="space-y-8 animate-in fade-in duration-500">
           <SvcBreadcrumb trail="New Service Quote" />
           <div className="text-center space-y-2">
-            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#C9A84C] bg-[#C9A84C]/10 px-3 py-1 rounded-full">Step 1 of 3</span>
-            <h2 className="text-2xl font-serif italic text-[#0C1B3A]">Choose a Service Category</h2>
-            <p className="text-[11px] text-[#0C1B3A]/45">请选择服务分类</p>
+            <span className="text-xs font-bold text-[#7A5F2A] bg-[#C9A84C]/10 px-3 py-1 rounded-full">Step 1 of 3</span>
+            <h2 className="text-2xl italic text-[#0C1B3A]">Choose a Service Category</h2>
+            <p className="text-xs text-slate-600">请选择服务分类</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 max-w-4xl mx-auto">
             {svcCategories.map(cat => {
@@ -1855,27 +1856,27 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
               return (
                 <button key={cat.id}
                   onClick={() => { setSvcActiveCategoryId(cat.id || null); setSvcPickerSearch(''); setSvcView('items'); }}
-                  className="group text-left p-7 bg-white border-2 border-[#0C1B3A]/8 rounded-[28px] hover:border-[#C9A84C] hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col gap-3"
+                  className="group text-left p-7 bg-white border-2 border-[#0C1B3A]/8 rounded-md hover:border-[#C9A84C] hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col gap-3"
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-[#0C1B3A]/4 group-hover:bg-[#C9A84C]/12 flex items-center justify-center transition-colors">
-                    <Icon className="w-6 h-6 text-[#0C1B3A]/40 group-hover:text-[#C9A84C] transition-colors" />
+                  <div className="w-12 h-12 rounded-[10px] bg-[#0C1B3A]/4 group-hover:bg-[#C9A84C]/12 flex items-center justify-center transition-colors">
+                    <Icon className="w-6 h-6 text-slate-600 group-hover:text-[#7A5F2A] transition-colors" />
                   </div>
                   <div>
-                    <h3 className="text-[15px] font-black text-[#0C1B3A] group-hover:text-[#C9A84C] transition-colors">{cat.name_cn}</h3>
-                    <p className="text-[11px] text-[#0C1B3A]/40 font-bold mt-0.5">{cat.name_en}</p>
+                    <h3 className="text-[15px] font-bold text-[#0C1B3A] group-hover:text-[#7A5F2A] transition-colors">{cat.name_cn}</h3>
+                    <p className="text-xs text-slate-600 font-bold mt-0.5">{cat.name_en}</p>
                   </div>
-                  <p className="text-[10px] text-[#0C1B3A]/30 mt-auto">{count} service{count === 1 ? '' : 's'}</p>
+                  <p className="text-xs text-slate-600 mt-auto">{count} service{count === 1 ? '' : 's'}</p>
                 </button>
               );
             })}
             {svcCategories.length === 0 && svcCatalogLoading && (
-              <p className="col-span-3 text-center text-[#0C1B3A]/30 text-[12px] py-10">Loading catalog... 正在加载服务目录</p>
+              <p className="col-span-3 text-center text-slate-600 text-[12px] py-10">Loading catalog... 正在加载服务目录</p>
             )}
             {svcCategories.length === 0 && !svcCatalogLoading && svcCatalogError && (
               <div className="col-span-3 text-center py-10 space-y-4">
                 <p className="text-[12px] text-red-500/80 max-w-md mx-auto leading-relaxed">{svcCatalogError}</p>
                 <button onClick={() => svcLoadCatalog(true)}
-                  className="px-6 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider border border-[#0C1B3A]/15 text-[#0C1B3A]/60 hover:border-[#C9A84C] hover:text-[#0C1B3A] transition-all">
+                  className="px-6 py-2.5 rounded-md text-xs font-bold border border-[#0C1B3A]/15 text-slate-600 hover:border-[#C9A84C] hover:text-[#0C1B3A] transition-all">
                   Retry 重试
                 </button>
               </div>
@@ -1883,7 +1884,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           </div>
           {svcItems.length > 0 && (
             <div className="flex justify-center">
-              <button onClick={() => setSvcView('editor')} className="px-8 py-3.5 rounded-[16px] text-[11px] font-black uppercase tracking-widest flex items-center gap-2" style={{ backgroundColor: '#C9A84C', color: '#0C1B3A' }}>
+              <button onClick={() => setSvcView('editor')} className="px-8 py-3.5 rounded-md text-xs font-bold flex items-center gap-2" style={{ backgroundColor: '#C9A84C', color: '#0C1B3A' }}>
                 {svcItems.length} service{svcItems.length === 1 ? '' : 's'} selected · Continue to Quote <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -1900,7 +1901,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-24">
           <SvcBreadcrumb trail="New Service Quote" />
-          <button onClick={() => setSvcView('category')} className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-[#0C1B3A]/40 hover:text-[#C9A84C] transition-colors">
+          <button onClick={() => setSvcView('category')} className="flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-[#7A5F2A] transition-colors">
             <ChevronLeft className="w-4 h-4" /> All Categories
           </button>
 
@@ -1908,7 +1909,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           <div className="flex gap-2 overflow-x-auto pb-1">
             {svcCategories.map(cat => (
               <button key={cat.id} onClick={() => { setSvcActiveCategoryId(cat.id || null); setSvcPickerSearch(''); }}
-                className="px-4 py-2 rounded-full text-[11px] font-bold whitespace-nowrap transition-all"
+                className="px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all"
                 style={cat.id === svcActiveCategoryId ? { backgroundColor: '#0C1B3A', color: '#C9A84C' } : { backgroundColor: '#0C1B3A0A', color: '#0C1B3A80' }}
               >
                 {cat.name_cn}
@@ -1917,10 +1918,10 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-xl font-serif italic text-[#0C1B3A]">{activeCat?.name_cn} <span className="text-[#0C1B3A]/30 text-[14px]">{activeCat?.name_en}</span></h2>
+            <h2 className="text-xl italic text-[#0C1B3A]">{activeCat?.name_cn} <span className="text-slate-600 text-[14px]">{activeCat?.name_en}</span></h2>
             <div className="flex items-center gap-3">
-              <input value={svcPickerSearch} onChange={e => setSvcPickerSearch(e.target.value)} placeholder="Search services... 搜索服务" className="flex-1 max-w-md bg-white border border-[#0C1B3A]/10 rounded-xl px-4 py-2.5 text-[12px] outline-none focus:border-[#C9A84C]" />
-              <button onClick={svcAddCustomItem} className="px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider border border-dashed border-[#0C1B3A]/20 text-[#0C1B3A]/50 hover:border-[#C9A84C] hover:text-[#0C1B3A] whitespace-nowrap transition-colors">+ Custom Service</button>
+              <input value={svcPickerSearch} onChange={e => setSvcPickerSearch(e.target.value)} placeholder="Search services... 搜索服务" className="flex-1 max-w-md bg-white border border-[#0C1B3A]/10 rounded-md px-4 py-2.5 text-[12px] outline-none focus:border-[#C9A84C]" />
+              <button onClick={svcAddCustomItem} className="px-4 py-2.5 rounded-md text-xs font-bold border border-dashed border-[#0C1B3A]/20 text-slate-600 hover:border-[#C9A84C] hover:text-[#0C1B3A] whitespace-nowrap transition-colors">+ Custom Service</button>
             </div>
           </div>
 
@@ -1930,21 +1931,21 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
               return (
                 <button key={it.id} onClick={() => svcAddItemFromCatalog(it)}
                   disabled={added}
-                  className={`text-left p-5 rounded-[20px] border-2 transition-all ${added ? 'bg-[#C9A84C]/8 border-[#C9A84C]/30 cursor-default' : 'bg-white border-[#0C1B3A]/8 hover:border-[#C9A84C] hover:shadow-md'}`}
+                  className={`text-left p-5 rounded-md border-2 transition-all ${added ? 'bg-[#C9A84C]/8 border-[#C9A84C]/30 cursor-default' : 'bg-white border-[#0C1B3A]/8 hover:border-[#C9A84C] hover:shadow-md'}`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="text-[13px] font-black text-[#0C1B3A]">{it.name_cn}</p>
-                      <p className="text-[11px] text-[#0C1B3A]/40 font-bold mt-0.5">{it.name_en}</p>
+                      <p className="text-[13px] font-bold text-[#0C1B3A]">{it.name_cn}</p>
+                      <p className="text-xs text-slate-600 font-bold mt-0.5">{it.name_en}</p>
                     </div>
-                    {added ? <CheckCircle2 className="w-4 h-4 text-[#C9A84C] shrink-0" /> : <Plus className="w-4 h-4 text-[#0C1B3A]/20 shrink-0" />}
+                    {added ? <CheckCircle2 className="w-4 h-4 text-[#7A5F2A] shrink-0" /> : <Plus className="w-4 h-4 text-slate-600 shrink-0" />}
                   </div>
-                  <p className="text-[9px] text-[#0C1B3A]/30 mt-3 uppercase font-bold tracking-wider">{it.default_unit} · {BILLING_TYPE_LABELS[it.default_billing_type]}</p>
+                  <p className="text-xs text-slate-600 mt-3 font-bold ">{it.default_unit} · {BILLING_TYPE_LABELS[it.default_billing_type]}</p>
                 </button>
               );
             })}
             {visibleItems.length === 0 && (
-              <p className="col-span-3 text-center text-[#0C1B3A]/30 text-[12px] py-10">No services match "{svcPickerSearch}". Try "+ Custom Service" instead.</p>
+              <p className="col-span-3 text-center text-slate-600 text-[12px] py-10">No services match "{svcPickerSearch}". Try "+ Custom Service" instead.</p>
             )}
           </div>
 
@@ -1954,9 +1955,9 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
               sidebar from md up (sidebar hidden below md). */}
           {createPortal(
           <div className="fixed bottom-0 left-0 md:left-[var(--sidebar-w)] right-0 bg-white border-t border-[#0C1B3A]/10 shadow-2xl px-6 py-4 flex items-center justify-between z-20">
-            <p className="text-[12px] font-bold text-[#0C1B3A]/60">{svcItems.length} service{svcItems.length === 1 ? '' : 's'} selected 已选择</p>
+            <p className="text-[12px] font-bold text-slate-600">{svcItems.length} service{svcItems.length === 1 ? '' : 's'} selected 已选择</p>
             <button onClick={() => setSvcView('editor')} disabled={svcItems.length === 0}
-              className="px-8 py-3 rounded-[14px] text-[11px] font-black uppercase tracking-widest flex items-center gap-2 disabled:opacity-30 transition-all"
+              className="px-8 py-3 rounded-md text-xs font-bold flex items-center gap-2 disabled:opacity-30 transition-all"
               style={{ backgroundColor: '#C9A84C', color: '#0C1B3A' }}
             >
               Continue to Quote 进入报价单 <ChevronRight className="w-4 h-4" />
@@ -1973,16 +1974,16 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
         <div className="space-y-8 animate-in fade-in duration-500">
           <SvcBreadcrumb trail="Catalog Manager" />
           <div>
-            <h2 className="text-2xl font-serif italic text-[#0C1B3A]">Service Catalog Manager</h2>
-            <p className="text-[11px] text-[#0C1B3A]/50 mt-1">新增服务分类/项目，无需修改代码 — Add categories/services here, no developer needed for future additions.</p>
+            <h2 className="text-2xl italic text-[#0C1B3A]">Service Catalog Manager</h2>
+            <p className="text-xs text-slate-600 mt-1">新增服务分类/项目，无需修改代码 — Add categories/services here, no developer needed for future additions.</p>
           </div>
 
           {/* Add category */}
-          <div className="bg-white rounded-[20px] border border-[#0C1B3A]/8 p-6 space-y-3">
-            <h4 className="text-[12px] font-black text-[#0C1B3A]">Add Category 新增分类</h4>
+          <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 p-6 space-y-3">
+            <h4 className="text-[12px] font-bold text-[#0C1B3A]">Add Category 新增分类</h4>
             <div className="flex gap-3">
-              <input value={svcNewCatName.cn} onChange={e => setSvcNewCatName(p => ({ ...p, cn: e.target.value }))} placeholder="中文名称" className="flex-1 bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-4 py-2.5 text-[13px] outline-none focus:border-[#C9A84C]" />
-              <input value={svcNewCatName.en} onChange={e => setSvcNewCatName(p => ({ ...p, en: e.target.value }))} placeholder="English Name" className="flex-1 bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-4 py-2.5 text-[13px] outline-none focus:border-[#C9A84C]" />
+              <input value={svcNewCatName.cn} onChange={e => setSvcNewCatName(p => ({ ...p, cn: e.target.value }))} placeholder="中文名称" className="flex-1 bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-4 py-2.5 text-[13px] outline-none focus:border-[#C9A84C]" />
+              <input value={svcNewCatName.en} onChange={e => setSvcNewCatName(p => ({ ...p, en: e.target.value }))} placeholder="English Name" className="flex-1 bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-4 py-2.5 text-[13px] outline-none focus:border-[#C9A84C]" />
               <button
                 onClick={async () => {
                   if (!svcNewCatName.cn.trim() || !svcNewCatName.en.trim()) return;
@@ -1990,7 +1991,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                   setSvcNewCatName({ cn: '', en: '' });
                   const cats = await listServiceCategories(); setSvcCategories(cats);
                 }}
-                className="px-6 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider shrink-0"
+                className="px-6 py-2.5 rounded-md text-xs font-bold shrink-0"
                 style={{ backgroundColor: '#0C1B3A', color: '#C9A84C' }}
               >
                 Add
@@ -1999,17 +2000,17 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           </div>
 
           {/* Add catalog item */}
-          <div className="bg-white rounded-[20px] border border-[#0C1B3A]/8 p-6 space-y-3">
-            <h4 className="text-[12px] font-black text-[#0C1B3A]">Add Service 新增服务项目</h4>
+          <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 p-6 space-y-3">
+            <h4 className="text-[12px] font-bold text-[#0C1B3A]">Add Service 新增服务项目</h4>
             <div className="grid grid-cols-5 gap-3">
-              <select value={svcNewItem.categoryId} onChange={e => setSvcNewItem(p => ({ ...p, categoryId: e.target.value }))} className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-3 py-2.5 text-[12px] outline-none focus:border-[#C9A84C]">
+              <select value={svcNewItem.categoryId} onChange={e => setSvcNewItem(p => ({ ...p, categoryId: e.target.value }))} className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-3 py-2.5 text-[12px] outline-none focus:border-[#C9A84C]">
                 <option value="">Category 分类</option>
                 {svcCategories.map(c => <option key={c.id} value={c.id}>{c.name_cn}</option>)}
               </select>
-              <input value={svcNewItem.cn} onChange={e => setSvcNewItem(p => ({ ...p, cn: e.target.value }))} placeholder="中文名称" className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-3 py-2.5 text-[12px] outline-none focus:border-[#C9A84C]" />
-              <input value={svcNewItem.en} onChange={e => setSvcNewItem(p => ({ ...p, en: e.target.value }))} placeholder="English Name" className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-3 py-2.5 text-[12px] outline-none focus:border-[#C9A84C]" />
-              <input value={svcNewItem.unit} onChange={e => setSvcNewItem(p => ({ ...p, unit: e.target.value }))} placeholder="Unit 单位" className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-3 py-2.5 text-[12px] outline-none focus:border-[#C9A84C]" />
-              <select value={svcNewItem.billing} onChange={e => setSvcNewItem(p => ({ ...p, billing: e.target.value as ServiceBillingType }))} className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-3 py-2.5 text-[11px] outline-none focus:border-[#C9A84C]">
+              <input value={svcNewItem.cn} onChange={e => setSvcNewItem(p => ({ ...p, cn: e.target.value }))} placeholder="中文名称" className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-3 py-2.5 text-[12px] outline-none focus:border-[#C9A84C]" />
+              <input value={svcNewItem.en} onChange={e => setSvcNewItem(p => ({ ...p, en: e.target.value }))} placeholder="English Name" className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-3 py-2.5 text-[12px] outline-none focus:border-[#C9A84C]" />
+              <input value={svcNewItem.unit} onChange={e => setSvcNewItem(p => ({ ...p, unit: e.target.value }))} placeholder="Unit 单位" className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-3 py-2.5 text-[12px] outline-none focus:border-[#C9A84C]" />
+              <select value={svcNewItem.billing} onChange={e => setSvcNewItem(p => ({ ...p, billing: e.target.value as ServiceBillingType }))} className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-3 py-2.5 text-xs outline-none focus:border-[#C9A84C]">
                 {Object.entries(BILLING_TYPE_LABELS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
               </select>
             </div>
@@ -2020,7 +2021,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                 setSvcNewItem({ categoryId: svcNewItem.categoryId, cn: '', en: '', unit: '项', billing: 'fixed' });
                 const items = await listServiceCatalogItems(); setSvcCatalog(items);
               }}
-              className="px-6 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider"
+              className="px-6 py-2.5 rounded-md text-xs font-bold "
               style={{ backgroundColor: '#C9A84C', color: '#0C1B3A' }}
             >
               Add Service
@@ -2028,18 +2029,18 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           </div>
 
           {/* Existing catalog */}
-          <div className="bg-white rounded-[20px] border border-[#0C1B3A]/8 overflow-hidden">
+          <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 overflow-hidden">
             {svcCategories.map(cat => (
               <div key={cat.id} className="border-b border-[#0C1B3A]/6 last:border-b-0">
                 <div className="px-6 py-3 bg-[#0C1B3A]/3">
-                  <p className="text-[11px] font-black text-[#0C1B3A]">{cat.name_cn} / {cat.name_en}</p>
+                  <p className="text-xs font-bold text-[#0C1B3A]">{cat.name_cn} / {cat.name_en}</p>
                 </div>
                 {svcCatalog.filter(it => it.category_id === cat.id).map(it => (
                   <div key={it.id} className="flex items-center justify-between px-6 py-2.5 hover:bg-[#0C1B3A]/2">
-                    <p className="text-[12px] text-[#0C1B3A]/80">{it.name_cn} / {it.name_en} <span className="text-[#0C1B3A]/30">· {it.default_unit} · {BILLING_TYPE_LABELS[it.default_billing_type]}</span></p>
+                    <p className="text-[12px] text-[#0C1B3A]/80">{it.name_cn} / {it.name_en} <span className="text-slate-600">· {it.default_unit} · {BILLING_TYPE_LABELS[it.default_billing_type]}</span></p>
                     <button
                       onClick={async () => { if (it.id) { await deleteServiceCatalogItem(it.id); const items = await listServiceCatalogItems(); setSvcCatalog(items); } }}
-                      className="text-[#0C1B3A]/20 hover:text-red-400 transition-colors"
+                      className="text-slate-600 hover:text-red-600 transition-colors"
                     ><X className="w-3.5 h-3.5" /></button>
                   </div>
                 ))}
@@ -2105,32 +2106,32 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
         <SvcBreadcrumb trail={svcMeta.quoteNo} />
 
         <div className="flex items-center gap-3">
-          <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#C9A84C] bg-[#C9A84C]/10 px-3 py-1 rounded-full">Step 3 of 3</span>
-          <h2 className="text-2xl font-serif italic text-[#0C1B3A]">{svcMeta.quoteNo}</h2>
+          <span className="text-xs font-bold text-[#7A5F2A] bg-[#C9A84C]/10 px-3 py-1 rounded-full">Step 3 of 3</span>
+          <h2 className="text-2xl italic text-[#0C1B3A]">{svcMeta.quoteNo}</h2>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 items-start">
           {/* ── Left: editable quote form ───────────────────────────────────── */}
           <div className="space-y-6">
             {/* Customer info */}
-            <div className="bg-white rounded-[24px] border border-[#0C1B3A]/8 p-7 space-y-5">
-              <h4 className="text-[12px] font-black uppercase tracking-widest text-[#0C1B3A]/50">客户信息 Customer Information</h4>
+            <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 p-7 space-y-5">
+              <h4 className="text-[12px] font-bold text-slate-600">客户信息 Customer Information</h4>
               <div className="grid grid-cols-2 gap-5">
                 <div>
-                  <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">Customer Name 客户名称</label>
-                  <input value={svcMeta.customerName} onChange={e => setSvcMeta(p => ({ ...p, customerName: e.target.value }))} className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-4 py-2.5 text-[13px] font-bold outline-none focus:border-[#C9A84C]" />
+                  <label className="text-xs font-bold text-slate-600 block mb-1.5">Customer Name 客户名称</label>
+                  <input value={svcMeta.customerName} onChange={e => setSvcMeta(p => ({ ...p, customerName: e.target.value }))} className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-4 py-2.5 text-[13px] font-bold outline-none focus:border-[#C9A84C]" />
                 </div>
                 <div>
-                  <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">Contact Person 联系人</label>
-                  <input value={svcMeta.contactPerson} onChange={e => setSvcMeta(p => ({ ...p, contactPerson: e.target.value }))} className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-4 py-2.5 text-[13px] outline-none focus:border-[#C9A84C]" />
+                  <label className="text-xs font-bold text-slate-600 block mb-1.5">Contact Person 联系人</label>
+                  <input value={svcMeta.contactPerson} onChange={e => setSvcMeta(p => ({ ...p, contactPerson: e.target.value }))} className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-4 py-2.5 text-[13px] outline-none focus:border-[#C9A84C]" />
                 </div>
                 <div>
-                  <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">Quote Date 日期</label>
-                  <input type="date" value={svcMeta.quoteDate} onChange={e => setSvcMeta(p => ({ ...p, quoteDate: e.target.value }))} className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-4 py-2.5 text-[13px] outline-none focus:border-[#C9A84C]" />
+                  <label className="text-xs font-bold text-slate-600 block mb-1.5">Quote Date 日期</label>
+                  <input type="date" value={svcMeta.quoteDate} onChange={e => setSvcMeta(p => ({ ...p, quoteDate: e.target.value }))} className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-4 py-2.5 text-[13px] outline-none focus:border-[#C9A84C]" />
                 </div>
                 <div>
-                  <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">Currency 币种</label>
-                  <select value={svcMeta.currency} onChange={e => setSvcMeta(p => ({ ...p, currency: e.target.value }))} className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-4 py-2.5 text-[13px] font-bold outline-none focus:border-[#C9A84C]">
+                  <label className="text-xs font-bold text-slate-600 block mb-1.5">Currency 币种</label>
+                  <select value={svcMeta.currency} onChange={e => setSvcMeta(p => ({ ...p, currency: e.target.value }))} className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-4 py-2.5 text-[13px] font-bold outline-none focus:border-[#C9A84C]">
                     {['AED','USD','CNY'].map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
@@ -2138,63 +2139,63 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             </div>
 
             {/* Service items — card style */}
-            <div className="bg-white rounded-[24px] border border-[#0C1B3A]/8 p-7 space-y-5">
+            <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 p-7 space-y-5">
               <div className="flex items-center justify-between">
-                <h4 className="text-[12px] font-black uppercase tracking-widest text-[#0C1B3A]/50">服务项目 Service Items</h4>
-                <button onClick={() => setSvcView('items')} className="text-[11px] font-black uppercase tracking-widest text-[#C9A84C] hover:text-[#0C1B3A] transition-colors flex items-center gap-1.5">
+                <h4 className="text-[12px] font-bold text-slate-600">服务项目 Service Items</h4>
+                <button onClick={() => setSvcView('items')} className="text-xs font-bold text-[#7A5F2A] hover:text-[#0C1B3A] transition-colors flex items-center gap-1.5">
                   <Plus className="w-4 h-4" /> Add More Services
                 </button>
               </div>
 
               {svcItems.length === 0 ? (
-                <div className="py-12 text-center text-[#0C1B3A]/30 text-[12px] border-2 border-dashed border-[#0C1B3A]/10 rounded-2xl">
+                <div className="py-12 text-center text-slate-600 text-[12px] border-2 border-dashed border-[#0C1B3A]/10 rounded-[10px]">
                   No services added yet. 还没有添加服务项目。
                 </div>
               ) : (
                 <div className="space-y-4">
                   {svcItems.map(item => (
-                    <div key={item.id} className="rounded-[20px] border border-[#0C1B3A]/8 p-5 space-y-3 bg-[#0C1B3A]/[0.015] hover:border-[#C9A84C]/40 transition-colors">
+                    <div key={item.id} className="rounded-[10px] border border-[#0C1B3A]/8 p-5 space-y-3 bg-[#0C1B3A]/[0.015] hover:border-[#C9A84C]/40 transition-colors">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1">
                           <input value={item.serviceName} onChange={e => svcUpdateItem(item.id, { serviceName: e.target.value })}
-                            className="w-full text-[14px] font-black text-[#0C1B3A] bg-transparent outline-none" />
-                          {item.categoryName && <p className="text-[9px] text-[#0C1B3A]/30 mt-0.5">{item.categoryName}</p>}
+                            className="w-full text-[14px] font-bold text-[#0C1B3A] bg-transparent outline-none" />
+                          {item.categoryName && <p className="text-xs text-slate-600 mt-0.5">{item.categoryName}</p>}
                         </div>
-                        <button onClick={() => setSvcItems(prev => prev.filter(it => it.id !== item.id))} className="text-[#0C1B3A]/20 hover:text-red-400 transition-colors shrink-0 p-1">
+                        <button onClick={() => setSvcItems(prev => prev.filter(it => it.id !== item.id))} className="text-slate-600 hover:text-red-600 transition-colors shrink-0 p-1">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
-                      <textarea value={item.description} onChange={e => svcUpdateItem(item.id, { description: e.target.value })} rows={2} placeholder="Service description / 服务描述" className="w-full text-[11.5px] text-[#0C1B3A]/60 bg-white border border-[#0C1B3A]/8 rounded-xl px-3 py-2 outline-none focus:border-[#C9A84C] resize-none placeholder:text-[#0C1B3A]/25" />
+                      <textarea value={item.description} onChange={e => svcUpdateItem(item.id, { description: e.target.value })} rows={2} placeholder="Service description / 服务描述" className="w-full text-[11.5px] text-slate-600 bg-white border border-[#0C1B3A]/8 rounded-md px-3 py-2 outline-none focus:border-[#C9A84C] resize-none placeholder:text-slate-600" />
                       <div className="grid grid-cols-5 gap-2.5 items-end">
                         <div className={item.billingType === 'custom' ? '' : 'col-span-2'}>
-                          <label className="text-[8px] font-black uppercase tracking-widest text-[#0C1B3A]/30 block mb-1">计费方式 Billing</label>
-                          <select value={item.billingType} onChange={e => svcUpdateItem(item.id, { billingType: e.target.value as ServiceBillingType })} className="w-full text-[10.5px] bg-white border border-[#0C1B3A]/10 rounded-lg px-2 py-2 outline-none focus:border-[#C9A84C]">
+                          <label className="text-xs font-bold text-slate-600 block mb-1">计费方式 Billing</label>
+                          <select value={item.billingType} onChange={e => svcUpdateItem(item.id, { billingType: e.target.value as ServiceBillingType })} className="w-full text-[10.5px] bg-white border border-[#0C1B3A]/10 rounded-md px-2 py-2 outline-none focus:border-[#C9A84C]">
                             {Object.entries(BILLING_TYPE_LABELS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
                           </select>
                         </div>
                         {item.billingType === 'custom' && (
                           <div>
-                            <label className="text-[8px] font-black uppercase tracking-widest text-[#0C1B3A]/30 block mb-1">Label</label>
-                            <input value={item.billingLabel} onChange={e => svcUpdateItem(item.id, { billingLabel: e.target.value })} className="w-full text-[10.5px] bg-white border border-[#0C1B3A]/10 rounded-lg px-2 py-2 outline-none focus:border-[#C9A84C]" />
+                            <label className="text-xs font-bold text-slate-600 block mb-1">Label</label>
+                            <input value={item.billingLabel} onChange={e => svcUpdateItem(item.id, { billingLabel: e.target.value })} className="w-full text-[10.5px] bg-white border border-[#0C1B3A]/10 rounded-md px-2 py-2 outline-none focus:border-[#C9A84C]" />
                           </div>
                         )}
                         <div>
-                          <label className="text-[8px] font-black uppercase tracking-widest text-[#0C1B3A]/30 block mb-1">单位 Unit</label>
-                          <input value={item.unit} onChange={e => svcUpdateItem(item.id, { unit: e.target.value })} className="w-full text-[10.5px] text-center bg-white border border-[#0C1B3A]/10 rounded-lg px-2 py-2 outline-none focus:border-[#C9A84C]" />
+                          <label className="text-xs font-bold text-slate-600 block mb-1">单位 Unit</label>
+                          <input value={item.unit} onChange={e => svcUpdateItem(item.id, { unit: e.target.value })} className="w-full text-[10.5px] text-center bg-white border border-[#0C1B3A]/10 rounded-md px-2 py-2 outline-none focus:border-[#C9A84C]" />
                         </div>
                         <div>
-                          <label className="text-[8px] font-black uppercase tracking-widest text-[#0C1B3A]/30 block mb-1">数量 Qty</label>
-                          <input type="number" min="0" value={item.quantity} onChange={e => svcUpdateItem(item.id, { quantity: Number(e.target.value) || 0 })} className="w-full text-[10.5px] font-mono text-center bg-white border border-[#0C1B3A]/10 rounded-lg px-2 py-2 outline-none focus:border-[#C9A84C]" />
+                          <label className="text-xs font-bold text-slate-600 block mb-1">数量 Qty</label>
+                          <input type="number" min="0" value={item.quantity} onChange={e => svcUpdateItem(item.id, { quantity: Number(e.target.value) || 0 })} className="w-full text-[10.5px] font-mono-label text-center bg-white border border-[#0C1B3A]/10 rounded-md px-2 py-2 outline-none focus:border-[#C9A84C]" />
                         </div>
                         <div>
-                          <label className="text-[8px] font-black uppercase tracking-widest text-[#0C1B3A]/30 block mb-1">单价 Unit Price</label>
-                          <input type="number" min="0" step="0.01" value={item.unitPrice} onChange={e => svcUpdateItem(item.id, { unitPrice: Number(e.target.value) || 0 })} className="w-full text-[10.5px] font-mono text-right bg-white border border-[#0C1B3A]/10 rounded-lg px-2 py-2 outline-none focus:border-[#C9A84C]" />
+                          <label className="text-xs font-bold text-slate-600 block mb-1">单价 Unit Price</label>
+                          <input type="number" min="0" step="0.01" value={item.unitPrice} onChange={e => svcUpdateItem(item.id, { unitPrice: Number(e.target.value) || 0 })} className="w-full text-[10.5px] font-mono-label text-right bg-white border border-[#0C1B3A]/10 rounded-md px-2 py-2 outline-none focus:border-[#C9A84C]" />
                         </div>
                       </div>
                       <div className="flex items-center justify-end gap-2 pt-1 border-t border-[#0C1B3A]/6">
-                        <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40">小计 Subtotal {item.totalOverridden && <span className="text-[#C9A84C]">✎ manual</span>}</label>
-                        <input type="number" step="0.01" value={item.lineTotal} onChange={e => svcUpdateItem(item.id, { lineTotal: Number(e.target.value) || 0, totalOverridden: true })} className="w-32 text-[13px] font-mono font-black text-right bg-[#C9A84C]/8 border border-[#C9A84C]/30 rounded-lg px-3 py-1.5 outline-none focus:border-[#C9A84C]" />
-                        <span className="text-[11px] font-bold text-[#0C1B3A]/40">{svcMeta.currency}</span>
+                        <label className="text-xs font-bold text-slate-600">小计 Subtotal {item.totalOverridden && <span className="text-[#7A5F2A]">✎ manual</span>}</label>
+                        <input type="number" step="0.01" value={item.lineTotal} onChange={e => svcUpdateItem(item.id, { lineTotal: Number(e.target.value) || 0, totalOverridden: true })} className="w-32 text-[13px] font-mono-label font-bold text-right bg-[#C9A84C]/8 border border-[#C9A84C]/30 rounded-md px-3 py-1.5 outline-none focus:border-[#C9A84C]" />
+                        <span className="text-xs font-bold text-slate-600">{svcMeta.currency}</span>
                       </div>
                     </div>
                   ))}
@@ -2203,53 +2204,53 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             </div>
 
             {/* Duration / Payment / Notes */}
-            <div className="bg-white rounded-[24px] border border-[#0C1B3A]/8 p-7 space-y-5">
-              <h4 className="text-[12px] font-black uppercase tracking-widest text-[#0C1B3A]/50">条款 Terms</h4>
+            <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 p-7 space-y-5">
+              <h4 className="text-[12px] font-bold text-slate-600">条款 Terms</h4>
               <div className="grid grid-cols-2 gap-5">
                 <div>
-                  <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">Project Duration 项目周期</label>
-                  <input value={svcMeta.projectDuration} onChange={e => setSvcMeta(p => ({ ...p, projectDuration: e.target.value }))} placeholder="e.g. 3 months / 长期" className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-4 py-2.5 text-[13px] outline-none focus:border-[#C9A84C] placeholder:text-[#0C1B3A]/20" />
+                  <label className="text-xs font-bold text-slate-600 block mb-1.5">Project Duration 项目周期</label>
+                  <input value={svcMeta.projectDuration} onChange={e => setSvcMeta(p => ({ ...p, projectDuration: e.target.value }))} placeholder="e.g. 3 months / 长期" className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-4 py-2.5 text-[13px] outline-none focus:border-[#C9A84C] placeholder:text-slate-600" />
                 </div>
                 <div>
-                  <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">Payment Terms 付款方式</label>
-                  <select value={svcMeta.paymentTerms} onChange={e => setSvcMeta(p => ({ ...p, paymentTerms: e.target.value }))} className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-4 py-2.5 text-[13px] outline-none focus:border-[#C9A84C]">
+                  <label className="text-xs font-bold text-slate-600 block mb-1.5">Payment Terms 付款方式</label>
+                  <select value={svcMeta.paymentTerms} onChange={e => setSvcMeta(p => ({ ...p, paymentTerms: e.target.value }))} className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-4 py-2.5 text-[13px] outline-none focus:border-[#C9A84C]">
                     {PAYMENT_TERM_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
                 <div className="col-span-2">
-                  <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">Notes 备注</label>
-                  <textarea value={svcMeta.notes} onChange={e => setSvcMeta(p => ({ ...p, notes: e.target.value }))} rows={2} className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-4 py-2.5 text-[13px] outline-none focus:border-[#C9A84C] resize-none" />
+                  <label className="text-xs font-bold text-slate-600 block mb-1.5">Notes 备注</label>
+                  <textarea value={svcMeta.notes} onChange={e => setSvcMeta(p => ({ ...p, notes: e.target.value }))} rows={2} className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-4 py-2.5 text-[13px] outline-none focus:border-[#C9A84C] resize-none" />
                 </div>
               </div>
             </div>
 
             {/* Total + Actions */}
-            <div className="bg-white rounded-[24px] border border-[#0C1B3A]/8 p-7 space-y-5">
+            <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 p-7 space-y-5">
               <div className="flex items-center justify-between">
-                <p className="text-[11px] font-bold uppercase text-[#0C1B3A]/30 tracking-wider">总金额 Total</p>
-                <p className="text-3xl font-black font-mono text-[#0C1B3A]">{svcMeta.currency} {svcGrandTotal().toFixed(2)}</p>
+                <p className="text-xs font-bold text-slate-600 ">总金额 Total</p>
+                <p className="text-3xl font-bold font-mono-label text-[#0C1B3A]">{svcMeta.currency} {svcGrandTotal().toFixed(2)}</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <button onClick={() => handleSaveServiceQuote('Draft')} disabled={svcSaveStatus === 'saving'}
-                  className="py-4 rounded-[18px] text-[12px] font-black uppercase tracking-widest border border-[#0C1B3A]/15 text-[#0C1B3A]/60 hover:border-[#C9A84C] hover:text-[#0C1B3A] transition-all">
+                  className="py-4 rounded-md text-[12px] font-bold border border-[#0C1B3A]/15 text-slate-600 hover:border-[#C9A84C] hover:text-[#0C1B3A] transition-all">
                   {svcSaveStatus === 'saving' ? 'Saving...' : 'Save Draft 保存草稿'}
                 </button>
                 <button onClick={() => handleSaveServiceQuote('Final')} disabled={svcSaveStatus === 'saving'}
-                  className="py-4 rounded-[18px] text-[12px] font-black uppercase tracking-widest shadow-lg"
+                  className="py-4 rounded-md text-[12px] font-bold shadow-lg"
                   style={{ backgroundColor: '#0C1B3A', color: '#C9A84C' }}>
                   {svcSaveStatus === 'saving' ? 'Saving...' : 'Save Final 保存正式报价'}
                 </button>
               </div>
               {svcSaveStatus === 'saved' && (
                 <div className={`grid ${canTrade ? 'grid-cols-3' : 'grid-cols-2'} gap-3 animate-in fade-in duration-300`}>
-                  <button onClick={generateServiceQuotePdf} className="py-3.5 rounded-[16px] text-[10.5px] font-black uppercase tracking-widest border border-[#0C1B3A]/15 text-[#0C1B3A]/60 hover:border-[#C9A84C] hover:text-[#0C1B3A] transition-all flex items-center justify-center gap-2">
+                  <button onClick={generateServiceQuotePdf} className="py-3.5 rounded-md text-[10.5px] font-bold border border-[#0C1B3A]/15 text-slate-600 hover:border-[#C9A84C] hover:text-[#0C1B3A] transition-all flex items-center justify-center gap-2">
                     <FileText className="w-4 h-4" /> PDF
                   </button>
-                  <button onClick={handleSendServiceQuoteToDeal} className="py-3.5 rounded-[16px] text-[10.5px] font-black uppercase tracking-widest border border-[#0C1B3A]/15 text-[#0C1B3A]/60 hover:border-[#C9A84C] hover:text-[#0C1B3A] transition-all">
+                  <button onClick={handleSendServiceQuoteToDeal} className="py-3.5 rounded-md text-[10.5px] font-bold border border-[#0C1B3A]/15 text-slate-600 hover:border-[#C9A84C] hover:text-[#0C1B3A] transition-all">
                     Send to DEAL
                   </button>
                   {canTrade && (
-                    <button onClick={handleSendServiceQuoteToTrade} className="py-3.5 rounded-[16px] text-[10.5px] font-black uppercase tracking-widest" style={{ backgroundColor: '#C9A84C', color: '#0C1B3A' }}>
+                    <button onClick={handleSendServiceQuoteToTrade} className="py-3.5 rounded-md text-[10.5px] font-bold " style={{ backgroundColor: '#C9A84C', color: '#0C1B3A' }}>
                       Send to TRADE
                     </button>
                   )}
@@ -2260,7 +2261,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
           {/* ── Right: live quote preview, sticky on desktop ────────────────── */}
           <div className="lg:sticky lg:top-6 space-y-3">
-            <p className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/35 px-1">报价预览 Quote Preview — what the customer will see</p>
+            <p className="text-xs font-bold text-slate-600 px-1">报价预览 Quote Preview — what the customer will see</p>
             <QuotePreview />
           </div>
         </div>
@@ -2279,36 +2280,36 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           {/* SUPPLY CHAIN 分区页面标题 */}
           <h1 className="text-2xl font-semibold" style={{ fontFamily: "'Space Grotesk',sans-serif", color: '#0C1B3A' }}>{t('Package Quote Page Title')}</h1>
           {/* Breadcrumb */}
-          <div className="flex items-center gap-2 text-[12px] font-black uppercase tracking-widest flex-wrap">
+          <div className="flex items-center gap-2 text-[12px] font-bold flex-wrap">
             <button onClick={() => { setAppMode('landing'); setPqProject(null); setPqParseStatus('idle'); setPqPhase('upload'); }}
-              className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">{t('Workflow Home')}</button>
-            <span className="text-[#0C1B3A]/20">›</span>
-            <button onClick={() => setPqPhase('upload')} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">{t('Package Quote Page Title')}</button>
-            <span className="text-[#0C1B3A]/20">›</span>
-            <span className="text-[#0C1B3A]/50">{pqProject.projectName}</span>
-            <span className="text-[#0C1B3A]/20">›</span>
-            <span className="text-[#C9A84C]">{t('GCI Package Quote')}</span>
+              className="text-slate-600 hover:text-[#7A5F2A] transition-colors">{t('Workflow Home')}</button>
+            <span className="text-slate-600">›</span>
+            <button onClick={() => setPqPhase('upload')} className="text-slate-600 hover:text-[#7A5F2A] transition-colors">{t('Package Quote Page Title')}</button>
+            <span className="text-slate-600">›</span>
+            <span className="text-slate-600">{pqProject.projectName}</span>
+            <span className="text-slate-600">›</span>
+            <span className="text-[#7A5F2A]">{t('GCI Package Quote')}</span>
           </div>
 
           {/* Quote Settings: internal pricing + customer info */}
-          <div className="bg-[#0C1B3A]/3 rounded-[24px] p-6 space-y-6">
-            <h3 className="text-[11px] font-black uppercase tracking-[0.25em] text-[#0C1B3A]/50">{t('Quote Settings')}</h3>
+          <div className="bg-[#0C1B3A]/3 rounded-[10px] p-6 space-y-6">
+            <h3 className="text-xs font-bold text-slate-600">{t('Quote Settings')}</h3>
 
             {/* Row 1: Project info + Currency + Exchange Rate (internal) */}
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Project')}</label>
+                <label className="text-xs font-bold text-slate-600">{t('Project')}</label>
                 {/* Quotation Center master-data unification (2026-09-15,
                     second revision) — read-only, inherited from the real
                     project/customer picked in Step 1. No longer a second
                     free-text field a user could drift away from the ID. */}
-                <div className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-bold text-[#0C1B3A]/70 bg-[#0C1B3A]/3">
+                <div className="w-full px-3 py-2 rounded-[10px] border border-[#0C1B3A]/10 text-sm font-bold text-[#0C1B3A]/70 bg-[#0C1B3A]/3">
                   {pqProject.projectName}
                 </div>
-                <p className="text-[11px] text-[#0C1B3A]/40 mt-1">{pqProject.supplierName}</p>
+                <p className="text-xs text-slate-600 mt-1">{pqProject.supplierName}</p>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Quote Currency')}</label>
+                <label className="text-xs font-bold text-slate-600">{t('Quote Currency')}</label>
                 <div className="flex gap-2">
                   {(['AED','USD'] as const).map(c => (
                     <button key={c} onClick={() => {
@@ -2320,27 +2321,27 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                                : 1;
                       setPqExchangeRate(r);
                     }}
-                      className={`px-4 py-2 rounded-xl text-[12px] font-black uppercase tracking-wider transition-all ${pqQuoteCurrency === c ? 'bg-[#0C1B3A] text-[#C9A84C]' : 'bg-white border border-[#0C1B3A]/10 text-[#0C1B3A]/50 hover:border-[#C9A84C]'}`}>
+                      className={`px-4 py-2 rounded-md text-[12px] font-bold transition-all ${pqQuoteCurrency === c ? 'bg-[#0C1B3A] text-[#7A5F2A]' : 'bg-white border border-[#0C1B3A]/10 text-slate-600 hover:border-[#C9A84C]'}`}>
                       {c}
                     </button>
                   ))}
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">
-                  {t('Exchange Rate')}&nbsp;<span className="normal-case font-medium text-[#0C1B3A]/30">1 {baseCur} =</span>
+                <label className="text-xs font-bold text-slate-600">
+                  {t('Exchange Rate')}&nbsp;<span className="normal-case font-medium text-slate-600">1 {baseCur} =</span>
                 </label>
                 <div className="flex items-center gap-2">
                   <input type="number" min={0} step={0.0001} value={pqExchangeRate}
                     onChange={e => setPqExchangeRate(parseFloat(e.target.value) || 0)}
-                    className="w-32 px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-mono font-bold text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
-                  <span className="text-sm font-bold text-[#0C1B3A]/50">{pqQuoteCurrency}</span>
+                    className="w-32 px-3 py-2 rounded-md border border-[#0C1B3A]/10 text-sm font-mono-label font-bold text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
+                  <span className="text-sm font-bold text-slate-600">{pqQuoteCurrency}</span>
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Reference / Quote No')}</label>
+                <label className="text-xs font-bold text-slate-600">{t('Reference / Quote No')}</label>
                 <input type="text" value={pqQuoteNo} onChange={e => setPqQuoteNo(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-mono font-bold text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
+                  className="w-full px-3 py-2 rounded-md border border-[#0C1B3A]/10 text-sm font-mono-label font-bold text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
               </div>
             </div>
 
@@ -2349,38 +2350,38 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
             {/* Row 2: Customer info */}
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#C9A84C]/70 mb-3">{t('Customer Information')} <span className="text-[#0C1B3A]/30 normal-case font-medium tracking-normal">{t('(for PDF only — not shown in cost view)')}</span></p>
+              <p className="text-xs font-bold text-[#C9A84C]/70 mb-3">{t('Customer Information')} <span className="text-slate-600 normal-case font-medium tracking-normal">{t('(for PDF only — not shown in cost view)')}</span></p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Customer Name')}</label>
+                  <label className="text-xs font-bold text-slate-600">{t('Customer Name')}</label>
                   {/* Quotation Center master-data unification (2026-09-15,
                       second revision) — read-only, inherited from the real
                       customer picked in Step 1 (was never seeded before
                       this fix — always started blank, disconnected from
                       customer_id entirely). */}
-                  <div className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-bold text-[#0C1B3A]/70 bg-[#0C1B3A]/3">
+                  <div className="w-full px-3 py-2 rounded-[10px] border border-[#0C1B3A]/10 text-sm font-bold text-[#0C1B3A]/70 bg-[#0C1B3A]/3">
                     {pqProject.customerName || '—'}
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Quote Date')}</label>
+                  <label className="text-xs font-bold text-slate-600">{t('Quote Date')}</label>
                   <input type="date" value={pqQuoteDate} onChange={e => setPqQuoteDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-bold text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
+                    className="w-full px-3 py-2 rounded-md border border-[#0C1B3A]/10 text-sm font-bold text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Valid Until')}</label>
+                  <label className="text-xs font-bold text-slate-600">{t('Valid Until')}</label>
                   <input type="date" value={pqValidUntil} onChange={e => setPqValidUntil(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-bold text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
+                    className="w-full px-3 py-2 rounded-md border border-[#0C1B3A]/10 text-sm font-bold text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Payment Terms')}</label>
+                  <label className="text-xs font-bold text-slate-600">{t('Payment Terms')}</label>
                   <input type="text" value={pqPaymentTerms} onChange={e => setPqPaymentTerms(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
+                    className="w-full px-3 py-2 rounded-md border border-[#0C1B3A]/10 text-sm text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
                 </div>
                 <div className="sm:col-span-2 space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Delivery Terms')}</label>
+                  <label className="text-xs font-bold text-slate-600">{t('Delivery Terms')}</label>
                   <input type="text" value={pqDeliveryTerms} onChange={e => setPqDeliveryTerms(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
+                    className="w-full px-3 py-2 rounded-md border border-[#0C1B3A]/10 text-sm text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors" />
                 </div>
               </div>
             </div>
@@ -2406,44 +2407,44 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
               });
 
               return (
-                <div key={pkg.id} className={`border rounded-[24px] overflow-hidden transition-opacity ${isSelected ? 'border-[#0C1B3A]/8' : 'border-[#0C1B3A]/4 opacity-40'}`}>
+                <div key={pkg.id} className={`border rounded-[10px] overflow-hidden transition-opacity ${isSelected ? 'border-[#0C1B3A]/8' : 'border-[#0C1B3A]/4 opacity-40'}`}>
                   {/* Package summary row */}
                   <div className="px-6 py-4 bg-[#0C1B3A]/2 flex flex-wrap items-center gap-4">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       {/* Checkbox */}
                       <button onClick={toggleSelect}
                         className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-[#0C1B3A] border-[#0C1B3A]' : 'border-[#0C1B3A]/20 bg-white'}`}>
-                        {isSelected && <svg className="w-3 h-3 text-[#C9A84C]" fill="none" viewBox="0 0 12 12"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                        {isSelected && <svg className="w-3 h-3 text-[#7A5F2A]" fill="none" viewBox="0 0 12 12"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                       </button>
-                      <span className={`font-black truncate ${isSelected ? 'text-[#0C1B3A]' : 'text-[#0C1B3A]/50'}`}>{pqTranslate(pkg.packageName)}</span>
-                      <span className="text-[11px] text-[#0C1B3A]/30 shrink-0">{t('{n} items').replace('{n}', String(pkg.items.length))}</span>
+                      <span className={`font-bold truncate ${isSelected ? 'text-[#0C1B3A]' : 'text-slate-600'}`}>{pqTranslate(pkg.packageName)}</span>
+                      <span className="text-xs text-slate-600 shrink-0">{t('{n} items').replace('{n}', String(pkg.items.length))}</span>
                     </div>
                     {/* Cost columns */}
                     <div className="flex items-center gap-6 text-right">
                       <div>
-                        <p className="text-[9px] font-black uppercase tracking-wider text-[#0C1B3A]/30">{t('Original Amount')}</p>
-                        <p className="text-[13px] font-mono font-bold text-[#0C1B3A]/60">{baseCur} {pkg.totalCost.toLocaleString()}</p>
+                        <p className="text-xs font-bold text-slate-600">{t('Original Amount')}</p>
+                        <p className="text-[13px] font-mono-label font-bold text-slate-600">{baseCur} {pkg.totalCost.toLocaleString()}</p>
                       </div>
                       <div>
-                        <p className="text-[9px] font-black uppercase tracking-wider text-[#0C1B3A]/30">{t('Converted')}</p>
-                        <p className="text-[13px] font-mono font-bold text-[#0C1B3A]">{pqQuoteCurrency} {convertedCost.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
+                        <p className="text-xs font-bold text-slate-600">{t('Converted')}</p>
+                        <p className="text-[13px] font-mono-label font-bold text-[#0C1B3A]">{pqQuoteCurrency} {convertedCost.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
                       </div>
                       {/* Markup input */}
                       <div className="flex items-center gap-1.5">
-                        <p className="text-[9px] font-black uppercase tracking-wider text-[#0C1B3A]/30 w-12">{t('Markup')}</p>
+                        <p className="text-xs font-bold text-slate-600 w-12">{t('Markup')}</p>
                         <input
                           type="number" min={0} max={999} step={1}
                           value={markup}
                           onChange={e => setPqMarkups(prev => ({ ...prev, [pkg.id]: parseFloat(e.target.value) || 0 }))}
-                          className="w-16 px-2 py-1 rounded-lg border border-[#0C1B3A]/10 text-sm font-bold text-center text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors"
+                          className="w-16 px-2 py-1 rounded-md border border-[#0C1B3A]/10 text-sm font-bold text-center text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors"
                         />
-                        <span className="text-sm text-[#0C1B3A]/40">%</span>
+                        <span className="text-sm text-slate-600">%</span>
                       </div>
                       <div>
-                        <p className="text-[9px] font-black uppercase tracking-wider text-[#C9A84C]">{t('GCI Price')}</p>
-                        <p className="text-[15px] font-mono font-black text-[#0C1B3A]">{pqQuoteCurrency} {gciPrice.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
+                        <p className="text-xs font-bold text-[#7A5F2A]">{t('GCI Price')}</p>
+                        <p className="text-[15px] font-mono-label font-bold text-[#0C1B3A]">{pqQuoteCurrency} {gciPrice.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
                       </div>
-                      <button onClick={toggle} className="text-[#0C1B3A]/25 hover:text-[#C9A84C] transition-colors text-lg ml-2">
+                      <button onClick={toggle} className="text-slate-600 hover:text-[#7A5F2A] transition-colors text-lg ml-2">
                         {isOpen ? '▲' : '▼'}
                       </button>
                     </div>
@@ -2455,7 +2456,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                       {/* Column labels */}
                       <div className="grid grid-cols-[48px_1fr_1fr_1fr_80px_60px_90px] gap-2 px-3 py-1">
                         {[t('Photo'),t('Item Name (EN)'),t('Material (EN)'),t('Size / Spec (EN)'),t('Qty / Unit'),`GCI ${pqQuoteCurrency}`,''].map((h, i) => (
-                          <p key={i} className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/30">{h}</p>
+                          <p key={i} className="text-xs font-bold text-slate-600">{h}</p>
                         ))}
                       </div>
                       {pkg.items.map((it, i) => {
@@ -2468,62 +2469,62 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                               <div className="pt-1">
                                 {it.imageDataUrl
                                   ? <img src={it.imageDataUrl} alt={it.name} className="w-10 h-10 object-cover rounded-lg border border-[#0C1B3A]/10" />
-                                  : <div className="w-10 h-10 rounded-lg bg-[#0C1B3A]/5 flex items-center justify-center text-[#0C1B3A]/20 text-[9px]">—</div>
+                                  : <div className="w-10 h-10 rounded-lg bg-[#0C1B3A]/5 flex items-center justify-center text-slate-600 text-xs">—</div>
                                 }
                               </div>
                               {/* Item Name */}
                               <div className="space-y-1">
-                                <p className="text-[9px] text-[#0C1B3A]/25 font-mono leading-tight">{it.seq} · {it.name}</p>
-                                <p className="text-[9px] text-[#0C1B3A]/20 leading-tight">{it.area}</p>
+                                <p className="text-xs text-slate-600 font-mono-label leading-tight">{it.seq} · {it.name}</p>
+                                <p className="text-xs text-slate-600 leading-tight">{it.area}</p>
                                 <input
                                   value={en.nameEN}
                                   onChange={e => updateItemEN(it.id, 'nameEN', e.target.value)}
                                   placeholder={t('Item name in English')}
-                                  className="w-full text-[11px] font-bold text-[#0C1B3A] bg-transparent border-b border-[#0C1B3A]/10 focus:border-[#C9A84C] outline-none py-0.5 transition-colors placeholder:text-[#0C1B3A]/15"
+                                  className="w-full text-xs font-bold text-[#0C1B3A] bg-transparent border-b border-[#0C1B3A]/10 focus:border-[#C9A84C] outline-none py-0.5 transition-colors placeholder:text-slate-600"
                                 />
                                 <input
                                   value={en.areaEN}
                                   onChange={e => updateItemEN(it.id, 'areaEN', e.target.value)}
                                   placeholder={t('Area')}
-                                  className="w-full text-[10px] text-[#0C1B3A]/50 bg-transparent border-b border-[#0C1B3A]/6 focus:border-[#C9A84C] outline-none py-0.5 transition-colors placeholder:text-[#0C1B3A]/15"
+                                  className="w-full text-xs text-slate-600 bg-transparent border-b border-[#0C1B3A]/6 focus:border-[#C9A84C] outline-none py-0.5 transition-colors placeholder:text-slate-600"
                                 />
                               </div>
                               {/* Material */}
                               <div className="space-y-1">
-                                <p className="text-[9px] text-[#0C1B3A]/20 leading-tight line-clamp-2">{it.material}</p>
+                                <p className="text-xs text-slate-600 leading-tight line-clamp-2">{it.material}</p>
                                 <textarea
                                   value={en.materialEN}
                                   onChange={e => updateItemEN(it.id, 'materialEN', e.target.value)}
                                   placeholder={t('Material in English')}
                                   rows={2}
-                                  className="w-full text-[11px] text-[#0C1B3A]/80 bg-transparent border border-[#0C1B3A]/10 focus:border-[#C9A84C] outline-none rounded-lg p-1.5 resize-none transition-colors placeholder:text-[#0C1B3A]/15"
+                                  className="w-full text-xs text-[#0C1B3A]/80 bg-transparent border border-[#0C1B3A]/10 focus:border-[#C9A84C] outline-none rounded-md p-1.5 resize-none transition-colors placeholder:text-slate-600"
                                 />
                               </div>
                               {/* Spec */}
                               <div className="space-y-1">
-                                <p className="text-[9px] text-[#0C1B3A]/20 leading-tight font-mono">{it.spec}</p>
+                                <p className="text-xs text-slate-600 leading-tight font-mono-label">{it.spec}</p>
                                 <input
                                   value={en.specEN}
                                   onChange={e => updateItemEN(it.id, 'specEN', e.target.value)}
                                   placeholder={t('Size / spec')}
-                                  className="w-full text-[11px] font-mono text-[#0C1B3A]/70 bg-transparent border-b border-[#0C1B3A]/10 focus:border-[#C9A84C] outline-none py-0.5 transition-colors placeholder:text-[#0C1B3A]/15"
+                                  className="w-full text-xs font-mono-label text-[#0C1B3A]/70 bg-transparent border-b border-[#0C1B3A]/10 focus:border-[#C9A84C] outline-none py-0.5 transition-colors placeholder:text-slate-600"
                                 />
                               </div>
                               {/* Qty / Unit */}
                               <div className="text-center pt-4">
                                 <p className="text-[13px] font-bold text-[#0C1B3A]">{it.qty}</p>
-                                <p className="text-[10px] text-[#0C1B3A]/40">{pqTranslate(it.unit)}</p>
+                                <p className="text-xs text-slate-600">{pqTranslate(it.unit)}</p>
                               </div>
                               {/* GCI Price */}
                               <div className="text-right pt-4">
-                                <p className="text-[12px] font-mono font-black text-[#0C1B3A]">
+                                <p className="text-[12px] font-mono-label font-bold text-[#0C1B3A]">
                                   {itemGCI.toLocaleString(undefined,{maximumFractionDigits:0})}
                                 </p>
                               </div>
                               {/* Internal cost (small) */}
                               <div className="text-right pt-4">
-                                <p className="text-[9px] font-mono text-[#0C1B3A]/25">{baseCur} {it.unitCost.toLocaleString()}</p>
-                                <p className="text-[9px] text-[#0C1B3A]/20">× {it.qty}</p>
+                                <p className="text-xs font-mono-label text-slate-600">{baseCur} {it.unitCost.toLocaleString()}</p>
+                                <p className="text-xs text-slate-600">× {it.qty}</p>
                               </div>
                             </div>
                           </div>
@@ -2546,14 +2547,14 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             }, 0);
             return (
               <div className="flex justify-end pt-2">
-                <div className="bg-[#0C1B3A] text-white rounded-[24px] px-8 py-5 space-y-2 text-right min-w-[280px]">
-                  <p className="text-[10px] font-black uppercase tracking-widest opacity-40">{t('Total Cost')} ({baseCur} → {pqQuoteCurrency})</p>
-                  <p className="text-sm font-mono text-white/60">{pqQuoteCurrency} {totalConverted.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
+                <div className="bg-[#0C1B3A] text-white rounded-[10px] px-8 py-5 space-y-2 text-right min-w-[280px]">
+                  <p className="text-xs font-bold opacity-40">{t('Total Cost')} ({baseCur} → {pqQuoteCurrency})</p>
+                  <p className="text-sm font-mono-label text-white/60">{pqQuoteCurrency} {totalConverted.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
                   <div className="border-t border-white/10 pt-2">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-[#C9A84C]">{t('GCI Total Selling Price')}</p>
-                    <p className="text-2xl font-black text-[#C9A84C]">{pqQuoteCurrency} {totalGCI.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
+                    <p className="text-xs font-bold text-[#7A5F2A]">{t('GCI Total Selling Price')}</p>
+                    <p className="text-2xl font-bold text-[#7A5F2A]">{pqQuoteCurrency} {totalGCI.toLocaleString(undefined,{maximumFractionDigits:0})}</p>
                   </div>
-                  <p className="text-[10px] opacity-30">{t('{n} / {total} packages selected · {m} items').replace('{n}', String(selectedPkgs.length)).replace('{total}', String(pqProject.packages.length)).replace('{m}', String(selectedPkgs.reduce((s,p)=>s+p.items.length,0)))}</p>
+                  <p className="text-xs opacity-30">{t('{n} / {total} packages selected · {m} items').replace('{n}', String(selectedPkgs.length)).replace('{total}', String(pqProject.packages.length)).replace('{m}', String(selectedPkgs.reduce((s,p)=>s+p.items.length,0)))}</p>
                 </div>
               </div>
             );
@@ -2572,7 +2573,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                 const safeProjectName = pqProject.projectName && !hasChinese(pqProject.projectName) ? pqProject.projectName : 'Package Project';
                 generatePkgCustomerPdf({ ...pqProject, projectName: safeProjectName, packages: selectedPkgs }, pqMarkups, pqExchangeRate, pqQuoteCurrency, { customer: pqProject.customerName || '', quoteNo: pqQuoteNo, quoteDate: pqQuoteDate, validUntil: pqValidUntil, paymentTerms: pqPaymentTerms, deliveryTerms: pqDeliveryTerms });
               }}
-              className="flex items-center gap-2 bg-[#0C1B3A] hover:bg-[#162a52] text-[#C9A84C] font-black text-[12px] uppercase tracking-widest px-6 py-3 rounded-2xl transition-all shadow-lg hover:shadow-xl active:scale-95"
+              className="flex items-center gap-2 bg-[#0C1B3A] hover:bg-[#162a52] text-[#7A5F2A] font-bold text-[12px] px-6 py-3 rounded-md transition-all shadow-lg hover:shadow-xl active:scale-95"
             >
               <Download className="w-4 h-4" />
               {t('Download Customer PDF')}
@@ -2588,17 +2589,17 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       {/* SUPPLY CHAIN 分区页面标题 */}
       <h1 className="text-2xl font-semibold" style={{ fontFamily: "'Space Grotesk',sans-serif", color: '#0C1B3A' }}>{t('Package Quote Page Title')}</h1>
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[12px] font-black uppercase tracking-widest">
+      <div className="flex items-center gap-2 text-[12px] font-bold ">
         <button onClick={() => { setAppMode('landing'); setPqProject(null); setPqParseStatus('idle'); setPqParseError(''); setPqPhase('upload'); }}
-          className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">
+          className="text-slate-600 hover:text-[#7A5F2A] transition-colors">
           {t('Workflow Home')}
         </button>
-        <span className="text-[#0C1B3A]/20">›</span>
-        <span className="text-[#C9A84C]">{t('Package Quote Page Title')}</span>
+        <span className="text-slate-600">›</span>
+        <span className="text-[#7A5F2A]">{t('Package Quote Page Title')}</span>
         {pqProject && (
           <>
-            <span className="text-[#0C1B3A]/20">›</span>
-            <span className="text-[#0C1B3A]/50">{pqProject.projectName}</span>
+            <span className="text-slate-600">›</span>
+            <span className="text-slate-600">{pqProject.projectName}</span>
           </>
         )}
       </div>
@@ -2607,22 +2608,22 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       {pqParseStatus !== 'done' && (
         <div className="max-w-2xl mx-auto space-y-6">
           <div className="text-center space-y-2">
-            <h2 className="text-3xl font-serif italic text-[#0C1B3A]">{t('Package Quote Page Title')}</h2>
-            <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#C9A84C]">{t('Project · Package · Items')}</p>
+            <h2 className="text-3xl italic text-[#0C1B3A]">{t('Package Quote Page Title')}</h2>
+            <p className="text-xs font-bold text-[#7A5F2A]">{t('Project · Package · Items')}</p>
           </div>
 
           {/* Meta fields — Quotation Center master-data unification
               (2026-09-15): Customer/Project and Supplier are now real
               crm_customers/crm_projects/suppliers picks, never hand-typed
               names. Base Currency is unaffected. */}
-          <div className="bg-[#0C1B3A]/3 rounded-[24px] p-6 space-y-6">
-            <h3 className="text-[11px] font-black uppercase tracking-[0.25em] text-[#0C1B3A]/50">{t('Project Info')}</h3>
+          <div className="bg-[#0C1B3A]/3 rounded-[10px] p-6 space-y-6">
+            <h3 className="text-xs font-bold text-slate-600">{t('Project Info')}</h3>
             <CustomerProjectSelector value={pqCpSelection} onChange={setPqCpSelection} requireProject />
             <SupplierSelector value={pqSupplierSelection} onChange={setPqSupplierSelection} />
             <div className="max-w-xs space-y-1">
-              <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Base Currency')}</label>
+              <label className="text-xs font-bold text-slate-600">{t('Base Currency')}</label>
               <select value={pqMeta.currency} onChange={e => setPqMeta(p => ({ ...p, currency: e.target.value }))}
-                className="w-full px-3 py-2 rounded-xl border border-[#0C1B3A]/10 text-sm font-medium text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors">
+                className="w-full px-3 py-2 rounded-md border border-[#0C1B3A]/10 text-sm font-medium text-[#0C1B3A] bg-white outline-none focus:border-[#C9A84C] transition-colors">
                 {['CNY','AED','USD','EUR','GBP'].map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
@@ -2630,7 +2631,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
           {/* Upload area */}
           <div className="space-y-3">
-            <h3 className="text-[11px] font-black uppercase tracking-[0.25em] text-[#0C1B3A]/50">{t('Upload Multi-Sheet Excel')}</h3>
+            <h3 className="text-xs font-bold text-slate-600">{t('Upload Multi-Sheet Excel')}</h3>
             {(() => {
               const pqFileInputRef = { current: null as HTMLInputElement | null };
               const handlePqDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -2645,7 +2646,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                   onClick={() => pqFileInputRef.current?.click()}
                   onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
                   onDrop={handlePqDrop}
-                  className="border-2 border-dashed border-[#C9A84C]/30 rounded-[24px] p-10 text-center hover:border-[#C9A84C] hover:bg-[#C9A84C]/3 transition-all cursor-pointer select-none"
+                  className="border-2 border-dashed border-[#C9A84C]/30 rounded-[10px] p-10 text-center hover:border-[#C9A84C] hover:bg-[#C9A84C]/3 transition-all cursor-pointer select-none"
                 >
                   <input
                     ref={el => { pqFileInputRef.current = el; }}
@@ -2660,21 +2661,21 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                     }}
                   />
                   <div className="space-y-2 pointer-events-none">
-                    <div className="w-10 h-10 rounded-2xl bg-[#C9A84C]/10 flex items-center justify-center mx-auto">
-                      <Upload className="w-5 h-5 text-[#C9A84C]" />
+                    <div className="w-10 h-10 rounded-[10px] bg-[#C9A84C]/10 flex items-center justify-center mx-auto">
+                      <Upload className="w-5 h-5 text-[#7A5F2A]" />
                     </div>
-                    <p className="text-sm font-bold text-[#0C1B3A]/60">{t('Drag & drop or click to select')}</p>
-                    <p className="text-[11px] text-[#0C1B3A]/30">{t('Excel with multiple sheets. Each sheet = one Package.')}</p>
-                    <p className="text-[10px] text-[#0C1B3A]/25">{t('Sheets named 总表 / Summary / Total will be skipped automatically.')}</p>
+                    <p className="text-sm font-bold text-slate-600">{t('Drag & drop or click to select')}</p>
+                    <p className="text-xs text-slate-600">{t('Excel with multiple sheets. Each sheet = one Package.')}</p>
+                    <p className="text-xs text-slate-600">{t('Sheets named 总表 / Summary / Total will be skipped automatically.')}</p>
                   </div>
                 </div>
               );
             })()}
             {pqParseStatus === 'parsing' && (
-              <p className="text-center text-[12px] font-bold text-[#C9A84C] animate-pulse">{t('Parsing Excel...')}</p>
+              <p className="text-center text-[12px] font-bold text-[#7A5F2A] animate-pulse">{t('Parsing Excel...')}</p>
             )}
             {pqParseStatus === 'error' && (
-              <p className="text-center text-[12px] font-bold text-red-500">❌ {pqParseError}</p>
+              <p className="text-center text-[12px] font-bold text-red-600">❌ {pqParseError}</p>
             )}
           </div>
         </div>
@@ -2686,14 +2687,14 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           {/* Project header */}
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-black text-[#0C1B3A]">{pqProject.projectName}</h2>
-              <p className="text-[11px] text-[#0C1B3A]/40 font-bold mt-0.5">
+              <h2 className="text-2xl font-bold text-[#0C1B3A]">{pqProject.projectName}</h2>
+              <p className="text-xs text-slate-600 font-bold mt-0.5">
                 {pqProject.supplierName && `${pqProject.supplierName} · `}
                 {t('{n} packages').replace('{n}', String(pqProject.packages.length))} · {pqProject.sourceFileName}
               </p>
             </div>
             <button onClick={() => { setPqProject(null); setPqParseStatus('idle'); setPqParseError(''); }}
-              className="text-[11px] font-black uppercase tracking-widest text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">
+              className="text-xs font-bold text-slate-600 hover:text-[#7A5F2A] transition-colors">
               {t('↑ Upload New File')}
             </button>
           </div>
@@ -2713,22 +2714,22 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
               : [{ area: '', items: pkg.items }];
 
             return (
-              <div key={pkg.id} className="border border-[#0C1B3A]/8 rounded-[24px] overflow-hidden">
+              <div key={pkg.id} className="border border-[#0C1B3A]/8 rounded-[10px] overflow-hidden">
                 {/* Package header */}
                 <button onClick={toggle}
                   className="w-full flex items-center justify-between px-6 py-4 bg-[#0C1B3A]/2 hover:bg-[#0C1B3A]/4 transition-colors text-left">
                   <div className="flex items-center gap-4">
                     <div className="w-2 h-2 rounded-full bg-[#C9A84C]" />
                     <div>
-                      <span className="text-base font-black text-[#0C1B3A]">{pkg.packageName}</span>
-                      <span className="ml-3 text-[11px] text-[#0C1B3A]/40 font-bold">{t('{n} items').replace('{n}', String(pkg.items.length))}</span>
+                      <span className="text-base font-bold text-[#0C1B3A]">{pkg.packageName}</span>
+                      <span className="ml-3 text-xs text-slate-600 font-bold">{t('{n} items').replace('{n}', String(pkg.items.length))}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <span className="text-base font-black text-[#0C1B3A]">
+                    <span className="text-base font-bold text-[#0C1B3A]">
                       {pkg.currency} {pkg.totalCost.toLocaleString()}
                     </span>
-                    <span className="text-[#0C1B3A]/30 text-lg">{isOpen ? '▲' : '▼'}</span>
+                    <span className="text-slate-600 text-lg">{isOpen ? '▲' : '▼'}</span>
                   </div>
                 </button>
 
@@ -2738,43 +2739,43 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                     {itemsByArea.map(({ area, items: areaItems }) => (
                       <div key={area || 'default'}>
                         {area && (
-                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#C9A84C] mb-2 mt-3">{area}</p>
+                          <p className="text-xs font-bold text-[#7A5F2A] mb-2 mt-3">{area}</p>
                         )}
-                        <div className="overflow-x-auto rounded-[16px] border border-[#0C1B3A]/6">
+                        <div className="overflow-x-auto rounded-[10px] border border-[#0C1B3A]/6">
                           <table className="w-full text-[12px]">
                             <thead>
                               <tr className="bg-[#0C1B3A] text-white">
                                 {['#',t('Photo'),t('Name'),t('Material / Spec'),t('Qty'),t('Unit'),t('Unit Cost'),t('Subtotal')].map((h, i) => (
-                                  <th key={i} className="px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-wider first:rounded-tl-[16px] last:rounded-tr-[16px]">{h}</th>
+                                  <th key={i} className="px-3 py-2.5 text-left text-xs font-bold first:rounded-tl-[16px] last:rounded-tr-[16px]">{h}</th>
                                 ))}
                               </tr>
                             </thead>
                             <tbody>
                               {areaItems.map((it, i) => (
                                 <tr key={it.id} className={i % 2 === 0 ? 'bg-white' : 'bg-[#0C1B3A]/2'}>
-                                  <td className="px-3 py-2 text-[#0C1B3A]/40 font-mono">{it.seq}</td>
+                                  <td className="px-3 py-2 text-slate-600 font-mono-label">{it.seq}</td>
                                   <td className="px-3 py-2">
                                     {it.imageDataUrl
                                       ? <img src={it.imageDataUrl} alt={it.name} className="w-12 h-12 object-cover rounded-lg border border-[#0C1B3A]/10" />
-                                      : <div className="w-12 h-12 rounded-lg bg-[#0C1B3A]/5 flex items-center justify-center text-[#0C1B3A]/20 text-[10px]">—</div>
+                                      : <div className="w-12 h-12 rounded-lg bg-[#0C1B3A]/5 flex items-center justify-center text-slate-600 text-xs">—</div>
                                     }
                                   </td>
                                   <td className="px-3 py-2 font-bold text-[#0C1B3A]">{it.name}</td>
-                                  <td className="px-3 py-2 text-[#0C1B3A]/55 max-w-[200px]">
+                                  <td className="px-3 py-2 text-slate-600 max-w-[200px]">
                                     <div>{it.material}</div>
-                                    {it.spec && <div className="text-[10px] text-[#0C1B3A]/30 mt-0.5">{it.spec}</div>}
+                                    {it.spec && <div className="text-xs text-slate-600 mt-0.5">{it.spec}</div>}
                                   </td>
                                   <td className="px-3 py-2 text-right text-[#0C1B3A]">{it.qty}</td>
-                                  <td className="px-3 py-2 text-[#0C1B3A]/50">{it.unit}</td>
-                                  <td className="px-3 py-2 text-right font-mono text-[#0C1B3A]">{it.unitCost.toLocaleString()}</td>
-                                  <td className="px-3 py-2 text-right font-mono font-bold text-[#0C1B3A]">{it.subtotal.toLocaleString()}</td>
+                                  <td className="px-3 py-2 text-slate-600">{it.unit}</td>
+                                  <td className="px-3 py-2 text-right font-mono-label text-[#0C1B3A]">{it.unitCost.toLocaleString()}</td>
+                                  <td className="px-3 py-2 text-right font-mono-label font-bold text-[#0C1B3A]">{it.subtotal.toLocaleString()}</td>
                                 </tr>
                               ))}
                             </tbody>
                             <tfoot>
                               <tr className="bg-[#0C1B3A]/5 border-t border-[#0C1B3A]/8">
-                                <td colSpan={7} className="px-3 py-2 text-[10px] font-black uppercase tracking-wider text-[#0C1B3A]/40 text-right">{t('Area Total')}</td>
-                                <td className="px-3 py-2 text-right font-mono font-black text-[#0C1B3A]">
+                                <td colSpan={7} className="px-3 py-2 text-xs font-bold text-slate-600 text-right">{t('Area Total')}</td>
+                                <td className="px-3 py-2 text-right font-mono-label font-bold text-[#0C1B3A]">
                                   {areaItems.reduce((s, it) => s + it.subtotal, 0).toLocaleString()}
                                 </td>
                               </tr>
@@ -2785,9 +2786,9 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                     ))}
                     {/* Package total */}
                     <div className="flex justify-end">
-                      <div className="bg-[#0C1B3A] text-white rounded-[16px] px-6 py-3 flex items-center gap-4">
-                        <span className="text-[10px] font-black uppercase tracking-widest opacity-60">{t('Package Total')}</span>
-                        <span className="text-lg font-black">{pkg.currency} {pkg.totalCost.toLocaleString()}</span>
+                      <div className="bg-[#0C1B3A] text-white rounded-[10px] px-6 py-3 flex items-center gap-4">
+                        <span className="text-xs font-bold opacity-60">{t('Package Total')}</span>
+                        <span className="text-lg font-bold">{pkg.currency} {pkg.totalCost.toLocaleString()}</span>
                       </div>
                     </div>
                   </div>
@@ -2798,12 +2799,12 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
           {/* Grand summary */}
           <div className="flex justify-end pt-2">
-            <div className="border border-[#C9A84C]/30 rounded-[20px] px-8 py-4 space-y-1 text-right">
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('All Packages Combined')}</p>
-              <p className="text-2xl font-black text-[#0C1B3A]">
+            <div className="border border-[#C9A84C]/30 rounded-[10px] px-8 py-4 space-y-1 text-right">
+              <p className="text-xs font-bold text-slate-600">{t('All Packages Combined')}</p>
+              <p className="text-2xl font-bold text-[#0C1B3A]">
                 {pqProject.currency} {pqProject.packages.reduce((s, p) => s + p.totalCost, 0).toLocaleString()}
               </p>
-              <p className="text-[10px] text-[#0C1B3A]/30">{t('{n} packages · {m} items total').replace('{n}', String(pqProject.packages.length)).replace('{m}', String(pqProject.packages.reduce((s, p) => s + p.items.length, 0)))}</p>
+              <p className="text-xs text-slate-600">{t('{n} packages · {m} items total').replace('{n}', String(pqProject.packages.length)).replace('{m}', String(pqProject.packages.reduce((s, p) => s + p.items.length, 0)))}</p>
             </div>
           </div>
 
@@ -2837,7 +2838,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                 setPqItemsEN(initEN);
                 setPqPhase('preview');
               }}
-              className="px-10 py-4 rounded-[20px] bg-[#0C1B3A] text-white text-[13px] font-black uppercase tracking-widest hover:bg-[#C9A84C] transition-colors shadow-lg"
+              className="px-10 py-4 rounded-md bg-[#0C1B3A] text-white text-[13px] font-bold hover:bg-[#C9A84C] transition-colors shadow-lg"
             >
               {t('Generate GCI Package Quote →')}
             </button>
@@ -2854,26 +2855,26 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       {/* SUPPLY CHAIN 分区页面标题 */}
       <h1 className="text-2xl font-semibold" style={{ fontFamily: "'Space Grotesk',sans-serif", color: '#0C1B3A' }}>{t('Supplier Quote Page Title')}</h1>
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[12px] font-black uppercase tracking-widest flex-wrap">
-        <button onClick={() => { setAppMode('landing'); setDraftItems([]); setTradeTerms(''); }} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">
+      <div className="flex items-center gap-2 text-[12px] font-bold flex-wrap">
+        <button onClick={() => { setAppMode('landing'); setDraftItems([]); setTradeTerms(''); }} className="text-slate-600 hover:text-[#7A5F2A] transition-colors">
           {t('Home')}
         </button>
-        <span className="text-[#0C1B3A]/15">›</span>
-        <span className="text-[#C9A84C]">{t('Save Supplier Quote')}</span>
+        <span className="text-slate-600">›</span>
+        <span className="text-[#7A5F2A]">{t('Save Supplier Quote')}</span>
       </div>
 
       {/* Supplier Metadata Form — Quotation Center master-data unification
           (2026-09-15): Supplier is now a required search-and-pick against
           real `suppliers`, never hand-typed. Selecting one auto-fills the
           contact/WhatsApp/Email snapshot below from supplier_contacts. */}
-      <div className="bg-white rounded-[28px] border border-[#0C1B3A]/8 p-8 shadow-sm">
+      <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 p-8 shadow-sm">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#0C1B3A' }}>
-            <Archive className="w-4 h-4 text-[#C9A84C]" />
+          <div className="w-8 h-8 rounded-[10px] flex items-center justify-center" style={{ backgroundColor: '#0C1B3A' }}>
+            <Archive className="w-4 h-4 text-[#7A5F2A]" />
           </div>
           <div>
-            <h3 className="text-base font-black text-[#0C1B3A]">{t('Supplier Information')}</h3>
-            <p className="text-[11px] text-[#0C1B3A]/40">{t('Supplier Information')} · {t('Supplier Information Subtitle')}</p>
+            <h3 className="text-base font-bold text-[#0C1B3A]">{t('Supplier Information')}</h3>
+            <p className="text-xs text-slate-600">{t('Supplier Information')} · {t('Supplier Information Subtitle')}</p>
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -2891,55 +2892,55 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             />
           </div>
           <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{t('Category (business)')}</label>
+            <label className="text-xs font-bold text-slate-600 block mb-1.5">{t('Category (business)')}</label>
             <input
               type="text"
               value={supplierMeta.category}
               placeholder={t('Furniture / Tissue / Building...')}
               onChange={e => setSupplierMeta(prev => ({ ...prev, category: e.target.value }))}
-              className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-4 py-2.5 text-[14px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C] transition-colors"
+              className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-4 py-2.5 text-[14px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C] transition-colors"
             />
           </div>
           <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{t('Currency')}</label>
+            <label className="text-xs font-bold text-slate-600 block mb-1.5">{t('Currency')}</label>
             <select
               value={supplierMeta.currency}
               onChange={e => setSupplierMeta(prev => ({ ...prev, currency: e.target.value }))}
-              className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-4 py-2.5 text-[14px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C] transition-colors"
+              className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-4 py-2.5 text-[14px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C] transition-colors"
             >
               {['AED','USD','CNY','EUR','GBP'].map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{t('Quote Date')}</label>
+            <label className="text-xs font-bold text-slate-600 block mb-1.5">{t('Quote Date')}</label>
             <input
               type="date"
               value={supplierMeta.quoteDate}
               onChange={e => setSupplierMeta(prev => ({ ...prev, quoteDate: e.target.value }))}
-              className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-4 py-2.5 text-[14px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C] transition-colors"
+              className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-4 py-2.5 text-[14px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C] transition-colors"
             />
           </div>
           <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{t('Valid Until')}</label>
+            <label className="text-xs font-bold text-slate-600 block mb-1.5">{t('Valid Until')}</label>
             <input
               type="date"
               value={supplierMeta.validUntil}
               onChange={e => setSupplierMeta(prev => ({ ...prev, validUntil: e.target.value }))}
-              className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-4 py-2.5 text-[14px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C] transition-colors"
+              className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-4 py-2.5 text-[14px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C] transition-colors"
             />
           </div>
         </div>
       </div>
 
       {/* GCI Quote Info */}
-      <div className="bg-white rounded-[28px] border border-[#0C1B3A]/8 p-8 shadow-sm">
+      <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 p-8 shadow-sm">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#0C1B3A' }}>
-            <FileText className="w-4 h-4 text-[#C9A84C]" />
+          <div className="w-8 h-8 rounded-[10px] flex items-center justify-center" style={{ backgroundColor: '#0C1B3A' }}>
+            <FileText className="w-4 h-4 text-[#7A5F2A]" />
           </div>
           <div>
-            <h3 className="text-base font-black text-[#0C1B3A]">{t('GCI Quote Info')}</h3>
-            <p className="text-[11px] text-[#0C1B3A]/40">{t('GCI Quote Info Subtitle')}</p>
+            <h3 className="text-base font-bold text-[#0C1B3A]">{t('GCI Quote Info')}</h3>
+            <p className="text-xs text-slate-600">{t('GCI Quote Info Subtitle')}</p>
           </div>
         </div>
         {/* Customer/Project — Quotation Center master-data unification
@@ -2963,13 +2964,13 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             { key: 'phoneWhatsApp', label: t('Phone / WA'), placeholder: '+971 50 000 0000' },
           ].map(f => (
             <div key={f.key}>
-              <label className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{f.label}</label>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">{f.label}</label>
               <input
                 type="text"
                 value={(quoteInfo as any)[f.key] || ''}
                 placeholder={f.placeholder}
                 onChange={e => setQuoteInfo(prev => ({ ...prev, [f.key]: e.target.value }))}
-                className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-4 py-2.5 text-[14px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C] transition-colors"
+                className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-4 py-2.5 text-[14px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C] transition-colors"
               />
             </div>
           ))}
@@ -2977,31 +2978,31 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       </div>
 
       {/* Upload + AI Parse section (reuse renderPackageWorkspace upload zone via shared state) */}
-      <div className="bg-white rounded-[28px] border border-[#0C1B3A]/8 overflow-hidden shadow-sm">
+      <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 overflow-hidden shadow-sm">
         <div className="p-6 border-b border-[#0C1B3A]/6 flex items-center gap-3">
-          <Cpu className="w-5 h-5 text-[#C9A84C]" />
+          <Cpu className="w-5 h-5 text-[#7A5F2A]" />
           <div>
-            <h3 className="text-[13px] font-black uppercase tracking-widest text-[#0C1B3A]">{t('Supplier Quote Import')}</h3>
-            <p className="text-[11px] text-[#0C1B3A]/40 mt-0.5">{t('Upload PDF/Excel/Image or paste text — AI extracts cost items')}</p>
+            <h3 className="text-[13px] font-bold text-[#0C1B3A]">{t('Supplier Quote Import')}</h3>
+            <p className="text-xs text-slate-600 mt-0.5">{t('Upload PDF/Excel/Image or paste text — AI extracts cost items')}</p>
           </div>
         </div>
         <div className="p-6 space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Text paste */}
             <div className="space-y-3">
-              <label className="text-[11px] font-black uppercase tracking-widest text-[#0C1B3A]/40 flex items-center gap-2">
+              <label className="text-xs font-bold text-slate-600 flex items-center gap-2">
                 <Clipboard className="w-3.5 h-3.5" /> {t('Paste supplier quote text')}
               </label>
               <textarea
                 value={importText}
                 onChange={e => setImportText(e.target.value)}
                 placeholder={t('Paste supplier quote content here...')}
-                className="w-full h-44 p-5 bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[20px] text-[13px] text-[#0C1B3A] placeholder:text-[#0C1B3A]/25 resize-none outline-none focus:border-[#C9A84C] transition-colors"
+                className="w-full h-44 p-5 bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-md text-[13px] text-[#0C1B3A] placeholder:text-slate-600 resize-none outline-none focus:border-[#C9A84C] transition-colors"
               />
             </div>
             {/* File upload */}
             <div className="space-y-3">
-              <label className="text-[11px] font-black uppercase tracking-widest text-[#0C1B3A]/40 flex items-center gap-2">
+              <label className="text-xs font-bold text-slate-600 flex items-center gap-2">
                 <Upload className="w-3.5 h-3.5" /> {t('Upload file')}
               </label>
               {/* Drop zone */}
@@ -3011,7 +3012,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                 onDrop={e => { e.preventDefault(); setIsDragging(false); handleFileUpload({ target: { files: e.dataTransfer.files } } as any); }}
                 onClick={() => !isProcessingAI && document.getElementById('sq-file-upload')?.click()}
                 style={{ cursor: isProcessingAI ? 'not-allowed' : 'pointer' }}
-                className={`h-40 rounded-[20px] border-4 border-dashed flex flex-col items-center justify-center transition-all select-none
+                className={`h-40 rounded-[10px] border-4 border-dashed flex flex-col items-center justify-center transition-all select-none
                   ${sqSelectedFile ? 'border-[#C9A84C] bg-[#C9A84C]/5' : isDragging ? 'border-[#C9A84C] bg-[#C9A84C]/5' : 'border-[#0C1B3A]/10 hover:border-[#C9A84C]/40'}`}
               >
                 <input
@@ -3023,25 +3024,25 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                 />
                 {sqSelectedFile ? (
                   <>
-                    <CheckCircle2 className="w-8 h-8 text-[#C9A84C]" />
-                    <p className="text-[13px] font-black text-[#0C1B3A] mt-2 px-4 text-center truncate max-w-full">{sqSelectedFile.name}</p>
-                    <p className="text-[11px] text-[#0C1B3A]/40 mt-1">{(sqSelectedFile.size / 1024).toFixed(1)} KB · Click to replace</p>
+                    <CheckCircle2 className="w-8 h-8 text-[#7A5F2A]" />
+                    <p className="text-[13px] font-bold text-[#0C1B3A] mt-2 px-4 text-center truncate max-w-full">{sqSelectedFile.name}</p>
+                    <p className="text-xs text-slate-600 mt-1">{(sqSelectedFile.size / 1024).toFixed(1)} KB · Click to replace</p>
                   </>
                 ) : (
                   <>
-                    <Upload className="w-8 h-8 text-[#0C1B3A]/20" />
-                    <p className="text-[12px] font-bold text-[#0C1B3A]/40 mt-3">Drag & drop or click to select</p>
-                    <p className="text-[11px] text-[#0C1B3A]/25 mt-1">Excel, CSV, PDF, DOCX, PNG, JPG</p>
+                    <Upload className="w-8 h-8 text-slate-600" />
+                    <p className="text-[12px] font-bold text-slate-600 mt-3">Drag & drop or click to select</p>
+                    <p className="text-xs text-slate-600 mt-1">Excel, CSV, PDF, DOCX, PNG, JPG</p>
                   </>
                 )}
               </div>
 
               {/* Parse error display */}
               {sqParseStatus === 'error' && sqParseError && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-[16px]">
-                  <p className="text-[11px] font-black text-red-600 uppercase tracking-widest mb-1">{t('❌ Parse Failed')}</p>
+                <div className="p-4 bg-red-50 border border-red-200 rounded-[10px]">
+                  <p className="text-xs font-bold text-red-600 mb-1">{t('❌ Parse Failed')}</p>
                   <p className="text-[12px] text-red-700">{sqParseError}</p>
-                  <p className="text-[11px] text-red-500 mt-2">
+                  <p className="text-xs text-red-600 mt-2">
                     {t('In China: Google AI may be blocked. Try VPN, or use text paste, or add items manually below.')}
                   </p>
                 </div>
@@ -3063,7 +3064,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                     else parseExcel(sqSelectedFile);
                   }}
                   disabled={isProcessingAI}
-                  className="w-full py-3.5 rounded-[16px] text-[13px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all"
+                  className="w-full py-3.5 rounded-md text-[13px] font-bold flex items-center justify-center gap-2 transition-all"
                   style={isProcessingAI
                     ? { backgroundColor: '#0C1B3A20', color: '#0C1B3A40', cursor: 'not-allowed' }
                     : { backgroundColor: '#0C1B3A', color: '#C9A84C' }
@@ -3083,7 +3084,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           <button
             onClick={handleAnalyze}
             disabled={isProcessingAI}
-            className="w-full py-4 rounded-[20px] text-[13px] font-black uppercase tracking-widest flex items-center justify-center gap-3 transition-all"
+            className="w-full py-4 rounded-md text-[13px] font-bold flex items-center justify-center gap-3 transition-all"
             style={!isProcessingAI
               ? { backgroundColor: '#0C1B3A', color: '#C9A84C' }
               : { backgroundColor: '#0C1B3A10', color: '#0C1B3A30', cursor: 'not-allowed' }
@@ -3101,7 +3102,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
         <div className="flex justify-center pt-2">
           <button
             onClick={() => setDraftItems([{ id: `sq-manual-${Date.now()}`, originalName: 'Item 1', originalSpec: '', quantity: 1, unit: 'pcs', targetUnitPrice: 0, targetTotal: 0, confidence: 1, status: 'Confirmed' as const, suggestedCategory: FurnitureCategory.OTHER, sourceType: 'manual' }])}
-            className="flex items-center gap-2 px-6 py-3 rounded-[16px] border-2 border-dashed border-[#0C1B3A]/15 text-[#0C1B3A]/50 text-[12px] font-black uppercase tracking-widest hover:border-[#C9A84C] hover:text-[#0C1B3A] transition-all"
+            className="flex items-center gap-2 px-6 py-3 rounded-md border-2 border-dashed border-[#0C1B3A]/15 text-slate-600 text-[12px] font-bold hover:border-[#C9A84C] hover:text-[#0C1B3A] transition-all"
           >
             <Plus className="w-4 h-4" /> {t('Add Items Manually (no AI needed)')}
           </button>
@@ -3114,46 +3115,46 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#C9A84C] bg-[#C9A84C]/10 px-2 py-1 rounded-full">{t('AI Parsed')}</span>
+                <span className="text-xs font-bold text-[#7A5F2A] bg-[#C9A84C]/10 px-2 py-1 rounded-full">{t('AI Parsed')}</span>
               </div>
-              <h3 className="text-xl font-black text-[#0C1B3A]">{t('Supplier Cost Items')}</h3>
-              <p className="text-[11px] text-[#0C1B3A]/50 mt-0.5">{t('Review and correct before saving · {n} items').replace('{n}', String(draftItems.length))}</p>
+              <h3 className="text-xl font-bold text-[#0C1B3A]">{t('Supplier Cost Items')}</h3>
+              <p className="text-xs text-slate-600 mt-0.5">{t('Review and correct before saving · {n} items').replace('{n}', String(draftItems.length))}</p>
             </div>
           </div>
           {/* Currency / Exchange Rate / Margin controls — live preview, applies to every row below */}
-          <div className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[20px] px-6 py-4 flex flex-wrap items-end gap-5">
+          <div className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[10px] px-6 py-4 flex flex-wrap items-end gap-5">
             <div>
-              <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{t('Supplier Currency')}</label>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">{t('Supplier Currency')}</label>
               <select value={supplierMeta.currency} onChange={e => setSupplierMeta(prev => ({ ...prev, currency: e.target.value }))}
-                className="bg-white border border-[#0C1B3A]/10 rounded-lg px-3 py-2 text-[13px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]">
+                className="bg-white border border-[#0C1B3A]/10 rounded-md px-3 py-2 text-[13px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]">
                 {['CNY','USD','AED'].map(c => <option key={c} value={c}>{c === 'CNY' ? t('RMB (CNY)') : c}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{t('Exchange Rate →')}</label>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">{t('Exchange Rate →')}</label>
               <input type="number" step="0.0001" min="0" value={sqExchangeRate}
                 onChange={e => setSqExchangeRate(Number(e.target.value) || 0)}
-                className="w-28 bg-white border border-[#0C1B3A]/10 rounded-lg px-3 py-2 text-[13px] font-mono font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]" />
+                className="w-28 bg-white border border-[#0C1B3A]/10 rounded-md px-3 py-2 text-[13px] font-mono-label font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]" />
             </div>
             <div>
-              <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{t('Customer Currency')}</label>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">{t('Customer Currency')}</label>
               <select value={sqCustomerCurrency} onChange={e => setSqCustomerCurrency(e.target.value as 'AED' | 'USD')}
-                className="bg-white border border-[#0C1B3A]/10 rounded-lg px-3 py-2 text-[13px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]">
+                className="bg-white border border-[#0C1B3A]/10 rounded-md px-3 py-2 text-[13px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]">
                 {['AED','USD'].map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1.5">{t('Default Margin %')}</label>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">{t('Default Margin %')}</label>
               <input type="number" step="1" min="0" value={sqGlobalMargin}
                 onChange={e => setSqGlobalMargin(Number(e.target.value) || 0)}
-                className="w-24 bg-white border border-[#0C1B3A]/10 rounded-lg px-3 py-2 text-[13px] font-mono font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]" />
+                className="w-24 bg-white border border-[#0C1B3A]/10 rounded-md px-3 py-2 text-[13px] font-mono-label font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]" />
             </div>
-            <p className="text-[10px] text-[#0C1B3A]/35 leading-snug max-w-[220px]">Converted = Supplier Cost × Rate. Customer Price = Converted × (1 + Margin%). Margin can be overridden per item below.</p>
+            <p className="text-xs text-slate-600 leading-snug max-w-[220px]">Converted = Supplier Cost × Rate. Customer Price = Converted × (1 + Margin%). Margin can be overridden per item below.</p>
           </div>
 
           {/* Editable table — rich detail + EN translation + currency conversion */}
-          <div className="bg-white rounded-[24px] border border-[#0C1B3A]/8 overflow-hidden shadow-sm">
-            <div className="grid grid-cols-12 gap-3 px-6 py-3 bg-[#0C1B3A] text-white text-[10px] font-black uppercase tracking-wider">
+          <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 overflow-hidden shadow-sm">
+            <div className="grid grid-cols-12 gap-3 px-6 py-3 bg-[#0C1B3A] text-white text-xs font-bold ">
               <div className="col-span-1 text-center">GCI</div>
               <div className="col-span-3">{t('Item')}</div>
               <div className="col-span-2">{t('Spec')}</div>
@@ -3181,16 +3182,16 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                         className="w-4 h-4 accent-[#C9A84C] cursor-pointer" />
                       {item.imageDataUrl
                         ? <img src={item.imageDataUrl} alt="" className="w-9 h-9 object-cover rounded-md border border-[#0C1B3A]/10" />
-                        : <div className="w-9 h-9 rounded-md bg-[#0C1B3A]/4 flex items-center justify-center text-[#0C1B3A]/15 text-[8px]">—</div>
+                        : <div className="w-9 h-9 rounded-md bg-[#0C1B3A]/4 flex items-center justify-center text-slate-600 text-xs">—</div>
                       }
                     </div>
                     <div className="col-span-3">
                       <div className="flex items-center gap-1.5 mb-0.5">
                         {item.sourceType === 'excel-image-ocr' && (
-                          <span className="text-[7px] font-black uppercase tracking-wider text-[#C9A84C] bg-[#C9A84C]/10 px-1.5 py-0.5 rounded">{t('Image OCR')}</span>
+                          <span className="text-xs font-bold text-[#7A5F2A] bg-[#C9A84C]/10 px-1.5 py-0.5 rounded">{t('Image OCR')}</span>
                         )}
                         {item.dataConfidence === 'low' && (
-                          <span className="text-[7px] font-black uppercase tracking-wider text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">{t('Low confidence — verify')}</span>
+                          <span className="text-xs font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">{t('Low confidence — verify')}</span>
                         )}
                       </div>
                       <input value={item.originalName}
@@ -3201,31 +3202,31 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                     <div className="col-span-2">
                       <input value={item.originalSpec || ''} placeholder={t('Spec / size')}
                         onChange={e => update({ originalSpec: e.target.value })}
-                        className="w-full text-[13px] text-[#0C1B3A]/55 bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-1 transition-colors placeholder:text-[#0C1B3A]/20" />
+                        className="w-full text-[13px] text-slate-600 bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-1 transition-colors placeholder:text-slate-600" />
                     </div>
                     <div className="col-span-1">
                       <input type="number" min="0" value={item.quantity}
                         onChange={e => update({ quantity: Number(e.target.value) || 1, targetTotal: (Number(e.target.value) || 1) * item.targetUnitPrice })}
-                        className="w-full text-[14px] font-mono font-bold text-[#0C1B3A] text-center bg-transparent border-b-2 border-[#0C1B3A]/10 focus:border-[#C9A84C] outline-none pb-1" />
+                        className="w-full text-[14px] font-mono-label font-bold text-[#0C1B3A] text-center bg-transparent border-b-2 border-[#0C1B3A]/10 focus:border-[#C9A84C] outline-none pb-1" />
                     </div>
                     <div className="col-span-1">
                       <input value={item.unit}
                         onChange={e => update({ unit: e.target.value })}
-                        className="w-full text-[13px] text-[#0C1B3A]/60 text-center bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-1" />
+                        className="w-full text-[13px] text-slate-600 text-center bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-1" />
                     </div>
                     <div className="col-span-2 text-right">
                       <input type="number" min="0" step="0.01" value={item.targetUnitPrice ? Number(item.targetUnitPrice.toFixed(2)) : ''} placeholder="0.00"
                         onChange={e => update({ targetUnitPrice: Number(e.target.value) || 0, targetTotal: (Number(e.target.value) || 0) * item.quantity })}
-                        className="w-full text-right text-[14px] font-mono font-black text-[#0C1B3A] bg-transparent border-b-2 border-[#0C1B3A]/10 focus:border-[#C9A84C] outline-none pb-1" />
-                      <p className="text-[9px] text-[#0C1B3A]/30 text-right mt-0.5">{supplierMeta.currency}/{item.unit}</p>
+                        className="w-full text-right text-[14px] font-mono-label font-bold text-[#0C1B3A] bg-transparent border-b-2 border-[#0C1B3A]/10 focus:border-[#C9A84C] outline-none pb-1" />
+                      <p className="text-xs text-slate-600 text-right mt-0.5">{supplierMeta.currency}/{item.unit}</p>
                     </div>
                     <div className="col-span-2 text-right flex items-start justify-end gap-2">
                       <div>
-                        <p className="text-[14px] font-black font-mono text-[#0C1B3A]">{sqCustomerCurrency} {customerLineTotal.toFixed(2)}</p>
-                        <p className="text-[9px] text-[#0C1B3A]/30">@ {customerUnitPrice.toFixed(2)} / {item.unit}</p>
+                        <p className="text-[14px] font-bold font-mono-label text-[#0C1B3A]">{sqCustomerCurrency} {customerLineTotal.toFixed(2)}</p>
+                        <p className="text-xs text-slate-600">@ {customerUnitPrice.toFixed(2)} / {item.unit}</p>
                       </div>
                       <button onClick={() => setDraftItems(prev => prev.filter((_, i) => i !== idx))}
-                        className="text-[#0C1B3A]/15 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
+                        className="text-slate-600 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100">
                         <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -3233,10 +3234,10 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
                   {/* Row 2: English Description (editable, used on customer quote) */}
                   <div className="pl-1">
-                    <label className="text-[9px] font-black uppercase tracking-widest text-[#C9A84C] block mb-1">{t('English Description')}</label>
+                    <label className="text-xs font-bold text-[#7A5F2A] block mb-1">{t('English Description')}</label>
                     <textarea value={item.englishDescription || ''} rows={2} placeholder={t('Professional English description for customer quote')}
                       onChange={e => update({ englishDescription: e.target.value })}
-                      className="w-full text-[12.5px] text-[#0C1B3A]/85 bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-lg p-2 resize-none outline-none focus:border-[#C9A84C] transition-colors" />
+                      className="w-full text-[12.5px] text-[#0C1B3A]/85 bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-md p-2 resize-none outline-none focus:border-[#C9A84C] transition-colors" />
                   </div>
 
                   {/* Row 3: extra supplier detail fields */}
@@ -3246,31 +3247,31 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                       ['moq','MOQ'],['packaging','Packaging'],['deliveryTime','Delivery'],
                     ] as [keyof DraftItem, string][]).map(([key, label]) => (
                       <div key={key}>
-                        <label className="text-[8px] font-black uppercase tracking-widest text-[#0C1B3A]/30 block mb-1">{label === 'MOQ' ? label : t(label)}</label>
+                        <label className="text-xs font-bold text-slate-600 block mb-1">{label === 'MOQ' ? label : t(label)}</label>
                         <input value={(item[key] as string) || ''} placeholder="—"
                           onChange={e => update({ [key]: e.target.value } as Partial<DraftItem>)}
-                          className="w-full text-[11px] text-[#0C1B3A]/70 bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-0.5 placeholder:text-[#0C1B3A]/15" />
+                          className="w-full text-xs text-[#0C1B3A]/70 bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-0.5 placeholder:text-slate-600" />
                       </div>
                     ))}
                   </div>
                   <div className="grid grid-cols-3 gap-2 pl-1">
                     <div>
-                      <label className="text-[8px] font-black uppercase tracking-widest text-[#0C1B3A]/30 block mb-1">{t('Payment Terms')}</label>
+                      <label className="text-xs font-bold text-slate-600 block mb-1">{t('Payment Terms')}</label>
                       <input value={item.paymentTerms || ''} placeholder="—"
                         onChange={e => update({ paymentTerms: e.target.value })}
-                        className="w-full text-[11px] text-[#0C1B3A]/70 bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-0.5 placeholder:text-[#0C1B3A]/15" />
+                        className="w-full text-xs text-[#0C1B3A]/70 bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-0.5 placeholder:text-slate-600" />
                     </div>
                     <div className="col-span-2">
-                      <label className="text-[8px] font-black uppercase tracking-widest text-[#0C1B3A]/30 block mb-1">{t('Remarks')}</label>
+                      <label className="text-xs font-bold text-slate-600 block mb-1">{t('Remarks')}</label>
                       <input value={item.remarks || ''} placeholder="—"
                         onChange={e => update({ remarks: e.target.value })}
-                        className="w-full text-[11px] text-[#0C1B3A]/70 bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-0.5 placeholder:text-[#0C1B3A]/15" />
+                        className="w-full text-xs text-[#0C1B3A]/70 bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-0.5 placeholder:text-slate-600" />
                     </div>
                     <div>
-                      <label className="text-[8px] font-black uppercase tracking-widest text-[#0C1B3A]/30 block mb-1">{t('Margin % (override)')}</label>
+                      <label className="text-xs font-bold text-slate-600 block mb-1">{t('Margin % (override)')}</label>
                       <input type="number" step="1" value={item.marginPercent ?? ''} placeholder={`${sqGlobalMargin} (default)`}
                         onChange={e => update({ marginPercent: e.target.value === '' ? undefined : Number(e.target.value) })}
-                        className="w-full text-[11px] font-mono text-[#0C1B3A]/70 bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-0.5 placeholder:text-[#0C1B3A]/20" />
+                        className="w-full text-xs font-mono-label text-[#0C1B3A]/70 bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-0.5 placeholder:text-slate-600" />
                     </div>
                   </div>
                 </div>
@@ -3279,15 +3280,15 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             </div>
             <div className="px-6 py-4 bg-[#0C1B3A]/3 border-t border-[#0C1B3A]/8 flex items-center justify-between">
               <button onClick={() => setDraftItems(prev => [...prev, { id: `sq-new-${Date.now()}`, originalName: 'New Item', originalSpec: '', quantity: 1, unit: 'pcs', targetUnitPrice: 0, targetTotal: 0, confidence: 1, status: 'Confirmed' as const, suggestedCategory: FurnitureCategory.OTHER, sourceType: 'manual' }])}
-                className="text-[12px] font-black uppercase tracking-widest text-[#C9A84C] hover:text-[#0C1B3A] transition-colors flex items-center gap-2">
+                className="text-[12px] font-bold text-[#7A5F2A] hover:text-[#0C1B3A] transition-colors flex items-center gap-2">
                 <Plus className="w-4 h-4" /> {t('Add Item')}
               </button>
               <div className="text-right">
-                <p className="text-[11px] font-bold uppercase text-[#0C1B3A]/30 tracking-wider">{t('Supplier Total / Customer Total')}</p>
-                <p className="text-[13px] font-mono text-[#0C1B3A]/50">
+                <p className="text-xs font-bold text-slate-600 ">{t('Supplier Total / Customer Total')}</p>
+                <p className="text-[13px] font-mono-label text-slate-600">
                   {supplierMeta.currency} {draftItems.reduce((s, it) => s + it.targetUnitPrice * it.quantity, 0).toFixed(2)}
                 </p>
-                <p className="text-2xl font-black font-mono text-[#0C1B3A]">
+                <p className="text-2xl font-bold font-mono-label text-[#0C1B3A]">
                   {sqCustomerCurrency} {draftItems.reduce((s, it) => {
                     const margin = it.marginPercent ?? sqGlobalMargin;
                     return s + it.targetUnitPrice * sqExchangeRate * (1 + margin / 100) * it.quantity;
@@ -3299,8 +3300,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
           {/* Terms */}
           {tradeTerms && (
-            <div className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[16px] px-6 py-4">
-              <p className="text-[11px] font-black uppercase tracking-widest text-[#0C1B3A]/40 mb-2">{t('Terms & Notes (from AI)')}</p>
+            <div className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[10px] px-6 py-4">
+              <p className="text-xs font-bold text-slate-600 mb-2">{t('Terms & Notes (from AI)')}</p>
               <p className="text-[13px] text-[#0C1B3A]/70 whitespace-pre-line">{tradeTerms}</p>
             </div>
           )}
@@ -3312,7 +3313,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
               <button
                 onClick={handleSaveSupplierQuote}
                 disabled={draftItems.length === 0 || sqSaveStatus === 'saving'}
-                className="px-12 py-5 rounded-[24px] font-black uppercase tracking-widest text-[13px] transition-all active:scale-95 flex items-center gap-3 shadow-xl disabled:opacity-40"
+                className="px-12 py-5 rounded-md font-bold text-[13px] transition-all active:scale-95 flex items-center gap-3 shadow-xl disabled:opacity-40"
                 style={{ backgroundColor: '#0C1B3A', color: '#C9A84C' }}
               >
                 <Archive className="w-5 h-5" />
@@ -3323,11 +3324,11 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             /* After save: show Convert + View Archive buttons */
             <div className="space-y-3 animate-in fade-in duration-500">
               {/* Success message */}
-              <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-[16px]">
-                <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
+              <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-[10px]">
+                <CheckCircle2 className="w-5 h-5 text-green-700 shrink-0" />
                 <div>
-                  <p className="text-[13px] font-black text-green-800">{t('Supplier Quote Saved')}</p>
-                  <p className="text-[11px] text-green-600">{t('What would you like to do next?')}</p>
+                  <p className="text-[13px] font-bold text-green-800">{t('Supplier Quote Saved')}</p>
+                  <p className="text-xs text-green-700">{t('What would you like to do next?')}</p>
                 </div>
               </div>
 
@@ -3339,23 +3340,23 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                   ['moq', 'MOQ'], ['paymentTerms', 'Payment Terms'],
                 ];
                 return (
-                  <div className="bg-white border border-[#0C1B3A]/8 rounded-[20px] p-6 space-y-4">
+                  <div className="bg-white border border-[#0C1B3A]/8 rounded-[10px] p-6 space-y-4">
                     <div>
-                      <h4 className="text-[13px] font-black text-[#0C1B3A]">{t('Include Fields — what the customer sees')}</h4>
-                      <p className="text-[11px] text-[#0C1B3A]/45 mt-0.5">{t('Supplier Cost Items is your internal view. Choose what carries over into the GCI Quote.')}</p>
+                      <h4 className="text-[13px] font-bold text-[#0C1B3A]">{t('Include Fields — what the customer sees')}</h4>
+                      <p className="text-xs text-slate-600 mt-0.5">{t('Supplier Cost Items is your internal view. Choose what carries over into the GCI Quote.')}</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 text-[11px]">
-                      <div className="bg-green-50 border border-green-200 rounded-xl p-3">
-                        <p className="font-black uppercase tracking-wider text-green-700 text-[9px] mb-1.5">{t('Always shown to customer')}</p>
+                    <div className="grid grid-cols-2 gap-4 text-xs">
+                      <div className="bg-green-50 border border-green-200 rounded-[10px] p-3">
+                        <p className="font-bold text-green-700 text-xs mb-1.5">{t('Always shown to customer')}</p>
                         <p className="text-green-800/80 leading-relaxed">{t('English Description, Specification, Size/Dimension, Material, Color, Unit, Qty, Customer Unit Price, Customer Line Total')}</p>
                       </div>
-                      <div className="bg-red-50 border border-red-200 rounded-xl p-3">
-                        <p className="font-black uppercase tracking-wider text-red-700 text-[9px] mb-1.5">{t('Never shown to customer')}</p>
+                      <div className="bg-red-50 border border-red-200 rounded-[10px] p-3">
+                        <p className="font-bold text-red-700 text-xs mb-1.5">{t('Never shown to customer')}</p>
                         <p className="text-red-800/80 leading-relaxed">{t('Supplier Name/Contact, Supplier Unit Cost, Supplier Currency, Exchange Rate, Margin %, Internal Notes')}</p>
                       </div>
                     </div>
                     <div>
-                      <p className="font-black uppercase tracking-wider text-[#0C1B3A]/40 text-[9px] mb-2">{t('Optional — include if checked')}</p>
+                      <p className="font-bold text-slate-600 text-xs mb-2">{t('Optional — include if checked')}</p>
                       <div className="flex flex-wrap gap-4">
                         {OPTIONAL_FIELDS.map(([key, label]) => (
                           <label key={key} className="flex items-center gap-2 text-[12px] font-bold text-[#0C1B3A]/70 cursor-pointer">
@@ -3367,7 +3368,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                         ))}
                       </div>
                     </div>
-                    <p className="text-[10px] text-[#0C1B3A]/35">{included.length} of {draftItems.length} items selected for the GCI Quote (toggle "Include in GCI Quote" per row above).</p>
+                    <p className="text-xs text-slate-600">{included.length} of {draftItems.length} items selected for the GCI Quote (toggle "Include in GCI Quote" per row above).</p>
                   </div>
                 );
               })()}
@@ -3384,7 +3385,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                   setShowCurrencyModal(true);
                 }}
                 disabled={!savedSQId}
-                className="w-full py-5 rounded-[24px] font-black uppercase tracking-widest text-[14px] transition-all active:scale-95 flex items-center justify-center gap-3 shadow-xl"
+                className="w-full py-5 rounded-md font-bold text-[14px] transition-all active:scale-95 flex items-center justify-center gap-3 shadow-xl"
                 style={{ backgroundColor: '#C9A84C', color: '#0C1B3A' }}
               >
                 <ExternalLink className="w-5 h-5" />
@@ -3402,7 +3403,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                   setSavedSQId(null);
                   setAppMode('landing');
                 }}
-                className="w-full py-4 rounded-[24px] font-black uppercase tracking-widest text-[12px] transition-all border border-[#0C1B3A]/12 text-[#0C1B3A]/60 hover:border-[#0C1B3A]/30 hover:text-[#0C1B3A] flex items-center justify-center gap-2"
+                className="w-full py-4 rounded-md font-bold text-[12px] transition-all border border-[#0C1B3A]/12 text-slate-600 hover:border-[#0C1B3A]/30 hover:text-[#0C1B3A] flex items-center justify-center gap-2"
               >
                 <History className="w-4 h-4" /> {t('View in Supplier Quote Archive')}
               </button>
@@ -6156,12 +6157,12 @@ Leave a field as empty string if not present. Never fabricate values.`;
       [wb.saveStatus, saveText],
     ];
     return (
-        <aside className="min-w-0 bg-[#0C1B3A] text-white rounded-2xl p-4 sm:p-5 lg:sticky lg:top-3">
-          <h3 className="text-[11px] font-black uppercase tracking-widest text-[#E8C96A] mb-3">{wb.summary}</h3>
+        <aside className="min-w-0 bg-[#0C1B3A] text-white rounded-[10px] p-4 sm:p-5 lg:sticky lg:top-3">
+          <h3 className="text-xs font-bold text-[#E8C96A] mb-3">{wb.summary}</h3>
           <dl className="space-y-2">
             {summaryRows.map(([k, v]) => (
               <div key={k} className="flex items-baseline justify-between gap-3 border-b border-white/10 pb-1.5 last:border-0">
-                <dt className="text-[10px] uppercase tracking-wider text-white/50 shrink-0">{k}</dt>
+                <dt className="text-xs text-white/50 shrink-0">{k}</dt>
                 <dd className="text-xs font-bold text-right truncate min-w-0" title={v}>{v}</dd>
               </div>
             ))}
@@ -6171,9 +6172,9 @@ Leave a field as empty string if not present. Never fabricate values.`;
   };
 
   const renderProjectInfo = () => {
-    const labelCls = 'text-[10px] font-black text-gray-400 uppercase tracking-widest';
-    const fieldCls = 'w-full p-3 border border-gray-300 rounded-lg outline-none focus:border-[#CBA85C] text-sm font-bold text-gray-700 bg-white min-w-0';
-    const readonlyCls = 'w-full p-3 border border-gray-200 rounded-lg text-sm font-bold text-gray-500 bg-gray-50 min-w-0';
+    const labelCls = 'text-xs font-semibold text-slate-600';
+    const fieldCls = 'w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#A07F3C] text-sm font-bold text-gray-700 bg-white min-w-0';
+    const readonlyCls = 'w-full p-3 border border-gray-200 rounded-md text-sm font-bold text-slate-600 bg-gray-50 min-w-0';
 
     // Step 1 is a real workflow: pick / create the customer, pick the project, then start. Nothing is shown as an error before the user acts.
     const hasCustomer = !!quoteInfo.customerId;
@@ -6191,13 +6192,13 @@ Leave a field as empty string if not present. Never fabricate values.`;
 
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)] gap-4 items-start">
           {/* ── Main form (~70%) ── */}
-          <section className="min-w-0 bg-white rounded-2xl border border-brand-beige p-4 sm:p-5 space-y-4">
+          <section className="min-w-0 bg-white rounded-[10px] border border-[rgba(12,27,58,0.1)] p-4 sm:p-5 space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="text-lg font-black text-[#0C1B3A] leading-tight">{wb.projectTitle}</h2>
-                <p className="text-xs text-gray-400 mt-0.5">{wb.projectSubtitle}</p>
+                <h2 className="text-lg font-bold text-[#0C1B3A] leading-tight">{wb.projectTitle}</h2>
+                <p className="text-xs text-slate-600 mt-0.5">{wb.projectSubtitle}</p>
               </div>
-              <button onClick={() => setAppMode('landing')} className="shrink-0 flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 hover:text-[#C9A84C] transition-colors">
+              <button onClick={() => setAppMode('landing')} className="shrink-0 flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-[#7A5F2A] transition-colors">
                 <ChevronLeft className="w-3.5 h-3.5" /> Workflow Home
               </button>
             </div>
@@ -6205,11 +6206,11 @@ Leave a field as empty string if not present. Never fabricate values.`;
             <ol className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
               {flow.map((s, i) => (
                 <li key={s.label} className="flex items-center gap-2">
-                  <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-black ${s.state === 'done' ? 'bg-[#CBA85C]/15 text-[#8A6D1F]' : s.state === 'current' ? 'bg-[#0C1B3A] text-[#E8C96A]' : 'bg-gray-100 text-gray-400'}`}>
-                    <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] bg-white/20">{s.state === 'done' ? '✓' : i + 1}</span>
+                  <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${s.state === 'done' ? 'bg-[#CBA85C]/15 text-[#8A6D1F]' : s.state === 'current' ? 'bg-[#0C1B3A] text-[#E8C96A]' : 'bg-gray-100 text-slate-600'}`}>
+                    <span className="w-4 h-4 rounded-full flex items-center justify-center text-xs bg-white/20">{s.state === 'done' ? '✓' : i + 1}</span>
                     {s.label}
                   </span>
-                  {i < flow.length - 1 && <ChevronRight className="w-3 h-3 text-gray-300" />}
+                  {i < flow.length - 1 && <ChevronRight className="w-3 h-3 text-slate-600" />}
                 </li>
               ))}
             </ol>
@@ -6273,7 +6274,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   setQuoteType(null); setQuoteMode(null); setTradePhase(null);
                   setProjectInfoSubmitted(true);
                 }}
-                className="px-6 py-3 bg-[#0C1B3A] text-[#E8C96A] rounded-xl font-black uppercase tracking-wider text-[11px] hover:bg-[#0F2551] transition-colors flex items-center gap-2 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
+                className="px-6 py-3 bg-[#0C1B3A] text-[#E8C96A] rounded-md font-bold text-xs hover:bg-[#0F2551] transition-colors flex items-center gap-2 disabled:bg-gray-200 disabled:text-slate-600 disabled:cursor-not-allowed"
               >
                 {wb.startCustom} <ChevronRight className="w-4 h-4" />
               </button>
@@ -6369,26 +6370,26 @@ Leave a field as empty string if not present. Never fabricate values.`;
     return (
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
         {/* Breadcrumb — source-aware */}
-        <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest flex-wrap">
+        <div className="flex items-center gap-2 text-xs font-bold flex-wrap">
           {quoteSource === 'supplier-archive' ? (
             <>
-              <button onClick={() => { setAppMode('landing'); setView('configurator'); setQuoteSource(null); setQuoteType(null); setQuoteMode(null); setTradePhase(null); }} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">{t('Workflow Home')}</button>
-              <span className="text-[#0C1B3A]/15">›</span>
-              <button onClick={() => { setView('history'); setHistoryTab('supplier'); setQuoteSource(null); setQuoteType(null); setQuoteMode(null); setTradePhase(null); setAppMode('landing'); }} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">{t('Supplier Quote Archive')}</button>
-              <span className="text-[#0C1B3A]/15">›</span>
-              <span className="text-[#C9A84C]">{t('GCI Quote Pricing Review')}</span>
+              <button onClick={() => { setAppMode('landing'); setView('configurator'); setQuoteSource(null); setQuoteType(null); setQuoteMode(null); setTradePhase(null); }} className="text-slate-600 hover:text-[#7A5F2A] transition-colors">{t('Workflow Home')}</button>
+              <span className="text-slate-600">›</span>
+              <button onClick={() => { setView('history'); setHistoryTab('supplier'); setQuoteSource(null); setQuoteType(null); setQuoteMode(null); setTradePhase(null); setAppMode('landing'); }} className="text-slate-600 hover:text-[#7A5F2A] transition-colors">{t('Supplier Quote Archive')}</button>
+              <span className="text-slate-600">›</span>
+              <span className="text-[#7A5F2A]">{t('GCI Quote Pricing Review')}</span>
             </>
           ) : (
             <>
-              <button onClick={() => { setAppMode('landing'); setView('configurator'); setProjectInfoSubmitted(false); setQuoteType(null); }} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">{t('Workflow Home')}</button>
-              <span className="text-[#0C1B3A]/15">›</span>
-              <button onClick={() => { setQuoteMode(null); setSelectedScenario(null); setQuoteType(null); setTradePhase(null); setActiveTab('items'); }} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">{t('Quote Type')}</button>
-              <span className="text-[#0C1B3A]/15">›</span>
-              <button onClick={handleBackFromPricing} className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors">
+              <button onClick={() => { setAppMode('landing'); setView('configurator'); setProjectInfoSubmitted(false); setQuoteType(null); }} className="text-slate-600 hover:text-[#7A5F2A] transition-colors">{t('Workflow Home')}</button>
+              <span className="text-slate-600">›</span>
+              <button onClick={() => { setQuoteMode(null); setSelectedScenario(null); setQuoteType(null); setTradePhase(null); setActiveTab('items'); }} className="text-slate-600 hover:text-[#7A5F2A] transition-colors">{t('Quote Type')}</button>
+              <span className="text-slate-600">›</span>
+              <button onClick={handleBackFromPricing} className="text-slate-600 hover:text-[#7A5F2A] transition-colors">
                 {quoteType === 'boq' ? t('BOQ & AI Analysis') : t('Trade & Sourcing')}
               </button>
-              <span className="text-[#0C1B3A]/15">›</span>
-              <span className="text-[#C9A84C]">{t('Pricing Review')}</span>
+              <span className="text-slate-600">›</span>
+              <span className="text-[#7A5F2A]">{t('Pricing Review')}</span>
             </>
           )}
         </div>
@@ -6396,7 +6397,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
         {/* Back button — always visible */}
         <button
           onClick={handleBackFromPricing}
-          className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-[#0C1B3A]/40 hover:text-[#C9A84C] transition-colors"
+          className="flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-[#7A5F2A] transition-colors"
         >
           <ChevronLeft className="w-4 h-4" />
           {quoteSource === 'supplier-archive' ? t('Back to Supplier Quote Archive') : quoteSource === 'gci-history' ? t('Back to GCI Quotes') : t('Back to Cost Items')}
@@ -6404,7 +6405,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
 
         {/* Page title — source-aware */}
         <div className="flex items-center gap-3">
-          <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#C9A84C] bg-[#C9A84C]/10 px-3 py-1 rounded-full">
+          <span className="text-xs font-bold text-[#7A5F2A] bg-[#C9A84C]/10 px-3 py-1 rounded-full">
             {quoteSource === 'supplier-archive' ? t('Supplier Quote → GCI Quote') : t('Trade & Sourcing')}
           </span>
         </div>
@@ -6412,7 +6413,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
         <StepIndicator current={sentToTrade ? 6 : quoteGenerated ? 5 : 4} />
 
         {/* Quote Context */}
-        <div className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[20px] px-6 py-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[10px] px-6 py-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {[
             { label: t('Customer / Project'), value: quoteInfo.customerProjectName || '—' },
             { label: t('Quote No'), value: quoteInfo.quoteNumber || 'Auto' },
@@ -6422,8 +6423,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
             { label: t('Source'), value: _businessIdParam ? `DEAL · ${_businessIdParam}` : t('Manual') },
           ].map(f => (
             <div key={f.label}>
-              <p className="text-[8px] font-black uppercase tracking-wider text-[#0C1B3A]/30 mb-0.5">{f.label}</p>
-              <p className="text-[11px] font-bold text-[#0C1B3A] truncate" title={f.value}>{f.value}</p>
+              <p className="text-xs font-bold text-slate-600 mb-0.5">{f.label}</p>
+              <p className="text-xs font-bold text-[#0C1B3A] truncate" title={f.value}>{f.value}</p>
             </div>
           ))}
         </div>
@@ -6432,25 +6433,25 @@ Leave a field as empty string if not present. Never fabricate values.`;
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[8px] font-black uppercase tracking-[0.3em] text-[#C9A84C] bg-[#C9A84C]/10 px-2 py-1 rounded-full">
+              <span className="text-xs font-bold text-[#7A5F2A] bg-[#C9A84C]/10 px-2 py-1 rounded-full">
                 {quoteType === 'boq' ? t('BOQ → Trade Pricing') : t('Trade & Sourcing')}
               </span>
             </div>
-            <h2 className="text-2xl font-serif italic text-[#0C1B3A]">{t('Review Cost & Set Selling Price')}</h2>
-            <p className="text-[10px] text-[#0C1B3A]/50 mt-1">输入销售价格 · 系统自动计算利润和VAT</p>
+            <h2 className="text-2xl italic text-[#0C1B3A]">{t('Review Cost & Set Selling Price')}</h2>
+            <p className="text-xs text-slate-600 mt-1">输入销售价格 · 系统自动计算利润和VAT</p>
           </div>
           <button
             onClick={() => setTradePhase('upload')}
-            className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#0C1B3A]/40 hover:text-[#0C1B3A] transition-colors"
+            className="flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-[#0C1B3A] transition-colors"
           >
             {t('← Back to Draft Items')}
           </button>
         </div>
 
         {/* Pricing Table */}
-        <div className="bg-white rounded-[32px] border border-[#0C1B3A]/8 overflow-hidden shadow-sm">
+        <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 overflow-hidden shadow-sm">
           {/* Table Header */}
-          <div className="grid grid-cols-12 gap-2 px-6 py-3 bg-[#0C1B3A] text-white text-[9px] font-black uppercase tracking-wider">
+          <div className="grid grid-cols-12 gap-2 px-6 py-3 bg-[#0C1B3A] text-white text-xs font-bold ">
             <div className="col-span-3">{t('Item')}</div>
             <div className="col-span-1 text-right">{t('Qty')}</div>
             <div className="col-span-2 text-right">{t('Supplier Cost')}</div>
@@ -6492,14 +6493,14 @@ Leave a field as empty string if not present. Never fabricate values.`;
               return (
                 <div key={item.id} className="grid grid-cols-12 gap-2 px-6 py-4 items-center hover:bg-[#0C1B3A]/2 transition-colors">
                   <div className="col-span-3">
-                    <p className="text-[11px] font-bold text-[#0C1B3A] truncate">{item.originalName}</p>
-                    {item.originalSpec && <p className="text-[9px] text-[#0C1B3A]/40 truncate">{item.originalSpec}</p>}
-                    <span className="text-[8px] font-bold text-[#0C1B3A]/30 uppercase">{tradeItemCurrencies[item.id] || 'AED'} · {item.unit}</span>
+                    <p className="text-xs font-bold text-[#0C1B3A] truncate">{item.originalName}</p>
+                    {item.originalSpec && <p className="text-xs text-slate-600 truncate">{item.originalSpec}</p>}
+                    <span className="text-xs font-bold text-slate-600 ">{tradeItemCurrencies[item.id] || 'AED'} · {item.unit}</span>
                   </div>
-                  <div className="col-span-1 text-right text-[11px] font-bold text-[#0C1B3A]">{item.quantity}</div>
+                  <div className="col-span-1 text-right text-xs font-bold text-[#0C1B3A]">{item.quantity}</div>
                   <div className="col-span-2 text-right">
-                    <p className="text-[11px] font-mono text-[#0C1B3A]/60">{supplierTotal.toFixed(2)}</p>
-                    <p className="text-[9px] text-[#0C1B3A]/30">@{supplierUnit.toFixed(2)}</p>
+                    <p className="text-xs font-mono-label text-slate-600">{supplierTotal.toFixed(2)}</p>
+                    <p className="text-xs text-slate-600">@{supplierUnit.toFixed(2)}</p>
                   </div>
                   {/* Selling Price */}
                   <div className="col-span-2">
@@ -6508,7 +6509,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       value={sellPrice || ''}
                       placeholder="0.00"
                       onChange={e => handleSellChange(Number(e.target.value) || 0)}
-                      className="w-full text-right bg-[#C9A84C]/8 border border-[#C9A84C]/30 rounded-lg px-2 py-1.5 text-[11px] font-black font-mono text-[#0C1B3A] outline-none focus:border-[#C9A84C] focus:bg-[#C9A84C]/12 transition-all"
+                      className="w-full text-right bg-[#C9A84C]/8 border border-[#C9A84C]/30 rounded-md px-2 py-1.5 text-xs font-bold font-mono-label text-[#0C1B3A] outline-none focus:border-[#C9A84C] focus:bg-[#C9A84C]/12 transition-all"
                     />
                   </div>
                   {/* Markup% */}
@@ -6518,23 +6519,23 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       value={sellPrice > 0 ? (markupPct || '') : ''}
                       placeholder="0%"
                       onChange={e => handleMarkupChange(Number(e.target.value) || 0)}
-                      className="w-full text-right bg-[#0C1B3A]/4 border border-[#0C1B3A]/15 rounded-lg px-2 py-1.5 text-[10px] font-black font-mono text-[#0C1B3A] outline-none focus:border-[#C9A84C] transition-all"
+                      className="w-full text-right bg-[#0C1B3A]/4 border border-[#0C1B3A]/15 rounded-md px-2 py-1.5 text-xs font-bold font-mono-label text-[#0C1B3A] outline-none focus:border-[#C9A84C] transition-all"
                     />
                   </div>
                   {/* Profit */}
-                  <div className={`col-span-1 text-right text-[10px] font-black font-mono ${isProfit ? 'text-green-600' : sellPrice > 0 ? 'text-red-500' : 'text-[#0C1B3A]/20'}`}>
+                  <div className={`col-span-1 text-right text-xs font-bold font-mono-label ${isProfit ? 'text-green-700' : sellPrice > 0 ? 'text-red-600' : 'text-slate-600'}`}>
                     {sellPrice > 0 ? (lineProfit >= 0 ? '+' : '') + lineProfit.toFixed(0) : '—'}
                   </div>
                   {/* Margin% */}
-                  <div className={`col-span-1 text-right text-[10px] font-black ${isProfit ? 'text-green-600' : sellPrice > 0 ? 'text-red-500' : 'text-[#0C1B3A]/20'}`}>
+                  <div className={`col-span-1 text-right text-xs font-bold ${isProfit ? 'text-green-700' : sellPrice > 0 ? 'text-red-600' : 'text-slate-600'}`}>
                     {sellPrice > 0 ? lineMargin.toFixed(1) + '%' : '—'}
                   </div>
                   {/* Line Total */}
                   <div className="col-span-1 text-right">
-                    <p className={`text-[10px] font-black font-mono ${sellPrice > 0 ? 'text-[#0C1B3A]' : 'text-[#0C1B3A]/20'}`}>
+                    <p className={`text-xs font-bold font-mono-label ${sellPrice > 0 ? 'text-[#0C1B3A]' : 'text-slate-600'}`}>
                       {sellPrice > 0 ? lineTotal.toFixed(2) : '—'}
                     </p>
-                    {sellPrice > 0 && <p className="text-[8px] text-[#0C1B3A]/25">+{lineVAT.toFixed(1)} VAT</p>}
+                    {sellPrice > 0 && <p className="text-xs text-slate-600">+{lineVAT.toFixed(1)} VAT</p>}
                   </div>
                 </div>
               );
@@ -6545,35 +6546,35 @@ Leave a field as empty string if not present. Never fabricate values.`;
           <div className="px-6 py-5 bg-[#0C1B3A]/3 border-t border-[#0C1B3A]/10">
             <div className="grid grid-cols-3 gap-8 text-center">
               <div>
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Total Supplier Cost')}</p>
-                <p className="text-xl font-black font-mono text-[#0C1B3A] mt-1">AED {totalSupplierCost.toFixed(2)}</p>
+                <p className="text-xs font-bold text-slate-600">{t('Total Supplier Cost')}</p>
+                <p className="text-xl font-bold font-mono-label text-[#0C1B3A] mt-1">AED {totalSupplierCost.toFixed(2)}</p>
               </div>
               <div>
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Total Profit · Margin')}</p>
-                <p className={`text-xl font-black font-mono mt-1 ${totalProfit > 0 ? 'text-green-600' : totalSelling > 0 ? 'text-red-500' : 'text-[#0C1B3A]/30'}`}>
+                <p className="text-xs font-bold text-slate-600">{t('Total Profit · Margin')}</p>
+                <p className={`text-xl font-bold font-mono-label mt-1 ${totalProfit > 0 ? 'text-green-700' : totalSelling > 0 ? 'text-red-600' : 'text-slate-600'}`}>
                   {totalSelling > 0 ? `AED ${totalProfit.toFixed(2)} · ${overallMargin.toFixed(1)}%` : '—'}
                 </p>
               </div>
               <div>
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Grand Total (incl 5% VAT)')}</p>
-                <p className="text-xl font-black font-mono text-[#C9A84C] mt-1">
+                <p className="text-xs font-bold text-slate-600">{t('Grand Total (incl 5% VAT)')}</p>
+                <p className="text-xl font-bold font-mono-label text-[#7A5F2A] mt-1">
                   {totalSelling > 0 ? `AED ${grandTotal.toFixed(2)}` : '—'}
                 </p>
-                {totalSelling > 0 && <p className="text-[8px] text-[#0C1B3A]/30 mt-0.5">VAT {totalVAT.toFixed(2)}</p>}
+                {totalSelling > 0 && <p className="text-xs text-slate-600 mt-0.5">VAT {totalVAT.toFixed(2)}</p>}
               </div>
             </div>
           </div>
         </div>
 
         {/* Note */}
-        <p className="text-center text-[9px] text-[#0C1B3A]/30 font-bold uppercase tracking-widest">
+        <p className="text-center text-xs text-slate-600 font-bold ">
           ⚠ Selling prices are manual · Enter Selling Price or Markup% · System calculates profit &amp; VAT · 定价由人决定，系统只做计算
         </p>
 
         {/* Step 5: Generate GCI Quote */}
         <div className="flex items-center gap-2 justify-center">
           <div className="h-px flex-1 bg-[#0C1B3A]/8" />
-          <span className="text-[8px] font-black uppercase tracking-[0.3em] text-[#C9A84C] px-3">{t('Step 5 · Generate GCI Quote')}</span>
+          <span className="text-xs font-bold text-[#7A5F2A] px-3">{t('Step 5 · Generate GCI Quote')}</span>
           <div className="h-px flex-1 bg-[#0C1B3A]/8" />
         </div>
         <div className="flex justify-center">
@@ -6585,7 +6586,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
               handleSaveToCloud(confirmed, { totalSupplierCost, totalSelling, totalProfit, overallMargin, totalVAT, grandTotal });
             }}
             disabled={totalSelling <= 0}
-            className="px-12 py-5 rounded-[24px] bg-[#C9A84C] text-[#0C1B3A] font-black uppercase tracking-widest text-xs shadow-xl hover:bg-[#E8C96A] transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-3"
+            className="px-12 py-5 rounded-md bg-[#C9A84C] text-[#0C1B3A] font-bold text-xs shadow-xl hover:bg-[#E8C96A] transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-3"
           >
             <FileText className="w-4 h-4" /> Generate GCI Quote
           </button>
@@ -6598,41 +6599,41 @@ Leave a field as empty string if not present. Never fabricate values.`;
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[8px] font-black uppercase tracking-[0.3em] text-white bg-[#C9A84C] px-3 py-1 rounded-full">{t('GCI Quotation Draft')}</span>
+                  <span className="text-xs font-bold text-white bg-[#C9A84C] px-3 py-1 rounded-full">{t('GCI Quotation Draft')}</span>
                 </div>
-                <h3 className="text-xl font-black text-[#0C1B3A]">{t('GCI Customer Quote')}</h3>
+                <h3 className="text-xl font-bold text-[#0C1B3A]">{t('GCI Customer Quote')}</h3>
               </div>
               <div className="flex items-center gap-3">
                 {/* Cloud save status indicator */}
                 {cloudSaveStatus === 'saved' && cloudId && (
                   <div className="flex items-center gap-1.5 px-3 py-1 bg-green-50 border border-green-200 rounded-full">
-                    <CheckCircle2 className="w-3 h-3 text-green-500" />
-                    <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">{t('Saved · {n}').replace('{n}', quoteInfo.quoteNumber)}</span>
+                    <CheckCircle2 className="w-3 h-3 text-green-700" />
+                    <span className="text-xs font-bold text-green-700 ">{t('Saved · {n}').replace('{n}', quoteInfo.quoteNumber)}</span>
                   </div>
                 )}
                 {cloudSaveStatus === 'saving' && (
                   <div className="flex items-center gap-1.5 px-3 py-1 bg-[#0C1B3A]/5 rounded-full">
-                    <RefreshCw className="w-3 h-3 text-[#C9A84C] animate-spin" />
-                    <span className="text-[9px] font-black text-[#0C1B3A]/50 uppercase tracking-widest">{t('Saving…')}</span>
+                    <RefreshCw className="w-3 h-3 text-[#7A5F2A] animate-spin" />
+                    <span className="text-xs font-bold text-slate-600 ">{t('Saving…')}</span>
                   </div>
                 )}
                 {cloudSaveStatus === 'error' && (
-                  <span className="text-[9px] font-black text-red-400 uppercase tracking-widest">{t('Save failed')}</span>
+                  <span className="text-xs font-bold text-red-600 ">{t('Save failed')}</span>
                 )}
                 <button
                   onClick={() => handleSaveToCloud(confirmed, { totalSupplierCost, totalSelling, totalProfit, overallMargin, totalVAT, grandTotal })}
                   disabled={cloudSaveStatus === 'saving'}
-                  className="px-4 py-2 bg-[#0C1B3A] text-[#C9A84C] rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-[#0F2551] transition-all disabled:opacity-40 flex items-center gap-1.5 border border-[#C9A84C]/30"
+                  className="px-4 py-2 bg-[#0C1B3A] text-[#7A5F2A] rounded-md text-xs font-bold hover:bg-[#0F2551] transition-all disabled:opacity-40 flex items-center gap-1.5 border border-[#C9A84C]/30"
                 >
                   {cloudId ? t('↑ Update Draft') : t('💾 Save Draft')}
                 </button>
-                <button onClick={() => setQuoteGenerated(false)} className="text-[9px] text-[#0C1B3A]/30 hover:text-[#0C1B3A] uppercase tracking-widest font-bold transition-colors">{t('← Edit Prices')}</button>
+                <button onClick={() => setQuoteGenerated(false)} className="text-xs text-slate-600 hover:text-[#0C1B3A] font-bold transition-colors">{t('← Edit Prices')}</button>
               </div>
             </div>
 
             {/* Editable Customer Info */}
-            <div className="bg-white rounded-[20px] border border-[#0C1B3A]/8 p-5 shadow-sm">
-              <p className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 mb-4">{t('Customer Info')}</p>
+            <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 p-5 shadow-sm">
+              <p className="text-xs font-bold text-slate-600 mb-4">{t('Customer Info')}</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[
                   { key: 'customerProjectName', label: t('Customer / Project'), placeholder: 'e.g. Al Nahyan Villa FF&E' },
@@ -6640,13 +6641,13 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   { key: 'phoneWhatsApp', label: t('Phone / WA'), placeholder: '+971 50 000 0000' },
                 ].map(f => (
                   <div key={f.key}>
-                    <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block mb-1">{f.label}</label>
+                    <label className="text-xs font-bold text-slate-600 block mb-1">{f.label}</label>
                     <input
                       type="text"
                       value={(quoteInfo as any)[f.key] || ''}
                       placeholder={f.placeholder}
                       onChange={e => setQuoteInfo(prev => ({ ...prev, [f.key]: e.target.value }))}
-                      className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-xl px-3 py-2 text-[13px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C] transition-colors"
+                      className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-3 py-2 text-[13px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C] transition-colors"
                     />
                   </div>
                 ))}
@@ -6654,7 +6655,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
             </div>
 
             {/* Quote info card */}
-            <div className="bg-[#0C1B3A] rounded-[24px] p-6 grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div className="bg-[#0C1B3A] rounded-[10px] p-6 grid grid-cols-2 sm:grid-cols-3 gap-4">
               {[
                 { label: t('Customer / Project'), value: quoteInfo.customerProjectName || '—' },
                 { label: t('Quote No'), value: quoteInfo.quoteNumber || 'Auto' },
@@ -6664,8 +6665,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 { label: t('Items'), value: t('{n} line items').replace('{n}', String(confirmed.length)) },
               ].map(f => (
                 <div key={f.label}>
-                  <p className="text-[8px] font-black uppercase tracking-wider text-white/30 mb-0.5">{f.label}</p>
-                  <p className="text-[11px] font-bold text-white truncate">{f.value}</p>
+                  <p className="text-xs font-bold text-white/30 mb-0.5">{f.label}</p>
+                  <p className="text-xs font-bold text-white truncate">{f.value}</p>
                 </div>
               ))}
             </div>
@@ -6673,22 +6674,22 @@ Leave a field as empty string if not present. Never fabricate values.`;
             {/* Financials summary */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               {[
-                { label: t('Supplier Cost'), value: `AED ${totalSupplierCost.toFixed(2)}`, color: 'text-[#0C1B3A]/60' },
+                { label: t('Supplier Cost'), value: `AED ${totalSupplierCost.toFixed(2)}`, color: 'text-slate-600' },
                 { label: t('Selling (excl VAT)'), value: `AED ${totalSelling.toFixed(2)}`, color: 'text-[#0C1B3A]' },
                 { label: t('Profit · {n}%').replace('{n}', overallMargin.toFixed(1)), value: `AED ${totalProfit.toFixed(2)}`, color: totalProfit > 0 ? 'text-green-600' : 'text-red-500' },
-                { label: t('VAT 5%'), value: `AED ${totalVAT.toFixed(2)}`, color: 'text-[#0C1B3A]/60' },
+                { label: t('VAT 5%'), value: `AED ${totalVAT.toFixed(2)}`, color: 'text-slate-600' },
                 { label: t('Grand Total'), value: `AED ${grandTotal.toFixed(2)}`, color: 'text-[#C9A84C] text-lg' },
               ].map(f => (
-                <div key={f.label} className="bg-white rounded-[16px] border border-[#0C1B3A]/8 p-4 text-center">
-                  <p className="text-[8px] font-black uppercase tracking-wider text-[#0C1B3A]/30 mb-1">{f.label}</p>
-                  <p className={`font-black font-mono text-base ${f.color}`}>{f.value}</p>
+                <div key={f.label} className="bg-white rounded-[10px] border border-[#0C1B3A]/8 p-4 text-center">
+                  <p className="text-xs font-bold text-slate-600 mb-1">{f.label}</p>
+                  <p className={`font-bold font-mono-label text-base ${f.color}`}>{f.value}</p>
                 </div>
               ))}
             </div>
 
             {/* Items table (read-only) */}
-            <div className="bg-white rounded-[20px] border border-[#0C1B3A]/8 overflow-hidden">
-              <div className="grid grid-cols-12 gap-2 px-5 py-2.5 bg-[#0C1B3A]/5 text-[8px] font-black uppercase tracking-wider text-[#0C1B3A]/50">
+            <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 overflow-hidden">
+              <div className="grid grid-cols-12 gap-2 px-5 py-2.5 bg-[#0C1B3A]/5 text-xs font-bold text-slate-600">
                 <div className="col-span-5">{t('Item')}</div>
                 <div className="col-span-1 text-center">{t('Qty')}</div>
                 <div className="col-span-2 text-right">{t('Unit Price (AED)')}</div>
@@ -6705,28 +6706,28 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   return (
                     <div key={item.id} className="grid grid-cols-12 gap-2 px-5 py-3 items-center">
                       <div className="col-span-5">
-                        <p className="text-[11px] font-bold text-[#0C1B3A]">{item.originalName}</p>
-                        {item.originalSpec && <p className="text-[9px] text-[#0C1B3A]/40">{item.originalSpec}</p>}
+                        <p className="text-xs font-bold text-[#0C1B3A]">{item.originalName}</p>
+                        {item.originalSpec && <p className="text-xs text-slate-600">{item.originalSpec}</p>}
                       </div>
-                      <div className="col-span-1 text-center text-[10px] font-mono text-[#0C1B3A]">{item.quantity}</div>
-                      <div className="col-span-2 text-right text-[10px] font-mono text-[#0C1B3A]">{unitSell.toFixed(2)}</div>
-                      <div className="col-span-2 text-right text-[10px] font-mono text-[#0C1B3A]">{sub.toFixed(2)}</div>
-                      <div className="col-span-1 text-right text-[9px] font-mono text-[#0C1B3A]/40">{vat.toFixed(2)}</div>
-                      <div className="col-span-1 text-right text-[10px] font-black font-mono text-[#0C1B3A]">{(sub + vat).toFixed(2)}</div>
+                      <div className="col-span-1 text-center text-xs font-mono-label text-[#0C1B3A]">{item.quantity}</div>
+                      <div className="col-span-2 text-right text-xs font-mono-label text-[#0C1B3A]">{unitSell.toFixed(2)}</div>
+                      <div className="col-span-2 text-right text-xs font-mono-label text-[#0C1B3A]">{sub.toFixed(2)}</div>
+                      <div className="col-span-1 text-right text-xs font-mono-label text-slate-600">{vat.toFixed(2)}</div>
+                      <div className="col-span-1 text-right text-xs font-bold font-mono-label text-[#0C1B3A]">{(sub + vat).toFixed(2)}</div>
                     </div>
                   );
                 })}
               </div>
               <div className="px-5 py-3 bg-[#0C1B3A] flex justify-end items-center gap-4">
-                <p className="text-[9px] font-black uppercase tracking-widest text-white/40">{t('Grand Total (incl 5% VAT)')}</p>
-                <p className="text-xl font-black font-mono text-[#C9A84C]">AED {grandTotal.toFixed(2)}</p>
+                <p className="text-xs font-bold text-white/40">{t('Grand Total (incl 5% VAT)')}</p>
+                <p className="text-xl font-bold font-mono-label text-[#7A5F2A]">AED {grandTotal.toFixed(2)}</p>
               </div>
             </div>
 
             {/* Terms & Notes in GCI Draft */}
             {tradeTerms && (
-              <div className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[16px] px-6 py-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]/40 mb-2">{t('Terms & Notes')}</p>
+              <div className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[10px] px-6 py-4">
+                <p className="text-xs font-bold text-slate-600 mb-2">{t('Terms & Notes')}</p>
                 <p className="text-[13px] text-[#0C1B3A]/70 whitespace-pre-line leading-relaxed">{tradeTerms}</p>
               </div>
             )}
@@ -6738,14 +6739,14 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 <StepIndicator current={6} />
 
                 {/* Success message */}
-                <div className="bg-green-50 border border-green-200 rounded-[20px] p-6 text-center">
+                <div className="bg-green-50 border border-green-200 rounded-[10px] p-6 text-center">
                   <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <CheckCircle2 className="w-6 h-6 text-green-600" />
+                    <CheckCircle2 className="w-6 h-6 text-green-700" />
                   </div>
-                  <h3 className="text-base font-black text-green-800">{t('Sent to TRADE successfully')}</h3>
-                  <p className="text-[13px] text-green-600 mt-1">已发送到 TRADE · Project PI 草稿已创建</p>
+                  <h3 className="text-base font-bold text-green-800">{t('Sent to TRADE successfully')}</h3>
+                  <p className="text-[13px] text-green-700 mt-1">已发送到 TRADE · Project PI 草稿已创建</p>
                   {quoteInfo.quoteNumber && (
-                    <p className="text-[12px] text-green-500/70 mt-2 font-mono">{quoteInfo.quoteNumber}</p>
+                    <p className="text-[12px] text-green-500/70 mt-2 font-mono-label">{quoteInfo.quoteNumber}</p>
                   )}
                 </div>
 
@@ -6756,10 +6757,10 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       generateTradePDF(confirmed, grandTotal, totalSelling, totalVAT);
                       setPdfDownloaded(true);
                     }}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white border border-[#0C1B3A]/15 text-[#0C1B3A] text-[13px] font-bold hover:border-[#C9A84C] transition-all"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-md bg-white border border-[#0C1B3A]/15 text-[#0C1B3A] text-[13px] font-bold hover:border-[#C9A84C] transition-all"
                   >
                     {pdfDownloaded
-                      ? <><CheckCircle2 className="w-4 h-4 text-green-500" /> {t('PDF Downloaded')}</>
+                      ? <><CheckCircle2 className="w-4 h-4 text-green-700" /> {t('PDF Downloaded')}</>
                       : <><Download className="w-4 h-4" /> {t('Download PDF')}</>
                     }
                   </button>
@@ -6770,23 +6771,23 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   {canTrade && (
                   <button
                     onClick={() => window.open(tradeQuoteUrl(), '_blank')}
-                    className="p-5 rounded-[20px] bg-[#0C1B3A] text-[#C9A84C] flex flex-col items-center gap-2 font-black text-[13px] uppercase tracking-wide hover:bg-[#0F2551] transition-all active:scale-95 border border-[#C9A84C]/30"
+                    className="p-5 rounded-md bg-[#0C1B3A] text-[#7A5F2A] flex flex-col items-center gap-2 font-bold text-[13px] hover:bg-[#0F2551] transition-all active:scale-95 border border-[#C9A84C]/30"
                   >
                     <ExternalLink className="w-5 h-5" />
                     {t('View in TRADE')}
-                    <span className="text-[11px] text-[#C9A84C]/60 normal-case font-bold tracking-normal">{t('Open TRADE OS PI tab')}</span>
+                    <span className="text-xs text-[#C9A84C]/60 normal-case font-bold tracking-normal">{t('Open TRADE OS PI tab')}</span>
                   </button>
                   )}
                   <button
                     onClick={() => { setSentToTrade(false); setView('history'); }}
-                    className="p-5 rounded-[20px] bg-white border-2 border-[#0C1B3A]/12 text-[#0C1B3A] flex flex-col items-center gap-2 font-black text-[13px] uppercase tracking-wide hover:border-[#C9A84C] transition-all active:scale-95"
+                    className="p-5 rounded-md bg-white border-2 border-[#0C1B3A]/12 text-[#0C1B3A] flex flex-col items-center gap-2 font-bold text-[13px] hover:border-[#C9A84C] transition-all active:scale-95"
                   >
                     <History className="w-5 h-5" />
                     {t('Back to History')}
                   </button>
                   <button
                     onClick={() => { resetProject(); }}
-                    className="p-5 rounded-[20px] bg-white border-2 border-[#0C1B3A]/12 text-[#0C1B3A] flex flex-col items-center gap-2 font-black text-[13px] uppercase tracking-wide hover:border-[#C9A84C] transition-all active:scale-95"
+                    className="p-5 rounded-md bg-white border-2 border-[#0C1B3A]/12 text-[#0C1B3A] flex flex-col items-center gap-2 font-bold text-[13px] hover:border-[#C9A84C] transition-all active:scale-95"
                   >
                     <PlusCircle className="w-5 h-5" />
                     {t('New Quote')}
@@ -6801,17 +6802,17 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     generateTradePDF(confirmed, grandTotal, totalSelling, totalVAT);
                     setPdfDownloaded(true);
                   }}
-                  className="flex-1 p-5 rounded-[24px] bg-white border-2 border-[#0C1B3A]/15 text-[#0C1B3A] flex justify-center items-center gap-3 font-black uppercase tracking-widest text-xs hover:border-[#C9A84C] transition-all active:scale-95"
+                  className="flex-1 p-5 rounded-md bg-white border-2 border-[#0C1B3A]/15 text-[#0C1B3A] flex justify-center items-center gap-3 font-bold text-xs hover:border-[#C9A84C] transition-all active:scale-95"
                 >
                   {pdfDownloaded
-                    ? <><CheckCircle2 className="w-4 h-4 text-green-500" /> {t('PDF Downloaded')}</>
+                    ? <><CheckCircle2 className="w-4 h-4 text-green-700" /> {t('PDF Downloaded')}</>
                     : <><Download className="w-4 h-4" /> {t('Download PDF')}</>
                   }
                 </button>
                 {canTrade && (
                 <button
                   onClick={handleSendTradeToTrade}
-                  className="flex-1 p-5 rounded-[24px] bg-[#0C1B3A] text-[#C9A84C] flex justify-center items-center gap-3 font-black uppercase tracking-widest text-xs shadow-xl hover:bg-[#0F2551] transition-all active:scale-95 border border-[#C9A84C]/30"
+                  className="flex-1 p-5 rounded-md bg-[#0C1B3A] text-[#7A5F2A] flex justify-center items-center gap-3 font-bold text-xs shadow-xl hover:bg-[#0F2551] transition-all active:scale-95 border border-[#C9A84C]/30"
                 >
                   <ExternalLink className="w-4 h-4" /> {t('Send to TRADE')}
                 </button>
@@ -6828,31 +6829,31 @@ Leave a field as empty string if not present. Never fabricate values.`;
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
 
       {/* ── Breadcrumb nav ─────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest flex-wrap">
+      <div className="flex items-center gap-2 text-xs font-bold flex-wrap">
         <button
           onClick={() => setProjectInfoSubmitted(false)}
-          className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors"
+          className="text-slate-600 hover:text-[#7A5F2A] transition-colors"
         >
           {t('Project Info')}
         </button>
-        <span className="text-[#0C1B3A]/15">›</span>
+        <span className="text-slate-600">›</span>
         <button
           onClick={() => { setQuoteMode(null); setSelectedScenario(null); setQuoteType(null); setTradePhase(null); setActiveTab('items'); }}
-          className="text-[#0C1B3A]/30 hover:text-[#C9A84C] transition-colors"
+          className="text-slate-600 hover:text-[#7A5F2A] transition-colors"
         >
           {t('Quote Type')}
         </button>
-        <span className="text-[#0C1B3A]/15">›</span>
-        <span className="text-[#C9A84C]">
+        <span className="text-slate-600">›</span>
+        <span className="text-[#7A5F2A]">
           {quoteType === 'trade' ? t('Trade & Sourcing') : quoteType === 'boq' ? t('BOQ & AI Analysis') : t('Project Package')}
         </span>
-        <span className="text-[#0C1B3A]/15">›</span>
-        <span className="text-[#0C1B3A]/50">{activeTab === 'draft' ? (quoteType === 'trade' || quoteType === 'boq' ? t('GCI Quotation Draft') : t('Draft')) : (quoteType === 'trade' || quoteType === 'boq' ? t('Supplier Cost Items') : t('Items'))}</span>
+        <span className="text-slate-600">›</span>
+        <span className="text-slate-600">{activeTab === 'draft' ? (quoteType === 'trade' || quoteType === 'boq' ? t('GCI Quotation Draft') : t('Draft')) : (quoteType === 'trade' || quoteType === 'boq' ? t('Supplier Cost Items') : t('Items'))}</span>
       </div>
 
       {/* ── Quote Context (trade/boq paths only) ───────────────────────── */}
       {(quoteType === 'trade' || quoteType === 'boq') && (
-        <div className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[20px] px-6 py-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[10px] px-6 py-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {[
             { label: t('Customer / Project'), value: quoteInfo.customerProjectName || '—' },
             { label: t('Quote No'), value: quoteInfo.quoteNumber || 'Auto' },
@@ -6862,8 +6863,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
             { label: t('Source'), value: _businessIdParam ? `DEAL · ${_businessIdParam}` : t('Manual') },
           ].map(f => (
             <div key={f.label}>
-              <p className="text-[8px] font-black uppercase tracking-wider text-[#0C1B3A]/30 mb-0.5">{f.label}</p>
-              <p className="text-[11px] font-bold text-[#0C1B3A] truncate" title={f.value}>{f.value}</p>
+              <p className="text-xs font-bold text-slate-600 mb-0.5">{f.label}</p>
+              <p className="text-xs font-bold text-[#0C1B3A] truncate" title={f.value}>{f.value}</p>
             </div>
           ))}
         </div>
@@ -6872,7 +6873,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
       <div className="flex justify-between items-center">
         <button
           onClick={() => { setQuoteMode(null); setSelectedScenario(null); setQuoteType(null); setTradePhase(null); setActiveTab('items'); }}
-          className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#C9A84C] hover:text-[#0C1B3A] transition-all group"
+          className="flex items-center gap-2 text-xs font-bold text-[#7A5F2A] hover:text-[#0C1B3A] transition-all group"
         >
           <ArrowLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" /> {t('← Quote Type Selection')}
         </button>
@@ -6880,18 +6881,18 @@ Leave a field as empty string if not present. Never fabricate values.`;
           {/* Context badge — changes based on quote path */}
           {quoteType === 'trade' ? (
             <div className="flex items-center gap-3 px-4 py-2.5 bg-[#0C1B3A]/8 rounded-full border border-[#0C1B3A]/12">
-              <ShoppingCart className="w-4 h-4 text-[#C9A84C]" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]">{t('Trade & Sourcing Quote')}</span>
+              <ShoppingCart className="w-4 h-4 text-[#7A5F2A]" />
+              <span className="text-xs font-bold text-[#0C1B3A]">{t('Trade & Sourcing Quote')}</span>
             </div>
           ) : quoteType === 'boq' ? (
             <div className="flex items-center gap-3 px-4 py-2.5 bg-[#0C1B3A]/8 rounded-full border border-[#0C1B3A]/12">
-              <FileSearch className="w-4 h-4 text-[#C9A84C]" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-[#0C1B3A]">{t('BOQ & AI Analysis')}</span>
+              <FileSearch className="w-4 h-4 text-[#7A5F2A]" />
+              <span className="text-xs font-bold text-[#0C1B3A]">{t('BOQ & AI Analysis')}</span>
             </div>
           ) : (
-            <div className="flex items-center gap-3 px-4 py-3 bg-brand-gold/10 rounded-full">
-              <Package className="w-4 h-4 text-brand-gold" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-brand-brown">{selectedScenario ? t(selectedScenario) : t('Project')} {t('Package Mode')}</span>
+            <div className="flex items-center gap-3 px-4 py-3 bg-[#080D1E]/10 rounded-full">
+              <Package className="w-4 h-4 text-[#7A5F2A]" />
+              <span className="text-xs font-bold text-[#0C1B3A]">{selectedScenario ? t(selectedScenario) : t('Project')} {t('Package Mode')}</span>
             </div>
           )}
         </div>
@@ -6899,19 +6900,19 @@ Leave a field as empty string if not present. Never fabricate values.`;
 
       {/* Split Modal */}
       {showSplitModal && itemToSplit && (
-        <div className="fixed inset-0 z-[110] bg-brand-brown/40 backdrop-blur-md flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-6xl rounded-[48px] shadow-2xl border border-brand-beige overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="p-10 border-b border-brand-beige bg-brand-beige/5">
+        <ModalPortal><div className="fixed inset-0 z-[1100] bg-[#080D1E]/40 flex items-center justify-center p-4 max-sm:p-0 max-sm:items-start max-sm:overflow-y-auto">
+          <div className="bg-white w-full max-w-6xl rounded-[14px] shadow-2xl border border-[rgba(12,27,58,0.1)] overflow-hidden animate-in zoom-in-95 duration-300 max-sm:w-full max-sm:min-h-full max-sm:my-0 max-sm:max-w-none max-sm:max-h-none max-sm:rounded-none">
+            <div className="p-10 border-b border-[rgba(12,27,58,0.1)] bg-[#F8F9FB]/5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <Split className="w-6 h-6 text-brand-gold" />
-                  <h3 className="text-xl font-serif italic text-brand-brown">{t('Split Combined Item')}</h3>
+                  <Split className="w-6 h-6 text-[#7A5F2A]" />
+                  <h3 className="text-xl italic text-[#0C1B3A]">{t('Split Combined Item')}</h3>
                 </div>
-                <button onClick={() => setShowSplitModal(false)} className="text-brand-brown/40 hover:text-brand-gold transition-colors">
+                <button onClick={() => setShowSplitModal(false)} className="text-slate-600 hover:text-[#7A5F2A] transition-colors">
                   <X className="w-6 h-6" />
                 </button>
               </div>
-              <p className="mt-4 p-4 bg-brand-beige/20 rounded-2xl text-brand-brown-muted text-xs italic">
+              <p className="mt-4 p-4 bg-[#F8F9FB]/20 rounded-[10px] text-slate-600 text-xs italic">
                 {t('Original')}: <span className="font-bold">{itemToSplit.originalName}</span> {itemToSplit.originalSpec && `(${itemToSplit.originalSpec})`}
               </p>
             </div>
@@ -6919,9 +6920,9 @@ Leave a field as empty string if not present. Never fabricate values.`;
             <div className="p-8 space-y-8 overflow-y-auto max-h-[60vh]">
               <div className="space-y-4">
                 {splitResult.map((res, idx) => (
-                  <div key={res.id} className="grid grid-cols-12 gap-4 items-start p-6 bg-brand-beige/5 rounded-3xl border border-brand-beige/50">
+                  <div key={res.id} className="grid grid-cols-12 gap-4 items-start p-6 bg-[#F8F9FB]/5 rounded-[10px] border border-[rgba(12,27,58,0.1)]/50">
                     <div className="col-span-2">
-                      <label className="text-[8px] font-bold text-brand-brown-muted uppercase tracking-widest mb-2 block">{t('Item Name')}</label>
+                      <label className="text-xs font-bold text-slate-600 mb-2 block">{t('Item Name')}</label>
                       <input 
                         value={res.originalName}
                         onChange={(e) => {
@@ -6929,11 +6930,11 @@ Leave a field as empty string if not present. Never fabricate values.`;
                           updated[idx].originalName = e.target.value;
                           setSplitResult(updated);
                         }}
-                        className="w-full bg-white border border-brand-beige rounded-xl px-4 py-2 text-[10px] font-bold text-brand-brown"
+                        className="w-full bg-white border border-[rgba(12,27,58,0.1)] rounded-md px-4 py-2 text-xs font-bold text-[#0C1B3A]"
                       />
                     </div>
                     <div className="col-span-2">
-                      <label className="text-[8px] font-bold text-brand-brown-muted uppercase tracking-widest mb-2 block">{t('Category')}</label>
+                      <label className="text-xs font-bold text-slate-600 mb-2 block">{t('Category')}</label>
                       <select 
                         value={res.suggestedCategory}
                         onChange={(e) => {
@@ -6941,7 +6942,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                           updated[idx].suggestedCategory = e.target.value as FurnitureCategory;
                           setSplitResult(updated);
                         }}
-                        className="w-full bg-white border border-brand-beige rounded-xl px-4 py-2 text-[10px] font-bold text-brand-brown"
+                        className="w-full bg-white border border-[rgba(12,27,58,0.1)] rounded-md px-4 py-2 text-xs font-bold text-[#0C1B3A]"
                       >
                         <option value="unknown">Select...</option>
                         {Object.values(FurnitureCategory).map(cat => (
@@ -6950,7 +6951,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       </select>
                     </div>
                     <div className="col-span-3">
-                      <label className="text-[8px] font-bold text-brand-brown-muted uppercase tracking-widest mb-2 block">{t('Type / Specification')}</label>
+                      <label className="text-xs font-bold text-slate-600 mb-2 block">{t('Type / Specification')}</label>
                       {res.suggestedCategory === FurnitureCategory.SOFA ? (
                         <div className="space-y-2">
                           <select 
@@ -6967,7 +6968,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                               }
                               setSplitResult(updated);
                             }}
-                            className="w-full bg-white border border-brand-beige rounded-xl px-4 py-2 text-[10px] font-bold text-brand-brown"
+                            className="w-full bg-white border border-[rgba(12,27,58,0.1)] rounded-md px-4 py-2 text-xs font-bold text-[#0C1B3A]"
                           >
                             <option value="">{t('Select type...')}</option>
                             {SOFA_TYPES.filter(type => type !== 'Other').map(type => (
@@ -6984,7 +6985,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                                 updated[idx].specOverride = e.target.value;
                                 setSplitResult(updated);
                               }}
-                              className="w-full bg-white border border-brand-beige rounded-xl px-4 py-2 text-[10px] font-bold text-brand-brown mt-1"
+                              className="w-full bg-white border border-[rgba(12,27,58,0.1)] rounded-md px-4 py-2 text-xs font-bold text-[#0C1B3A] mt-1"
                             />
                           )}
                         </div>
@@ -6997,12 +6998,12 @@ Leave a field as empty string if not present. Never fabricate values.`;
                             updated[idx].specOverride = e.target.value;
                             setSplitResult(updated);
                           }}
-                          className="w-full bg-white border border-brand-beige rounded-xl px-4 py-2 text-[10px] font-bold text-brand-brown"
+                          className="w-full bg-white border border-[rgba(12,27,58,0.1)] rounded-md px-4 py-2 text-xs font-bold text-[#0C1B3A]"
                         />
                       )}
                     </div>
                     <div className="col-span-1">
-                       <label className="text-[8px] font-bold text-brand-brown-muted uppercase tracking-widest mb-2 block">{t('Qty')}</label>
+                       <label className="text-xs font-bold text-slate-600 mb-2 block">{t('Qty')}</label>
                        <input 
                         type="number"
                         value={res.quantity}
@@ -7011,11 +7012,11 @@ Leave a field as empty string if not present. Never fabricate values.`;
                           updated[idx].quantity = parseInt(e.target.value) || 0;
                           setSplitResult(updated);
                         }}
-                        className="w-full bg-white border border-brand-beige rounded-xl px-4 py-2 text-[10px] font-bold text-brand-brown text-center"
+                        className="w-full bg-white border border-[rgba(12,27,58,0.1)] rounded-md px-4 py-2 text-xs font-bold text-[#0C1B3A] text-center"
                        />
                     </div>
                     <div className="col-span-3">
-                      <label className="text-[8px] font-bold text-brand-brown-muted uppercase tracking-widest mb-2 block">{t('Notes')}</label>
+                      <label className="text-xs font-bold text-slate-600 mb-2 block">{t('Notes')}</label>
                       <textarea 
                         placeholder={t('Add notes...')}
                         value={res.notes || ''}
@@ -7025,13 +7026,13 @@ Leave a field as empty string if not present. Never fabricate values.`;
                           setSplitResult(updated);
                         }}
                         rows={1}
-                        className="w-full bg-white border border-brand-beige rounded-xl px-4 py-2 text-[10px] font-bold text-brand-brown resize-none min-h-[40px]"
+                        className="w-full bg-white border border-[rgba(12,27,58,0.1)] rounded-md px-4 py-2 text-xs font-bold text-[#0C1B3A] resize-none min-h-[40px]"
                       />
                     </div>
                     <div className="col-span-1 flex justify-end pt-6">
                       <button 
                         onClick={() => setSplitResult(splitResult.filter((_, i) => i !== idx))}
-                        className="p-2 text-red-300 hover:text-red-500 transition-colors"
+                        className="p-2 text-red-300 hover:text-red-600 transition-colors"
                       >
                         <Trash2 className="w-5 h-5" />
                       </button>
@@ -7041,7 +7042,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
 
                 <button 
                   onClick={() => setSplitResult([...splitResult, { ...itemToSplit, id: `split-${Date.now()}`, isSplittable: false, status: 'Confirmed', specOverride: '', notes: '' }])}
-                  className="w-full py-4 border-2 border-dashed border-brand-beige rounded-3xl text-[10px] font-bold text-brand-brown-muted uppercase tracking-widest hover:border-brand-gold hover:text-brand-gold transition-all"
+                  className="w-full py-4 border-2 border-dashed border-[rgba(12,27,58,0.1)] rounded-md text-xs font-bold text-slate-600 hover:border-[#A07F3C] hover:text-[#7A5F2A] transition-all"
                 >
                   + {t('Add Item')}
                 </button>
@@ -7050,7 +7051,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
               <div className="flex gap-4 pt-4">
                 <button 
                   onClick={() => setShowSplitModal(false)}
-                  className="flex-1 px-8 py-5 rounded-3xl border border-brand-beige text-brand-brown-muted text-[10px] font-bold uppercase tracking-widest hover:bg-brand-beige/20 transition-all"
+                  className="flex-1 px-8 py-5 rounded-md border border-[rgba(12,27,58,0.1)] text-slate-600 text-xs font-bold hover:bg-[#F8F9FB]/20 transition-all"
                 >
                   {t('Cancel')}
                 </button>
@@ -7065,24 +7066,24 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       alert(t('Successfully split item'));
                     }
                   }}
-                  className="flex-[2] px-8 py-5 rounded-3xl bg-brand-brown text-brand-ivory text-[10px] font-bold uppercase tracking-widest hover:bg-brand-brown/90 shadow-xl shadow-brand-brown/20"
+                  className="flex-[2] px-8 py-5 rounded-md bg-[#080D1E] text-white text-xs font-bold hover:bg-[#080D1E]/90 shadow-xl shadow-brand-brown/20"
                 >
                   {t('Apply Split / 应用拆分')}
                 </button>
               </div>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
       {showMapping && rawExcelData && (
-        <div className="fixed inset-0 z-[100] bg-brand-brown/40 backdrop-blur-sm flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-2xl rounded-[48px] shadow-2xl border border-brand-beige overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="p-10 border-b border-brand-beige bg-brand-beige/5">
+        <ModalPortal><div className="fixed inset-0 z-[1100] bg-[#080D1E]/40 flex items-center justify-center p-4 max-sm:p-0 max-sm:items-start max-sm:overflow-y-auto">
+          <div className="bg-white w-full max-w-2xl rounded-[14px] shadow-2xl border border-[rgba(12,27,58,0.1)] overflow-hidden animate-in zoom-in-95 duration-300 max-sm:w-full max-sm:min-h-full max-sm:my-0 max-sm:max-w-none max-sm:max-h-none max-sm:rounded-none">
+            <div className="p-10 border-b border-[rgba(12,27,58,0.1)] bg-[#F8F9FB]/5">
               <div className="flex items-center gap-4 mb-2">
-                <FileSpreadsheet className="w-6 h-6 text-brand-gold" />
-                <h3 className="text-xl font-serif italic text-brand-brown">{t('Column Mapping')}</h3>
+                <FileSpreadsheet className="w-6 h-6 text-[#7A5F2A]" />
+                <h3 className="text-xl italic text-[#0C1B3A]">{t('Column Mapping')}</h3>
               </div>
-              <p className="text-[10px] font-bold text-brand-brown-muted uppercase tracking-widest">{t('Please map the columns correctly')}</p>
+              <p className="text-xs font-bold text-slate-600 ">{t('Please map the columns correctly')}</p>
             </div>
             
             <div className="p-10 space-y-6">
@@ -7095,11 +7096,11 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   { label: t('Total Price Column'), key: 'total' }
                 ].map(m => (
                   <div key={m.key} className="flex items-center justify-between gap-8">
-                    <label className="text-[10px] font-bold text-brand-brown uppercase tracking-widest min-w-[150px]">{m.label}</label>
+                    <label className="text-xs font-bold text-[#0C1B3A] min-w-[150px]">{m.label}</label>
                     <select 
                       value={excelMappings[m.key]}
                       onChange={(e) => setExcelMappings({...excelMappings, [m.key]: parseInt(e.target.value)})}
-                      className="flex-1 bg-brand-beige/5 border border-brand-beige rounded-2xl px-6 py-3 text-xs font-bold text-brand-brown outline-none focus:ring-1 focus:ring-brand-gold transition-all"
+                      className="flex-1 bg-[#F8F9FB]/5 border border-[rgba(12,27,58,0.1)] rounded-md px-6 py-3 text-xs font-bold text-[#0C1B3A] outline-none focus:ring-1 focus:ring-[#A07F3C] transition-all"
                     >
                       {rawExcelData[0].map((h: any, i: number) => (
                         <option key={i} value={i}>{h || `Column ${i + 1}`}</option>
@@ -7112,29 +7113,29 @@ Leave a field as empty string if not present. Never fabricate values.`;
               <div className="flex gap-4 pt-8">
                 <button 
                   onClick={() => setShowMapping(false)}
-                  className="flex-1 px-8 py-5 rounded-3xl border border-brand-beige text-brand-brown-muted text-[10px] font-bold uppercase tracking-widest hover:bg-brand-beige/20 transition-all"
+                  className="flex-1 px-8 py-5 rounded-md border border-[rgba(12,27,58,0.1)] text-slate-600 text-xs font-bold hover:bg-[#F8F9FB]/20 transition-all"
                 >
                   {t('Cancel')}
                 </button>
                 <button 
                   onClick={processMappedData}
-                  className="flex-2 px-8 py-5 rounded-3xl bg-brand-brown text-brand-ivory text-[10px] font-bold uppercase tracking-widest hover:bg-brand-brown/90 transition-all flex items-center justify-center gap-3 shadow-xl shadow-brand-brown/20"
+                  className="flex-2 px-8 py-5 rounded-md bg-[#080D1E] text-white text-xs font-bold hover:bg-[#080D1E]/90 transition-all flex items-center justify-center gap-3 shadow-xl shadow-brand-brown/20"
                 >
-                  <Cpu className="w-4 h-4 text-brand-gold" /> {t('Start Analysis')}
+                  <Cpu className="w-4 h-4 text-[#7A5F2A]" /> {t('Start Analysis')}
                 </button>
               </div>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
 
       {/* Advanced Import Zone */}
       <div className="max-w-4xl mx-auto mb-16">
-        <div className="bg-white rounded-[48px] border border-brand-beige overflow-hidden shadow-2xl shadow-brand-brown/5">
-          <div className="p-8 border-b border-brand-beige bg-brand-beige/5">
+        <div className="bg-white rounded-[10px] border border-[rgba(12,27,58,0.1)] overflow-hidden shadow-2xl shadow-brand-brown/5">
+          <div className="p-8 border-b border-[rgba(12,27,58,0.1)] bg-[#F8F9FB]/5">
             <div className="flex items-center gap-3">
-              <Cpu className="w-5 h-5 text-brand-gold" />
-              <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-brand-brown">
+              <Cpu className="w-5 h-5 text-[#7A5F2A]" />
+              <h3 className="text-xs font-bold text-[#0C1B3A]">
                 {(quoteType === 'trade' || quoteType === 'boq') ? t('Supplier Quote Import') : t('Import Zone')}
               </h3>
             </div>
@@ -7145,48 +7146,48 @@ Leave a field as empty string if not present. Never fabricate values.`;
               {/* Left: Text Input */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <label className="text-[9px] font-bold text-brand-brown-muted uppercase tracking-widest flex items-center gap-2">
+                  <label className="text-xs font-bold text-slate-600 flex items-center gap-2">
                     <Clipboard className="w-3 h-3" /> {t('Text Analysis')}
                   </label>
-                  <span className="text-[8px] text-brand-brown-muted opacity-50 uppercase font-bold tracking-widest">{t('Paste requirement text')}</span>
+                  <span className="text-xs text-slate-600 opacity-50 font-bold ">{t('Paste requirement text')}</span>
                 </div>
                 <textarea 
                   value={importText}
                   onChange={(e) => setImportText(e.target.value)}
                   placeholder={t('Paste client text here')}
-                  className="w-full h-48 p-6 bg-brand-beige/5 border border-brand-beige rounded-[32px] text-xs text-brand-brown placeholder:text-brand-brown/30 resize-none focus:ring-1 focus:ring-brand-gold outline-none transition-all"
+                  className="w-full h-48 p-6 bg-[#F8F9FB]/5 border border-[rgba(12,27,58,0.1)] rounded-md text-xs text-[#0C1B3A] placeholder:text-slate-600 resize-none focus:ring-1 focus:ring-[#A07F3C] outline-none transition-all"
                 />
               </div>
 
               {/* Right: File Drop Zone */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <label className="text-[9px] font-bold text-brand-brown-muted uppercase tracking-widest flex items-center gap-2">
+                  <label className="text-xs font-bold text-slate-600 flex items-center gap-2">
                     <Upload className="w-3 h-3" /> {t('Upload File')}
                   </label>
-                  <span className="text-[8px] text-brand-brown-muted opacity-50 uppercase font-bold tracking-widest">{t('Supported formats')}</span>
+                  <span className="text-xs text-slate-600 opacity-50 font-bold ">{t('Supported formats')}</span>
                 </div>
                 <div 
                   onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                   onDragLeave={() => setIsDragging(false)}
                   onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFileUpload(e); }}
                   onClick={() => document.getElementById('advanced-file-upload')?.click()}
-                  className={`h-48 border-2 border-dashed rounded-[32px] flex flex-col items-center justify-center gap-4 cursor-pointer transition-all duration-500 group ${
-                    isDragging ? 'border-brand-gold bg-brand-gold/5 scale-[0.98]' : 'border-brand-beige hover:border-brand-gold/50 hover:bg-brand-beige/5'
+                  className={`h-48 border-2 border-dashed rounded-[10px] flex flex-col items-center justify-center gap-4 cursor-pointer transition-all duration-500 group ${
+                    isDragging ? 'border-[#A07F3C] bg-[#080D1E]/5 scale-[0.98]' : 'border-[rgba(12,27,58,0.1)] hover:border-[#A07F3C]/50 hover:bg-[#F8F9FB]/5'
                   }`}
                 >
                   <input id="advanced-file-upload" type="file" className="hidden" accept=".xlsx,.csv,.pdf,image/*" onChange={handleFileUpload} />
-                  <div className="w-16 h-16 bg-brand-beige/20 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <div className="w-16 h-16 bg-[#F8F9FB]/20 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
                     {isProcessingAI ? (
-                       <RefreshCw className="w-8 h-8 text-brand-gold animate-spin" />
+                       <RefreshCw className="w-8 h-8 text-[#7A5F2A] animate-spin" />
                     ) : (
                        <div className="relative">
-                          <FileSpreadsheet className="w-8 h-8 text-brand-gold" />
-                          <ImageIcon className="w-4 h-4 text-brand-gold absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 border border-brand-gold/20" />
+                          <FileSpreadsheet className="w-8 h-8 text-[#7A5F2A]" />
+                          <ImageIcon className="w-4 h-4 text-[#7A5F2A] absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 border border-[#A07F3C]/20" />
                        </div>
                     )}
                   </div>
-                  <p className="text-[10px] font-bold text-brand-brown uppercase tracking-widest text-center px-10">
+                  <p className="text-xs font-bold text-[#0C1B3A] text-center px-10">
                     {isDragging ? t('Drop files to upload') : t('Drag and drop files here')}
                   </p>
                 </div>
@@ -7197,20 +7198,20 @@ Leave a field as empty string if not present. Never fabricate values.`;
               <button 
                 onClick={handleAnalyze}
                 disabled={isProcessingAI || !importText.trim()}
-                className={`px-12 py-6 rounded-full font-bold uppercase tracking-[0.2em] text-[10px] shadow-xl transition-all active:scale-95 flex items-center gap-4 ${
+                className={`px-12 py-6 rounded-full font-bold text-xs shadow-xl transition-all active:scale-95 flex items-center gap-4 ${
                   isProcessingAI || !importText.trim() 
-                  ? 'bg-brand-beige/50 text-brand-brown-muted cursor-not-allowed' 
-                  : 'bg-brand-brown text-brand-ivory hover:bg-brand-brown/90 shadow-brand-brown/20'
+                  ? 'bg-[#F8F9FB]/50 text-slate-600 cursor-not-allowed' 
+                  : 'bg-[#080D1E] text-white hover:bg-[#080D1E]/90 shadow-brand-brown/20'
                 }`}
               >
                 {isProcessingAI ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin text-brand-gold" />
+                    <RefreshCw className="w-4 h-4 animate-spin text-[#7A5F2A]" />
                     {t('Importing and Analyzing')}
                   </>
                 ) : (
                   <>
-                    <Cpu className="w-4 h-4 text-brand-gold" />
+                    <Cpu className="w-4 h-4 text-[#7A5F2A]" />
                     {(quoteType === 'trade' || quoteType === 'boq') ? t('Analyze Supplier Quote') : t('Analyze Client List')}
                   </>
                 )}
@@ -7223,20 +7224,20 @@ Leave a field as empty string if not present. Never fabricate values.`;
       {/* Tab switcher — package path only. Trade/BOQ shows linear sections below. */}
       {!(quoteType === 'trade' || quoteType === 'boq') && (
         <div className="flex justify-center">
-          <div className="flex bg-brand-beige/20 p-1 rounded-2xl border border-brand-beige">
+          <div className="flex bg-[#F8F9FB]/20 p-1 rounded-[10px] border border-[rgba(12,27,58,0.1)]">
             <button
               onClick={() => setActiveTab('items')}
-              className={`px-8 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'items' ? 'bg-white text-brand-brown shadow-sm' : 'text-brand-brown-muted hover:text-brand-brown'}`}
+              className={`px-8 py-2.5 rounded-md text-xs font-bold transition-all ${activeTab === 'items' ? 'bg-white text-[#0C1B3A] shadow-sm' : 'text-slate-600 hover:text-[#0C1B3A]'}`}
             >
               {t('Project Package Items')}
             </button>
             <button
               onClick={() => setActiveTab('draft')}
-              className={`px-8 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all relative ${activeTab === 'draft' ? 'bg-white text-brand-brown shadow-sm' : 'text-brand-brown-muted hover:text-brand-brown'}`}
+              className={`px-8 py-2.5 rounded-md text-xs font-bold transition-all relative ${activeTab === 'draft' ? 'bg-white text-[#0C1B3A] shadow-sm' : 'text-slate-600 hover:text-[#0C1B3A]'}`}
             >
               {t('Project Package Draft')}
               {draftItems.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-brand-gold text-[10px] text-white flex items-center justify-center rounded-full border-2 border-brand-beige shadow-sm">
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#080D1E] text-xs text-white flex items-center justify-center rounded-full border-2 border-[rgba(12,27,58,0.1)] shadow-sm">
                   {draftItems.length}
                 </span>
               )}
@@ -7252,18 +7253,18 @@ Leave a field as empty string if not present. Never fabricate values.`;
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-[8px] font-black uppercase tracking-[0.3em] text-[#C9A84C] bg-[#C9A84C]/10 px-2 py-1 rounded-full">{t('Step 1')}</span>
+                <span className="text-xs font-bold text-[#7A5F2A] bg-[#C9A84C]/10 px-2 py-1 rounded-full">{t('Step 1')}</span>
               </div>
-              <h3 className="text-xl font-black text-[#0C1B3A]">{t('Supplier Cost Items')}</h3>
-              <p className="text-[10px] text-[#0C1B3A]/50 mt-0.5">{t('Review and correct AI-parsed supplier costs')}</p>
+              <h3 className="text-xl font-bold text-[#0C1B3A]">{t('Supplier Cost Items')}</h3>
+              <p className="text-xs text-slate-600 mt-0.5">{t('Review and correct AI-parsed supplier costs')}</p>
             </div>
-            <span className="text-[9px] font-bold text-[#0C1B3A]/30 uppercase tracking-widest">{draftItems.length} items</span>
+            <span className="text-xs font-bold text-slate-600 ">{draftItems.length} items</span>
           </div>
 
           {/* Editable cost table */}
-          <div className="bg-white rounded-[24px] border border-[#0C1B3A]/8 overflow-hidden shadow-sm">
+          <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 overflow-hidden shadow-sm">
             {/* Header */}
-            <div className="grid grid-cols-12 gap-3 px-6 py-3 bg-[#0C1B3A] text-white text-[10px] font-black uppercase tracking-wider">
+            <div className="grid grid-cols-12 gap-3 px-6 py-3 bg-[#0C1B3A] text-white text-xs font-bold ">
               <div className="col-span-3">{t('Item Name')}</div>
               <div className="col-span-3">{t('Description / Spec')}</div>
               <div className="col-span-1 text-center">{t('Qty')}</div>
@@ -7290,7 +7291,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       value={item.originalSpec || ''}
                       onChange={e => setDraftItems(prev => prev.map((it, i) => i === idx ? { ...it, originalSpec: e.target.value } : it))}
                       placeholder="—"
-                      className="w-full text-[14px] text-[#0C1B3A]/55 bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-1 transition-colors placeholder:text-[#0C1B3A]/20"
+                      className="w-full text-[14px] text-slate-600 bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-1 transition-colors placeholder:text-slate-600"
                     />
                   </div>
                   {/* Qty */}
@@ -7299,7 +7300,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       type="number" min="0" step="1"
                       value={item.quantity}
                       onChange={e => setDraftItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) || 0, targetTotal: (Number(e.target.value) || 0) * it.targetUnitPrice } : it))}
-                      className="w-full text-[15px] font-mono font-bold text-[#0C1B3A] text-center bg-transparent border-b-2 border-[#0C1B3A]/10 focus:border-[#C9A84C] outline-none pb-1"
+                      className="w-full text-[15px] font-mono-label font-bold text-[#0C1B3A] text-center bg-transparent border-b-2 border-[#0C1B3A]/10 focus:border-[#C9A84C] outline-none pb-1"
                     />
                   </div>
                   {/* Unit */}
@@ -7307,7 +7308,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     <input
                       value={item.unit}
                       onChange={e => setDraftItems(prev => prev.map((it, i) => i === idx ? { ...it, unit: e.target.value } : it))}
-                      className="w-full text-[14px] text-[#0C1B3A]/60 text-center bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-1"
+                      className="w-full text-[14px] text-slate-600 text-center bg-transparent border-b border-[#0C1B3A]/8 focus:border-[#C9A84C] outline-none pb-1"
                     />
                   </div>
                   {/* Supplier Unit Cost */}
@@ -7317,16 +7318,16 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       value={item.targetUnitPrice || ''}
                       placeholder="0.00"
                       onChange={e => setDraftItems(prev => prev.map((it, i) => i === idx ? { ...it, targetUnitPrice: Number(e.target.value) || 0, targetTotal: (Number(e.target.value) || 0) * it.quantity } : it))}
-                      className="w-full text-right text-[15px] font-mono font-black text-[#0C1B3A] bg-transparent border-b-2 border-[#0C1B3A]/10 focus:border-[#C9A84C] outline-none pb-1"
+                      className="w-full text-right text-[15px] font-mono-label font-bold text-[#0C1B3A] bg-transparent border-b-2 border-[#0C1B3A]/10 focus:border-[#C9A84C] outline-none pb-1"
                     />
-                    <p className="text-[11px] text-[#0C1B3A]/30 text-right mt-1 font-mono">{t('unit price')}</p>
+                    <p className="text-xs text-slate-600 text-right mt-1 font-mono-label">{t('unit price')}</p>
                   </div>
                   {/* Currency */}
                   <div className="col-span-1 text-center">
                     <select
                       value={tradeItemCurrencies[item.id] || 'AED'}
                       onChange={e => setTradeItemCurrencies(prev => ({ ...prev, [item.id]: e.target.value }))}
-                      className="text-[12px] font-bold text-[#0C1B3A]/60 bg-transparent border-b border-[#0C1B3A]/8 outline-none w-full text-center pb-1"
+                      className="text-[12px] font-bold text-slate-600 bg-transparent border-b border-[#0C1B3A]/8 outline-none w-full text-center pb-1"
                     >
                       {['AED','USD','CNY','EUR','GBP'].map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
@@ -7334,14 +7335,14 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   {/* Line Total + Delete */}
                   <div className="col-span-1 text-right flex items-center justify-end gap-2">
                     <div>
-                      <p className="text-[15px] font-black font-mono text-[#0C1B3A]">
+                      <p className="text-[15px] font-bold font-mono-label text-[#0C1B3A]">
                         {(item.targetUnitPrice * item.quantity).toFixed(2)}
                       </p>
-                      <p className="text-[11px] text-[#0C1B3A]/30 font-mono">{t('total (caption)')}</p>
+                      <p className="text-xs text-slate-600 font-mono-label">{t('total (caption)')}</p>
                     </div>
                     <button
                       onClick={() => setDraftItems(prev => prev.filter((_, i) => i !== idx))}
-                      className="text-[#0C1B3A]/15 hover:text-red-400 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+                      className="text-slate-600 hover:text-red-600 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
                       title={t('Remove item')}
                     >
                       <X className="w-4 h-4" />
@@ -7354,13 +7355,13 @@ Leave a field as empty string if not present. Never fabricate values.`;
             <div className="px-6 py-4 bg-[#0C1B3A]/3 border-t border-[#0C1B3A]/8 flex items-center justify-between">
               <button
                 onClick={() => setDraftItems(prev => [...prev, { id: `manual-${Date.now()}`, originalName: 'New Item', originalSpec: '', quantity: 1, unit: 'pcs', targetUnitPrice: 0, targetTotal: 0, confidence: 1, status: 'Confirmed', suggestedCategory: FurnitureCategory.OTHER }])}
-                className="text-[11px] font-black uppercase tracking-widest text-[#C9A84C] hover:text-[#0C1B3A] transition-colors flex items-center gap-2"
+                className="text-xs font-bold text-[#7A5F2A] hover:text-[#0C1B3A] transition-colors flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" /> {t('Add Item')}
               </button>
               <div className="text-right">
-                <p className="text-[10px] font-bold uppercase text-[#0C1B3A]/30 tracking-wider">{t('Total Supplier Cost')}</p>
-                <p className="text-xl font-black font-mono text-[#0C1B3A]">
+                <p className="text-xs font-bold text-slate-600 ">{t('Total Supplier Cost')}</p>
+                <p className="text-xl font-bold font-mono-label text-[#0C1B3A]">
                   AED {draftItems.reduce((s, it) => s + it.targetUnitPrice * it.quantity, 0).toFixed(2)}
                 </p>
               </div>
@@ -7368,14 +7369,14 @@ Leave a field as empty string if not present. Never fabricate values.`;
           </div>
 
           {/* ── Terms & Notes ─────────────────────────────────────────── */}
-          <div className="bg-white rounded-[20px] border border-[#0C1B3A]/8 overflow-hidden shadow-sm">
+          <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 overflow-hidden shadow-sm">
             <div className="px-6 py-3 bg-[#0C1B3A]/5 border-b border-[#0C1B3A]/6 flex items-center justify-between">
               <div>
-                <h4 className="text-[11px] font-black uppercase tracking-widest text-[#0C1B3A]">{t('Terms & Notes')}</h4>
-                <p className="text-[10px] text-[#0C1B3A]/40 mt-0.5">{t('Payment terms · Lead time · Validity · Remarks from supplier quote')}</p>
+                <h4 className="text-xs font-bold text-[#0C1B3A]">{t('Terms & Notes')}</h4>
+                <p className="text-xs text-slate-600 mt-0.5">{t('Payment terms · Lead time · Validity · Remarks from supplier quote')}</p>
               </div>
               {tradeTerms && (
-                <button onClick={() => setTradeTerms('')} className="text-[9px] text-[#0C1B3A]/25 hover:text-red-400 transition-colors uppercase tracking-widest font-bold">{t('Clear')}</button>
+                <button onClick={() => setTradeTerms('')} className="text-xs text-slate-600 hover:text-red-600 transition-colors font-bold">{t('Clear')}</button>
               )}
             </div>
             <div className="p-5">
@@ -7384,7 +7385,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 onChange={e => setTradeTerms(e.target.value)}
                 rows={tradeTerms ? Math.max(3, tradeTerms.split('\n').length + 1) : 3}
                 placeholder={t('AI-extracted payment terms, lead time, validity, warranty, notes will appear here automatically.&#10;You can also type or paste manually.&#10;&#10;Example:&#10;Payment: 30% TT advance, 70% before shipment&#10;Lead time: 45 days after deposit&#10;Validity: 30 days')}
-                className="w-full text-[13px] text-[#0C1B3A]/70 bg-transparent outline-none resize-none leading-relaxed placeholder:text-[#0C1B3A]/20 placeholder:text-[12px]"
+                className="w-full text-[13px] text-[#0C1B3A]/70 bg-transparent outline-none resize-none leading-relaxed placeholder:text-slate-600 placeholder:text-[12px]"
               />
             </div>
           </div>
@@ -7395,10 +7396,10 @@ Leave a field as empty string if not present. Never fabricate values.`;
             <button
               onClick={handleSaveSupplierQuote}
               disabled={draftItems.length === 0 || sqSaveStatus === 'saving'}
-              className="px-6 py-4 rounded-full text-[11px] font-black uppercase tracking-widest border transition-all active:scale-95 disabled:opacity-40 flex items-center gap-2"
+              className="px-6 py-4 rounded-full text-xs font-bold border transition-all active:scale-95 disabled:opacity-40 flex items-center gap-2"
               style={sqSaveStatus === 'saved'
                 ? { borderColor: '#10B981', color: '#10B981', backgroundColor: '#10B98110' }
-                : { borderColor: '#0C1B3A30', color: '#0C1B3A60', backgroundColor: 'white' }
+                : { borderColor: '#0C1B3A30', color: '#475569', backgroundColor: 'white' }
               }
             >
               <Archive className="w-4 h-4" />
@@ -7423,7 +7424,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 setDraftItems(allConfirmed);
                 setTradePhase('pricing');
               }}
-              className="px-10 py-5 bg-[#0C1B3A] text-[#C9A84C] rounded-full text-[11px] font-black uppercase tracking-widest shadow-xl hover:bg-[#0F2551] active:scale-95 transition-all border border-[#C9A84C]/30 flex items-center gap-3"
+              className="px-10 py-5 bg-[#0C1B3A] text-[#7A5F2A] rounded-full text-xs font-bold shadow-xl hover:bg-[#0F2551] active:scale-95 transition-all border border-[#C9A84C]/30 flex items-center gap-3"
             >
               {t('Next: Set Selling Prices →')}
             </button>
@@ -7435,47 +7436,47 @@ Leave a field as empty string if not present. Never fabricate values.`;
       {activeTab === 'items' && !(quoteType === 'trade' || quoteType === 'boq') ? (
         <>
           <div className="text-center space-y-4">
-            <h2 className="text-4xl font-serif italic text-brand-brown">
+            <h2 className="text-4xl italic text-[#0C1B3A]">
               {(quoteType === 'trade' || quoteType === 'boq') ? t('Supplier Cost Items') : t('Project Package Items')}
             </h2>
-            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-gold">
+            <p className="text-xs font-bold text-[#7A5F2A]">
               {(quoteType === 'trade' || quoteType === 'boq') ? t('Items extracted from supplier quote · pending price review') : t('Consolidate multiple items into one engineering specification')}
             </p>
           </div>
 
           <div className="space-y-8">
             {packageItems.length === 0 ? (
-              <div className="text-center py-32 bg-brand-beige/5 border-2 border-dashed border-brand-beige rounded-[48px]">
+              <div className="text-center py-32 bg-[#F8F9FB]/5 border-2 border-dashed border-[rgba(12,27,58,0.1)] rounded-[10px]">
                 <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
-                    <PlusCircle className="w-8 h-8 text-brand-gold/30" />
+                    <PlusCircle className="w-8 h-8 text-[#7A5F2A]/30" />
                 </div>
-                <h3 className="text-xl font-serif italic text-brand-brown mb-2">{t('Your package is empty')}</h3>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-brand-brown/40">{t('Add items below to start building your quote')}</p>
+                <h3 className="text-xl italic text-[#0C1B3A] mb-2">{t('Your package is empty')}</h3>
+                <p className="text-xs font-bold text-slate-600">{t('Add items below to start building your quote')}</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-4">
                 {packageItems.map((item, idx) => (
-                  <div key={item.id} className="p-8 bg-white border border-brand-beige rounded-[32px] flex items-center justify-between group hover:shadow-xl transition-all duration-500">
+                  <div key={item.id} className="p-8 bg-white border border-[rgba(12,27,58,0.1)] rounded-[10px] flex items-center justify-between group hover:shadow-xl transition-all duration-500">
                     <div className="flex items-center gap-8">
-                      <div className="w-16 h-16 bg-brand-beige/20 rounded-2xl flex items-center justify-center group-hover:bg-brand-gold/10 transition-colors">
+                      <div className="w-16 h-16 bg-[#F8F9FB]/20 rounded-[10px] flex items-center justify-center group-hover:bg-[#080D1E]/10 transition-colors">
                         {(() => {
                           const Icon = CATEGORY_ICONS[item.category];
-                          return <Icon className="w-8 h-8 text-brand-gold" />;
+                          return <Icon className="w-8 h-8 text-[#7A5F2A]" />;
                         })()}
                       </div>
                       <div>
                         <div className="flex items-center gap-3 mb-1">
-                          <span className="text-[10px] font-bold text-brand-gold uppercase tracking-widest">{t('Item {n}').replace('{n}', String(idx + 1))}</span>
-                          <span className="w-1 h-1 rounded-full bg-brand-beige" />
-                          <span className="text-[10px] font-bold text-brand-brown-muted uppercase tracking-widest">{t(item.category)}</span>
+                          <span className="text-xs font-bold text-[#7A5F2A] ">{t('Item {n}').replace('{n}', String(idx + 1))}</span>
+                          <span className="w-1 h-1 rounded-full bg-[#F8F9FB]" />
+                          <span className="text-xs font-bold text-slate-600 ">{t(item.category)}</span>
                         </div>
-                        <h4 className="text-xl font-serif italic text-brand-brown">
+                        <h4 className="text-xl italic text-[#0C1B3A]">
                           {item.category === FurnitureCategory.BED ? `${(item.config as any).size} Bed` : `${t(item.category)} Unit`}
                         </h4>
                       </div>
                     </div>
                     <div className="flex items-center gap-12">
-                       <div className="flex items-center gap-4 bg-brand-beige/10 p-2 rounded-2xl border border-brand-beige">
+                       <div className="flex items-center gap-4 bg-[#F8F9FB]/10 p-2 rounded-[10px] border border-[rgba(12,27,58,0.1)]">
                           <button 
                             onClick={() => {
                               const updated = [...packageItems];
@@ -7484,31 +7485,31 @@ Leave a field as empty string if not present. Never fabricate values.`;
                                 setPackageItems(updated);
                               }
                             }}
-                            className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-brand-brown hover:bg-brand-brown hover:text-brand-ivory transition-all"
+                            className="w-8 h-8 rounded-md bg-white flex items-center justify-center text-[#0C1B3A] hover:bg-[#080D1E] hover:text-white transition-all"
                           >
                             -
                           </button>
-                          <span className="w-8 text-center font-bold font-mono text-brand-brown">{item.quantity}</span>
+                          <span className="w-8 text-center font-bold font-mono-label text-[#0C1B3A]">{item.quantity}</span>
                           <button 
                             onClick={() => {
                               const updated = [...packageItems];
                               updated[idx].quantity += 1;
                               setPackageItems(updated);
                             }}
-                            className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-brand-brown hover:bg-brand-brown hover:text-brand-ivory transition-all"
+                            className="w-8 h-8 rounded-md bg-white flex items-center justify-center text-[#0C1B3A] hover:bg-[#080D1E] hover:text-white transition-all"
                           >
                             +
                           </button>
                        </div>
                        <div className="text-right">
-                         <span className="text-[10px] font-bold text-brand-brown-muted uppercase block">{t('Total Value')}</span>
-                         <span className="text-2xl font-serif italic text-brand-brown">
+                         <span className="text-xs font-bold text-slate-600 block">{t('Total Value')}</span>
+                         <span className="text-2xl italic text-[#0C1B3A]">
                             {(item.totalAmount * item.quantity).toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs not-italic">AED</span>
                          </span>
                        </div>
                        <button 
                         onClick={() => setPackageItems(packageItems.filter((_, i) => i !== idx))}
-                        className="p-4 rounded-full text-red-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                        className="p-4 rounded-full text-red-300 hover:text-red-600 hover:bg-red-50 transition-all"
                        >
                         <X className="w-5 h-5" />
                        </button>
@@ -7518,9 +7519,9 @@ Leave a field as empty string if not present. Never fabricate values.`;
               </div>
             )}
 
-            <div className="pt-12 border-t border-brand-beige/50">
+            <div className="pt-12 border-t border-[rgba(12,27,58,0.1)]/50">
               <div className="text-center mb-8">
-                <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-brand-brown mb-4">{t('Add to Project Package')}</h3>
+                <h3 className="text-sm font-bold text-[#0C1B3A] mb-4">{t('Add to Project Package')}</h3>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
                 {Object.values(FurnitureCategory).map(cat => {
@@ -7532,10 +7533,10 @@ Leave a field as empty string if not present. Never fabricate values.`;
                         setSelectedCategory(cat);
                         setCurrentStep(0);
                       }}
-                      className="p-6 bg-white border border-brand-beige rounded-[32px] flex flex-col items-center gap-3 hover:border-brand-gold hover:shadow-lg transition-all group"
+                      className="p-6 bg-white border border-[rgba(12,27,58,0.1)] rounded-md flex flex-col items-center gap-3 hover:border-[#A07F3C] hover:shadow-lg transition-all group"
                     >
-                      <Icon className="w-5 h-5 text-brand-gold group-hover:scale-110 transition-transform" />
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-brand-brown text-center">{t(cat)}</span>
+                      <Icon className="w-5 h-5 text-[#7A5F2A] group-hover:scale-110 transition-transform" />
+                      <span className="text-xs font-bold text-[#0C1B3A] text-center">{t(cat)}</span>
                     </button>
                   );
                 })}
@@ -7543,10 +7544,10 @@ Leave a field as empty string if not present. Never fabricate values.`;
             </div>
 
             {packageItems.length > 0 && (
-              <div className="mt-20 p-12 bg-brand-brown rounded-[48px] shadow-2xl flex flex-col sm:flex-row justify-between items-center gap-8">
+              <div className="mt-20 p-12 bg-[#080D1E] rounded-[10px] shadow-2xl flex flex-col sm:flex-row justify-between items-center gap-8">
                 <div className="text-center sm:text-left">
-                  <span className="text-[10px] font-bold text-brand-gold uppercase tracking-[0.3em]">{t('Consolidated Package Total')}</span>
-                  <h2 className="text-5xl font-serif italic text-brand-ivory mt-2">
+                  <span className="text-xs font-bold text-[#7A5F2A] ">{t('Consolidated Package Total')}</span>
+                  <h2 className="text-5xl italic text-white mt-2">
                     {packageItems.reduce((acc, item) => acc + (item.totalAmount * item.quantity), 0).toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs not-italic">AED</span>
                   </h2>
                 </div>
@@ -7554,7 +7555,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   onClick={() => {
                     alert(t('Generating package quote message'));
                   }}
-                  className="px-12 py-6 bg-brand-gold text-brand-ivory rounded-[32px] font-bold uppercase tracking-[0.2em] text-xs shadow-xl hover:bg-brand-gold/90 transition-all flex items-center gap-4 group"
+                  className="px-12 py-6 bg-[#080D1E] text-white rounded-md font-bold text-xs shadow-xl hover:bg-[#080D1E]/90 transition-all flex items-center gap-4 group"
                 >
                   {t('Generate Package Quote')} <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </button>
@@ -7567,40 +7568,40 @@ Leave a field as empty string if not present. Never fabricate values.`;
         <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 max-w-7xl mx-auto px-6 w-full">
            <div className="text-center space-y-4 mb-20">
             <div className="flex items-center justify-center gap-4">
-              <div className="h-px w-12 bg-brand-gold/30" />
-              <div className="flex items-center gap-2 text-brand-gold">
+              <div className="h-px w-12 bg-[#080D1E]/30" />
+              <div className="flex items-center gap-2 text-[#7A5F2A]">
                 <Cpu className="w-5 h-5" />
-                <span className="text-[10px] font-bold uppercase tracking-[0.4em]">{t('AI Mapping Engine Activated')}</span>
+                <span className="text-xs font-bold ">{t('AI Mapping Engine Activated')}</span>
               </div>
-              <div className="h-px w-12 bg-brand-gold/30" />
+              <div className="h-px w-12 bg-[#080D1E]/30" />
             </div>
-            <h2 className="text-4xl font-serif italic text-brand-brown">
+            <h2 className="text-4xl italic text-[#0C1B3A]">
               {(quoteType === 'trade' || quoteType === 'boq') ? t('GCI Quotation Draft') : t('Project Package Draft')}
             </h2>
-            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-gold opacity-80">
+            <p className="text-xs font-bold text-[#7A5F2A] opacity-80">
               {(quoteType === 'trade' || quoteType === 'boq') ? t('⚠ AI-generated draft — confirm supplier costs before pricing') : t('Classified items waiting for configuration push')}
             </p>
           </div>
 
           {draftItems.length === 0 ? (
-            <div className="text-center py-40 bg-brand-beige/10 rounded-[64px] border border-brand-beige/50">
+            <div className="text-center py-40 bg-[#F8F9FB]/10 rounded-[10px] border border-[rgba(12,27,58,0.1)]/50">
               <div className="w-24 h-24 bg-white/50 rounded-full flex items-center justify-center mx-auto mb-8">
-                <FileSpreadsheet className="w-10 h-10 text-brand-gold/40" />
+                <FileSpreadsheet className="w-10 h-10 text-[#7A5F2A]/40" />
               </div>
-              <p className="text-brand-brown font-serif italic text-xl mb-4 italic opacity-60">{t('Upload a client Excel to populate this workspace')}</p>
+              <p className="text-[#0C1B3A] italic text-xl mb-4 italic opacity-60">{t('Upload a client Excel to populate this workspace')}</p>
               <button 
                 onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
-                className="px-10 py-5 bg-brand-brown text-brand-ivory rounded-full text-[10px] font-bold uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl"
+                className="px-10 py-5 bg-[#080D1E] text-white rounded-full text-xs font-bold hover:scale-105 active:scale-95 transition-all shadow-xl"
               >
                 {t('Select a file')}
               </button>
             </div>
           ) : (
-            <div className="bg-white rounded-[48px] border border-brand-beige shadow-2xl shadow-brand-brown/5 overflow-hidden">
+            <div className="bg-white rounded-[10px] border border-[rgba(12,27,58,0.1)] shadow-2xl shadow-brand-brown/5 overflow-hidden">
               <div className="w-full overflow-x-hidden">
                 <table className="w-full text-left text-xs border-collapse table-fixed">
                   <thead className="sticky top-0 z-10">
-                    <tr className="bg-brand-beige text-brand-brown-muted font-bold uppercase tracking-widest text-[9px] border-b border-brand-beige shadow-sm">
+                    <tr className="bg-[#F8F9FB] text-slate-600 font-bold text-xs border-b border-[rgba(12,27,58,0.1)] shadow-sm">
                       <th className="p-8 py-6 w-[60px]">{t('ID')}</th>
                       <th className="p-8 py-6 w-[220px]">{t('Original Item Name')}</th>
                       <th className="p-8 py-6 w-[200px]">{t('Original Specification')}</th>
@@ -7612,21 +7613,21 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   </thead>
                   <tbody className="divide-y divide-brand-beige/30">
                     {draftItems.map((item, idx) => (
-                      <tr key={item.id} className="group hover:bg-brand-gold/5 transition-colors">
-                        <td className="p-8 text-[10px] font-mono text-brand-brown-muted opacity-50">#{idx + 1}</td>
+                      <tr key={item.id} className="group hover:bg-[#080D1E]/5 transition-colors">
+                        <td className="p-8 text-xs font-mono-label text-slate-600 opacity-50">#{idx + 1}</td>
                         <td className="p-8">
-                          <p className="font-bold text-brand-brown text-sm truncate" title={item.originalName}>{item.originalName}</p>
+                          <p className="font-bold text-[#0C1B3A] text-sm truncate" title={item.originalName}>{item.originalName}</p>
                         </td>
-                        <td className="p-8 text-brand-brown-muted">
-                          <p className="line-clamp-2 text-[10px]" title={item.originalSpec}>{item.originalSpec}</p>
+                        <td className="p-8 text-slate-600">
+                          <p className="line-clamp-2 text-xs" title={item.originalSpec}>{item.originalSpec}</p>
                         </td>
                         <td className="p-8">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-brand-beige/20 flex items-center justify-center shrink-0">
+                            <div className="w-8 h-8 rounded-[10px] bg-[#F8F9FB]/20 flex items-center justify-center shrink-0">
                               {item.suggestedCategory !== 'unknown' ? (
                                 (() => {
                                   const Icon = CATEGORY_ICONS[item.suggestedCategory as FurnitureCategory];
-                                  return <Icon className="w-4 h-4 text-brand-gold" />;
+                                  return <Icon className="w-4 h-4 text-[#7A5F2A]" />;
                                 })()
                               ) : (
                                 <AlertCircle className="w-4 h-4 text-red-300" />
@@ -7640,7 +7641,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                                 if (updated[idx].status === 'Need Review') updated[idx].status = 'Confirmed';
                                 setDraftItems(updated);
                               }}
-                              className="bg-transparent border-none font-bold text-brand-brown text-[10px] uppercase tracking-widest outline-none focus:ring-0 cursor-pointer hover:text-brand-gold transition-colors truncate max-w-[150px]"
+                              className="bg-transparent border-none font-bold text-[#0C1B3A] text-xs outline-none focus:ring-0 cursor-pointer hover:text-[#7A5F2A] transition-colors truncate max-w-[150px]"
                             >
                               <option value="unknown">{t('Select...')}</option>
                               {Object.values(FurnitureCategory).map(cat => (
@@ -7649,17 +7650,17 @@ Leave a field as empty string if not present. Never fabricate values.`;
                             </select>
                           </div>
                         </td>
-                        <td className="p-8 font-mono font-bold text-brand-brown whitespace-nowrap">{item.quantity} {item.unit}</td>
+                        <td className="p-8 font-mono-label font-bold text-[#0C1B3A] whitespace-nowrap">{item.quantity} {item.unit}</td>
                         <td className="p-8">
-                          <span className={`px-4 py-2 rounded-full text-[8px] font-bold uppercase tracking-widest flex items-center gap-2 w-fit whitespace-nowrap ${
+                          <span className={`px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 w-fit whitespace-nowrap ${
                             item.status === 'Confirmed' ? 'bg-green-100 text-green-700' :
                             item.status === 'Need Split' ? 'bg-orange-100 text-orange-700' :
-                            'bg-brand-gold/10 text-brand-gold'
+                            'bg-[#080D1E]/10 text-[#7A5F2A]'
                           }`}>
                             <div className={`w-1 h-1 rounded-full ${
                               item.status === 'Confirmed' ? 'bg-green-700' :
                               item.status === 'Need Split' ? 'bg-orange-700' :
-                              'bg-brand-gold'
+                              'bg-[#080D1E]'
                             }`} />
                             {t(item.status)}
                           </span>
@@ -7673,10 +7674,10 @@ Leave a field as empty string if not present. Never fabricate values.`;
                                  setShowSplitModal(true);
                                }}
                                disabled={item.status !== 'Need Split'}
-                               className={`px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all ${
+                               className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${
                                  item.status === 'Need Split' 
                                  ? 'bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white' 
-                                 : 'bg-gray-50 text-gray-300 cursor-not-allowed opacity-50'
+                                 : 'bg-gray-50 text-slate-600 cursor-not-allowed opacity-50'
                                }`}
                                title={item.status !== 'Need Split' ? t('Item does not need splitting') : ''}
                              >
@@ -7691,10 +7692,10 @@ Leave a field as empty string if not present. Never fabricate values.`;
                                  alert(t('Successfully confirmed category'));
                                }}
                                disabled={item.status === 'Confirmed'}
-                               className={`px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all ${
+                               className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${
                                  item.status !== 'Confirmed' 
-                                 ? 'bg-green-50 text-green-600 hover:bg-green-600 hover:text-white' 
-                                 : 'bg-gray-50 text-gray-300 cursor-not-allowed opacity-50'
+                                 ? 'bg-green-50 text-green-700 hover:bg-green-600 hover:text-white' 
+                                 : 'bg-gray-50 text-slate-600 cursor-not-allowed opacity-50'
                                }`}
                              >
                                {t('Confirm / 确认')}
@@ -7704,10 +7705,10 @@ Leave a field as empty string if not present. Never fabricate values.`;
                                <button 
                                  onClick={() => handlePushToConfigurator(item)}
                                  disabled={item.status !== 'Confirmed'}
-                                 className={`px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all ${
+                                 className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${
                                    item.status === 'Confirmed' 
-                                   ? 'bg-brand-gold/10 text-brand-gold hover:bg-brand-gold hover:text-white' 
-                                   : 'bg-gray-50 text-gray-300 cursor-not-allowed opacity-50'
+                                   ? 'bg-[#080D1E]/10 text-[#7A5F2A] hover:bg-[#080D1E] hover:text-white' 
+                                   : 'bg-gray-50 text-slate-600 cursor-not-allowed opacity-50'
                                  }`}
                                >
                                  {t('Add / 加入')}
@@ -7716,10 +7717,10 @@ Leave a field as empty string if not present. Never fabricate values.`;
                                <button 
                                  onClick={() => handlePushToConfigurator(item)}
                                  disabled={item.status !== 'Confirmed' || item.suggestedCategory === 'unknown'}
-                                 className={`px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all ${
+                                 className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${
                                     item.status === 'Confirmed' && item.suggestedCategory !== 'unknown'
-                                    ? 'bg-brand-brown text-brand-ivory hover:bg-brand-brown/90 shadow-md' 
-                                    : 'bg-gray-50 text-gray-300 cursor-not-allowed opacity-50'
+                                    ? 'bg-[#080D1E] text-white hover:bg-[#080D1E]/90 shadow-md' 
+                                    : 'bg-gray-50 text-slate-600 cursor-not-allowed opacity-50'
                                  }`}
                                >
                                  {t('Configure / 配置')}
@@ -7728,7 +7729,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
 
                              <button 
                                onClick={() => setDraftItems(draftItems.filter((_, i) => i !== idx))}
-                               className="px-4 py-2 bg-red-50 text-red-400 rounded-xl hover:bg-red-500 hover:text-white transition-all text-[9px] font-bold uppercase tracking-widest"
+                               className="px-4 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-500 hover:text-white transition-all text-xs font-bold "
                              >
                                {t('Ignore / 忽略')}
                              </button>
@@ -7739,14 +7740,14 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   </tbody>
                 </table>
               </div>
-              <div className="p-12 bg-brand-beige/5 border-t border-brand-beige flex justify-between items-center">
+              <div className="p-12 bg-[#F8F9FB]/5 border-t border-[rgba(12,27,58,0.1)] flex justify-between items-center">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">
-                    <FileSpreadsheet className="w-6 h-6 text-brand-gold" />
+                  <div className="w-12 h-12 bg-white rounded-[10px] flex items-center justify-center shadow-sm">
+                    <FileSpreadsheet className="w-6 h-6 text-[#7A5F2A]" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-brand-brown uppercase tracking-widest">{t('Client Draft Summary')}</h4>
-                    <p className="text-[10px] text-brand-brown-muted uppercase font-bold opacity-60">
+                    <h4 className="text-sm font-bold text-[#0C1B3A] ">{t('Client Draft Summary')}</h4>
+                    <p className="text-xs text-slate-600 font-bold opacity-60">
                       {t('Total Items: {n}').replace('{n}', String(draftItems.length))}
                     </p>
                   </div>
@@ -7763,7 +7764,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                         }
                         setTradePhase('pricing');
                       }}
-                      className="px-10 py-5 bg-[#0C1B3A] text-[#C9A84C] rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-[#0F2551] active:scale-95 transition-all border border-[#C9A84C]/30 flex items-center gap-3"
+                      className="px-10 py-5 bg-[#0C1B3A] text-[#7A5F2A] rounded-full text-xs font-bold shadow-xl hover:bg-[#0F2551] active:scale-95 transition-all border border-[#C9A84C]/30 flex items-center gap-3"
                     >
                       {t('Proceed to Pricing →')}
                     </button>
@@ -7800,7 +7801,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                         setActiveTab('items');
                         alert(t('Added confirmed items to Project Package. Please configure non-furniture items individually.'));
                     }}
-                    className="px-10 py-5 bg-brand-brown text-brand-ivory rounded-full text-[10px] font-bold uppercase tracking-widest shadow-xl shadow-brand-brown/20 hover:scale-105 active:scale-95 transition-all"
+                    className="px-10 py-5 bg-[#080D1E] text-white rounded-full text-xs font-bold shadow-xl shadow-brand-brown/20 hover:scale-105 active:scale-95 transition-all"
                    >
                      {t('Batch Add to Package')}
                    </button>
@@ -7818,7 +7819,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
       <div className="flex justify-start">
         <button 
           onClick={() => setProjectInfoSubmitted(false)}
-          className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-gold hover:text-brand-brown transition-all group"
+          className="flex items-center gap-2 text-xs font-bold text-[#7A5F2A] hover:text-[#0C1B3A] transition-all group"
         >
           <ArrowLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" /> {t('Back to Project Info')}
         </button>
@@ -7829,9 +7830,9 @@ Leave a field as empty string if not present. Never fabricate values.`;
         {quoteType !== 'trade' && quoteType !== 'boq' && (
         <section className="space-y-8">
           <div className="text-center space-y-3">
-            <h2 className="text-3xl font-serif italic text-brand-brown">{t('Individual Item Quote')}</h2>
-            <div className="w-24 h-px bg-brand-gold/30 mx-auto" />
-            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-gold">Custom-made furniture &amp; engineering items</p>
+            <h2 className="text-3xl italic text-[#0C1B3A]">{t('Individual Item Quote')}</h2>
+            <div className="w-24 h-px bg-[#080D1E]/30 mx-auto" />
+            <p className="text-xs font-bold text-[#7A5F2A]">Custom-made furniture &amp; engineering items</p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 max-w-6xl mx-auto">
             {Object.values(FurnitureCategory).map(cat => {
@@ -7844,12 +7845,12 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     setSelectedCategory(cat);
                     setCurrentStep(0);
                   }}
-                  className="group p-10 bg-white border border-brand-beige rounded-[48px] flex flex-col items-center gap-6 hover:border-brand-gold shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500"
+                  className="group p-10 bg-white border border-[rgba(12,27,58,0.1)] rounded-md flex flex-col items-center gap-6 hover:border-[#A07F3C] shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500"
                 >
-                  <div className="p-6 bg-brand-beige/20 rounded-[32px] group-hover:bg-brand-gold/10 group-hover:-rotate-6 transition-all duration-500">
-                    <Icon className="w-8 h-8 text-brand-gold" />
+                  <div className="p-6 bg-[#F8F9FB]/20 rounded-[10px] group-hover:bg-[#080D1E]/10 group-hover:-rotate-6 transition-all duration-500">
+                    <Icon className="w-8 h-8 text-[#7A5F2A]" />
                   </div>
-                  <span className="text-lg font-serif italic text-brand-brown group-hover:text-brand-gold transition-colors">{t(cat)}</span>
+                  <span className="text-lg italic text-[#0C1B3A] group-hover:text-[#7A5F2A] transition-colors">{t(cat)}</span>
                 </button>
               );
             })}
@@ -7859,11 +7860,11 @@ Leave a field as empty string if not present. Never fabricate values.`;
 
         {/* Section 2: Scenarios — hidden, trade/boq go direct to workspace */}
         {false && (
-        <section className="space-y-8 pt-12 border-t border-brand-beige/50">
+        <section className="space-y-8 pt-12 border-t border-[rgba(12,27,58,0.1)]/50">
           <div className="text-center space-y-3">
-            <h2 className="text-3xl font-serif italic text-brand-brown">{t('Project Package Quote')}</h2>
-            <div className="w-24 h-px bg-brand-gold/30 mx-auto" />
-            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-gold">Consolidated furniture bundles by environment</p>
+            <h2 className="text-3xl italic text-[#0C1B3A]">{t('Project Package Quote')}</h2>
+            <div className="w-24 h-px bg-[#080D1E]/30 mx-auto" />
+            <p className="text-xs font-bold text-[#7A5F2A]">Consolidated furniture bundles by environment</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-6">
             {Object.values(Scenario).map(s => {
@@ -7875,14 +7876,14 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     setQuoteMode('package');
                     handleScenarioSelect(s);
                   }}
-                  className="group p-8 bg-brand-beige/5 border border-brand-beige/60 rounded-[40px] flex flex-col items-center text-center gap-5 hover:bg-white hover:border-brand-gold hover:shadow-xl transition-all duration-500"
+                  className="group p-8 bg-[#F8F9FB]/5 border border-[rgba(12,27,58,0.1)]/60 rounded-md flex flex-col items-center text-center gap-5 hover:bg-white hover:border-[#A07F3C] hover:shadow-xl transition-all duration-500"
                 >
                   <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                    <Icon className="w-8 h-8 text-brand-gold" />
+                    <Icon className="w-8 h-8 text-[#7A5F2A]" />
                   </div>
                   <div className="space-y-1">
-                    <h4 className="text-base font-serif italic text-brand-brown">{t(s)} {t('Bundle')}</h4>
-                    <p className="text-[9px] font-bold text-brand-gold uppercase tracking-widest">{t('Full Set Quote')}</p>
+                    <h4 className="text-base italic text-[#0C1B3A]">{t(s)} {t('Bundle')}</h4>
+                    <p className="text-xs font-bold text-[#7A5F2A] ">{t('Full Set Quote')}</p>
                   </div>
                 </button>
               );
@@ -7910,21 +7911,21 @@ Leave a field as empty string if not present. Never fabricate values.`;
     if (STEPS[currentStep].id === 'summary') return null;
 
     return (
-      <div className="mb-8 p-6 bg-brand-gold/5 border border-brand-gold/20 rounded-3xl space-y-4">
-        <h4 className="text-[10px] font-bold text-brand-gold uppercase tracking-[0.25em] flex items-center gap-2">
+      <div className="mb-8 p-6 bg-[#080D1E]/5 border border-[#A07F3C]/20 rounded-[10px] space-y-4">
+        <h4 className="text-xs font-bold text-[#7A5F2A] flex items-center gap-2">
            <Info className="w-3 h-3" /> {t('Split Requirement Info')}
         </h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
            {specOverride && (
              <div className="space-y-1">
-               <span className="text-[9px] font-bold text-brand-brown-muted uppercase tracking-widest">{t('Type / Specification')}</span>
-               <p className="text-sm font-serif italic text-brand-brown">{specOverride}</p>
+               <span className="text-xs font-bold text-slate-600 ">{t('Type / Specification')}</span>
+               <p className="text-sm italic text-[#0C1B3A]">{specOverride}</p>
              </div>
            )}
            {notes && (
              <div className="space-y-1">
-               <span className="text-[9px] font-bold text-brand-brown-muted uppercase tracking-widest">{t('Notes')}</span>
-               <p className="text-sm text-brand-brown-muted">{notes}</p>
+               <span className="text-xs font-bold text-slate-600 ">{t('Notes')}</span>
+               <p className="text-sm text-slate-600">{notes}</p>
              </div>
            )}
         </div>
@@ -7946,9 +7947,9 @@ Leave a field as empty string if not present. Never fabricate values.`;
 
       return (
         <div className="space-y-12 text-sans">
-           <div className="bg-brand-beige/10 p-10 rounded-[40px] border border-brand-beige">
-             <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown mb-8 flex items-center gap-2 italic">
-               <FileText className="w-3 h-3 text-brand-gold" /> {t('Quotation Details')}
+           <div className="bg-[#F8F9FB]/10 p-10 rounded-[10px] border border-[rgba(12,27,58,0.1)]">
+             <h3 className="text-xs font-bold text-[#0C1B3A] mb-8 flex items-center gap-2 italic">
+               <FileText className="w-3 h-3 text-[#7A5F2A]" /> {t('Quotation Details')}
              </h3>
              <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
                 {[
@@ -7959,63 +7960,63 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   { key: 'date', label: t('Date'), type: 'date' }
                 ].map(field => (
                   <div key={field.key} className="space-y-2">
-                    <label className="text-[9px] font-bold text-brand-brown-muted uppercase tracking-[0.1em]">{field.label}</label>
+                    <label className="text-xs font-bold text-slate-600 ">{field.label}</label>
                     <input 
                       type={field.type || 'text'}
                       value={quoteInfo[field.key as keyof typeof quoteInfo] as string}
                       onChange={e => setQuoteInfo({...quoteInfo, [field.key]: e.target.value})}
-                      className="w-full bg-transparent border-b border-brand-brown/10 py-1 text-sm font-medium focus:border-brand-gold outline-none"
+                      className="w-full bg-transparent border-b border-[#0C1B3A]/10 py-1 text-sm font-medium focus:border-[#A07F3C] outline-none"
                     />
                   </div>
                 ))}
              </div>
            </div>
 
-           <div className="bg-white p-6 sm:p-12 rounded-[48px] border border-brand-beige">
+           <div className="bg-white p-6 sm:p-12 rounded-[10px] border border-[rgba(12,27,58,0.1)]">
                <div className="space-y-12">
-                <section className="bg-brand-beige/5 p-8 rounded-[32px] border border-brand-beige/30">
-                  <h4 className="text-[10px] font-bold text-brand-brown-muted uppercase tracking-[0.25em] mb-6 flex items-center gap-3">
-                     <Settings className="w-3 h-3 text-brand-gold" /> {t('Project Overview')}
+                <section className="bg-[#F8F9FB]/5 p-8 rounded-[10px] border border-[rgba(12,27,58,0.1)]/30">
+                  <h4 className="text-xs font-bold text-slate-600 mb-6 flex items-center gap-3">
+                     <Settings className="w-3 h-3 text-[#7A5F2A]" /> {t('Project Overview')}
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-16 gap-y-4 text-xs">
-                     <div className="flex justify-between border-b border-brand-beige/50 pb-2">
-                       <span className="text-brand-brown-muted">{t('Category')}</span>
+                     <div className="flex justify-between border-b border-[rgba(12,27,58,0.1)]/50 pb-2">
+                       <span className="text-slate-600">{t('Category')}</span>
                        <span className="font-bold">{t(selectedCategory!)}</span>
                      </div>
-                     <div className="flex justify-between border-b border-brand-beige/50 pb-2">
-                       <span className="text-brand-brown-muted">{t('Scenario')}</span>
+                     <div className="flex justify-between border-b border-[rgba(12,27,58,0.1)]/50 pb-2">
+                       <span className="text-slate-600">{t('Scenario')}</span>
                        <span className="font-bold">{selectedScenario ? t(selectedScenario) : 'Generic'}</span>
                      </div>
-                     <div className="flex justify-between border-b border-brand-beige/50 pb-2">
-                       <span className="text-brand-brown-muted">{t('Finish')}</span>
+                     <div className="flex justify-between border-b border-[rgba(12,27,58,0.1)]/50 pb-2">
+                       <span className="text-slate-600">{t('Finish')}</span>
                        <span className="font-bold">{(currentConfig as any).finish ? t((currentConfig as any).finish) : 'N/A'}</span>
                      </div>
-                     <div className="flex justify-between border-b border-brand-beige/50 pb-2">
-                       <span className="text-brand-brown-muted">{t('Color Way')}</span>
+                     <div className="flex justify-between border-b border-[rgba(12,27,58,0.1)]/50 pb-2">
+                       <span className="text-slate-600">{t('Color Way')}</span>
                        <span className="font-bold">{currentConfig.color === Color.CUSTOM ? `Custom` : t(currentConfig.color)}</span>
                      </div>
                   </div>
                 </section>
 
-                <section className="bg-brand-brown p-8 rounded-[32px] text-brand-ivory">
-                  <h4 className="text-[10px] font-bold uppercase tracking-[0.25em] mb-6 flex items-center gap-3">
-                     <Square className="w-3 h-3 text-brand-gold" /> {t('Product Summary')}
+                <section className="bg-[#080D1E] p-8 rounded-[10px] text-white">
+                  <h4 className="text-xs font-bold mb-6 flex items-center gap-3">
+                     <Square className="w-3 h-3 text-[#7A5F2A]" /> {t('Product Summary')}
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                     {selectedCategory === FurnitureCategory.WARDROBE || selectedCategory === FurnitureCategory.CABINET || selectedCategory === FurnitureCategory.TV_UNIT ? (
                       modularConfig.modules.map((m, idx) => (
-                        <div key={idx} className="bg-white/5 p-4 rounded-2xl border border-white/10">
-                          <p className="text-[9px] uppercase tracking-widest text-brand-gold/60 font-bold mb-1">Module {idx + 1}</p>
-                          <p className="font-serif italic text-lg">{t(m.type)}</p>
+                        <div key={idx} className="bg-white/5 p-4 rounded-[10px] border border-white/10">
+                          <p className="text-xs text-[#7A5F2A]/60 font-bold mb-1">Module {idx + 1}</p>
+                          <p className=" italic text-lg">{t(m.type)}</p>
                           <p className="text-xs opacity-60 mt-2">{m.width}x{m.height}x{m.depth}mm</p>
-                          <p className="text-xs font-bold mt-1 text-brand-gold">QTY: {m.quantity}</p>
+                          <p className="text-xs font-bold mt-1 text-[#7A5F2A]">QTY: {m.quantity}</p>
                         </div>
                       ))
                     ) : (
-                      <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
-                        <p className="text-[9px] uppercase tracking-widest text-brand-gold/60 font-bold mb-1">Primary Unit</p>
-                        <p className="font-serif italic text-lg">{t(selectedCategory!)}</p>
-                        <p className="text-xs font-bold mt-1 text-brand-gold">QTY: 1</p>
+                      <div className="bg-white/5 p-4 rounded-[10px] border border-white/10">
+                        <p className="text-xs text-[#7A5F2A]/60 font-bold mb-1">Primary Unit</p>
+                        <p className=" italic text-lg">{t(selectedCategory!)}</p>
+                        <p className="text-xs font-bold mt-1 text-[#7A5F2A]">QTY: 1</p>
                       </div>
                     )}
                   </div>
@@ -8023,8 +8024,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
 
                 <section>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-                    <h4 className="text-[10px] font-bold text-brand-brown-muted uppercase tracking-[0.25em] flex items-center gap-3">
-                       <Package className="w-3 h-3 text-brand-gold" /> {t('BOM Breakdown')}
+                    <h4 className="text-xs font-bold text-slate-600 flex items-center gap-3">
+                       <Package className="w-3 h-3 text-[#7A5F2A]" /> {t('BOM Breakdown')}
                     </h4>
                   </div>
                   
@@ -8038,11 +8039,11 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       }, {} as Record<string, typeof bom>)
                     ).map(([groupName, items], gIdx) => (
                       <div key={gIdx} className="space-y-4">
-                        <h5 className="text-[9px] font-bold text-brand-gold uppercase tracking-[0.3em] border-l-2 border-brand-gold pl-3">{groupName}</h5>
+                        <h5 className="text-xs font-bold text-[#7A5F2A] border-l-2 border-[#A07F3C] pl-3">{groupName}</h5>
                         <div className="overflow-x-auto">
-                          <table className="w-full text-[11px] text-left">
+                          <table className="w-full text-xs text-left">
                             <thead>
-                              <tr className="border-b border-brand-beige text-brand-brown/40 font-bold uppercase tracking-widest">
+                              <tr className="border-b border-[rgba(12,27,58,0.1)] text-slate-600 font-bold ">
                                 <th className="pb-3 px-2">{t('Component')}</th>
                                 <th className="pb-3 text-center px-2">{t('Qty')}</th>
                                 <th className="pb-3 text-right px-2">{t('Rate')}</th>
@@ -8052,17 +8053,17 @@ Leave a field as empty string if not present. Never fabricate values.`;
                             <tbody className="divide-y divide-brand-beige/30">
                               {(items as any[]).map((item: any, iIdx) => (
                                 <tr key={iIdx}>
-                                  <td className="py-4 px-2 font-medium text-brand-brown">{item.component}</td>
-                                  <td className="py-4 text-center px-2 text-brand-brown-muted font-mono">{item.quantity} {item.unit}</td>
-                                  <td className="py-4 text-right px-2 text-brand-brown-muted font-mono">{item.unitPrice.toLocaleString()}</td>
-                                  <td className="py-4 text-right px-2 font-bold text-brand-brown font-mono">{item.total.toLocaleString()}</td>
+                                  <td className="py-4 px-2 font-medium text-[#0C1B3A]">{item.component}</td>
+                                  <td className="py-4 text-center px-2 text-slate-600 font-mono-label">{item.quantity} {item.unit}</td>
+                                  <td className="py-4 text-right px-2 text-slate-600 font-mono-label">{item.unitPrice.toLocaleString()}</td>
+                                  <td className="py-4 text-right px-2 font-bold text-[#0C1B3A] font-mono-label">{item.total.toLocaleString()}</td>
                                 </tr>
                               ))}
                             </tbody>
                             <tfoot>
-                              <tr className="bg-brand-beige/5 font-bold">
-                                <td colSpan={3} className="py-3 text-right text-[9px] uppercase tracking-widest px-2">Module Subtotal</td>
-                                <td className="py-3 text-right text-brand-brown font-mono px-2">
+                              <tr className="bg-[#F8F9FB]/5 font-bold">
+                                <td colSpan={3} className="py-3 text-right text-xs px-2">Module Subtotal</td>
+                                <td className="py-3 text-right text-[#0C1B3A] font-mono-label px-2">
                                   {(items as any[]).reduce((sum: number, i: any) => sum + i.total, 0).toLocaleString()}
                                 </td>
                               </tr>
@@ -8073,17 +8074,17 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     ))}
                   </div>
 
-                  <div className="mt-12 pt-8 border-t-4 border-brand-brown">
-                    <div className="flex justify-between items-center bg-brand-beige/10 p-6 rounded-2xl">
-                      <span className="text-[10px] font-bold text-brand-brown uppercase tracking-[0.3em]">{t('Total Materials Subtotal')}</span>
-                      <span className="text-3xl font-serif italic text-brand-brown">{costs.material.toLocaleString()} <span className="text-[10px] font-sans font-bold uppercase tracking-widest not-italic ml-2 font-mono">AED</span></span>
+                  <div className="mt-12 pt-8 border-t-4 border-[#0C1B3A]">
+                    <div className="flex justify-between items-center bg-[#F8F9FB]/10 p-6 rounded-[10px]">
+                      <span className="text-xs font-bold text-[#0C1B3A] ">{t('Total Materials Subtotal')}</span>
+                      <span className="text-3xl italic text-[#0C1B3A]">{costs.material.toLocaleString()} <span className="text-xs font-sans font-bold not-italic ml-2 font-mono-label">AED</span></span>
                     </div>
                   </div>
                 </section>
 
-                <section className="grid grid-cols-1 sm:grid-cols-2 gap-10 sm:gap-16 pt-12 border-t border-brand-beige">
+                <section className="grid grid-cols-1 sm:grid-cols-2 gap-10 sm:gap-16 pt-12 border-t border-[rgba(12,27,58,0.1)]">
                   <div className="space-y-6">
-                     <h4 className="text-[10px] font-bold text-brand-brown uppercase tracking-[0.2em] mb-4 italic">{t('Operational Overheads')}</h4>
+                     <h4 className="text-xs font-bold text-[#0C1B3A] mb-4 italic">{t('Operational Overheads')}</h4>
                      <div className="space-y-3 text-xs">
                        {[
                          { label: t('Labor'), key: 'labor' },
@@ -8091,57 +8092,57 @@ Leave a field as empty string if not present. Never fabricate values.`;
                          { label: t('Transport'), key: 'transport' },
                          { label: t('Installation'), key: 'installation' },
                        ].map(field => (
-                         <div key={field.key} className="flex justify-between items-center border-b border-brand-beige pb-2">
-                           <span className="text-brand-brown-muted font-medium">{field.label}</span>
+                         <div key={field.key} className="flex justify-between items-center border-b border-[rgba(12,27,58,0.1)] pb-2">
+                           <span className="text-slate-600 font-medium">{field.label}</span>
                            <div className="flex items-center gap-2">
                              <input 
                                type="number" 
                                value={costOverrides[field.key as keyof typeof costOverrides]} 
                                onChange={e => setCostOverrides(prev => ({ ...prev, [field.key]: Number(e.target.value) }))}
-                               className="w-20 bg-brand-beige/20 text-right font-mono text-brand-brown px-2 py-1 rounded focus:outline-none focus:bg-brand-gold/10 transition-colors"
+                               className="w-20 bg-[#F8F9FB]/20 text-right font-mono-label text-[#0C1B3A] px-2 py-1 rounded focus:outline-none focus:bg-[#080D1E]/10 transition-colors"
                              />
-                             <span className="text-[9px] opacity-40">AED</span>
+                             <span className="text-xs opacity-40">AED</span>
                            </div>
                          </div>
                        ))}
                      </div>
                   </div>
                   <div className="space-y-6">
-                     <h4 className="text-[10px] font-bold text-brand-brown uppercase tracking-[0.2em] mb-4 italic">{t('Financial Summary')}</h4>
+                     <h4 className="text-xs font-bold text-[#0C1B3A] mb-4 italic">{t('Financial Summary')}</h4>
                      <div className="space-y-4">
                        <div className="flex justify-between items-center text-xs">
-                          <span className="text-brand-brown-muted">{t('Margin (%)')}</span>
+                          <span className="text-slate-600">{t('Margin (%)')}</span>
                           <input 
                             type="number" 
                             value={costOverrides.marginPercent} 
                             onChange={e => setCostOverrides(prev => ({ ...prev, marginPercent: Number(e.target.value) }))}
-                            className="w-16 bg-brand-beige/20 text-right font-mono text-brand-brown px-2 py-1 rounded focus:outline-none focus:bg-brand-gold/10 transition-colors"
+                            className="w-16 bg-[#F8F9FB]/20 text-right font-mono-label text-[#0C1B3A] px-2 py-1 rounded focus:outline-none focus:bg-[#080D1E]/10 transition-colors"
                           />
                        </div>
-                       <div className="flex justify-between text-xs pt-1 border-t border-brand-beige/30">
-                         <span className="text-brand-brown-muted italic">{t('Margin Amt')}</span>
-                         <span className="font-mono text-brand-brown font-bold">{costs.margin.toLocaleString()}</span>
+                       <div className="flex justify-between text-xs pt-1 border-t border-[rgba(12,27,58,0.1)]/30">
+                         <span className="text-slate-600 italic">{t('Margin Amt')}</span>
+                         <span className="font-mono-label text-[#0C1B3A] font-bold">{costs.margin.toLocaleString()}</span>
                        </div>
-                       <div className="flex justify-between text-sm pt-6 font-bold border-t border-brand-brown/10 mt-4">
-                         <span className="uppercase tracking-widest text-[10px]">{t('Net (Excl. VAT)')}</span>
-                         <span className="font-mono text-brand-brown">{(costs.total / (1 + costOverrides.vatPercent/100)).toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                       <div className="flex justify-between text-sm pt-6 font-bold border-t border-[#0C1B3A]/10 mt-4">
+                         <span className=" text-xs">{t('Net (Excl. VAT)')}</span>
+                         <span className="font-mono-label text-[#0C1B3A]">{(costs.total / (1 + costOverrides.vatPercent/100)).toLocaleString(undefined,{maximumFractionDigits:0})}</span>
                        </div>
-                       <div className="flex justify-between items-center text-[10px] text-brand-brown-muted italic mt-1 font-medium">
+                       <div className="flex justify-between items-center text-xs text-slate-600 italic mt-1 font-medium">
                          <span>{t('VAT (%)')}</span>
                          <input 
                             type="number" 
                             value={costOverrides.vatPercent} 
                             onChange={e => setCostOverrides(prev => ({ ...prev, vatPercent: Number(e.target.value) }))}
-                            className="w-14 bg-brand-beige/10 text-right font-mono italic px-2 py-0.5 rounded focus:outline-none"
+                            className="w-14 bg-[#F8F9FB]/10 text-right font-mono-label italic px-2 py-0.5 rounded focus:outline-none"
                           />
                        </div>
-                       <div className="flex justify-between text-[10px] text-brand-brown-muted italic font-medium">
+                       <div className="flex justify-between text-xs text-slate-600 italic font-medium">
                          <span>{t('VAT Amt')}</span>
-                         <span className="font-mono italic">{costs.vat.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                         <span className="font-mono-label italic">{costs.vat.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
                        </div>
-                       <div className="mt-8 p-6 bg-brand-brown text-brand-ivory rounded-[32px] flex justify-between items-center shadow-2xl shadow-brand-brown/20 border border-brand-gold/30 transition-all duration-700">
-                          <span className="text-[10px] font-bold uppercase tracking-[0.3em]">{t('Gross Quote')}</span>
-                          <span className="text-3xl font-serif italic tracking-tighter text-brand-gold">{costs.total.toLocaleString(undefined, {maximumFractionDigits:0})} <span className="text-sm not-italic opacity-60">AED</span></span>
+                       <div className="mt-8 p-6 bg-[#080D1E] text-white rounded-[10px] flex justify-between items-center shadow-2xl shadow-brand-brown/20 border border-[#A07F3C]/30 transition-all duration-700">
+                          <span className="text-xs font-bold ">{t('Gross Quote')}</span>
+                          <span className="text-3xl italic tracking-tighter text-[#7A5F2A]">{costs.total.toLocaleString(undefined, {maximumFractionDigits:0})} <span className="text-sm not-italic opacity-60">AED</span></span>
                        </div>
                      </div>
                   </div>
@@ -8152,7 +8153,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
             {/* Step 5 marker — final action row */}
             <div className="flex items-center gap-2 justify-center mb-3">
               <div className="h-px flex-1 bg-[#0C1B3A]/8" />
-              <span className="text-[8px] font-black uppercase tracking-[0.3em] text-[#C9A84C] px-3">{t('Step 5 · Final Actions')}</span>
+              <span className="text-xs font-bold text-[#7A5F2A] px-3">{t('Step 5 · Final Actions')}</span>
               <div className="h-px flex-1 bg-[#0C1B3A]/8" />
             </div>
 
@@ -8160,27 +8161,27 @@ Leave a field as empty string if not present. Never fabricate values.`;
               {quoteMode === 'package' ? (
                 <button
                   onClick={addToPackage}
-                  className="flex-1 p-6 rounded-[28px] bg-brand-gold text-brand-ivory flex justify-center items-center gap-4 font-bold uppercase tracking-widest text-xs shadow-xl shadow-brand-gold/20 hover:bg-brand-gold/90 transition-all active:scale-95 group"
+                  className="flex-1 p-6 rounded-md bg-[#080D1E] text-white flex justify-center items-center gap-4 font-bold text-xs shadow-xl shadow-brand-gold/20 hover:bg-[#080D1E]/90 transition-all active:scale-95 group"
                 >
                   <PlusCircle className="w-5 h-5 text-white group-hover:scale-110 transition-transform" /> {t('Add to Project Package')}
                 </button>
               ) : (
-                <button onClick={saveToHistory} className="flex-1 p-6 rounded-[28px] bg-white border border-brand-gold text-brand-brown flex justify-center items-center gap-4 font-bold uppercase tracking-widest text-xs hover:bg-brand-gold/10 transition-all active:scale-95 group">
-                  <Archive className="w-5 h-5 text-brand-gold group-hover:scale-110 transition-transform" /> {t('Save Record')}
+                <button onClick={saveToHistory} className="flex-1 p-6 rounded-md bg-white border border-[#A07F3C] text-[#0C1B3A] flex justify-center items-center gap-4 font-bold text-xs hover:bg-[#080D1E]/10 transition-all active:scale-95 group">
+                  <Archive className="w-5 h-5 text-[#7A5F2A] group-hover:scale-110 transition-transform" /> {t('Save Record')}
                 </button>
               )}
-             <button onClick={() => window.print()} className="flex-1 p-6 rounded-[28px] bg-white border border-brand-brown text-brand-brown flex justify-center items-center gap-4 font-bold uppercase tracking-widest text-xs hover:bg-brand-beige/30 transition-all active:scale-95 group">
-               <Printer className="w-5 h-5 text-brand-gold group-hover:scale-110 transition-transform" /> {t('Print Spec')}
+             <button onClick={() => window.print()} className="flex-1 p-6 rounded-md bg-white border border-[#0C1B3A] text-[#0C1B3A] flex justify-center items-center gap-4 font-bold text-xs hover:bg-[#F8F9FB]/30 transition-all active:scale-95 group">
+               <Printer className="w-5 h-5 text-[#7A5F2A] group-hover:scale-110 transition-transform" /> {t('Print Spec')}
              </button>
-             <button onClick={generatePDF} className="flex-1 p-6 rounded-[28px] bg-white border border-brand-gold text-brand-gold flex justify-center items-center gap-4 font-bold uppercase tracking-widest text-xs hover:bg-brand-gold/10 transition-all active:scale-95 group">
-               <Download className="w-5 h-5 text-brand-gold group-hover:scale-110 transition-transform" /> {t('Download PDF')}
+             <button onClick={generatePDF} className="flex-1 p-6 rounded-md bg-white border border-[#A07F3C] text-[#7A5F2A] flex justify-center items-center gap-4 font-bold text-xs hover:bg-[#080D1E]/10 transition-all active:scale-95 group">
+               <Download className="w-5 h-5 text-[#7A5F2A] group-hover:scale-110 transition-transform" /> {t('Download PDF')}
              </button>
-             <button onClick={() => alert(t('Quotation sent message'))} className="flex-1 p-6 rounded-[28px] bg-brand-brown text-brand-ivory flex justify-center items-center gap-4 font-bold uppercase tracking-widest text-xs shadow-xl shadow-brand-brown/20 hover:bg-brand-brown/90 transition-all active:scale-95 group">
-               <Download className="w-5 h-5 text-brand-gold group-hover:translate-y-1 transition-transform" /> {t('Sync to CRM')}
+             <button onClick={() => alert(t('Quotation sent message'))} className="flex-1 p-6 rounded-md bg-[#080D1E] text-white flex justify-center items-center gap-4 font-bold text-xs shadow-xl shadow-brand-brown/20 hover:bg-[#080D1E]/90 transition-all active:scale-95 group">
+               <Download className="w-5 h-5 text-[#7A5F2A] group-hover:translate-y-1 transition-transform" /> {t('Sync to CRM')}
              </button>
              {canTrade && (
-             <button onClick={sendToTrade} className="flex-1 p-6 rounded-[28px] bg-[#0C1B3A] text-[#C9A84C] flex justify-center items-center gap-4 font-bold uppercase tracking-widest text-xs shadow-xl hover:bg-[#0F2551] transition-all active:scale-95 group border border-[#C9A84C]/30">
-               <ExternalLink className="w-5 h-5 text-[#C9A84C] group-hover:translate-x-1 transition-transform" /> {t('Send to TRADE')}
+             <button onClick={sendToTrade} className="flex-1 p-6 rounded-md bg-[#0C1B3A] text-[#7A5F2A] flex justify-center items-center gap-4 font-bold text-xs shadow-xl hover:bg-[#0F2551] transition-all active:scale-95 group border border-[#C9A84C]/30">
+               <ExternalLink className="w-5 h-5 text-[#7A5F2A] group-hover:translate-x-1 transition-transform" /> {t('Send to TRADE')}
              </button>
              )}
              {/* Print Only View (English) */}
@@ -8281,8 +8282,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'dimensions':
           return (
             <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Ruler className="w-3 h-3 text-brand-gold" /> 尺寸规格 (mm)
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Ruler className="w-3 h-3 text-[#7A5F2A]" /> 尺寸规格 (mm)
               </h3>
               <div className="grid grid-cols-1 gap-8">
                 {[
@@ -8292,12 +8293,12 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   { label: t('Back Height Label'), key: 'backHeight' }
                 ].map(f => (
                   <div key={f.key} className="space-y-3">
-                    <label className="text-[9px] font-bold text-brand-brown-muted uppercase tracking-[0.15em]">{f.label}</label>
+                    <label className="text-xs font-bold text-slate-600 ">{f.label}</label>
                     <input
                       type="number"
                       value={chairConfig[f.key as keyof ChairConfiguration] as number}
                       onChange={e => updateChairConfig({ [f.key]: Number(e.target.value) })}
-                      className="w-full bg-transparent border-b border-brand-brown/10 text-2xl font-serif italic text-brand-brown focus:border-brand-gold outline-none pb-2"
+                      className="w-full bg-transparent border-b border-[#0C1B3A]/10 text-2xl italic text-[#0C1B3A] focus:border-[#A07F3C] outline-none pb-2"
                     />
                   </div>
                 ))}
@@ -8307,17 +8308,17 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'type':
           return (
             <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Layout className="w-3 h-3 text-brand-gold" /> {t('Chair Type')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Layout className="w-3 h-3 text-[#7A5F2A]" /> {t('Chair Type')}
               </h3>
               <div className="grid grid-cols-1 gap-4">
                 {Object.values(ChairType).map(tVal => (
                   <button
                     key={tVal}
                     onClick={() => updateChairConfig({ type: tVal })}
-                    className={`p-10 text-left border rounded-[32px] font-bold text-xs uppercase tracking-widest transition-all relative group ${chairConfig.type === tVal ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-10 text-left border rounded-md font-bold text-xs transition-all relative group ${chairConfig.type === tVal ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
-                    <span className="block text-xl font-serif italic">{t(tVal)}</span>
+                    <span className="block text-xl italic">{t(tVal)}</span>
                   </button>
                 ))}
               </div>
@@ -8326,15 +8327,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'frame':
           return (
             <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Square className="w-3 h-3 text-brand-gold" /> {t('Frame Material')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Square className="w-3 h-3 text-[#7A5F2A]" /> {t('Frame Material')}
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 {[Material.SOLID_WOOD, Material.METAL, Material.PLYWOOD].map(m => (
                   <button
                     key={m}
                     onClick={() => updateChairConfig({ frameMaterial: m })}
-                    className={`p-6 text-center border rounded-[24px] font-bold text-xs uppercase tracking-widest ${chairConfig.frameMaterial === m ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-6 text-center border rounded-md font-bold text-xs ${chairConfig.frameMaterial === m ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
                     {t(m)}
                   </button>
@@ -8345,15 +8346,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'legs':
           return (
             <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Columns className="w-3 h-3 text-brand-gold" /> {t('Leg Type')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Columns className="w-3 h-3 text-[#7A5F2A]" /> {t('Leg Type')}
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 {Object.values(LegType).map(l => (
                   <button
                     key={l}
                     onClick={() => updateChairConfig({ legType: l })}
-                    className={`p-6 text-center border rounded-[24px] font-bold text-xs uppercase tracking-widest ${chairConfig.legType === l ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-6 text-center border rounded-md font-bold text-xs ${chairConfig.legType === l ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
                     {t(l)}
                   </button>
@@ -8364,15 +8365,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'backrest':
           return (
              <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Layers className="w-3 h-3 text-brand-gold" /> {t('Backrest')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Layers className="w-3 h-3 text-[#7A5F2A]" /> {t('Backrest')}
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 {Object.values(BackrestType).map(b => (
                   <button
                     key={b}
                     onClick={() => updateChairConfig({ backrest: b })}
-                    className={`p-6 text-center border rounded-[24px] font-bold text-xs uppercase tracking-widest ${chairConfig.backrest === b ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-6 text-center border rounded-md font-bold text-xs ${chairConfig.backrest === b ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
                     {t(b)}
                   </button>
@@ -8383,15 +8384,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'seat':
           return (
              <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Archive className="w-3 h-3 text-brand-gold" /> {t('Seat')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Archive className="w-3 h-3 text-[#7A5F2A]" /> {t('Seat')}
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 {Object.values(SeatType).map(s => (
                   <button
                     key={s}
                     onClick={() => updateChairConfig({ seat: s })}
-                    className={`p-6 text-center border rounded-[24px] font-bold text-xs uppercase tracking-widest ${chairConfig.seat === s ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-6 text-center border rounded-md font-bold text-xs ${chairConfig.seat === s ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
                     {t(s)}
                   </button>
@@ -8402,15 +8403,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'upholstery':
           return (
              <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Palette className="w-3 h-3 text-brand-gold" /> {t('Upholstery')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Palette className="w-3 h-3 text-[#7A5F2A]" /> {t('Upholstery')}
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 {Object.values(SofaUpholsteryType).map(u => (
                   <button
                     key={u}
                     onClick={() => updateChairConfig({ upholstery: u })}
-                    className={`p-6 text-center border rounded-[24px] font-bold text-xs uppercase tracking-widest ${chairConfig.upholstery === u ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-6 text-center border rounded-md font-bold text-xs ${chairConfig.upholstery === u ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
                     {t(u)}
                   </button>
@@ -8421,15 +8422,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'armrest':
           return (
              <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Trello className="w-3 h-3 text-brand-gold" /> {t('Armrest')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Trello className="w-3 h-3 text-[#7A5F2A]" /> {t('Armrest')}
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 {Object.values(ArmrestType).map(a => (
                   <button
                     key={a}
                     onClick={() => updateChairConfig({ armrest: a })}
-                    className={`p-6 text-center border rounded-[24px] font-bold text-xs uppercase tracking-widest ${chairConfig.armrest === a ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-6 text-center border rounded-md font-bold text-xs ${chairConfig.armrest === a ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
                     {t(a)}
                   </button>
@@ -8440,15 +8441,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'finish':
           return (
              <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Palette className="w-3 h-3 text-brand-gold" /> {t('Finish')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Palette className="w-3 h-3 text-[#7A5F2A]" /> {t('Finish')}
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 {Object.values(FinishType).map(f => (
                   <button
                     key={f}
                     onClick={() => updateChairConfig({ finish: f })}
-                    className={`p-6 text-center border rounded-[24px] font-bold text-xs uppercase tracking-widest ${chairConfig.finish === f ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-6 text-center border rounded-md font-bold text-xs ${chairConfig.finish === f ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
                     {t(f)}
                   </button>
@@ -8459,29 +8460,29 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'color':
           return (
             <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Palette className="w-3 h-3 text-brand-gold" /> {t('Color')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Palette className="w-3 h-3 text-[#7A5F2A]" /> {t('Color')}
               </h3>
               <div className="grid grid-cols-5 gap-4">
                 {Object.values(Color).map(c => (
                   <button
                     key={c}
                     onClick={() => updateChairConfig({ color: c })}
-                    className={`h-16 rounded-3xl border-2 transition-all flex items-center justify-center relative group ${chairConfig.color === c ? 'border-brand-gold scale-110 shadow-lg' : 'border-transparent hover:border-brand-beige'}`}
+                    className={`h-16 rounded-md border-2 transition-all flex items-center justify-center relative group ${chairConfig.color === c ? 'border-[#A07F3C] scale-110 shadow-lg' : 'border-transparent hover:border-[rgba(12,27,58,0.1)]'}`}
                     style={{ backgroundColor: c === Color.WHITE ? '#FFFFFF' : c === Color.BEIGE ? '#F5F5DC' : c === Color.WALNUT ? '#5D4037' : c === Color.GREY ? '#808080' : '#CCCCCC' }}
                   >
-                    {chairConfig.color === c && <PlusCircle className={`w-4 h-4 ${c === Color.WHITE || c === Color.BEIGE ? 'text-brand-gold' : 'text-brand-ivory'}`} />}
+                    {chairConfig.color === c && <PlusCircle className={`w-4 h-4 ${c === Color.WHITE || c === Color.BEIGE ? 'text-[#7A5F2A]' : 'text-white'}`} />}
                   </button>
                 ))}
               </div>
               {chairConfig.color === Color.CUSTOM && (
-                <div className="mt-8 p-6 bg-white border border-brand-beige rounded-[32px]">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-brand-gold block mb-2">Custom Color RAL/Pantone</label>
+                <div className="mt-8 p-6 bg-white border border-[rgba(12,27,58,0.1)] rounded-[10px]">
+                  <label className="text-xs font-bold text-[#7A5F2A] block mb-2">Custom Color RAL/Pantone</label>
                   <input
                     type="text"
                     value={chairConfig.customColor || ''}
                     onChange={e => updateChairConfig({ customColor: e.target.value })}
-                    className="w-full bg-transparent border-b border-brand-beige py-2 px-1 focus:border-brand-gold outline-none"
+                    className="w-full bg-transparent border-b border-[rgba(12,27,58,0.1)] py-2 px-1 focus:border-[#A07F3C] outline-none"
                     placeholder="e.g. RAL 7016"
                   />
                 </div>
@@ -8491,17 +8492,17 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'addons':
           return (
             <div className="space-y-8">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <PlusCircle className="w-3 h-3 text-brand-gold" /> {t('Add-ons')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <PlusCircle className="w-3 h-3 text-[#7A5F2A]" /> {t('Add-ons')}
               </h3>
               <div className="grid grid-cols-1 gap-4">
                 {Object.values(AddOn).map(a => (
                   <button
                     key={a}
                     onClick={() => toggleChairAddOn(a)}
-                    className={`p-8 text-left border rounded-[32px] flex justify-between items-center transition-all ${chairConfig.addOns.includes(a) ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-xl' : 'bg-white text-brand-brown border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-8 text-left border rounded-md flex justify-between items-center transition-all ${chairConfig.addOns.includes(a) ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-xl' : 'bg-white text-[#0C1B3A] border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
-                    <span className="text-xl font-serif italic">{t(a)}</span>
+                    <span className="text-xl italic">{t(a)}</span>
                   </button>
                 ))}
               </div>
@@ -8516,15 +8517,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'shape':
           return (
             <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Layout className="w-3 h-3 text-brand-gold" /> {t('Shape')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Layout className="w-3 h-3 text-[#7A5F2A]" /> {t('Shape')}
               </h3>
               <div className="grid grid-cols-3 gap-4">
                 {Object.values(TableShape).map(s => (
                   <button
                     key={s}
                     onClick={() => updateDiningTableConfig({ shape: s })}
-                    className={`p-6 text-center border rounded-[24px] font-bold text-xs uppercase tracking-widest ${diningTableConfig.shape === s ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-6 text-center border rounded-md font-bold text-xs ${diningTableConfig.shape === s ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
                     {t(s)}
                   </button>
@@ -8535,28 +8536,28 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'material':
           return (
             <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Layers className="w-3 h-3 text-brand-gold" /> {t('Top Material')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Layers className="w-3 h-3 text-[#7A5F2A]" /> {t('Top Material')}
               </h3>
               <div className="grid grid-cols-3 gap-4">
                 {[Material.SOLID_WOOD, Material.MARBLE, Material.GLASS, Material.PLYWOOD].map(m => (
                   <button
                     key={m}
                     onClick={() => updateDiningTableConfig({ topMaterial: m })}
-                    className={`p-6 text-center border rounded-[24px] font-bold text-xs uppercase tracking-widest ${diningTableConfig.topMaterial === m ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-6 text-center border rounded-md font-bold text-xs ${diningTableConfig.topMaterial === m ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
                     {t(m)}
                   </button>
                 ))}
               </div>
               <div className="mt-8">
-                <label className="text-[9px] font-bold text-brand-brown-muted uppercase tracking-[0.15em] mb-3 block">{t('Thickness_Label')} (mm)</label>
+                <label className="text-xs font-bold text-slate-600 mb-3 block">{t('Thickness_Label')} (mm)</label>
                 <div className="grid grid-cols-3 gap-4">
                   {Object.values(Thickness).map(th => (
                     <button
                       key={th}
                       onClick={() => updateDiningTableConfig({ thickness: th })}
-                      className={`p-4 border rounded-xl text-[10px] font-bold ${diningTableConfig.thickness === th ? 'bg-brand-gold text-white' : 'bg-white text-brand-brown border-brand-beige'}`}
+                      className={`p-4 border rounded-md text-xs font-bold ${diningTableConfig.thickness === th ? 'bg-[#080D1E] text-white' : 'bg-white text-[#0C1B3A] border-[rgba(12,27,58,0.1)]'}`}
                     >
                       {t(th)}
                     </button>
@@ -8568,15 +8569,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'legs':
           return (
             <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Columns className="w-3 h-3 text-brand-gold" /> {t('Base/Legs')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Columns className="w-3 h-3 text-[#7A5F2A]" /> {t('Base/Legs')}
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 {Object.values(TableBaseType).map(b => (
                   <button
                     key={b}
                     onClick={() => updateDiningTableConfig({ baseType: b })}
-                    className={`p-6 text-center border rounded-[24px] font-bold text-xs uppercase tracking-widest ${diningTableConfig.baseType === b ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-6 text-center border rounded-md font-bold text-xs ${diningTableConfig.baseType === b ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
                     {t(b)}
                   </button>
@@ -8587,15 +8588,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'edge':
           return (
              <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Ruler className="w-3 h-3 text-brand-gold" /> {t('Edge Treatment')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Ruler className="w-3 h-3 text-[#7A5F2A]" /> {t('Edge Treatment')}
               </h3>
               <div className="grid grid-cols-3 gap-4">
                 {Object.values(EdgeTreatment).map(e => (
                   <button
                     key={e}
                     onClick={() => updateDiningTableConfig({ edge: e })}
-                    className={`p-6 text-center border rounded-[24px] font-bold text-xs uppercase tracking-widest ${diningTableConfig.edge === e ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-6 text-center border rounded-md font-bold text-xs ${diningTableConfig.edge === e ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
                     {t(e)}
                   </button>
@@ -8606,8 +8607,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'dimensions':
           return (
             <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Ruler className="w-3 h-3 text-brand-gold" /> {t('Dimensions (mm)')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Ruler className="w-3 h-3 text-[#7A5F2A]" /> {t('Dimensions (mm)')}
               </h3>
               <div className="grid grid-cols-1 gap-8">
                 {[
@@ -8616,24 +8617,24 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   { label: t('Height Label'), key: 'height' }
                 ].map(f => (
                   <div key={f.key} className="space-y-3">
-                    <label className="text-[9px] font-bold text-brand-brown-muted uppercase tracking-[0.15em]">{f.label}</label>
+                    <label className="text-xs font-bold text-slate-600 ">{f.label}</label>
                     <input
                       type="number"
                       value={diningTableConfig[f.key as keyof DiningTableConfiguration] as number}
                       onChange={e => updateDiningTableConfig({ [f.key]: Number(e.target.value) })}
-                      className="w-full bg-transparent border-b border-brand-brown/10 text-2xl font-serif italic text-brand-brown focus:border-brand-gold outline-none pb-2"
+                      className="w-full bg-transparent border-b border-[#0C1B3A]/10 text-2xl italic text-[#0C1B3A] focus:border-[#A07F3C] outline-none pb-2"
                     />
                   </div>
                 ))}
               </div>
               <div className="mt-8">
-                <label className="text-[9px] font-bold text-brand-brown-muted uppercase tracking-[0.15em] mb-3 block">{t('Thickness_Label')} (mm)</label>
+                <label className="text-xs font-bold text-slate-600 mb-3 block">{t('Thickness_Label')} (mm)</label>
                 <div className="grid grid-cols-3 gap-4">
                   {Object.values(Thickness).map(th => (
                     <button
                       key={th}
                       onClick={() => updateDiningTableConfig({ thickness: th })}
-                      className={`p-4 border rounded-xl text-[10px] font-bold ${diningTableConfig.thickness === th ? 'bg-brand-gold text-white' : 'bg-white text-brand-brown border-brand-beige'}`}
+                      className={`p-4 border rounded-md text-xs font-bold ${diningTableConfig.thickness === th ? 'bg-[#080D1E] text-white' : 'bg-white text-[#0C1B3A] border-[rgba(12,27,58,0.1)]'}`}
                     >
                       {t(th)}
                     </button>
@@ -8645,15 +8646,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'finish':
           return (
             <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Palette className="w-3 h-3 text-brand-gold" /> {t('Project Finish')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Palette className="w-3 h-3 text-[#7A5F2A]" /> {t('Project Finish')}
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 {Object.values(FinishType).map(f => (
                   <button
                     key={f}
                     onClick={() => updateDiningTableConfig({ finish: f })}
-                    className={`p-6 text-center border rounded-[24px] font-bold text-xs uppercase tracking-widest ${diningTableConfig.finish === f ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-6 text-center border rounded-md font-bold text-xs ${diningTableConfig.finish === f ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
                     {t(f)}
                   </button>
@@ -8664,18 +8665,18 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'color':
           return (
             <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Palette className="w-3 h-3 text-brand-gold" /> 颜色方案 Color
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Palette className="w-3 h-3 text-[#7A5F2A]" /> 颜色方案 Color
               </h3>
               <div className="grid grid-cols-5 gap-4">
                 {Object.values(Color).map(c => (
                   <button
                     key={c}
                     onClick={() => updateDiningTableConfig({ color: c })}
-                    className={`h-16 rounded-3xl border-2 transition-all flex items-center justify-center relative group ${diningTableConfig.color === c ? 'border-brand-gold scale-110 shadow-lg' : 'border-transparent hover:border-brand-beige'}`}
+                    className={`h-16 rounded-md border-2 transition-all flex items-center justify-center relative group ${diningTableConfig.color === c ? 'border-[#A07F3C] scale-110 shadow-lg' : 'border-transparent hover:border-[rgba(12,27,58,0.1)]'}`}
                     style={{ backgroundColor: c === Color.WHITE ? '#FFFFFF' : c === Color.BEIGE ? '#F5F5DC' : c === Color.WALNUT ? '#5D4037' : c === Color.GREY ? '#808080' : '#CCCCCC' }}
                   >
-                    {diningTableConfig.color === c && <PlusCircle className={`w-4 h-4 ${c === Color.WHITE || c === Color.BEIGE ? 'text-brand-gold' : 'text-brand-ivory'}`} />}
+                    {diningTableConfig.color === c && <PlusCircle className={`w-4 h-4 ${c === Color.WHITE || c === Color.BEIGE ? 'text-[#7A5F2A]' : 'text-white'}`} />}
                   </button>
                 ))}
               </div>
@@ -8689,16 +8690,16 @@ Leave a field as empty string if not present. Never fabricate values.`;
       if (stepId === 'modules') {
         return (
           <div className="space-y-12">
-            <div className="flex justify-between items-center bg-brand-beige/10 p-6 rounded-[32px] border border-brand-beige">
+            <div className="flex justify-between items-center bg-[#F8F9FB]/10 p-6 rounded-[10px] border border-[rgba(12,27,58,0.1)]">
               <div className="space-y-1">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Layout className="w-3 h-3 text-brand-gold" /> {t('Module Management')}
+                <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Layout className="w-3 h-3 text-[#7A5F2A]" /> {t('Module Management')}
               </h3>
-                <p className="text-[8px] text-brand-brown-muted uppercase tracking-widest italic">Add multiple components to build your custom storage system</p>
+                <p className="text-xs text-slate-600 italic">Add multiple components to build your custom storage system</p>
               </div>
               <button 
                 onClick={handleAddModule}
-                className="flex items-center gap-2 px-8 py-4 rounded-full bg-brand-gold text-brand-ivory text-[10px] font-bold uppercase tracking-widest hover:bg-brand-gold/90 transition-all shadow-xl shadow-brand-gold/20 active:scale-95"
+                className="flex items-center gap-2 px-8 py-4 rounded-full bg-[#080D1E] text-white text-xs font-bold hover:bg-[#080D1E]/90 transition-all shadow-xl shadow-brand-gold/20 active:scale-95"
               >
                 <PlusCircle className="w-4 h-4" /> {t('Add Module')}
               </button>
@@ -8706,13 +8707,13 @@ Leave a field as empty string if not present. Never fabricate values.`;
 
             <div className="space-y-6">
               {modularConfig.modules.length === 0 ? (
-                <div className="py-24 border-2 border-dashed border-brand-beige rounded-[48px] text-center space-y-6 bg-brand-beige/5">
-                  <div className="w-20 h-20 bg-brand-beige/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Package className="w-10 h-10 text-brand-gold/40" />
+                <div className="py-24 border-2 border-dashed border-[rgba(12,27,58,0.1)] rounded-[10px] text-center space-y-6 bg-[#F8F9FB]/5">
+                  <div className="w-20 h-20 bg-[#F8F9FB]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Package className="w-10 h-10 text-[#7A5F2A]/40" />
                   </div>
                   <div className="space-y-2">
-                    <p className="text-brand-brown font-serif italic text-xl">Empty Configuration</p>
-                    <p className="text-brand-brown-muted text-[10px] uppercase tracking-widest font-bold">开始添加模块进行系统设计 Add modules to start designing</p>
+                    <p className="text-[#0C1B3A] italic text-xl">Empty Configuration</p>
+                    <p className="text-slate-600 text-xs font-bold">开始添加模块进行系统设计 Add modules to start designing</p>
                   </div>
                 </div>
               ) : (
@@ -8723,49 +8724,49 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       layout
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="bg-white p-10 rounded-[40px] border border-brand-beige shadow-sm hover:shadow-xl transition-all group relative overflow-hidden"
+                      className="bg-white p-10 rounded-[10px] border border-[rgba(12,27,58,0.1)] shadow-sm hover:shadow-xl transition-all group relative overflow-hidden"
                     >
                       <div className="flex justify-between items-start mb-10 relative z-10">
                         <div className="space-y-2">
                           <div className="flex items-center gap-3">
-                            <span className="px-3 py-1 bg-brand-gold/10 text-brand-gold text-[8px] font-bold rounded-full uppercase tracking-widest">
+                            <span className="px-3 py-1 bg-[#080D1E]/10 text-[#7A5F2A] text-xs font-bold rounded-full ">
                               M-{idx + 1}
                             </span>
-                            <span className="text-[9px] font-bold text-brand-brown-muted uppercase tracking-[0.2em]">Qty: {module.quantity}</span>
+                            <span className="text-xs font-bold text-slate-600 ">Qty: {module.quantity}</span>
                           </div>
-                          <h4 className="text-2xl font-serif italic text-brand-brown pr-20">{t(module.type)}</h4>
+                          <h4 className="text-2xl italic text-[#0C1B3A] pr-20">{t(module.type)}</h4>
                         </div>
                         <div className="flex gap-3 relative z-20">
-                          <button onClick={() => handleDuplicateModule(module)} className="p-3 rounded-2xl bg-brand-beige/20 hover:bg-brand-gold/10 text-brand-brown hover:text-brand-gold transition-all" title="Duplicate"><Layers className="w-4 h-4" /></button>
-                          <button onClick={() => handleEditModule(module)} className="p-3 rounded-2xl bg-brand-beige/20 hover:bg-brand-gold/10 text-brand-brown hover:text-brand-gold transition-all" title="Edit"><Settings className="w-4 h-4" /></button>
-                          <button onClick={() => handleDeleteModule(module.id)} className="p-3 rounded-2xl bg-brand-beige/20 hover:bg-red-50 text-brand-brown hover:text-red-400 transition-all" title="Delete"><X className="w-4 h-4" /></button>
+                          <button onClick={() => handleDuplicateModule(module)} className="p-3 rounded-md bg-[#F8F9FB]/20 hover:bg-[#080D1E]/10 text-[#0C1B3A] hover:text-[#7A5F2A] transition-all" title="Duplicate"><Layers className="w-4 h-4" /></button>
+                          <button onClick={() => handleEditModule(module)} className="p-3 rounded-md bg-[#F8F9FB]/20 hover:bg-[#080D1E]/10 text-[#0C1B3A] hover:text-[#7A5F2A] transition-all" title="Edit"><Settings className="w-4 h-4" /></button>
+                          <button onClick={() => handleDeleteModule(module.id)} className="p-3 rounded-md bg-[#F8F9FB]/20 hover:bg-red-50 text-[#0C1B3A] hover:text-red-600 transition-all" title="Delete"><X className="w-4 h-4" /></button>
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-10 text-[10px] relative z-10">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-10 text-xs relative z-10">
                         <div className="space-y-2">
-                          <span className="text-brand-brown-muted uppercase font-bold tracking-[0.15em] block opacity-60">Dimensions (mm)</span>
-                          <span className="text-brand-brown font-mono text-lg font-medium">{module.width}w × {module.depth}d × {module.height}h</span>
+                          <span className="text-slate-600 font-bold block opacity-60">Dimensions (mm)</span>
+                          <span className="text-[#0C1B3A] font-mono-label text-lg font-medium">{module.width}w × {module.depth}d × {module.height}h</span>
                         </div>
                         <div className="space-y-3">
-                          <span className="text-brand-brown-muted uppercase font-bold tracking-[0.15em] block opacity-60">Board Material</span>
+                          <span className="text-slate-600 font-bold block opacity-60">Board Material</span>
                           <div className="space-y-1">
-                            <span className="text-brand-brown font-bold block">{t(module.material)}</span>
-                            <span className="text-[9px] text-brand-gold italic">{t(module.thickness)} Thickness</span>
+                            <span className="text-[#0C1B3A] font-bold block">{t(module.material)}</span>
+                            <span className="text-xs text-[#7A5F2A] italic">{t(module.thickness)} Thickness</span>
                           </div>
                         </div>
                         <div className="space-y-3">
-                          <span className="text-brand-brown-muted uppercase font-bold tracking-[0.15em] block opacity-60">Components</span>
+                          <span className="text-slate-600 font-bold block opacity-60">Components</span>
                           <div className="space-y-1">
-                             <span className="text-brand-brown block">{module.doorCount}x {t(module.doorType)}</span>
-                             {module.hasDrawers && <span className="text-brand-brown block">{module.drawerCount}x {t(module.runnerType)} Drawers</span>}
-                             <span className="text-brand-brown block">{module.shelfCount} Shelves</span>
-                             {module.hasHangingRail && <span className="text-brand-brown block">Hanging Rail</span>}
+                             <span className="text-[#0C1B3A] block">{module.doorCount}x {t(module.doorType)}</span>
+                             {module.hasDrawers && <span className="text-[#0C1B3A] block">{module.drawerCount}x {t(module.runnerType)} Drawers</span>}
+                             <span className="text-[#0C1B3A] block">{module.shelfCount} Shelves</span>
+                             {module.hasHangingRail && <span className="text-[#0C1B3A] block">Hanging Rail</span>}
                           </div>
                         </div>
                         <div className="space-y-3">
-                          <span className="text-brand-brown-muted uppercase font-bold tracking-[0.15em] block opacity-60">Mount / Hardware</span>
-                          <div className="space-y-1 text-brand-brown italic">
+                          <span className="text-slate-600 font-bold block opacity-60">Mount / Hardware</span>
+                          <div className="space-y-1 text-[#0C1B3A] italic">
                             <span>{t(module.mounting)} | {t(module.color)}</span>
                             <span className="block">{t(module.finish)}</span>
                             <span className="block">{t(module.handle)} | {t(module.hingeType)}</span>
@@ -8792,8 +8793,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'dimensions':
           return (
             <div className="space-y-12">
-               <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Ruler className="w-3 h-3 text-brand-gold" /> {t('Sofa Dimensions')} (mm)
+               <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Ruler className="w-3 h-3 text-[#7A5F2A]" /> {t('Sofa Dimensions')} (mm)
               </h3>
               <div className="grid grid-cols-1 gap-8">
                 {[
@@ -8803,12 +8804,12 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   { label: t('Back Height'), key: 'backHeight' }
                 ].map((field) => (
                   <div key={field.key} className="space-y-3">
-                    <label className="text-[9px] font-bold text-brand-brown-muted uppercase tracking-[0.15em]">{field.label}</label>
+                    <label className="text-xs font-bold text-slate-600 ">{field.label}</label>
                     <input
                       type="number"
                       value={sofaConfig[field.key as keyof SofaConfiguration] as number}
                       onChange={e => updateSofaConfig({ [field.key]: Number(e.target.value) })}
-                      className="w-full bg-transparent border-b border-brand-brown/10 text-2xl font-serif italic text-brand-brown focus:border-brand-gold outline-none pb-2 transition-colors"
+                      className="w-full bg-transparent border-b border-[#0C1B3A]/10 text-2xl italic text-[#0C1B3A] focus:border-[#A07F3C] outline-none pb-2 transition-colors"
                     />
                   </div>
                 ))}
@@ -8818,19 +8819,19 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'material':
           return (
             <div className="space-y-12">
-               <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Layers className="w-3 h-3 text-brand-gold" /> {t('Cushion & Foam')}
+               <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Layers className="w-3 h-3 text-[#7A5F2A]" /> {t('Cushion & Foam')}
               </h3>
               <div className="grid grid-cols-1 gap-4">
                 {Object.values(SofaCushionType).map(m => (
                   <button
                     key={m}
                     onClick={() => updateSofaConfig({ cushionType: m })}
-                    className={`p-10 text-left border rounded-[32px] font-bold text-xs uppercase tracking-widest transition-all overflow-hidden relative group ${sofaConfig.cushionType === m ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-10 text-left border rounded-md font-bold text-xs transition-all overflow-hidden relative group ${sofaConfig.cushionType === m ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
-                    <span className="block text-xl font-serif italic mb-2">{t(m)}</span>
-                    <span className={`text-[10px] opacity-60 ${sofaConfig.cushionType === m ? 'text-brand-gold' : 'text-brand-brown'}`}>+{SOFA_CUSHION_COSTS[m]} AED Base</span>
-                    {sofaConfig.cushionType === m && <div className="absolute top-0 right-0 p-4"><PlusCircle className="w-4 h-4 text-brand-gold" /></div>}
+                    <span className="block text-xl italic mb-2">{t(m)}</span>
+                    <span className={`text-xs opacity-60 ${sofaConfig.cushionType === m ? 'text-[#7A5F2A]' : 'text-[#0C1B3A]'}`}>+{SOFA_CUSHION_COSTS[m]} AED Base</span>
+                    {sofaConfig.cushionType === m && <div className="absolute top-0 right-0 p-4"><PlusCircle className="w-4 h-4 text-[#7A5F2A]" /></div>}
                   </button>
                 ))}
               </div>
@@ -8839,19 +8840,19 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'frame':
           return (
             <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Square className="w-3 h-3 text-brand-gold" /> {t('Frame')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Square className="w-3 h-3 text-[#7A5F2A]" /> {t('Frame')}
               </h3>
               <div className="grid grid-cols-2 gap-5">
                 {Object.values(SofaFrameType).map(f => (
                   <button
                     key={f}
                     onClick={() => updateSofaConfig({ frameType: f })}
-                    className={`p-10 text-left border rounded-[32px] transition-all relative group ${sofaConfig.frameType === f ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-xl' : 'bg-brand-beige/30 text-brand-brown border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-10 text-left border rounded-md transition-all relative group ${sofaConfig.frameType === f ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-xl' : 'bg-[#F8F9FB]/30 text-[#0C1B3A] border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
-                    <span className="block text-xl font-serif italic mb-2 tracking-tight">{t(f)}</span>
-                    <span className={`text-[10px] font-mono opacity-60 ${sofaConfig.frameType === f ? 'text-brand-gold' : 'text-brand-brown'}`}>+{SOFA_FRAME_COSTS[f]} AED</span>
-                    {sofaConfig.frameType === f && <div className="absolute top-0 right-0 p-4"><PlusCircle className="w-4 h-4 text-brand-gold" /></div>}
+                    <span className="block text-xl italic mb-2 tracking-tight">{t(f)}</span>
+                    <span className={`text-xs font-mono-label opacity-60 ${sofaConfig.frameType === f ? 'text-[#7A5F2A]' : 'text-[#0C1B3A]'}`}>+{SOFA_FRAME_COSTS[f]} AED</span>
+                    {sofaConfig.frameType === f && <div className="absolute top-0 right-0 p-4"><PlusCircle className="w-4 h-4 text-[#7A5F2A]" /></div>}
                   </button>
                 ))}
               </div>
@@ -8861,15 +8862,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
           return (
              <div className="space-y-12">
               <section className="space-y-8">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                  <Palette className="w-3 h-3 text-brand-gold" /> {t('Upholstery')}
+                <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                  <Palette className="w-3 h-3 text-[#7A5F2A]" /> {t('Upholstery')}
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   {Object.values(SofaUpholsteryType).map(f => (
                     <button
                       key={f}
                       onClick={() => updateSofaConfig({ upholsteryType: f })}
-                      className={`p-6 text-center border rounded-[24px] font-bold text-xs uppercase tracking-widest ${sofaConfig.upholsteryType === f ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                      className={`p-6 text-center border rounded-md font-bold text-xs ${sofaConfig.upholsteryType === f ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                     >
                       {t(f)}
                     </button>
@@ -8881,20 +8882,20 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'addons':
            return (
             <div className="space-y-8">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <PlusCircle className="w-3 h-3 text-brand-gold" /> {t('Add-ons')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <PlusCircle className="w-3 h-3 text-[#7A5F2A]" /> {t('Add-ons')}
               </h3>
               <div className="grid grid-cols-1 gap-4">
                 {Object.values(AddOn).map(a => (
                   <button
                     key={a}
                     onClick={() => toggleSofaAddOn(a)}
-                    className={`p-8 text-left border rounded-[32px] flex justify-between items-center transition-all ${sofaConfig.addOns.includes(a) ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-xl translate-x-3' : 'bg-white text-brand-brown border-brand-beige hover:border-brand-gold-muted hover:translate-x-1'}`}
+                    className={`p-8 text-left border rounded-md flex justify-between items-center transition-all ${sofaConfig.addOns.includes(a) ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-xl translate-x-3' : 'bg-white text-[#0C1B3A] border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted hover:translate-x-1'}`}
                   >
-                    <span className="text-xl font-serif italic">{t(a)}</span>
+                    <span className="text-xl italic">{t(a)}</span>
                     <div className="flex flex-col items-end gap-1">
-                      <span className="text-[10px] font-mono font-bold text-brand-brown uppercase tracking-tighter">+{ADDON_COSTS_BASE[a] || 150} AED</span>
-                      {sofaConfig.addOns.includes(a) && <X className="w-4 h-4 text-brand-gold opacity-50" />}
+                      <span className="text-xs font-mono-label font-bold text-[#0C1B3A] tracking-tighter">+{ADDON_COSTS_BASE[a] || 150} AED</span>
+                      {sofaConfig.addOns.includes(a) && <X className="w-4 h-4 text-[#7A5F2A] opacity-50" />}
                     </div>
                   </button>
                 ))}
@@ -8911,8 +8912,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'dimensions':
           return (
             <div className="space-y-12">
-               <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Ruler className="w-3 h-3 text-brand-gold" /> {t('Engineering Dimensions')} (mm)
+               <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Ruler className="w-3 h-3 text-[#7A5F2A]" /> {t('Engineering Dimensions')} (mm)
               </h3>
               <div className="grid grid-cols-1 gap-8">
                 {[
@@ -8923,25 +8924,25 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   const key = f.key as keyof GenericConfiguration;
                   return (
                     <div key={key} className="space-y-3">
-                      <label className="text-[9px] font-bold text-brand-brown-muted uppercase tracking-[0.15em]">{f.label}</label>
+                      <label className="text-xs font-bold text-slate-600 ">{f.label}</label>
                       <input
                         type="number"
                         value={genericConfig[key] as number}
                         onChange={e => updateGenericConfig({ [key]: Number(e.target.value) })}
-                        className="w-full bg-transparent border-b border-brand-brown/10 text-2xl font-serif italic text-brand-brown focus:border-brand-gold outline-none pb-2 transition-colors"
+                        className="w-full bg-transparent border-b border-[#0C1B3A]/10 text-2xl italic text-[#0C1B3A] focus:border-[#A07F3C] outline-none pb-2 transition-colors"
                       />
                     </div>
                   );
                 })}
               </div>
               <div className="mt-8">
-                <label className="text-[9px] font-bold text-brand-brown-muted uppercase tracking-[0.15em] mb-3 block">{t('Top Thickness')} (mm)</label>
+                <label className="text-xs font-bold text-slate-600 mb-3 block">{t('Top Thickness')} (mm)</label>
                 <div className="grid grid-cols-3 gap-4">
                   {Object.values(Thickness).map(th => (
                     <button
                       key={th}
                       onClick={() => updateGenericConfig({ thickness: th })}
-                      className={`p-4 border rounded-xl text-[10px] font-bold ${genericConfig.thickness === th ? 'bg-brand-gold text-white' : 'bg-white text-brand-brown border-brand-beige'}`}
+                      className={`p-4 border rounded-md text-xs font-bold ${genericConfig.thickness === th ? 'bg-[#080D1E] text-white' : 'bg-white text-[#0C1B3A] border-[rgba(12,27,58,0.1)]'}`}
                     >
                       {t(th)}
                     </button>
@@ -8953,15 +8954,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'material':
           return (
             <div className="space-y-12">
-               <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Layers className="w-3 h-3 text-brand-gold" /> {t('Material Specification')}
+               <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Layers className="w-3 h-3 text-[#7A5F2A]" /> {t('Material Specification')}
               </h3>
               <div className="grid grid-cols-3 gap-4">
                 {Object.values(Material).map(m => (
                   <button
                     key={m}
                     onClick={() => updateGenericConfig({ material: m })}
-                    className={`p-6 text-center border rounded-[24px] font-bold text-xs uppercase tracking-widest transition-all ${genericConfig.material === m ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-6 text-center border rounded-md font-bold text-xs transition-all ${genericConfig.material === m ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
                     {t(m)}
                   </button>
@@ -8972,15 +8973,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'finish':
           return (
              <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Palette className="w-3 h-3 text-brand-gold" /> {t('Surface Treatment')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Palette className="w-3 h-3 text-[#7A5F2A]" /> {t('Surface Treatment')}
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 {Object.values(FinishType).map(f => (
                   <button
                     key={f}
                     onClick={() => updateGenericConfig({ finish: f })}
-                    className={`p-6 text-center border rounded-[24px] font-bold text-xs uppercase tracking-widest ${genericConfig.finish === f ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-6 text-center border rounded-md font-bold text-xs ${genericConfig.finish === f ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
                     {t(f)}
                   </button>
@@ -8991,20 +8992,20 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'addons':
            return (
             <div className="space-y-8">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <PlusCircle className="w-3 h-3 text-brand-gold" /> 附加配件 Add-ons
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <PlusCircle className="w-3 h-3 text-[#7A5F2A]" /> 附加配件 Add-ons
               </h3>
               <div className="grid grid-cols-1 gap-4">
                 {Object.values(AddOn).map(a => (
                   <button
                     key={a}
                     onClick={() => toggleGenericAddOn(a)}
-                    className={`p-8 text-left border rounded-[32px] flex justify-between items-center transition-all ${genericConfig.addOns.includes(a) ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-xl translate-x-3' : 'bg-white text-brand-brown border-brand-beige hover:border-brand-gold-muted hover:translate-x-1'}`}
+                    className={`p-8 text-left border rounded-md flex justify-between items-center transition-all ${genericConfig.addOns.includes(a) ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-xl translate-x-3' : 'bg-white text-[#0C1B3A] border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted hover:translate-x-1'}`}
                   >
-                    <span className="text-xl font-serif italic">{t(a)}</span>
+                    <span className="text-xl italic">{t(a)}</span>
                     <div className="flex flex-col items-end gap-1">
-                      <span className="text-[10px] font-mono font-bold text-brand-brown uppercase tracking-tighter">+{ADDON_COSTS_BASE[a] || 150} AED</span>
-                      {genericConfig.addOns.includes(a) && <X className="w-4 h-4 text-brand-gold opacity-50" />}
+                      <span className="text-xs font-mono-label font-bold text-[#0C1B3A] tracking-tighter">+{ADDON_COSTS_BASE[a] || 150} AED</span>
+                      {genericConfig.addOns.includes(a) && <X className="w-4 h-4 text-[#7A5F2A] opacity-50" />}
                     </div>
                   </button>
                 ))}
@@ -9018,24 +9019,24 @@ Leave a field as empty string if not present. Never fabricate values.`;
           return (
             <div className="space-y-12">
               <section className="space-y-8">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                  <Palette className="w-3 h-3 text-brand-gold" /> {t('Color Way')}
+                <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                  <Palette className="w-3 h-3 text-[#7A5F2A]" /> {t('Color Way')}
                 </h3>
                 <div className="grid grid-cols-5 gap-4">
                   {Object.values(Color).map(c => (
                     <button
                       key={c}
                       onClick={() => updateFn({ color: c })}
-                      className={`h-16 rounded-3xl border-2 transition-all flex items-center justify-center relative group ${currentConfig.color === c ? 'border-brand-gold scale-110 shadow-lg' : 'border-transparent hover:border-brand-beige'}`}
+                      className={`h-16 rounded-md border-2 transition-all flex items-center justify-center relative group ${currentConfig.color === c ? 'border-[#A07F3C] scale-110 shadow-lg' : 'border-transparent hover:border-[rgba(12,27,58,0.1)]'}`}
                       style={{ backgroundColor: c === Color.WHITE ? '#FFFFFF' : c === Color.BEIGE ? '#F5F5DC' : c === Color.WALNUT ? '#5D4037' : c === Color.GREY ? '#808080' : '#CCCCCC' }}
                       title={t(c)}
                     >
                       {currentConfig.color === c && (
-                        <div className="bg-brand-brown rounded-full p-1 shadow-md">
-                          <PlusCircle className={`w-4 h-4 ${c === Color.WHITE || c === Color.BEIGE ? 'text-brand-gold' : 'text-brand-ivory'}`} />
+                        <div className="bg-[#080D1E] rounded-full p-1 shadow-md">
+                          <PlusCircle className={`w-4 h-4 ${c === Color.WHITE || c === Color.BEIGE ? 'text-[#7A5F2A]' : 'text-white'}`} />
                         </div>
                       )}
-                      <span className="absolute -bottom-6 text-[8px] font-bold uppercase tracking-widest text-brand-brown opacity-0 group-hover:opacity-100 transition-opacity">{t(c)}</span>
+                      <span className="absolute -bottom-6 text-xs font-bold text-[#0C1B3A] opacity-0 group-hover:opacity-100 transition-opacity">{t(c)}</span>
                     </button>
                   ))}
                 </div>
@@ -9044,9 +9045,9 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   <motion.div 
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="mt-12 p-8 bg-white border border-brand-beige rounded-[32px] space-y-4"
+                    className="mt-12 p-8 bg-white border border-[rgba(12,27,58,0.1)] rounded-[10px] space-y-4"
                   >
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-brand-gold block">
+                    <label className="text-xs font-bold text-[#7A5F2A] block">
                       {t('Custom Color Specification')}
                     </label>
                     <input
@@ -9054,7 +9055,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       value={currentConfig.customColor || ''}
                       onChange={e => updateFn({ customColor: e.target.value })}
                       placeholder="e.g. RAL 9016 / Pantone 432C / light oak / dark grey matte"
-                      className="w-full bg-brand-beige/10 border-b border-brand-beige py-4 px-2 font-serif italic text-xl text-brand-brown focus:border-brand-gold outline-none transition-colors"
+                      className="w-full bg-[#F8F9FB]/10 border-b border-[rgba(12,27,58,0.1)] py-4 px-2 italic text-xl text-[#0C1B3A] focus:border-[#A07F3C] outline-none transition-colors"
                     />
                   </motion.div>
                 )}
@@ -9064,8 +9065,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
         case 'frame':
           return (
             <div className="space-y-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Square className="w-3 h-3 text-brand-gold" /> {t('Structure/Frame')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Square className="w-3 h-3 text-[#7A5F2A]" /> {t('Structure/Frame')}
               </h3>
               <div className="grid grid-cols-2 gap-5">
                 {[
@@ -9076,11 +9077,11 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   <button
                     key={f.type}
                     onClick={() => updateGenericConfig({ frameType: f.type })}
-                    className={`p-10 text-left border rounded-[32px] transition-all relative group ${genericConfig.frameType === f.type ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-xl' : 'bg-brand-beige/30 text-brand-brown border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-10 text-left border rounded-md transition-all relative group ${genericConfig.frameType === f.type ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-xl' : 'bg-[#F8F9FB]/30 text-[#0C1B3A] border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
-                    <span className="block text-xl font-serif italic mb-2 tracking-tight">{f.label}</span>
-                    <span className={`text-[10px] font-mono opacity-60 ${genericConfig.frameType === f.type ? 'text-brand-gold' : 'text-brand-brown'}`}>+{f.cost} AED</span>
-                    {genericConfig.frameType === f.type && <div className="absolute top-0 right-0 p-4"><PlusCircle className="w-4 h-4 text-brand-gold" /></div>}
+                    <span className="block text-xl italic mb-2 tracking-tight">{f.label}</span>
+                    <span className={`text-xs font-mono-label opacity-60 ${genericConfig.frameType === f.type ? 'text-[#7A5F2A]' : 'text-[#0C1B3A]'}`}>+{f.cost} AED</span>
+                    {genericConfig.frameType === f.type && <div className="absolute top-0 right-0 p-4"><PlusCircle className="w-4 h-4 text-[#7A5F2A]" /></div>}
                   </button>
                 ))}
               </div>
@@ -9097,26 +9098,26 @@ Leave a field as empty string if not present. Never fabricate values.`;
         return (
           <div className="space-y-12">
             <section className="space-y-6">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Ruler className="w-3 h-3 text-brand-gold" /> {t('Select Foundation')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Ruler className="w-3 h-3 text-[#7A5F2A]" /> {t('Select Foundation')}
               </h3>
               <div className="grid grid-cols-2 gap-5">
                 {Object.values(BedSize).map(s => (
                   <button
                     key={s}
                     onClick={() => updateConfig({ size: s })}
-                    className={`p-8 text-left border rounded-[32px] transition-all relative overflow-hidden group ${config.size === s ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-xl' : 'bg-brand-beige/30 text-brand-brown border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-8 text-left border rounded-md transition-all relative overflow-hidden group ${config.size === s ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-xl' : 'bg-[#F8F9FB]/30 text-[#0C1B3A] border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
-                    <span className="block text-xl font-serif italic tracking-tight">{t(s)}</span>
-                    {SIZE_DIMENSIONS[s] && <span className={`text-[10px] font-mono mt-1 block opacity-60 ${config.size === s ? 'text-brand-gold-muted' : 'text-brand-brown'}`}>{SIZE_DIMENSIONS[s].w} x {SIZE_DIMENSIONS[s].l} mm</span>}
-                    {config.size === s && <div className="absolute top-0 right-0 p-3"><PlusCircle className="w-4 h-4 text-brand-gold" /></div>}
+                    <span className="block text-xl italic tracking-tight">{t(s)}</span>
+                    {SIZE_DIMENSIONS[s] && <span className={`text-xs font-mono-label mt-1 block opacity-60 ${config.size === s ? 'text-slate-600' : 'text-[#0C1B3A]'}`}>{SIZE_DIMENSIONS[s].w} x {SIZE_DIMENSIONS[s].l} mm</span>}
+                    {config.size === s && <div className="absolute top-0 right-0 p-3"><PlusCircle className="w-4 h-4 text-[#7A5F2A]" /></div>}
                   </button>
                 ))}
               </div>
             </section>
             
-            <section className="bg-brand-beige/20 p-10 rounded-[40px] border border-brand-beige">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown mb-8 italic">{t('Dimensions Adjustment')}</h3>
+            <section className="bg-[#F8F9FB]/20 p-10 rounded-[10px] border border-[rgba(12,27,58,0.1)]">
+              <h3 className="text-xs font-bold text-[#0C1B3A] mb-8 italic">{t('Dimensions Adjustment')}</h3>
               <div className="grid grid-cols-2 gap-x-12 gap-y-10 font-sans">
                 {[
                   { label: t('Width Label'), key: 'width' },
@@ -9125,12 +9126,12 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   { label: t('Headboard Height Label'), key: 'headboardHeight' }
                 ].map(f => (
                   <div key={f.key} className="space-y-3">
-                    <label className="text-[9px] font-bold text-brand-brown-muted uppercase tracking-[0.15em]">{f.label}</label>
+                    <label className="text-xs font-bold text-slate-600 ">{f.label}</label>
                     <input
                       type="number"
                       value={config[f.key as keyof BedConfiguration] as number}
                       onChange={e => updateConfig({ [f.key]: Number(e.target.value), size: (f.key === 'width' || f.key === 'length') ? BedSize.CUSTOM : config.size })}
-                      className="w-full bg-transparent border-b border-brand-brown/10 text-xl font-serif italic text-brand-brown focus:border-brand-gold outline-none pb-2 transition-colors"
+                      className="w-full bg-transparent border-b border-[#0C1B3A]/10 text-xl italic text-[#0C1B3A] focus:border-[#A07F3C] outline-none pb-2 transition-colors"
                     />
                   </div>
                 ))}
@@ -9142,15 +9143,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
         return (
           <div className="space-y-12">
             <section className="space-y-6">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Layers className="w-3 h-3 text-brand-gold" /> {t('Primary Substrate')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Layers className="w-3 h-3 text-[#7A5F2A]" /> {t('Primary Substrate')}
               </h3>
               <div className="grid grid-cols-3 gap-4">
                 {Object.values(Material).map(m => (
                   <button
                     key={m}
                     onClick={() => updateConfig({ material: m })}
-                    className={`p-6 text-center border rounded-[24px] font-bold text-xs uppercase tracking-widest transition-all ${config.material === m ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-6 text-center border rounded-md font-bold text-xs transition-all ${config.material === m ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
                     {t(m)}
                   </button>
@@ -9158,15 +9159,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
               </div>
             </section>
             <section className="space-y-6">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Settings className="w-3 h-3 text-brand-gold" /> {t('Board Thickness')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Settings className="w-3 h-3 text-[#7A5F2A]" /> {t('Board Thickness')}
               </h3>
               <div className="grid grid-cols-3 gap-4">
                 {Object.values(Thickness).map(tVal => (
                   <button
                     key={tVal}
                     onClick={() => updateConfig({ thickness: tVal })}
-                    className={`p-6 text-center border rounded-[24px] font-bold text-xs uppercase tracking-widest transition-all ${config.thickness === tVal ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-6 text-center border rounded-md font-bold text-xs transition-all ${config.thickness === tVal ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
                     {t(tVal)}
                   </button>
@@ -9179,32 +9180,32 @@ Leave a field as empty string if not present. Never fabricate values.`;
         return (
           <div className="space-y-12">
              <section className="space-y-6">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Square className="w-3 h-3 text-brand-gold" /> {t('Core Structure')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Square className="w-3 h-3 text-[#7A5F2A]" /> {t('Core Structure')}
               </h3>
               <div className="space-y-4">
                 {Object.values(FrameType).map(f => (
                   <button
                     key={f}
                     onClick={() => updateConfig({ frame: f })}
-                    className={`w-full p-8 text-left border rounded-[28px] flex justify-between items-center group transition-all ${config.frame === f ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-xl' : 'bg-brand-beige/20 text-brand-brown border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`w-full p-8 text-left border rounded-md flex justify-between items-center group transition-all ${config.frame === f ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-xl' : 'bg-[#F8F9FB]/20 text-[#0C1B3A] border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
-                    <span className="text-lg font-serif italic">{t(f)}</span>
-                    <span className={`text-[10px] font-mono uppercase tracking-widest ${config.frame === f ? 'text-brand-gold group-hover:text-brand-ivory' : 'text-brand-brown-muted opacity-80'}`}>+{FRAME_TYPE_COSTS[f]} AED</span>
+                    <span className="text-lg italic">{t(f)}</span>
+                    <span className={`text-xs font-mono-label ${config.frame === f ? 'text-[#7A5F2A] group-hover:text-white' : 'text-slate-600 opacity-80'}`}>+{FRAME_TYPE_COSTS[f]} AED</span>
                   </button>
                 ))}
               </div>
             </section>
             <section className="space-y-6">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Palette className="w-3 h-3 text-brand-gold" /> {t('Headboard Architecture')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Palette className="w-3 h-3 text-[#7A5F2A]" /> {t('Headboard Architecture')}
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 {Object.values(HeadboardType).map(h => (
                   <button
                     key={h}
                     onClick={() => updateConfig({ headboard: h })}
-                    className={`p-5 text-xs text-center border rounded-[20px] font-bold uppercase tracking-widest ${config.headboard === h ? 'bg-brand-brown text-brand-ivory border-brand-brown' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-5 text-xs text-center border rounded-md font-bold ${config.headboard === h ? 'bg-[#080D1E] text-white border-[#0C1B3A]' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
                     {t(h)}
                   </button>
@@ -9217,15 +9218,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
         return (
           <div className="space-y-12">
             <section className="space-y-6">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Palette className="w-3 h-3 text-brand-gold" /> {t('Surface Treatment')}
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Palette className="w-3 h-3 text-[#7A5F2A]" /> {t('Surface Treatment')}
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 {Object.values(FinishType).map(f => (
                   <button
                     key={f}
                     onClick={() => updateConfig({ finish: f })}
-                    className={`p-6 text-center border rounded-[24px] font-bold text-xs uppercase tracking-widest ${config.finish === f ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-lg' : 'bg-white text-brand-brown/80 border-brand-beige hover:border-brand-gold-muted'}`}
+                    className={`p-6 text-center border rounded-md font-bold text-xs ${config.finish === f ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-lg' : 'bg-white text-[#0C1B3A]/80 border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted'}`}
                   >
                     {t(f)}
                   </button>
@@ -9237,20 +9238,20 @@ Leave a field as empty string if not present. Never fabricate values.`;
       case 'addons':
         return (
           <div className="space-y-8">
-            <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-              <PlusCircle className="w-3 h-3 text-brand-gold" /> 豪华配置升级 Luxury Enhancements
+            <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+              <PlusCircle className="w-3 h-3 text-[#7A5F2A]" /> 豪华配置升级 Luxury Enhancements
             </h3>
             <div className="grid grid-cols-1 gap-4">
               {Object.values(AddOn).map(a => (
                 <button
                   key={a}
                   onClick={() => toggleAddOn(a)}
-                  className={`p-8 text-left border rounded-[32px] flex justify-between items-center transition-all ${config.addOns.includes(a) ? 'bg-brand-brown text-brand-ivory border-brand-brown shadow-xl translate-x-3' : 'bg-white text-brand-brown border-brand-beige hover:border-brand-gold-muted hover:translate-x-1'}`}
+                  className={`p-8 text-left border rounded-md flex justify-between items-center transition-all ${config.addOns.includes(a) ? 'bg-[#080D1E] text-white border-[#0C1B3A] shadow-xl translate-x-3' : 'bg-white text-[#0C1B3A] border-[rgba(12,27,58,0.1)] hover:border-brand-gold-muted hover:translate-x-1'}`}
                 >
-                  <span className="text-xl font-serif italic">{t(a)}</span>
+                  <span className="text-xl italic">{t(a)}</span>
                   <div className="flex flex-col items-end gap-1">
-                    <span className="text-[10px] font-mono font-bold text-brand-brown uppercase tracking-tighter">+{ADDON_COSTS_BASE[a]} AED</span>
-                    {config.addOns.includes(a) && <X className="w-4 h-4 text-brand-gold opacity-50" />}
+                    <span className="text-xs font-mono-label font-bold text-[#0C1B3A] tracking-tighter">+{ADDON_COSTS_BASE[a]} AED</span>
+                    {config.addOns.includes(a) && <X className="w-4 h-4 text-[#7A5F2A] opacity-50" />}
                   </div>
                 </button>
               ))}
@@ -9261,24 +9262,24 @@ Leave a field as empty string if not present. Never fabricate values.`;
         return (
           <div className="space-y-12">
             <section className="space-y-8">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-brown flex items-center gap-2">
-                <Palette className="w-3 h-3 text-brand-gold" /> 颜色方案 Color Way
+              <h3 className="text-xs font-bold text-[#0C1B3A] flex items-center gap-2">
+                <Palette className="w-3 h-3 text-[#7A5F2A]" /> 颜色方案 Color Way
               </h3>
               <div className="grid grid-cols-5 gap-4">
                 {Object.values(Color).map(c => (
                   <button
                     key={c}
                     onClick={() => updateConfig({ color: c })}
-                    className={`h-16 rounded-3xl border-2 transition-all flex items-center justify-center relative group ${config.color === c ? 'border-brand-gold scale-110 shadow-lg' : 'border-transparent hover:border-brand-beige'}`}
+                    className={`h-16 rounded-md border-2 transition-all flex items-center justify-center relative group ${config.color === c ? 'border-[#A07F3C] scale-110 shadow-lg' : 'border-transparent hover:border-[rgba(12,27,58,0.1)]'}`}
                     style={{ backgroundColor: c === Color.WHITE ? '#FFFFFF' : c === Color.BEIGE ? '#F5F5DC' : c === Color.WALNUT ? '#5D4037' : c === Color.GREY ? '#808080' : '#CCCCCC' }}
                     title={t(c)}
                   >
                     {config.color === c && (
-                      <div className="bg-brand-brown rounded-full p-1 shadow-md">
-                        <PlusCircle className={`w-4 h-4 ${c === Color.WHITE || c === Color.BEIGE ? 'text-brand-gold' : 'text-brand-ivory'}`} />
+                      <div className="bg-[#080D1E] rounded-full p-1 shadow-md">
+                        <PlusCircle className={`w-4 h-4 ${c === Color.WHITE || c === Color.BEIGE ? 'text-[#7A5F2A]' : 'text-white'}`} />
                       </div>
                     )}
-                    <span className="absolute -bottom-6 text-[8px] font-bold uppercase tracking-widest text-brand-brown opacity-0 group-hover:opacity-100 transition-opacity">{t(c)}</span>
+                    <span className="absolute -bottom-6 text-xs font-bold text-[#0C1B3A] opacity-0 group-hover:opacity-100 transition-opacity">{t(c)}</span>
                   </button>
                 ))}
               </div>
@@ -9287,9 +9288,9 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 <motion.div 
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mt-12 p-8 bg-white border border-brand-beige rounded-[32px] space-y-4"
+                  className="mt-12 p-8 bg-white border border-[rgba(12,27,58,0.1)] rounded-[10px] space-y-4"
                 >
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-brand-gold block">
+                  <label className="text-xs font-bold text-[#7A5F2A] block">
                     自定义颜色描述 Custom Color Specification (RAL / Pantone / Name)
                   </label>
                   <input
@@ -9297,7 +9298,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     value={config.customColor || ''}
                     onChange={e => updateConfig({ customColor: e.target.value })}
                     placeholder="e.g. RAL 9016 / Pantone 432C / light oak / dark grey matte"
-                    className="w-full bg-brand-beige/10 border-b border-brand-beige py-4 px-2 font-serif italic text-xl text-brand-brown focus:border-brand-gold outline-none transition-colors"
+                    className="w-full bg-[#F8F9FB]/10 border-b border-[rgba(12,27,58,0.1)] py-4 px-2 italic text-xl text-[#0C1B3A] focus:border-[#A07F3C] outline-none transition-colors"
                   />
                 </motion.div>
               )}
@@ -9308,112 +9309,112 @@ Leave a field as empty string if not present. Never fabricate values.`;
   };
 
   return (
-    <div className="min-h-screen bg-brand-ivory text-brand-brown selection:bg-brand-gold/20 font-sans">
+    <div className="min-h-screen bg-[#F5F6FA] text-[#0C1B3A] selection:bg-[#080D1E]/20" style={{ fontFamily: workspaceFontFamily }}>
       {/* Settings Modal */}
-      <AnimatePresence>
+      <ModalPortal><AnimatePresence>
         {showSettings && (
-          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 bg-brand-brown/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <motion.div initial={{y:50}} animate={{y:0}} className="bg-white w-full max-w-2xl rounded-[40px] shadow-2xl p-10 overflow-hidden relative border border-brand-beige">
-              <button onClick={() => setShowSettings(false)} className="absolute top-8 right-8 p-2 bg-brand-beige rounded-full hover:bg-brand-gold-muted/30 transition-colors text-brand-brown"><X className="w-5 h-5" /></button>
-              <h2 className="text-3xl font-serif italic tracking-tight mb-8 flex items-center gap-3 text-brand-brown">
-                <CreditCard className="w-7 h-7 text-brand-gold" /> {t('Pricing Configuration')}
+          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 bg-[rgba(8,13,30,0.5)] z-[1100] flex items-center justify-center p-4 max-sm:p-0 max-sm:items-start max-sm:overflow-y-auto">
+            <motion.div initial={{y:50}} animate={{y:0}} className="bg-white w-full max-w-2xl rounded-[14px] shadow-2xl p-10 overflow-hidden relative border border-[rgba(12,27,58,0.1)] max-sm:min-h-full max-sm:rounded-none max-sm:p-6">
+              <button onClick={() => setShowSettings(false)} className="absolute top-8 right-8 p-2 bg-[#F8F9FB] rounded-full hover:bg-brand-gold-muted/30 transition-colors text-[#0C1B3A]"><X className="w-5 h-5" /></button>
+              <h2 className="text-3xl italic tracking-tight mb-8 flex items-center gap-3 text-[#0C1B3A]">
+                <CreditCard className="w-7 h-7 text-[#7A5F2A]" /> {t('Pricing Configuration')}
               </h2>
               <div className="grid grid-cols-2 gap-8 max-h-[60vh] overflow-y-auto pr-4 scrollbar-hide">
                 <section className="space-y-4">
-                  <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-gold">{t('Material & Finish')}</h4>
+                  <h4 className="text-xs font-bold text-[#7A5F2A]">{t('Material & Finish')}</h4>
                   {Object.values(Material).map(m => (
                     <div key={m} className="space-y-1">
-                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{t(m)}</label>
-                      <input type="number" value={prices[m]} onChange={e => setPrices({...prices, [m]: Number(e.target.value)})} className="w-full p-4 bg-brand-beige/50 rounded-2xl font-mono text-sm border-none outline-none focus:ring-1 focus:ring-brand-gold" />
+                      <label className="text-xs font-medium text-slate-600 ">{t(m)}</label>
+                      <input type="number" value={prices[m]} onChange={e => setPrices({...prices, [m]: Number(e.target.value)})} className="w-full p-4 bg-[#F8F9FB]/50 rounded-md font-mono-label text-sm border-none outline-none focus:ring-1 focus:ring-[#A07F3C]" />
                     </div>
                   ))}
                   <div className="space-y-1 pt-4">
-                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">面料 Upholstery (m²)</label>
-                    <input type="number" value={prices.upholsteryFabric} onChange={e => setPrices({...prices, upholsteryFabric: Number(e.target.value)})} className="w-full p-4 bg-brand-beige/50 rounded-2xl font-mono text-sm border-none outline-none" />
+                    <label className="text-xs font-medium text-slate-600 ">{lang === 'en' ? "Upholstery (m²)" : "面料 (m²)"}</label>
+                    <input type="number" value={prices.upholsteryFabric} onChange={e => setPrices({...prices, upholsteryFabric: Number(e.target.value)})} className="w-full p-4 bg-[#F8F9FB]/50 rounded-md font-mono-label text-sm border-none outline-none" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">饰面 Finish (m²)</label>
-                    <input type="number" value={prices.finishVeneer} onChange={e => setPrices({...prices, finishVeneer: Number(e.target.value)})} className="w-full p-4 bg-brand-beige/50 rounded-2xl font-mono text-sm border-none outline-none" />
+                    <label className="text-xs font-medium text-slate-600 ">{lang === 'en' ? "Finish (m²)" : "饰面 (m²)"}</label>
+                    <input type="number" value={prices.finishVeneer} onChange={e => setPrices({...prices, finishVeneer: Number(e.target.value)})} className="w-full p-4 bg-[#F8F9FB]/50 rounded-md font-mono-label text-sm border-none outline-none" />
                   </div>
                 </section>
                 <section className="space-y-4">
-                   <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-gold">其它费用项 Manual Overheads</h4>
+                   <h4 className="text-xs font-bold text-[#7A5F2A]">{lang === 'en' ? "Manual Overheads" : "其它费用项"}</h4>
                    {[
-                     { key: 'labor', label: '人工费 Labor' },
-                     { key: 'packaging', label: '包装费 Packaging' },
-                     { key: 'transport', label: '运输费 Transport' },
-                     { key: 'installation', label: '安装费 Installation' }
+                     { key: 'labor', label: lang === 'en' ? "Labor" : "人工费" },
+                     { key: 'packaging', label: lang === 'en' ? "Packaging" : "包装费" },
+                     { key: 'transport', label: lang === 'en' ? "Transport" : "运输费" },
+                     { key: 'installation', label: lang === 'en' ? "Installation" : "安装费" }
                    ].map(cost => (
                      <div key={cost.key} className="space-y-1">
-                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{cost.label}</label>
+                        <label className="text-xs font-medium text-slate-600 ">{cost.label}</label>
                         <input 
                           type="number" 
                           value={prices[cost.key as keyof MaterialPrices]} 
                           onChange={e => setPrices({...prices, [cost.key]: Number(e.target.value)})} 
-                          className="w-full p-4 bg-brand-beige/50 rounded-2xl font-mono text-sm border-none outline-none" 
+                          className="w-full p-4 bg-[#F8F9FB]/50 rounded-md font-mono-label text-sm border-none outline-none" 
                         />
                      </div>
                    ))}
-                   <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-brand-beige">
+                   <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-[rgba(12,27,58,0.1)]">
                      <div className="space-y-1">
-                       <label className="text-[9px] font-bold uppercase tracking-wide text-brand-gold">利润 Margin %</label>
-                       <input type="number" value={prices.marginPercent} onChange={e => setPrices({...prices, marginPercent: Number(e.target.value)})} className="w-full p-3 bg-brand-beige/50 rounded-xl font-mono text-xs border-none outline-none" />
+                       <label className="text-xs font-bold text-[#7A5F2A]">{lang === 'en' ? "Margin %" : "利润 %"}</label>
+                       <input type="number" value={prices.marginPercent} onChange={e => setPrices({...prices, marginPercent: Number(e.target.value)})} className="w-full p-3 bg-[#F8F9FB]/50 rounded-md font-mono-label text-xs border-none outline-none" />
                      </div>
                      <div className="space-y-1">
-                       <label className="text-[9px] font-bold uppercase tracking-wide text-brand-gold">税率 VAT %</label>
-                       <input type="number" value={prices.vatPercent} onChange={e => setPrices({...prices, vatPercent: Number(e.target.value)})} className="w-full p-3 bg-brand-beige/50 rounded-xl font-mono text-xs border-none outline-none" />
+                       <label className="text-xs font-bold text-[#7A5F2A]">{lang === 'en' ? "VAT %" : "税率 %"}</label>
+                       <input type="number" value={prices.vatPercent} onChange={e => setPrices({...prices, vatPercent: Number(e.target.value)})} className="w-full p-3 bg-[#F8F9FB]/50 rounded-md font-mono-label text-xs border-none outline-none" />
                      </div>
                    </div>
                 </section>
               </div>
-              <button onClick={() => setShowSettings(false)} className="w-full mt-10 p-5 bg-brand-brown text-brand-ivory rounded-2xl font-bold uppercase tracking-widest text-sm hover:bg-brand-brown/90 transition-all shadow-lg shadow-brand-brown/10">保存并应用 Save & Apply Rates</button>
+              <button onClick={() => setShowSettings(false)} className="w-full mt-10 p-5 bg-[#080D1E] text-white rounded-md font-bold text-sm hover:bg-[#080D1E]/90 transition-all shadow-lg shadow-brand-brown/10">{lang === 'en' ? "Save & Apply Rates" : "保存并应用"}</button>
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence></ModalPortal>
 
       <div className={`max-w-7xl mx-auto px-3 sm:px-6 ${isProjectInfoScreen ? 'py-3' : 'py-6 lg:py-12'}`}>
         {_returnUrlParam && (
-          <div className="mb-6 flex items-center justify-between px-5 py-2.5 bg-brand-brown rounded-2xl text-brand-ivory">
+          <div className="mb-6 flex items-center justify-between px-5 py-2.5 bg-[#080D1E] rounded-[10px] text-white">
             <a
               href={_returnUrlParam}
-              className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-gold hover:text-brand-ivory transition-colors group"
+              className="flex items-center gap-2 text-xs font-bold text-[#7A5F2A] hover:text-white transition-colors group"
             >
               <ArrowLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" />
               返回 DEAL 项目
             </a>
-            <div className="flex items-center gap-5 text-[10px] font-bold uppercase tracking-widest text-brand-ivory/50">
-              {_clientParam && <span>客户：<span className="text-brand-ivory">{_clientParam}</span></span>}
-              {_projectParam && <span>项目：<span className="text-brand-ivory">{_projectParam}</span></span>}
-              {_businessIdParam && <span className="text-brand-gold/80">{_businessIdParam}</span>}
-              {_salespersonParam && <span>负责人：<span className="text-brand-ivory">{_salespersonParam}</span></span>}
+            <div className="flex items-center gap-5 text-xs font-bold text-white/50">
+              {_clientParam && <span>客户：<span className="text-white">{_clientParam}</span></span>}
+              {_projectParam && <span>项目：<span className="text-white">{_projectParam}</span></span>}
+              {_businessIdParam && <span className="text-[#7A5F2A]/80">{_businessIdParam}</span>}
+              {_salespersonParam && <span>负责人：<span className="text-white">{_salespersonParam}</span></span>}
             </div>
           </div>
         )}
-        <header className="mb-3 flex justify-between items-center gap-3 bg-gradient-to-r from-[#0C1B3A] via-[#0F2551] to-[#0C1B3A] text-white px-4 sm:px-6 py-2.5 rounded-2xl shadow-lg">
+        <header className="mb-3 flex justify-between items-center gap-3 bg-gradient-to-r from-[#0C1B3A] via-[#0F2551] to-[#0C1B3A] text-white px-4 sm:px-6 py-2.5 rounded-[10px] shadow-lg">
           <div className="flex items-center gap-4">
             <div className="bg-gradient-to-br from-[#C9A84C] to-[#A07C2D] w-8 h-8 rounded-lg flex items-center justify-center shadow-md shrink-0">
-              <span className="text-white font-black text-sm tracking-tight">G</span>
+              <span className="text-white font-bold text-sm tracking-tight">G</span>
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base font-black tracking-tight uppercase leading-none">GCI Quotation Center</h1>
-                <span className="hidden sm:inline text-[9px] bg-[#C9A84C]/20 border border-[#C9A84C]/30 px-2 py-0.5 rounded text-[#E8C96A] font-bold tracking-wide">LIVING STUDIO</span>
+                <h1 className="text-base font-bold tracking-tight leading-none">GCI Quotation Center</h1>
+                <span className="hidden sm:inline text-xs bg-[#C9A84C]/20 border border-[#C9A84C]/30 px-2 py-0.5 rounded text-[#E8C96A] font-bold ">LIVING STUDIO</span>
               </div>
-              <p className="text-[10px] text-white/50 font-medium mt-0.5 hidden sm:block">FF&amp;E · Engineering Quotation · BOQ</p>
+              <p className="text-xs text-white/50 font-medium mt-0.5 hidden sm:block">FF&amp;E · Engineering Quotation · BOQ</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setView(view === 'history' ? 'configurator' : 'history')}
-              className={`flex items-center gap-2 px-2.5 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shrink-0 ${view === 'history' ? 'bg-[#C9A84C] text-[#0C1B3A]' : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'}`}
+              className={`flex items-center gap-2 px-2.5 sm:px-4 py-2 rounded-md text-xs font-bold transition-all shrink-0 ${view === 'history' ? 'bg-[#C9A84C] text-[#0C1B3A]' : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'}`}
             >
               <FileText className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{view === 'history' ? t('← Back') : t('History')}</span>
             </button>
             <button
               onClick={() => setShowSettings(true)}
-              aria-label="Pricing" className="flex items-center gap-2 px-2.5 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all shrink-0"
+              aria-label="Pricing" className="flex items-center gap-2 px-2.5 sm:px-4 py-2 rounded-md text-xs font-bold bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all shrink-0"
             >
               <Settings className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Pricing</span>
@@ -9429,17 +9430,17 @@ Leave a field as empty string if not present. Never fabricate values.`;
             those keep their own existing navigation as-is. */}
         {(appMode === 'customer-quote' || appMode === 'supplier-quote' || appMode === 'package-quote') && view !== 'history' && (
           <div className="mb-3 flex justify-start overflow-x-auto">
-            <div className="inline-flex bg-white p-1 rounded-xl border border-brand-beige gap-1">
+            <div className="inline-flex bg-white p-1 rounded-[10px] border border-[rgba(12,27,58,0.1)] gap-1">
               {([
-                { id: 'customer-quote', label: '工程 / 定制报价' },
-                { id: 'supplier-quote', label: '供应商报价' },
-                { id: 'package-quote', label: '套餐报价' },
+                { id: 'customer-quote', label: lang === 'en' ? 'Project / Custom Quote' : '工程 / 定制报价' },
+                { id: 'supplier-quote', label: lang === 'en' ? 'Supplier Quote' : '供应商报价' },
+                { id: 'package-quote', label: lang === 'en' ? 'Package Quote' : '套餐报价' },
               ] as { id: QuoteAppMode; label: string }[]).map(qt => (
                 <button
                   key={qt.id}
                   onClick={() => setAppMode(qt.id)}
-                  className={`px-4 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${
-                    appMode === qt.id ? 'bg-[#0C1B3A] text-white shadow-lg' : 'text-[#0C1B3A]/50 hover:bg-[#0C1B3A]/5'
+                  className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
+                    appMode === qt.id ? 'bg-[#0C1B3A] text-white shadow-lg' : 'text-slate-600 hover:bg-[#0C1B3A]/5'
                   }`}
                 >
                   {qt.label}
@@ -9449,7 +9450,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
           </div>
         )}
 
-        <main className={`bg-white ${isProjectInfoScreen ? 'rounded-2xl' : 'rounded-[56px] shadow-[0_45px_120px_-30px_rgba(62,39,35,0.08)]'} border border-brand-beige overflow-hidden`}>
+        <main className={`bg-white ${isProjectInfoScreen ? 'rounded-[10px]' : 'rounded-[10px] shadow-[0_45px_120px_-30px_rgba(62,39,35,0.08)]'} border border-[rgba(12,27,58,0.1)] overflow-hidden`}>
           <div className={`${isProjectInfoScreen ? 'p-3 sm:p-5' : 'p-8 sm:p-20 min-h-[650px]'} flex flex-col`}>
 
             {/* ── TOP-LEVEL: Landing / Supplier Upload / Customer Quote ── */}
@@ -9458,75 +9459,75 @@ Leave a field as empty string if not present. Never fabricate values.`;
               <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700">
                 <div className="text-center space-y-3">
                   <h2 className="text-4xl font-semibold" style={{ fontFamily: "'Space Grotesk',sans-serif", color: '#080D1E' }}>GCI Supply Chain Center</h2>
-                  <p className="text-[12px] font-bold uppercase tracking-[0.4em] text-[#CBA85C]" style={{ fontFamily: "'IBM Plex Mono',monospace" }}>Choose your workflow</p>
+                  <p className="text-[12px] font-bold text-[#7A5F2A]" style={{ fontFamily: "'IBM Plex Mono',monospace" }}>Choose your workflow</p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
                   {/* 1: Customer Quote */}
                   <button onClick={() => setAppMode('customer-quote')}
-                    className="group text-left p-8 bg-white border rounded-[18px] shadow-sm hover:border-[#CBA85C] hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col gap-4" style={{ borderColor: '#080D1E14' }}>
+                    className="group text-left p-8 bg-white border rounded-md shadow-sm hover:border-[#CBA85C] hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col gap-4" style={{ borderColor: '#080D1E14' }}>
                     <div className="flex items-center justify-between">
-                      <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#CBA85C] bg-[#CBA85C]/10 px-2 py-1 rounded-full">For Clients</span>
-                      <FileText className="w-6 h-6 text-[#080D1E]/20 group-hover:text-[#CBA85C] transition-colors" />
+                      <span className="text-xs font-bold text-[#7A5F2A] bg-[#CBA85C]/10 px-2 py-1 rounded-full">For Clients</span>
+                      <FileText className="w-6 h-6 text-slate-600 group-hover:text-[#7A5F2A] transition-colors" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-[#080D1E] group-hover:text-[#CBA85C] transition-colors" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>Custom Customer Quote</h3>
-                      <p className="text-[11px] text-[#080D1E]/40 font-bold mt-0.5">定制客户报价</p>
+                      <h3 className="text-lg font-semibold text-[#080D1E] group-hover:text-[#7A5F2A] transition-colors" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>Custom Customer Quote</h3>
+                      {lang !== 'en' && <p className="text-xs text-slate-600 font-bold mt-0.5">定制客户报价</p>}
                     </div>
-                    <p className="text-[12px] text-[#080D1E]/55 leading-relaxed flex-1">
-                      For custom furniture, engineering BOQ, or manual item quotation. 用于家具定制、工程BOQ、手工录入报价。
+                    <p className="text-[12px] text-slate-600 leading-relaxed flex-1">
+                      {lang === 'en' ? "For custom furniture, engineering BOQ, or manual item quotation." : "用于家具定制、工程BOQ、手工录入报价。"}
                     </p>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-[#CBA85C] opacity-0 group-hover:opacity-100 transition-opacity">Start →</p>
+                    <p className="text-xs font-bold text-[#7A5F2A] opacity-0 group-hover:opacity-100 transition-opacity">Start →</p>
                   </button>
 
                   {/* 2: Supplier Quote */}
                   <button onClick={() => { setAppMode('supplier-quote'); setDraftItems([]); setTradeTerms(''); setSqSaveStatus('idle'); }}
-                    className="group text-left p-8 bg-white border rounded-[18px] shadow-sm hover:border-[#CBA85C] hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col gap-4" style={{ borderColor: '#080D1E14' }}>
+                    className="group text-left p-8 bg-white border rounded-md shadow-sm hover:border-[#CBA85C] hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col gap-4" style={{ borderColor: '#080D1E14' }}>
                     <div className="flex items-center justify-between">
-                      <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#CBA85C] bg-[#CBA85C]/10 px-2 py-1 rounded-full">Archive</span>
-                      <Archive className="w-6 h-6 text-[#080D1E]/20 group-hover:text-[#CBA85C] transition-colors" />
+                      <span className="text-xs font-bold text-[#7A5F2A] bg-[#CBA85C]/10 px-2 py-1 rounded-full">Archive</span>
+                      <Archive className="w-6 h-6 text-slate-600 group-hover:text-[#7A5F2A] transition-colors" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-[#080D1E] group-hover:text-[#CBA85C] transition-colors" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>Supplier Quote to GCI Quote</h3>
-                      <p className="text-[11px] text-[#080D1E]/40 font-bold mt-0.5">供应商报价转 GCI 报价</p>
+                      <h3 className="text-lg font-semibold text-[#080D1E] group-hover:text-[#7A5F2A] transition-colors" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>Supplier Quote to GCI Quote</h3>
+                      {lang !== 'en' && <p className="text-xs text-slate-600 font-bold mt-0.5">供应商报价转 GCI 报价</p>}
                     </div>
-                    <p className="text-[12px] text-[#080D1E]/55 leading-relaxed flex-1">
-                      Upload supplier Excel/PDF, extract cost items, add margin, and generate GCI customer quote. 上传供应商报价，读取成本，加价后生成 GCI 客户报价。
+                    <p className="text-[12px] text-slate-600 leading-relaxed flex-1">
+                      {lang === 'en' ? "Upload supplier Excel/PDF, extract cost items, add margin, and generate GCI customer quote." : "上传供应商报价，读取成本，加价后生成 GCI 客户报价。"}
                     </p>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-[#CBA85C] opacity-0 group-hover:opacity-100 transition-opacity">Save to Archive →</p>
+                    <p className="text-xs font-bold text-[#7A5F2A] opacity-0 group-hover:opacity-100 transition-opacity">Save to Archive →</p>
                   </button>
 
                   {/* 3: Package Quote — NEW */}
                   <button onClick={() => { setAppMode('package-quote'); setPqProject(null); setPqParseStatus('idle'); setPqParseError(''); }}
-                    className="group text-left p-8 bg-white border rounded-[18px] shadow-sm hover:border-[#CBA85C] hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col gap-4" style={{ borderColor: '#080D1E14' }}>
+                    className="group text-left p-8 bg-white border rounded-md shadow-sm hover:border-[#CBA85C] hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col gap-4" style={{ borderColor: '#080D1E14' }}>
                     <div className="flex items-center justify-between">
-                      <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#CBA85C] bg-[#CBA85C]/10 px-2 py-1 rounded-full">FF&E · Hotel · Apt</span>
-                      <Layers className="w-6 h-6 text-[#080D1E]/20 group-hover:text-[#CBA85C] transition-colors" />
+                      <span className="text-xs font-bold text-[#7A5F2A] bg-[#CBA85C]/10 px-2 py-1 rounded-full">FF&E · Hotel · Apt</span>
+                      <Layers className="w-6 h-6 text-slate-600 group-hover:text-[#7A5F2A] transition-colors" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-[#080D1E] group-hover:text-[#CBA85C] transition-colors" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>Package Quote</h3>
-                      <p className="text-[11px] text-[#080D1E]/40 font-bold mt-0.5">套餐报价</p>
+                      <h3 className="text-lg font-semibold text-[#080D1E] group-hover:text-[#7A5F2A] transition-colors" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>Package Quote</h3>
+                      {lang !== 'en' && <p className="text-xs text-slate-600 font-bold mt-0.5">套餐报价</p>}
                     </div>
-                    <p className="text-[12px] text-[#080D1E]/55 leading-relaxed flex-1">
-                      Import multi-sheet Excel as Project → Package → Items. For CoolHome, FF&E, Apartment, Hotel. 多 Sheet 套餐导入，适用于公寓/酒店项目。
+                    <p className="text-[12px] text-slate-600 leading-relaxed flex-1">
+                      {lang === 'en' ? "Import multi-sheet Excel as Project → Package → Items. For CoolHome, FF&E, Apartment, Hotel." : "多 Sheet 套餐导入，适用于公寓/酒店项目。"}
                     </p>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-[#CBA85C] opacity-0 group-hover:opacity-100 transition-opacity">Import Packages →</p>
+                    <p className="text-xs font-bold text-[#7A5F2A] opacity-0 group-hover:opacity-100 transition-opacity">Import Packages →</p>
                   </button>
 
                   {/* 4: Service Quote — NEW */}
                   <button onClick={() => { setAppMode('service-quote'); setSvcView('list'); svcLoadQuoteList(); }}
-                    className="group text-left p-8 bg-white border rounded-[18px] shadow-sm hover:border-[#CBA85C] hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col gap-4" style={{ borderColor: '#080D1E14' }}>
+                    className="group text-left p-8 bg-white border rounded-md shadow-sm hover:border-[#CBA85C] hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col gap-4" style={{ borderColor: '#080D1E14' }}>
                     <div className="flex items-center justify-between">
-                      <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#CBA85C] bg-[#CBA85C]/10 px-2 py-1 rounded-full">Services</span>
-                      <Briefcase className="w-6 h-6 text-[#080D1E]/20 group-hover:text-[#CBA85C] transition-colors" />
+                      <span className="text-xs font-bold text-[#7A5F2A] bg-[#CBA85C]/10 px-2 py-1 rounded-full">Services</span>
+                      <Briefcase className="w-6 h-6 text-slate-600 group-hover:text-[#7A5F2A] transition-colors" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-[#080D1E] group-hover:text-[#CBA85C] transition-colors" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>Service Quote</h3>
-                      <p className="text-[11px] text-[#080D1E]/40 font-bold mt-0.5">服务报价</p>
+                      <h3 className="text-lg font-semibold text-[#080D1E] group-hover:text-[#7A5F2A] transition-colors" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>Service Quote</h3>
+                      {lang !== 'en' && <p className="text-xs text-slate-600 font-bold mt-0.5">服务报价</p>}
                     </div>
-                    <p className="text-[12px] text-[#080D1E]/55 leading-relaxed flex-1">
-                      Corporate services, market entry, project coordination, overseas warehouse, supply chain, AI solutions. 企业服务/出海/项目/海外仓/供应链/AI数字化（不涉及库存与成本）。
+                    <p className="text-[12px] text-slate-600 leading-relaxed flex-1">
+                      {lang === 'en' ? "Corporate services, market entry, project coordination, overseas warehouse, supply chain, AI solutions." : "企业服务/出海/项目/海外仓/供应链/AI数字化（不涉及库存与成本）。"}
                     </p>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-[#CBA85C] opacity-0 group-hover:opacity-100 transition-opacity">Build Quote →</p>
+                    <p className="text-xs font-bold text-[#7A5F2A] opacity-0 group-hover:opacity-100 transition-opacity">Build Quote →</p>
                   </button>
                 </div>
               </div>
@@ -9545,26 +9546,26 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 <div className="space-y-4">
                   <div className="text-center space-y-2">
                     <h2 className="text-3xl font-semibold" style={{ fontFamily: "'Space Grotesk',sans-serif", color: '#080D1E' }}>{t('History Center')}</h2>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#CBA85C]" style={{ fontFamily: "'IBM Plex Mono',monospace" }}>{t('Supplier Quotes Archive · GCI Customer Quotes')}</p>
+                    <p className="text-xs font-bold text-[#7A5F2A]" style={{ fontFamily: "'IBM Plex Mono',monospace" }}>{t('Supplier Quotes Archive · GCI Customer Quotes')}</p>
                   </div>
                   {/* Tab switcher */}
                   <div className="flex justify-center">
-                    <div className="flex bg-[#080D1E]/5 p-1 rounded-2xl gap-1">
+                    <div className="flex bg-[#080D1E]/5 p-1 rounded-[10px] gap-1">
                       <button
                         onClick={() => setHistoryTab('supplier')}
-                        className="px-6 py-2.5 rounded-xl text-[12px] font-black uppercase tracking-wider transition-all"
+                        className="px-6 py-2.5 rounded-md text-[12px] font-bold transition-all"
                         style={historyTab === 'supplier'
                           ? { backgroundColor: '#080D1E', color: '#CBA85C' }
-                          : { color: '#080D1E60' }}
+                          : { color: '#475569' }}
                       >
                         {t('Supplier Quotes')}
                       </button>
                       <button
                         onClick={() => setHistoryTab('gci')}
-                        className="px-6 py-2.5 rounded-xl text-[12px] font-black uppercase tracking-wider transition-all"
+                        className="px-6 py-2.5 rounded-md text-[12px] font-bold transition-all"
                         style={historyTab === 'gci'
                           ? { backgroundColor: '#080D1E', color: '#CBA85C' }
-                          : { color: '#080D1E60' }}
+                          : { color: '#475569' }}
                       >
                         {t('GCI Quotes')}
                       </button>
@@ -9576,15 +9577,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 {historyTab === 'supplier' && (
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-[#080D1E]">{t('Supplier Quote Archive')}</span>
+                      <span className="text-xs font-bold text-[#080D1E]">{t('Supplier Quote Archive')}</span>
                       <div className="h-px flex-1 bg-[#080D1E]/10" />
-                      {supplierQuotesLoading && <RefreshCw className="w-3.5 h-3.5 text-[#CBA85C] animate-spin" />}
-                      <span className="text-[9px] text-[#080D1E]/30 font-bold uppercase">{t('Cloud · Supabase')}</span>
+                      {supplierQuotesLoading && <RefreshCw className="w-3.5 h-3.5 text-[#7A5F2A] animate-spin" />}
+                      <span className="text-xs text-slate-600 font-bold ">{t('Cloud · Supabase')}</span>
                     </div>
                     {!supplierQuotesLoading && supplierQuotes.length === 0 && (
-                      <div className="text-center py-12 border-2 border-dashed border-[#080D1E]/8 rounded-[28px] text-[#080D1E]/30">
+                      <div className="text-center py-12 border-2 border-dashed border-[#080D1E]/8 rounded-[10px] text-slate-600">
                         <p className="text-sm" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>{t('No supplier quotes saved yet')}</p>
-                        <p className="text-[11px] mt-1">{t('Upload a supplier quote → review costs → click "Save to Supplier Archive"')}</p>
+                        <p className="text-xs mt-1">{t('Upload a supplier quote → review costs → click "Save to Supplier Archive"')}</p>
                       </div>
                     )}
                     <div className="grid grid-cols-1 gap-3">
@@ -9594,30 +9595,30 @@ Leave a field as empty string if not present. Never fabricate values.`;
                           : sq.status === 'Archived' ? 'bg-slate-100 text-slate-500'
                           : 'bg-[#CBA85C]/15 text-[#A07C2D]';
                         return (
-                          <div key={sq.id} id={`sq-row-${sq.id}`} className={`p-5 bg-white border rounded-[24px] flex items-center gap-5 hover:border-[#CBA85C]/40 transition-all group ${sq.id === _focusSqId ? 'border-[#CBA85C] ring-2 ring-[#CBA85C]/40' : 'border-[#080D1E]/8'}`}>
+                          <div key={sq.id} id={`sq-row-${sq.id}`} className={`p-5 bg-white border rounded-[10px] flex items-center gap-5 hover:border-[#CBA85C]/40 transition-all group ${sq.id === _focusSqId ? 'border-[#CBA85C] ring-2 ring-[#CBA85C]/40' : 'border-[#080D1E]/8'}`}>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
-                                <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${statusColor}`}>{sq.status}</span>
-                                {sq.supplier_quote_no && <span className="text-[9px] font-mono text-[#080D1E]/40">{sq.supplier_quote_no}</span>}
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${statusColor}`}>{sq.status}</span>
+                                {sq.supplier_quote_no && <span className="text-xs font-mono-label text-slate-600">{sq.supplier_quote_no}</span>}
                               </div>
-                              <h3 className="text-base font-black text-[#080D1E] truncate">{sq.supplier_name || t('(Unnamed Supplier)')}</h3>
-                              <p className="text-[11px] text-[#080D1E]/40 mt-0.5">{sq.quote_date} · {sq.currency}</p>
-                              {sq.terms_notes && <p className="text-[10px] text-[#080D1E]/30 mt-0.5 truncate">{sq.terms_notes.slice(0, 60)}</p>}
+                              <h3 className="text-base font-bold text-[#080D1E] truncate">{sq.supplier_name || t('(Unnamed Supplier)')}</h3>
+                              <p className="text-xs text-slate-600 mt-0.5">{sq.quote_date} · {sq.currency}</p>
+                              {sq.terms_notes && <p className="text-xs text-slate-600 mt-0.5 truncate">{sq.terms_notes.slice(0, 60)}</p>}
                             </div>
                             <div className="text-right shrink-0">
-                              <p className="text-[9px] font-bold uppercase text-[#080D1E]/30">{t('Total Cost')}</p>
-                              <p className="text-lg font-black font-mono text-[#080D1E]">{sq.currency} {(sq.total_cost || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                              <p className="text-xs font-bold text-slate-600">{t('Total Cost')}</p>
+                              <p className="text-lg font-bold font-mono-label text-[#080D1E]">{sq.currency} {(sq.total_cost || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
                             </div>
                             {sq.status !== 'Converted' && (
                               <button
                                 onClick={() => handleCreateGCIQuoteFromSupplier(sq)}
-                                className="shrink-0 px-4 py-3 rounded-[16px] text-[10px] font-black uppercase tracking-wider border border-[#CBA85C]/30 text-[#CBA85C] bg-[#080D1E] hover:bg-[#0F2551] transition-all active:scale-95"
+                                className="shrink-0 px-4 py-3 rounded-md text-xs font-bold border border-[#CBA85C]/30 text-[#7A5F2A] bg-[#080D1E] hover:bg-[#0F2551] transition-all active:scale-95"
                               >
                                 {t('Create GCI Quote')}
                               </button>
                             )}
                             {sq.status === 'Converted' && (
-                              <div className="shrink-0 px-4 py-3 rounded-[16px] text-[10px] font-black uppercase tracking-wider text-green-600 bg-green-50">
+                              <div className="shrink-0 px-4 py-3 rounded-[10px] text-xs font-bold text-green-700 bg-green-50">
                                 {t('✓ Converted')}
                               </div>
                             )}
@@ -9633,7 +9634,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                                   alert(t('Delete failed. Please try again.'));
                                 }
                               }}
-                              className="shrink-0 px-3 py-3 rounded-[16px] text-[10px] font-black uppercase tracking-wider text-red-400 border border-red-200 hover:bg-red-50 transition-all"
+                              className="shrink-0 px-3 py-3 rounded-md text-xs font-bold text-red-600 border border-red-200 hover:bg-red-50 transition-all"
                             >
                               {t('Delete')}
                             </button>
@@ -9650,45 +9651,45 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 {/* ── Section 1: Cloud Trade/BOQ Quotes ───────────────── */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-[#080D1E]">{t('Trade & Sourcing · BOQ')}</span>
+                    <span className="text-xs font-bold text-[#080D1E]">{t('Trade & Sourcing · BOQ')}</span>
                     <div className="h-px flex-1 bg-[#080D1E]/10" />
-                    {cloudHistoryLoading && <RefreshCw className="w-3.5 h-3.5 text-[#CBA85C] animate-spin" />}
-                    <span className="text-[9px] text-[#080D1E]/30 font-bold uppercase">{t('Cloud · Auto-saved')}</span>
+                    {cloudHistoryLoading && <RefreshCw className="w-3.5 h-3.5 text-[#7A5F2A] animate-spin" />}
+                    <span className="text-xs text-slate-600 font-bold ">{t('Cloud · Auto-saved')}</span>
                   </div>
 
                   {!cloudHistoryLoading && cloudHistory.length === 0 && (
-                    <div className="text-center py-10 border-2 border-dashed border-[#080D1E]/8 rounded-[28px] text-[#080D1E]/30">
+                    <div className="text-center py-10 border-2 border-dashed border-[#080D1E]/8 rounded-[10px] text-slate-600">
                       <p className="text-sm" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>{t('No cloud quotes yet')}</p>
-                      <p className="text-[10px] mt-1">{t('Quotes auto-save when you click Generate GCI Quote')}</p>
+                      <p className="text-xs mt-1">{t('Quotes auto-save when you click Generate GCI Quote')}</p>
                     </div>
                   )}
 
                   <div className="grid grid-cols-1 gap-3">
                     {cloudHistory.map(rec => {
-                      const statusColor = rec.status === 'SENT_TO_TRADE' ? 'bg-green-100 text-green-700' : rec.status === 'GENERATED' ? 'bg-[#CBA85C]/15 text-[#A07C2D]' : 'bg-[#080D1E]/8 text-[#080D1E]/50';
+                      const statusColor = rec.status === 'SENT_TO_TRADE' ? 'bg-green-100 text-green-700' : rec.status === 'GENERATED' ? 'bg-[#CBA85C]/15 text-[#A07C2D]' : 'bg-[#080D1E]/8 text-slate-600';
                       return (
                         <div
                           key={rec.id}
-                          className="p-5 bg-white border border-[#080D1E]/8 rounded-[24px] flex items-center gap-5 hover:border-[#CBA85C] hover:shadow-lg transition-all group cursor-pointer"
+                          className="p-5 bg-white border border-[#080D1E]/8 rounded-[10px] flex items-center gap-5 hover:border-[#CBA85C] hover:shadow-lg transition-all group cursor-pointer"
                           onClick={() => handleLoadDraft(rec.quote_no)}
                         >
                           {/* Left: info */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${statusColor}`}>
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${statusColor}`}>
                                 {rec.status?.replace('_', ' ')}
                               </span>
-                              <span className="text-[9px] font-bold text-[#080D1E]/30 uppercase">{rec.quote_type}</span>
-                              {rec.source === 'DEAL' && <span className="text-[8px] font-black text-[#CBA85C] bg-[#CBA85C]/10 px-1.5 py-0.5 rounded">DEAL</span>}
+                              <span className="text-xs font-bold text-slate-600 ">{rec.quote_type}</span>
+                              {rec.source === 'DEAL' && <span className="text-xs font-bold text-[#7A5F2A] bg-[#CBA85C]/10 px-1.5 py-0.5 rounded">DEAL</span>}
                             </div>
-                            <h3 className="text-base font-black text-[#080D1E] truncate">{rec.customer_name || '—'}</h3>
-                            <p className="text-[10px] text-[#080D1E]/40 mt-0.5">{rec.quote_no} · {rec.quote_date} · {rec.salesperson || t('Staff')}</p>
+                            <h3 className="text-base font-bold text-[#080D1E] truncate">{rec.customer_name || '—'}</h3>
+                            <p className="text-xs text-slate-600 mt-0.5">{rec.quote_no} · {rec.quote_date} · {rec.salesperson || t('Staff')}</p>
                           </div>
                           {/* Right: amounts */}
                           <div className="text-right shrink-0">
-                            <p className="text-[9px] font-bold uppercase text-[#080D1E]/30">{t('Grand Total')}</p>
-                            <p className="text-lg font-black font-mono text-[#080D1E]">AED {(rec.grand_total || 0).toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
-                            {rec.margin_percent > 0 && <p className="text-[9px] text-green-600 font-bold">{rec.margin_percent.toFixed(1)}% margin</p>}
+                            <p className="text-xs font-bold text-slate-600">{t('Grand Total')}</p>
+                            <p className="text-lg font-bold font-mono-label text-[#080D1E]">AED {(rec.grand_total || 0).toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
+                            {rec.margin_percent > 0 && <p className="text-xs text-green-700 font-bold">{rec.margin_percent.toFixed(1)}% margin</p>}
                           </div>
                           <button
                             onClick={async e => {
@@ -9703,11 +9704,11 @@ Leave a field as empty string if not present. Never fabricate values.`;
                                 alert(t('Delete failed. Please try again.'));
                               }
                             }}
-                            className="shrink-0 px-3 py-3 rounded-[16px] text-[10px] font-black uppercase tracking-wider text-red-400 border border-red-200 hover:bg-red-50 transition-all"
+                            className="shrink-0 px-3 py-3 rounded-md text-xs font-bold text-red-600 border border-red-200 hover:bg-red-50 transition-all"
                           >
                             {t('Delete')}
                           </button>
-                          <ChevronRight className="w-5 h-5 text-[#080D1E]/20 group-hover:text-[#CBA85C] transition-colors shrink-0" />
+                          <ChevronRight className="w-5 h-5 text-slate-600 group-hover:text-[#7A5F2A] transition-colors shrink-0" />
                         </div>
                       );
                     })}
@@ -9718,23 +9719,23 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 {quoteHistory.length > 0 && (
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-brand-brown/60">{t('Custom Item Quotes')}</span>
-                      <div className="h-px flex-1 bg-brand-beige" />
-                      <span className="text-[9px] text-brand-brown/30 font-bold uppercase">{t('Local · BOM')}</span>
+                      <span className="text-xs font-bold text-slate-600">{t('Custom Item Quotes')}</span>
+                      <div className="h-px flex-1 bg-[#F8F9FB]" />
+                      <span className="text-xs text-slate-600 font-bold ">{t('Local · BOM')}</span>
                     </div>
                     <div className="grid grid-cols-1 gap-3">
                       {quoteHistory.map(quote => (
-                        <div key={quote.id} className="p-6 bg-brand-beige/20 border border-brand-beige rounded-[24px] flex items-center gap-5 hover:shadow-md transition-all group cursor-pointer" onClick={() => restoreQuote(quote)}>
+                        <div key={quote.id} className="p-6 bg-[#F8F9FB]/20 border border-[rgba(12,27,58,0.1)] rounded-[10px] flex items-center gap-5 hover:shadow-md transition-all group cursor-pointer" onClick={() => restoreQuote(quote)}>
                           <div className="flex-1 min-w-0">
-                            <p className="text-[9px] font-bold text-brand-gold uppercase tracking-widest">{quote.date} · {quote.quoteNumber}</p>
-                            <h3 className="text-base font-serif italic text-brand-brown truncate">{quote.customerProjectName || '未命名'}</h3>
-                            <p className="text-[10px] text-brand-brown-muted mt-0.5">{t(quote.category)} · {quote.salesperson || t('Staff')}</p>
+                            <p className="text-xs font-bold text-[#7A5F2A] ">{quote.date} · {quote.quoteNumber}</p>
+                            <h3 className="text-base italic text-[#0C1B3A] truncate">{quote.customerProjectName || '未命名'}</h3>
+                            <p className="text-xs text-slate-600 mt-0.5">{t(quote.category)} · {quote.salesperson || t('Staff')}</p>
                           </div>
                           <div className="text-right shrink-0">
-                            <span className="text-[9px] font-bold text-brand-brown-muted uppercase block">{t('Total')}</span>
-                            <span className="text-lg font-serif italic text-brand-brown">{quote.totalAmount.toLocaleString(undefined, {maximumFractionDigits:0})} AED</span>
+                            <span className="text-xs font-bold text-slate-600 block">{t('Total')}</span>
+                            <span className="text-lg italic text-[#0C1B3A]">{quote.totalAmount.toLocaleString(undefined, {maximumFractionDigits:0})} AED</span>
                           </div>
-                          <ChevronRight className="w-5 h-5 text-brand-gold/40 group-hover:text-brand-brown transition-colors shrink-0" />
+                          <ChevronRight className="w-5 h-5 text-[#7A5F2A]/40 group-hover:text-[#0C1B3A] transition-colors shrink-0" />
                         </div>
                       ))}
                     </div>
@@ -9772,7 +9773,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   <div className="flex items-center gap-6">
                     <button
                       onClick={() => setSelectedCategory(null)}
-                      className="p-3 bg-brand-beige/50 rounded-full hover:bg-brand-brown hover:text-brand-ivory transition-all text-brand-brown"
+                      className="p-3 bg-[#F8F9FB]/50 rounded-full hover:bg-[#080D1E] hover:text-white transition-all text-[#0C1B3A]"
                     >
                       <ChevronLeft className="w-5 h-5" />
                     </button>
@@ -9780,20 +9781,20 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       <div className="flex items-center gap-2">
                         {selectedScenario && (
                           <>
-                            <span className="text-[8px] font-bold text-brand-gold uppercase tracking-widest">{t(selectedScenario)}</span>
-                            <span className="w-1 h-1 rounded-full bg-brand-beige" />
+                            <span className="text-xs font-bold text-[#7A5F2A] ">{t(selectedScenario)}</span>
+                            <span className="w-1 h-1 rounded-full bg-[#F8F9FB]" />
                           </>
                         )}
-                        <span className="text-[8px] font-bold text-brand-brown uppercase tracking-widest">{t(selectedCategory)}</span>
+                        <span className="text-xs font-bold text-[#0C1B3A] ">{t(selectedCategory)}</span>
                       </div>
-                      <h2 className="text-xl font-serif italic text-brand-brown mt-1">{t('Configuration Panel')}</h2>
+                      <h2 className="text-xl italic text-[#0C1B3A] mt-1">{t('Configuration Panel')}</h2>
                     </div>
                   </div>
                   <div className="hidden sm:flex items-center gap-2">
                     {STEPS.map((step, idx) => (
                       <div 
                         key={step.id}
-                        className={`w-2 h-2 rounded-full transition-all duration-500 ${idx === currentStep ? 'bg-brand-gold w-6' : idx < currentStep ? 'bg-brand-brown' : 'bg-brand-beige'}`}
+                        className={`w-2 h-2 rounded-full transition-all duration-500 ${idx === currentStep ? 'bg-[#080D1E] w-6' : idx < currentStep ? 'bg-[#080D1E]' : 'bg-[#F8F9FB]'}`}
                       />
                     ))}
                   </div>
@@ -9816,18 +9817,18 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 </AnimatePresence>
 
                 {currentStep < STEPS.length - 1 && (
-                  <div className="mt-20 flex justify-between items-center max-w-2xl mx-auto w-full pt-12 border-t border-brand-beige">
+                  <div className="mt-20 flex justify-between items-center max-w-2xl mx-auto w-full pt-12 border-t border-[rgba(12,27,58,0.1)]">
                     <button
                       onClick={handleBack}
-                      className={`flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.2em] transition-colors ${currentStep === 0 ? 'opacity-0 cursor-default' : 'text-brand-gold-muted hover:text-brand-brown'}`}
+                      className={`flex items-center gap-3 text-xs font-bold transition-colors ${currentStep === 0 ? 'opacity-0 cursor-default' : 'text-slate-600 hover:text-[#0C1B3A]'}`}
                     >
                       <ChevronLeft className="w-4 h-4" /> {t('Previous')}
                     </button>
                     <button
                       onClick={handleNext}
-                      className="bg-brand-brown text-brand-ivory py-6 px-14 rounded-[28px] text-[11px] font-bold uppercase tracking-[0.3em] shadow-2xl shadow-brand-brown/20 flex items-center gap-4 hover:translate-x-1 hover:shadow-brand-brown/30 transition-all active:scale-95 group"
+                      className="bg-[#080D1E] text-white py-6 px-14 rounded-md text-xs font-bold shadow-2xl shadow-brand-brown/20 flex items-center gap-4 hover:translate-x-1 hover:shadow-brand-brown/30 transition-all active:scale-95 group"
                     >
-                      {t('Next Stage')} <ChevronRight className="w-4 h-4 text-brand-gold group-hover:translate-x-1 transition-transform" />
+                      {t('Next Stage')} <ChevronRight className="w-4 h-4 text-[#7A5F2A] group-hover:translate-x-1 transition-transform" />
                     </button>
                   </div>
                 )}
@@ -9836,56 +9837,56 @@ Leave a field as empty string if not present. Never fabricate values.`;
           </div>
         </main>
 
-        <footer className="mt-20 flex flex-col sm:flex-row justify-between items-center gap-10 text-[10px] font-bold uppercase tracking-[0.25em] text-brand-brown-muted italic px-4">
+        <footer className="mt-20 flex flex-col sm:flex-row justify-between items-center gap-10 text-xs font-bold text-slate-600 italic px-4">
           <div className="flex gap-12">
-             <span className="hover:text-brand-brown transition-colors cursor-default">{t('Terms Factory')}</span>
-             <span className="hover:text-brand-brown transition-colors cursor-default">{t('Commercial Grade')}</span>
+             <span className="hover:text-[#0C1B3A] transition-colors cursor-default">{t('Terms Factory')}</span>
+             <span className="hover:text-[#0C1B3A] transition-colors cursor-default">{t('Commercial Grade')}</span>
           </div>
           <div className="flex items-center gap-4">
-             <span className="w-2 h-2 rounded-full bg-brand-gold shadow-[0_0_12px_rgba(197,160,89,0.6)] animate-pulse" />
-             <span className="text-brand-brown opacity-80">{t('Verified Status')}</span>
+             <span className="w-2 h-2 rounded-full bg-[#080D1E] shadow-[0_0_12px_rgba(197,160,89,0.6)] animate-pulse" />
+             <span className="text-[#0C1B3A] opacity-80">{t('Verified Status')}</span>
           </div>
         </footer>
 
         {/* Module Edit Modal */}
         <AnimatePresence>
           {isModuleModalOpen && editingModule && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-10">
+            <ModalPortal><div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 max-sm:p-0 max-sm:items-start max-sm:overflow-y-auto sm:p-10">
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setIsModuleModalOpen(false)}
-                className="absolute inset-0 bg-brand-brown/40 backdrop-blur-md"
+                className="absolute inset-0 bg-[#080D1E]/40 backdrop-blur-md"
               />
               <motion.div 
                 initial={{ opacity: 0, scale: 0.9, y: 30 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: 30 }}
-                className="relative bg-brand-ivory w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-[60px] shadow-3xl border border-brand-gold/20 p-8 sm:p-16 custom-scrollbar text-sans"
+                className="relative bg-[#F5F6FA] w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-[10px] shadow-3xl border border-[#A07F3C]/20 p-8 sm:p-16 custom-scrollbar text-sans"
               >
                 <button 
                   onClick={() => setIsModuleModalOpen(false)}
-                  className="absolute top-8 right-8 p-4 rounded-full bg-brand-beige/20 text-brand-brown hover:bg-brand-brown hover:text-brand-ivory transition-all z-20"
+                  className="absolute top-8 right-8 p-4 rounded-full bg-[#F8F9FB]/20 text-[#0C1B3A] hover:bg-[#080D1E] hover:text-white transition-all z-20"
                 >
                   <X className="w-6 h-6" />
                 </button>
       
                 <div className="space-y-12">
                   <header className="space-y-3">
-                     <span className="text-[10px] font-bold text-brand-gold uppercase tracking-[0.4em]">{t('Module Configuration')}</span>
-                     <h2 className="text-4xl font-serif italic text-brand-brown">{t('Detailed Parameters')}</h2>
+                     <span className="text-xs font-bold text-[#7A5F2A] ">{t('Module Configuration')}</span>
+                     <h2 className="text-4xl italic text-[#0C1B3A]">{t('Detailed Parameters')}</h2>
                   </header>
       
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-12">
                     <div className="space-y-4">
-                      <label className="text-[10px] font-bold text-brand-brown-muted uppercase tracking-widest">{t('Module Type')}</label>
+                      <label className="text-xs font-bold text-slate-600 ">{t('Module Type')}</label>
                       <div className="grid grid-cols-2 gap-3">
                         {Object.values(CabinetModuleType).map(type => (
                           <button
                             key={type}
                             onClick={() => setEditingModule({...editingModule, type})}
-                            className={`p-4 text-[10px] font-bold uppercase tracking-wider rounded-2xl border transition-all ${editingModule.type === type ? 'bg-brand-brown text-brand-ivory border-brand-brown' : 'bg-white text-brand-brown border-brand-beige hover:border-brand-gold'}`}
+                            className={`p-4 text-xs font-bold rounded-md border transition-all ${editingModule.type === type ? 'bg-[#080D1E] text-white border-[#0C1B3A]' : 'bg-white text-[#0C1B3A] border-[rgba(12,27,58,0.1)] hover:border-[#A07F3C]'}`}
                           >
                             {t(type)}
                           </button>
@@ -9894,7 +9895,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     </div>
       
                     <div className="space-y-6">
-                      <label className="text-[10px] font-bold text-brand-brown-muted uppercase tracking-widest">{t('Dimensions & Qty')}</label>
+                      <label className="text-xs font-bold text-slate-600 ">{t('Dimensions & Qty')}</label>
                       <div className="grid grid-cols-2 gap-6">
                         {[
                           { label: t('Width Label'), key: 'width' },
@@ -9903,12 +9904,12 @@ Leave a field as empty string if not present. Never fabricate values.`;
                           { label: t('Quantity'), key: 'quantity' }
                         ].map(field => (
                           <div key={field.key} className="space-y-2">
-                             <span className="text-[9px] font-bold text-brand-gold/60 uppercase">{field.label}</span>
+                             <span className="text-xs font-bold text-[#7A5F2A]/60 ">{field.label}</span>
                              <input 
                                type="number"
                                value={(editingModule as any)[field.key]}
                                onChange={e => setEditingModule({...editingModule, [field.key]: Number(e.target.value)})}
-                               className="w-full bg-transparent border-b border-brand-brown/10 py-2 text-xl font-serif italic focus:border-brand-gold outline-none"
+                               className="w-full bg-transparent border-b border-[#0C1B3A]/10 py-2 text-xl italic focus:border-[#A07F3C] outline-none"
                              />
                           </div>
                         ))}
@@ -9916,14 +9917,14 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     </div>
       
                     <div className="space-y-6">
-                       <label className="text-[10px] font-bold text-brand-brown-muted uppercase tracking-widest">{t('Materials')}</label>
+                       <label className="text-xs font-bold text-slate-600 ">{t('Materials')}</label>
                        <div className="space-y-6">
                          <div className="grid grid-cols-2 gap-3">
                            {[Material.PLYWOOD, Material.MDF, Material.SOLID_WOOD].map(m => (
                              <button
                                key={m}
                                onClick={() => setEditingModule({...editingModule, material: m})}
-                               className={`p-4 text-[10px] font-bold rounded-2xl border ${editingModule.material === m ? 'bg-brand-brown text-brand-ivory border-brand-brown' : 'bg-white border-brand-beige'}`}
+                               className={`p-4 text-xs font-bold rounded-md border ${editingModule.material === m ? 'bg-[#080D1E] text-white border-[#0C1B3A]' : 'bg-white border-[rgba(12,27,58,0.1)]'}`}
                              >
                                {t(m)}
                              </button>
@@ -9934,7 +9935,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                              <button
                                key={th}
                                onClick={() => setEditingModule({...editingModule, thickness: th})}
-                               className={`p-3 text-[9px] font-bold rounded-xl border ${editingModule.thickness === th ? 'bg-brand-gold text-white border-brand-gold' : 'bg-white border-brand-beige'}`}
+                               className={`p-3 text-xs font-bold rounded-md border ${editingModule.thickness === th ? 'bg-[#080D1E] text-white border-[#A07F3C]' : 'bg-white border-[rgba(12,27,58,0.1)]'}`}
                              >
                                {t(th)}
                              </button>
@@ -9944,14 +9945,14 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     </div>
       
                     <div className="space-y-6">
-                      <label className="text-[10px] font-bold text-brand-brown-muted uppercase tracking-widest">{t('Aesthetics')}</label>
+                      <label className="text-xs font-bold text-slate-600 ">{t('Aesthetics')}</label>
                       <div className="space-y-6">
                          <div className="grid grid-cols-2 gap-3">
                             {Object.values(FinishType).map(f => (
                               <button
                                 key={f}
                                 onClick={() => setEditingModule({...editingModule, finish: f})}
-                                className={`p-4 text-[10px] font-bold rounded-2xl border ${editingModule.finish === f ? 'bg-brand-brown text-brand-ivory border-brand-brown' : 'bg-white border-brand-beige'}`}
+                                className={`p-4 text-xs font-bold rounded-md border ${editingModule.finish === f ? 'bg-[#080D1E] text-white border-[#0C1B3A]' : 'bg-white border-[rgba(12,27,58,0.1)]'}`}
                               >
                                 {t(f)}
                               </button>
@@ -9962,10 +9963,10 @@ Leave a field as empty string if not present. Never fabricate values.`;
                               <button
                                 key={c}
                                 onClick={() => setEditingModule({...editingModule, color: c})}
-                                className={`h-10 rounded-xl border-2 transition-all flex items-center justify-center ${editingModule.color === c ? 'border-brand-gold scale-105 shadow-sm' : 'border-transparent'}`}
+                                className={`h-10 rounded-md border-2 transition-all flex items-center justify-center ${editingModule.color === c ? 'border-[#A07F3C] scale-105 shadow-sm' : 'border-transparent'}`}
                                 style={{ backgroundColor: c === Color.WHITE ? '#FFFFFF' : c === Color.BEIGE ? '#F5F5DC' : c === Color.WALNUT ? '#5D4037' : c === Color.GREY ? '#808080' : '#CCCCCC' }}
                               >
-                                {editingModule.color === c && <PlusCircle className={`w-3 h-3 ${c === Color.WHITE || c === Color.BEIGE ? 'text-brand-gold' : 'text-brand-ivory'}`} />}
+                                {editingModule.color === c && <PlusCircle className={`w-3 h-3 ${c === Color.WHITE || c === Color.BEIGE ? 'text-[#7A5F2A]' : 'text-white'}`} />}
                               </button>
                             ))}
                          </div>
@@ -9973,45 +9974,45 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     </div>
   
                     <div className="space-y-6">
-                      <label className="text-[10px] font-bold text-brand-brown-muted uppercase tracking-widest">{t('Options')}</label>
-                      <div className="space-y-6 text-[10px]">
-                         <div className="flex items-center justify-between p-5 bg-brand-beige/20 rounded-3xl">
-                            <span className="font-bold uppercase tracking-widest">{t('Door Type Label')}</span>
+                      <label className="text-xs font-bold text-slate-600 ">{t('Options')}</label>
+                      <div className="space-y-6 text-xs">
+                         <div className="flex items-center justify-between p-5 bg-[#F8F9FB]/20 rounded-[10px]">
+                            <span className="font-bold ">{t('Door Type Label')}</span>
                             <select 
                               value={editingModule.doorType}
                               onChange={e => setEditingModule({...editingModule, doorType: e.target.value as DoorType})}
-                              className="bg-transparent border-none outline-none font-serif italic text-brand-brown text-right"
+                              className="bg-transparent border-none outline-none italic text-[#0C1B3A] text-right"
                             >
                               {Object.values(DoorType).map(dt => <option key={dt} value={dt}>{t(dt)}</option>)}
                             </select>
                          </div>
                          {editingModule.doorType !== DoorType.OPEN && (
-                            <div className="flex items-center justify-between p-5 bg-brand-beige/20 rounded-3xl">
-                               <span className="font-bold uppercase tracking-widest">{t('Door Count Label')}</span>
+                            <div className="flex items-center justify-between p-5 bg-[#F8F9FB]/20 rounded-[10px]">
+                               <span className="font-bold ">{t('Door Count Label')}</span>
                                <input 
                                  type="number"
                                  value={editingModule.doorCount}
                                  onChange={e => setEditingModule({...editingModule, doorCount: Number(e.target.value)})}
-                                 className="w-12 bg-transparent border-b border-brand-brown/10 text-center font-mono"
+                                 className="w-12 bg-transparent border-b border-[#0C1B3A]/10 text-center font-mono-label"
                                />
                             </div>
                          )}
-                         <div className="flex items-center justify-between p-5 bg-brand-beige/20 rounded-3xl">
-                            <span className="font-bold uppercase tracking-widest">{t('Mounting Label')}</span>
+                         <div className="flex items-center justify-between p-5 bg-[#F8F9FB]/20 rounded-[10px]">
+                            <span className="font-bold ">{t('Mounting Label')}</span>
                             <select 
                               value={editingModule.mounting}
                               onChange={e => setEditingModule({...editingModule, mounting: e.target.value as MountingType})}
-                              className="bg-transparent border-none outline-none font-serif italic text-brand-brown text-right"
+                              className="bg-transparent border-none outline-none italic text-[#0C1B3A] text-right"
                             >
                               {Object.values(MountingType).map(mt => <option key={mt} value={mt}>{t(mt)}</option>)}
                             </select>
                          </div>
-                         <div className="flex items-center justify-between p-5 bg-brand-beige/20 rounded-3xl">
-                            <span className="font-bold uppercase tracking-widest">{t('Drawers Label')}</span>
+                         <div className="flex items-center justify-between p-5 bg-[#F8F9FB]/20 rounded-[10px]">
+                            <span className="font-bold ">{t('Drawers Label')}</span>
                             <div className="flex items-center gap-4">
                               <button 
                                 onClick={() => setEditingModule({...editingModule, hasDrawers: !editingModule.hasDrawers})}
-                                className={`w-12 h-6 rounded-full relative transition-colors ${editingModule.hasDrawers ? 'bg-brand-gold' : 'bg-brand-beige'}`}
+                                className={`w-12 h-6 rounded-full relative transition-colors ${editingModule.hasDrawers ? 'bg-[#080D1E]' : 'bg-[#F8F9FB]'}`}
                               >
                                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${editingModule.hasDrawers ? 'left-7' : 'left-1'}`} />
                               </button>
@@ -10020,7 +10021,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                                   type="number"
                                   value={editingModule.drawerCount}
                                   onChange={e => setEditingModule({...editingModule, drawerCount: Number(e.target.value)})}
-                                  className="w-12 bg-transparent border-b border-brand-brown/10 text-center font-mono"
+                                  className="w-12 bg-transparent border-b border-[#0C1B3A]/10 text-center font-mono-label"
                                 />
                               )}
                             </div>
@@ -10029,22 +10030,22 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     </div>
 
                     <div className="space-y-6">
-                      <label className="text-[10px] font-bold text-brand-brown-muted uppercase tracking-widest">{t('Internal Layout')}</label>
-                      <div className="space-y-4 text-[10px]">
-                         <div className="flex items-center justify-between p-5 bg-brand-beige/20 rounded-3xl">
-                            <span className="font-bold uppercase tracking-widest">{t('Shelves Label')}</span>
+                      <label className="text-xs font-bold text-slate-600 ">{t('Internal Layout')}</label>
+                      <div className="space-y-4 text-xs">
+                         <div className="flex items-center justify-between p-5 bg-[#F8F9FB]/20 rounded-[10px]">
+                            <span className="font-bold ">{t('Shelves Label')}</span>
                             <input 
                               type="number"
                               value={editingModule.shelfCount}
                               onChange={e => setEditingModule({...editingModule, shelfCount: Number(e.target.value)})}
-                              className="w-12 bg-transparent border-b border-brand-brown/10 text-center font-mono"
+                              className="w-12 bg-transparent border-b border-[#0C1B3A]/10 text-center font-mono-label"
                             />
                          </div>
-                         <div className="flex items-center justify-between p-5 bg-brand-beige/20 rounded-3xl">
-                            <span className="font-bold uppercase tracking-widest">{t('Hanging Rail Label')}</span>
+                         <div className="flex items-center justify-between p-5 bg-[#F8F9FB]/20 rounded-[10px]">
+                            <span className="font-bold ">{t('Hanging Rail Label')}</span>
                             <button 
                               onClick={() => setEditingModule({...editingModule, hasHangingRail: !editingModule.hasHangingRail})}
-                              className={`w-12 h-6 rounded-full relative transition-colors ${editingModule.hasHangingRail ? 'bg-brand-gold' : 'bg-brand-beige'}`}
+                              className={`w-12 h-6 rounded-full relative transition-colors ${editingModule.hasHangingRail ? 'bg-[#080D1E]' : 'bg-[#F8F9FB]'}`}
                             >
                               <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${editingModule.hasHangingRail ? 'left-7' : 'left-1'}`} />
                             </button>
@@ -10053,16 +10054,16 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     </div>
 
                     <div className="space-y-6 md:col-span-2">
-                       <label className="text-[10px] font-bold text-brand-brown-muted uppercase tracking-widest">{t('Hardware Configuration')}</label>
+                       <label className="text-xs font-bold text-slate-600 ">{t('Hardware Configuration')}</label>
                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                          <div className="space-y-3">
-                            <span className="text-[9px] font-bold text-brand-gold/60 uppercase block">{t('Hinge Label')}</span>
+                            <span className="text-xs font-bold text-[#7A5F2A]/60 block">{t('Hinge Label')}</span>
                             <div className="flex flex-col gap-2">
                                {Object.values(HingeType).map(h => (
                                  <button
                                    key={h}
                                    onClick={() => setEditingModule({...editingModule, hingeType: h})}
-                                   className={`px-4 py-3 text-[10px] font-bold rounded-xl border text-left transition-all ${editingModule.hingeType === h ? 'bg-brand-brown text-brand-ivory border-brand-brown' : 'bg-white border-brand-beige'}`}
+                                   className={`px-4 py-3 text-xs font-bold rounded-md border text-left transition-all ${editingModule.hingeType === h ? 'bg-[#080D1E] text-white border-[#0C1B3A]' : 'bg-white border-[rgba(12,27,58,0.1)]'}`}
                                  >
                                    {t(h)}
                                  </button>
@@ -10070,13 +10071,13 @@ Leave a field as empty string if not present. Never fabricate values.`;
                             </div>
                          </div>
                          <div className="space-y-3">
-                            <span className="text-[9px] font-bold text-brand-gold/60 uppercase block">{t('Runner Label')}</span>
+                            <span className="text-xs font-bold text-[#7A5F2A]/60 block">{t('Runner Label')}</span>
                             <div className="flex flex-col gap-2">
                                {Object.values(RunnerType).map(r => (
                                  <button
                                    key={r}
                                    onClick={() => setEditingModule({...editingModule, runnerType: r})}
-                                   className={`px-4 py-3 text-[10px] font-bold rounded-xl border text-left transition-all ${editingModule.runnerType === r ? 'bg-brand-brown text-brand-ivory border-brand-brown' : 'bg-white border-brand-beige'}`}
+                                   className={`px-4 py-3 text-xs font-bold rounded-md border text-left transition-all ${editingModule.runnerType === r ? 'bg-[#080D1E] text-white border-[#0C1B3A]' : 'bg-white border-[rgba(12,27,58,0.1)]'}`}
                                  >
                                    {t(r)}
                                  </button>
@@ -10084,13 +10085,13 @@ Leave a field as empty string if not present. Never fabricate values.`;
                             </div>
                          </div>
                          <div className="space-y-3">
-                            <span className="text-[9px] font-bold text-brand-gold/60 uppercase block">{t('Handle Label')}</span>
+                            <span className="text-xs font-bold text-[#7A5F2A]/60 block">{t('Handle Label')}</span>
                             <div className="flex flex-col gap-2">
                                {Object.values(HandleType).map(h => (
                                  <button
                                    key={h}
                                    onClick={() => setEditingModule({...editingModule, handle: h})}
-                                   className={`px-4 py-3 text-[10px] font-bold rounded-xl border text-left transition-all ${editingModule.handle === h ? 'bg-brand-brown text-brand-ivory border-brand-brown' : 'bg-white border-brand-beige'}`}
+                                   className={`px-4 py-3 text-xs font-bold rounded-md border text-left transition-all ${editingModule.handle === h ? 'bg-[#080D1E] text-white border-[#0C1B3A]' : 'bg-white border-[rgba(12,27,58,0.1)]'}`}
                                  >
                                    {t(h)}
                                  </button>
@@ -10101,23 +10102,23 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     </div>
                   </div>
       
-                  <div className="pt-12 border-t border-brand-beige flex justify-end gap-6">
+                  <div className="pt-12 border-t border-[rgba(12,27,58,0.1)] flex justify-end gap-6">
                      <button 
                        onClick={() => setIsModuleModalOpen(false)}
-                       className="px-10 py-5 rounded-full text-[11px] font-bold uppercase tracking-widest text-brand-brown-muted hover:text-brand-brown"
+                       className="px-10 py-5 rounded-full text-xs font-bold text-slate-600 hover:text-[#0C1B3A]"
                      >
                        {t('Cancel')}
                      </button>
                      <button 
                        onClick={handleSaveModule}
-                       className="px-12 py-5 rounded-full bg-brand-brown text-brand-ivory text-[11px] font-bold uppercase tracking-widest shadow-2xl shadow-brand-brown/30 hover:bg-brand-brown/90 transition-all"
+                       className="px-12 py-5 rounded-full bg-[#080D1E] text-white text-xs font-bold shadow-2xl shadow-brand-brown/30 hover:bg-[#080D1E]/90 transition-all"
                      >
                        {t('Save Module')}
                      </button>
                   </div>
                 </div>
               </motion.div>
-            </div>
+            </div></ModalPortal>
           )}
         </AnimatePresence>
 
@@ -10137,24 +10138,24 @@ Leave a field as empty string if not present. Never fabricate values.`;
             : '—';
 
           return (
-            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0C1B3A]/60 backdrop-blur-sm">
-              <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-md mx-4 p-8 space-y-6">
+            <ModalPortal><div className="fixed inset-0 z-[1100] flex items-center justify-center bg-[#0C1B3A]/60">
+              <div className="bg-white rounded-[14px] shadow-2xl w-full max-w-md mx-4 p-8 space-y-6 max-sm:w-full max-sm:min-h-full max-sm:my-0 max-sm:max-w-none max-sm:max-h-none max-sm:rounded-none">
                 {/* Header */}
                 <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.3em] text-[#C9A84C] mb-1">{t('Step · Before Pricing')}</p>
-                  <h2 className="text-xl font-serif italic text-[#0C1B3A]">{t('Currency & Exchange Rate')}</h2>
-                  <p className="text-[11px] text-[#0C1B3A]/50 mt-1">确认汇率后才能进入定价</p>
+                  <p className="text-xs font-bold text-[#7A5F2A] mb-1">{t('Step · Before Pricing')}</p>
+                  <h2 className="text-xl italic text-[#0C1B3A]">{t('Currency & Exchange Rate')}</h2>
+                  <p className="text-xs text-slate-600 mt-1">确认汇率后才能进入定价</p>
                 </div>
 
                 {/* Supplier currency (read-only) */}
-                <div className="bg-[#0C1B3A]/4 rounded-2xl p-4 space-y-1">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40">{t('Supplier Original Currency')}</p>
-                  <p className="text-[18px] font-black text-[#0C1B3A]">{supplierCur}</p>
+                <div className="bg-[#0C1B3A]/4 rounded-[10px] p-4 space-y-1">
+                  <p className="text-xs font-bold text-slate-600">{t('Supplier Original Currency')}</p>
+                  <p className="text-[18px] font-bold text-[#0C1B3A]">{supplierCur}</p>
                 </div>
 
                 {/* GCI Quote Currency */}
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block">{t('GCI Quote Currency')}</label>
+                  <label className="text-xs font-bold text-slate-600 block">{t('GCI Quote Currency')}</label>
                   <select
                     value={quoteCurrency}
                     onChange={e => {
@@ -10162,7 +10163,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       const newRate = DEFAULT_RATES[supplierCur]?.[qc] ?? 1;
                       setRateConfig({ quoteCurrency: qc, rate: supplierCur === qc ? 1 : newRate });
                     }}
-                    className="w-full bg-[#0C1B3A]/4 border border-[#0C1B3A]/10 rounded-xl px-4 py-3 text-[14px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]"
+                    className="w-full bg-[#0C1B3A]/4 border border-[#0C1B3A]/10 rounded-md px-4 py-3 text-[14px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]"
                   >
                     {['AED', 'USD'].map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -10170,38 +10171,38 @@ Leave a field as empty string if not present. Never fabricate values.`;
 
                 {/* Exchange Rate */}
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-black uppercase tracking-widest text-[#0C1B3A]/40 block">
+                  <label className="text-xs font-bold text-slate-600 block">
                     {t('Exchange Rate')}
-                    {!isSameCurrency && <span className="ml-2 text-[#C9A84C] normal-case font-bold">{t('Manually adjustable')}</span>}
+                    {!isSameCurrency && <span className="ml-2 text-[#7A5F2A] normal-case font-bold">{t('Manually adjustable')}</span>}
                   </label>
                   {isSameCurrency ? (
-                    <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-[13px] font-bold text-green-700">
+                    <div className="bg-green-50 border border-green-200 rounded-[10px] px-4 py-3 text-[13px] font-bold text-green-700">
                       同币种，无需换算
                     </div>
                   ) : (
                     <div className="flex items-center gap-3">
-                      <span className="text-[12px] font-bold text-[#0C1B3A]/50 whitespace-nowrap">1 {supplierCur} =</span>
+                      <span className="text-[12px] font-bold text-slate-600 whitespace-nowrap">1 {supplierCur} =</span>
                       <input
                         type="number"
                         min="0.0001"
                         step="0.0001"
                         value={rate}
                         onChange={e => setRateConfig(prev => ({ ...prev, rate: parseFloat(e.target.value) || 1 }))}
-                        className="flex-1 bg-[#0C1B3A]/4 border border-[#C9A84C]/40 rounded-xl px-4 py-3 text-[14px] font-black text-[#0C1B3A] font-mono outline-none focus:border-[#C9A84C]"
+                        className="flex-1 bg-[#0C1B3A]/4 border border-[#C9A84C]/40 rounded-md px-4 py-3 text-[14px] font-bold text-[#0C1B3A] font-mono-label outline-none focus:border-[#C9A84C]"
                       />
-                      <span className="text-[12px] font-bold text-[#0C1B3A]/50">{quoteCurrency}</span>
+                      <span className="text-[12px] font-bold text-slate-600">{quoteCurrency}</span>
                     </div>
                   )}
-                  <p className="text-[10px] text-[#0C1B3A]/40 font-mono pl-1">{rateLabel}</p>
+                  <p className="text-xs text-slate-600 font-mono-label pl-1">{rateLabel}</p>
                 </div>
 
                 {/* Preview */}
                 {!isSameCurrency && pendingConversionItems.length > 0 && (
-                  <div className="bg-[#C9A84C]/8 border border-[#C9A84C]/20 rounded-2xl px-4 py-3">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-[#C9A84C] mb-1">{t('Preview · First Item')}</p>
+                  <div className="bg-[#C9A84C]/8 border border-[#C9A84C]/20 rounded-[10px] px-4 py-3">
+                    <p className="text-xs font-bold text-[#7A5F2A] mb-1">{t('Preview · First Item')}</p>
                     <p className="text-[12px] text-[#0C1B3A] font-bold truncate">{pendingConversionItems[0].originalName}</p>
-                    <p className="text-[11px] text-[#0C1B3A]/50 mt-0.5 font-mono">
-                      {exampleOrig} {supplierCur} → <span className="text-[#0C1B3A] font-black">{exampleCost} {quoteCurrency}</span>
+                    <p className="text-xs text-slate-600 mt-0.5 font-mono-label">
+                      {exampleOrig} {supplierCur} → <span className="text-[#0C1B3A] font-bold">{exampleCost} {quoteCurrency}</span>
                     </p>
                   </div>
                 )}
@@ -10210,19 +10211,19 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 <div className="flex gap-3 pt-2">
                   <button
                     onClick={() => setShowCurrencyModal(false)}
-                    className="flex-1 py-3.5 rounded-[16px] border border-[#0C1B3A]/10 text-[12px] font-black uppercase tracking-widest text-[#0C1B3A]/50 hover:text-[#0C1B3A] transition-colors"
+                    className="flex-1 py-3.5 rounded-md border border-[#0C1B3A]/10 text-[12px] font-bold text-slate-600 hover:text-[#0C1B3A] transition-colors"
                   >
                     {t('Cancel')}
                   </button>
                   <button
                     onClick={handleConfirmRate}
-                    className="flex-1 px-8 py-3.5 rounded-[16px] bg-[#C9A84C] text-[#0C1B3A] text-[12px] font-black uppercase tracking-widest shadow-lg hover:bg-[#E8C96A] transition-all active:scale-95"
+                    className="flex-1 px-8 py-3.5 rounded-md bg-[#C9A84C] text-[#0C1B3A] text-[12px] font-bold shadow-lg hover:bg-[#E8C96A] transition-all active:scale-95"
                   >
                     {t('Confirm & Enter Pricing →')}
                   </button>
                 </div>
               </div>
-            </div>
+            </div></ModalPortal>
           );
         })()}
 
