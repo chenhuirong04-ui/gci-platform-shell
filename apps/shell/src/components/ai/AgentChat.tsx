@@ -33,7 +33,7 @@ const TOOL_LABEL: Record<string, [string, string]> = {
 
 const fmt = (n: number) => (Number.isFinite(n) ? n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—');
 
-export function AgentChat() {
+export function AgentChat({ initialQuestion = '' }: { initialQuestion?: string }) {
   const { lang } = useI18n();
   const en = lang === 'en';
   const navigate = useNavigate();
@@ -43,6 +43,14 @@ export function AgentChat() {
   const [confirming, setConfirming] = useState<number | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [entries, busy]);
+  // A question handed over from the Home assistant box (/ai?tab=agent&agent_q=…) is asked once.
+  const askedInitial = useRef(false);
+  useEffect(() => {
+    if (askedInitial.current || !initialQuestion.trim()) return;
+    askedInitial.current = true;
+    send(initialQuestion);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuestion]);
 
   const examples = en
     ? ['How much stock do we have for LED panel 600x600?', 'Check stock for office chairs, match products and draft a quote for customer ABC: 20 pcs']

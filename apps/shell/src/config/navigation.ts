@@ -28,6 +28,7 @@ export interface ModuleDef {
     | 'financeCenter'
     | 'invoiceManager'
     | 'aiAssistant'
+    | 'aiAgent'
     | 'settings'
     | 'supplierLibrary'
     | 'accessVault';
@@ -113,6 +114,8 @@ export const sections: SectionDef[] = [
       // Center / History Archive were four separate entries all reading the
       // same underlying Follow-up Log data — collapsed into two. Old ?tab=
       // values still resolve inside CrmModule.tsx for bookmark compatibility.
+      // AI Business Agent — multi-step assistant (stock, products, prices, quotation drafts).
+      { code: 'AI', nameKey: 'aiAgent', path: '/ai?tab=agent' },
       { code: 'BO', nameKey: 'businessOverview', path: '/crm?tab=control' },
       // Task 17.2 — repointed from legacy /crm?tab=project (localStorage/
       // Notion) to the new Supabase-backed CRM page. Legacy Projects/

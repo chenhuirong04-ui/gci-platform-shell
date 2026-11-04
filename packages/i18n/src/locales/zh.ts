@@ -40,6 +40,7 @@ export const zh: typeof en = {
     supplierLibrary: '供应商库',
     accessVault: '账号与权限 / Access Vault',
     aiAssistant: '历史 AI 工具 / Legacy',
+    aiAgent: 'AI 业务智能体',
     settings: '设置',
   },
   header: {

@@ -4,7 +4,7 @@
 // the existing, audited Assistant Action Layer and the existing inventory
 // check instead of re-implementing any business logic:
 //   search_customers        -> _lib.searchCustomers          (CRM)
-//   check_inventory         -> /api/trade/check-inventory    (user's own permissions)
+//   check_inventory         -> consignment_stock, same source as /api/trade/check-inventory
 //   search_products         -> _context.searchProducts       (supplier catalog)
 //   get_product_prices      -> _context.productContext       (supplier + historical prices)
 //   propose_quotation_draft -> NO WRITE: returns a signed, user-bound draft proposal
@@ -18,11 +18,10 @@
 // already-configured OpenAI key. GCI_AGENT_MODEL overrides the model id.
 export const config = { runtime: 'edge' };
 
-import { requireUser, type AuthContext } from '../_lib/auth';
+import { requireUser, legacyTradeAnonHeaders, type AuthContext } from '../_lib/auth';
 import { serverContext, searchCustomers, json, type AssistantContext } from './_lib';
 import { searchProducts, productContext } from './_context';
 import { executeAction } from './_actions';
-import checkInventoryHandler from '../trade/check-inventory';
 
 const MAX_STEPS = 6;
 const TOOL_RESULT_LIMIT = 8_000;
@@ -35,7 +34,9 @@ You can call tools to look up real data: customers (CRM), inventory, the supplie
 
 Rules:
 - Ground every fact (stock, prices, customers, products) ONLY in tool results. Never invent a price, quantity, customer or product. If data is missing, say so and ask the user.
-- Inventory comes from check_inventory (current consignment / trade stock). The supplier catalog is not stock.
+- Inventory comes from check_inventory. It is GCI's CONSIGNMENT stock (goods placed with customers, not settled yet): remaining quantity, latest unit price and the consigning customer per product. It has no specification and no warehouse / reserved / available quantity. When the user asks for "sellable / available stock", list this data and state clearly that it is consignment stock remaining. Call check_inventory without a product keyword to list everything in stock.
+- Specifications are not in the inventory data: get them from search_products (supplier catalog) by product name/model when the user needs them, and say when no catalog match is found. The supplier catalog itself is not stock.
+- Product recommendations must be based only on the returned data (e.g. higher remaining quantity, available unit or historical selling price) and say why.
 - Selling prices: prefer the user's explicit price, then historical selling prices from get_product_prices. If neither exists, ask the user for the selling price — do not make one up. Supplier cost may be filled from supplier prices when available.
 - Quotations: you can only PROPOSE a draft with propose_quotation_draft. Nothing is saved until the user clicks Confirm in the app. Never say a quotation was created or sent.
 - You never send emails/WhatsApp, approve, issue, delete or change anything else.
@@ -52,8 +53,8 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: 'check_inventory',
-    description: 'Check current stock for a product keyword (model, name or SKU). Returns matching stock lines with quantities.',
-    parameters: { type: 'object', properties: { product: { type: 'string', description: 'Product keyword' } }, required: ['product'], additionalProperties: false },
+    description: 'List products currently in (consignment) stock with remaining quantity, latest unit price and customers. Optional product keyword (name/model); omit it to list all products in stock.',
+    parameters: { type: 'object', properties: { product: { type: 'string', description: 'Optional product name/model keyword' } }, additionalProperties: false },
   },
   {
     name: 'search_products',
@@ -186,6 +187,46 @@ async function verifyProposal(token: string, userId: string): Promise<DraftPaylo
   } catch { return null; }
 }
 
+// ── consignment stock (same source and identity as /api/trade/check-inventory) ──
+// Products with remaining stock on unsettled consignment rows, with the latest
+// unit price and the consigning customers. Read-only.
+async function consignmentStock(keyword: string): Promise<{ ok: boolean; result: unknown }> {
+  const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+  if (!supabaseUrl) return { ok: false, result: { error: 'supabase_not_configured' } };
+  const res = await fetch(`${supabaseUrl}/rest/v1/consignment_stock?select=created_at,payload&state=eq.active&order=created_at.desc&limit=500`, {
+    headers: { ...legacyTradeAnonHeaders(), 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) return { ok: false, result: { error: `stock_read_failed_${res.status}` } };
+  const rows = ((await res.json().catch(() => [])) as Array<{ payload?: Record<string, any> }>).map((r) => r.payload || {});
+  const kw = keyword.trim().toLowerCase();
+  const byName = new Map<string, { product_name: string; remaining_qty: number; unit_price: number | null; customers: string[]; so_nos: string[] }>();
+  for (const p of rows) {
+    const name = String(p.productName || '').trim();
+    if (!name || String(p.settlementStatus || '').toUpperCase() === 'SETTLED') continue;
+    if (kw && !name.toLowerCase().includes(kw)) continue;
+    const qty = Number(p.remainingQty);
+    if (!Number.isFinite(qty)) continue;
+    const entry = byName.get(name) || { product_name: name, remaining_qty: 0, unit_price: null, customers: [], so_nos: [] };
+    entry.remaining_qty += qty;
+    // rows are newest first, so the first price seen is the latest one
+    if (entry.unit_price === null && Number(p.unitPrice) > 0) entry.unit_price = Number(p.unitPrice);
+    if (p.customerName && !entry.customers.includes(p.customerName)) entry.customers.push(String(p.customerName));
+    if (p.soNo && !entry.so_nos.includes(p.soNo)) entry.so_nos.push(String(p.soNo));
+    byName.set(name, entry);
+  }
+  const products = [...byName.values()].filter((e) => e.remaining_qty > 0).sort((a, b) => b.remaining_qty - a.remaining_qty);
+  return {
+    ok: true,
+    result: {
+      source: 'consignment_stock (unsettled consignment rows)',
+      keyword: kw || null,
+      product_count: products.length,
+      products: products.slice(0, 50),
+      fields_not_available: ['specification', 'warehouse', 'reserved_quantity', 'available_quantity'],
+    },
+  };
+}
+
 // ── tool execution ──────────────────────────────────────────────────────────
 type Proposal = { token: string; customer_name?: string; payload: DraftPayload; subtotal: number; vat: number; total: number };
 type Step = { tool: string; input: string; ok: boolean };
@@ -214,15 +255,8 @@ async function runTool(
       const res = await searchCustomers(new Request(`${env.origin}/api/assistant/customers/search?q=${encodeURIComponent(q)}`), env.ctx);
       return { ok: res.ok, result: await body(res) };
     }
-    case 'check_inventory': {
-      const product = str(input.product, 100);
-      if (!product) return { ok: false, result: { error: 'product_required' } };
-      const headers = new Headers();
-      const auth = env.request.headers.get('authorization');
-      if (auth) headers.set('authorization', auth);
-      const res = await checkInventoryHandler(new Request(`${env.origin}/api/trade/check-inventory?product=${encodeURIComponent(product)}`, { headers }));
-      return { ok: res.ok, result: await body(res) };
-    }
+    case 'check_inventory':
+      return consignmentStock(str(input.product, 100) || '');
     case 'search_products': {
       const q = str(input.q, 100);
       if (!q) return { ok: false, result: { error: 'q_required' } };
