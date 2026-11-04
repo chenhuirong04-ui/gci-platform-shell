@@ -5,22 +5,23 @@ import { getCertStatusLabel } from '../lib/labelMaps';
 import {
   createCertification, deleteCertification, listCertifications, updateCertification,
 } from '../lib/certificationsCloud';
-import { workspace, fontSizes } from '@gci/design-system';
+import { workspace, fontSizes, radii } from '@gci/design-system';
+import { INPUT, LABEL, formGrid, MODAL_OVERLAY, MODAL_PANEL_CLASS, modalPanel, ModalPortal } from '../lib/ui';
 import { listDocuments } from '../lib/documentsCloud';
 import CertificationUploader from './CertificationUploader';
 
 const NAVY = workspace.textPrimary;
 const BORDER = workspace.border;
 const T2 = '#334155';
-const T3 = '#94a3b8';
-const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #b0bec5', fontSize: fontSizes.md, color: '#0F172A', background: '#fff', outline: 'none' };
-const LBL: React.CSSProperties = { display: 'block', fontSize: fontSizes.sm, fontWeight: 600, color: '#334155', marginBottom: 6 };
+const T3 = workspace.textSecondary;
+const INP = INPUT;
+const LBL = LABEL;
 
 const STATUS_COLOR: Record<CertificationStatus, { bg: string; text: string }> = {
   available:            { bg: '#dcfce7', text: '#166534' },
   not_available:        { bg: '#f1f5f9', text: '#475569' },
   pending_verification: { bg: '#fef9ec', text: '#92400e' },
-  not_applicable:       { bg: '#f8fafc', text: '#94a3b8' },
+  not_applicable:       { bg: '#f8fafc', text: '#64748b' },
   expired:              { bg: '#fee2e2', text: '#991b1b' },
 };
 
@@ -99,17 +100,17 @@ export default function CertificationManager({ supplierId }: Props) {
   return (
     <div>
       {/* Primary upload action */}
-      <div style={{ background: '#fffbf0', border: `1.5px dashed #C9A84C`, borderRadius: 10, padding: '14px 20px', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: fontSizes.xs, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t.quickUpload}</span>
+      <div style={{ background: '#fffbf0', border: `1.5px dashed ${workspace.accent}`, borderRadius: 10, padding: '14px 20px', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: fontSizes.xs, fontWeight: 700, color: '#92400e' }}>{t.quickUpload}</span>
         <button
           onClick={() => setShowUploader(true)}
-          style={{ padding: '9px 18px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 8, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
+          style={{ padding: '9px 18px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: radii.sm, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
         >
           {t.uploadBtn}
         </button>
         <button
           onClick={() => setEdit(EMPTY(supplierId))}
-          style={{ padding: '9px 18px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, fontSize: fontSizes.sm, fontWeight: 600, color: NAVY, cursor: 'pointer' }}
+          style={{ padding: '9px 18px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: radii.sm, fontSize: fontSizes.sm, fontWeight: 600, color: NAVY, cursor: 'pointer' }}
         >
           {t.manualAdd}
         </button>
@@ -161,10 +162,10 @@ export default function CertificationManager({ supplierId }: Props) {
       )}
 
       {edit && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => { if (e.target === e.currentTarget) setEdit(null); }}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 540, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <ModalPortal><div style={MODAL_OVERLAY} onClick={e => { if (e.target === e.currentTarget) setEdit(null); }}>
+          <div className={MODAL_PANEL_CLASS} style={{ ...modalPanel(540), display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY }}>{edit.id ? t.modalEdit : t.modalNew}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div style={{ ...formGrid(200), gap: 14 }}>
               <F label={t.fType}>
                 <select style={INP} value={edit.certification_type ?? ''} onChange={e => setEdit(v => ({ ...v!, certification_type: e.target.value }))}>
                   <option value="">{c0.pleaseSelect}</option>
@@ -186,11 +187,11 @@ export default function CertificationManager({ supplierId }: Props) {
             </div>
             <F label={t.fNotes}><textarea style={{ ...INP, resize: 'vertical', minHeight: 60 }} value={edit.notes ?? ''} onChange={e => setEdit(v => ({ ...v!, notes: e.target.value }))} /></F>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '10px 0', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>{saving ? c0.saving : c0.save}</button>
-              <button onClick={() => setEdit(null)} style={{ padding: '10px 20px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T2, fontWeight: 600, cursor: 'pointer' }}>{c0.cancel}</button>
+              <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '10px 0', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: radii.sm, fontWeight: 700, cursor: 'pointer' }}>{saving ? c0.saving : c0.save}</button>
+              <button onClick={() => setEdit(null)} style={{ padding: '10px 20px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: radii.sm, color: T2, fontWeight: 600, cursor: 'pointer' }}>{c0.cancel}</button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
     </div>
   );

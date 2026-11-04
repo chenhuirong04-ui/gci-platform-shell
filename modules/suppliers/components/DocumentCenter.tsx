@@ -5,7 +5,8 @@ import {
   createDocument, deleteDocument, deleteStorageObject, listDocuments, updateDocument,
   getDocumentUrl, resolveStorageBucket, uploadSupplierFile,
 } from '../lib/documentsCloud';
-import { workspace, fontSizes } from '@gci/design-system';
+import { workspace, fontSizes, radii } from '@gci/design-system';
+import { INPUT, LABEL, formGrid, MODAL_OVERLAY, MODAL_PANEL_CLASS, modalPanel, ModalPortal } from '../lib/ui';
 import { getDocStatusLabel, getDocTypeLabel } from '../lib/labelMaps';
 import TradeLicenseUploader from './TradeLicenseUploader';
 
@@ -13,9 +14,9 @@ const GOLD = workspace.accent;
 const NAVY = workspace.textPrimary;
 const BORDER = workspace.border;
 const T2 = '#334155';
-const T3 = '#94a3b8';
-const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #b0bec5', fontSize: fontSizes.md, color: '#0F172A', background: '#fff', outline: 'none' };
-const LBL: React.CSSProperties = { display: 'block', fontSize: fontSizes.sm, fontWeight: 600, color: '#334155', marginBottom: 6 };
+const T3 = workspace.textSecondary;
+const INP = INPUT;
+const LBL = LABEL;
 
 const DOC_TYPES: DocumentType[] = [
   '营业执照','公司注册文件','VAT文件','税务文件','公司简介',
@@ -49,7 +50,7 @@ function isPreviewable(doc: SupplierDocument): boolean {
 }
 
 const VSTATUS_COLOR: Record<DocumentVerificationStatus, string> = {
-  unverified: '#94a3b8', verified: '#16a34a', rejected: '#dc2626', pending_reupload: '#d97706',
+  unverified: '#64748b', verified: '#16a34a', rejected: '#dc2626', pending_reupload: '#d97706',
 };
 
 function formatBytes(b: number) {
@@ -242,16 +243,16 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
 
       {/* Primary upload actions */}
       <div style={{ background: '#fffbf0', border: `1.5px dashed ${GOLD}`, borderRadius: 10, padding: '16px 20px', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: fontSizes.xs, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t.quickUpload}</span>
+        <span style={{ fontSize: fontSizes.xs, fontWeight: 700, color: '#92400e' }}>{t.quickUpload}</span>
         <button
           onClick={() => setShowLicenseUploader(true)}
-          style={{ padding: '9px 18px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 8, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+          style={{ padding: '9px 18px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: radii.sm, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
         >
           {t.uploadLicenseBtn}
         </button>
         <button
           onClick={() => openEdit({ ...EMPTY(supplierId), document_type: '产品目录' as DocumentType })}
-          style={{ padding: '9px 18px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, fontSize: fontSizes.sm, fontWeight: 600, color: NAVY, cursor: 'pointer' }}
+          style={{ padding: '9px 18px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: radii.sm, fontSize: fontSizes.sm, fontWeight: 600, color: NAVY, cursor: 'pointer' }}
         >
           {t.uploadOtherBtn}
         </button>
@@ -259,7 +260,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <span style={{ fontSize: fontSizes.sm, color: T2 }}>{t.count(docs.length)}</span>
-        <button onClick={() => openEdit(EMPTY(supplierId))} style={{ padding: '7px 16px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 7, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}>{t.add}</button>
+        <button onClick={() => openEdit(EMPTY(supplierId))} style={{ padding: '7px 16px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: radii.sm, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}>{t.add}</button>
       </div>
 
       {loading ? <div style={{ color: T3, textAlign: 'center', padding: 40 }}>{c0.loading}</div>
@@ -268,7 +269,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {Object.entries(groups).map(([type, items]) => (
             <div key={type}>
-              <div style={{ fontSize: fontSizes.xs, fontWeight: 800, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{getDocTypeLabel(type, lang)}</div>
+              <div style={{ fontSize: fontSizes.xs, fontWeight: 800, color: '#4b5563', marginBottom: 8 }}>{getDocTypeLabel(type, lang)}</div>
               {items.map(doc => {
                 const ec = expiryColor(doc.expire_date);
                 return (
@@ -283,7 +284,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
                         )}
                         {doc.issue_date && <span>{t.issued(doc.issue_date)}</span>}
                         {doc.expire_date && <span style={{ color: ec || T3, fontWeight: ec ? 700 : undefined }}>{t.expires(doc.expire_date)}{ec && ' ⚠'}</span>}
-                        {doc.storage_path && <span style={{ color: '#16a34a' }}>{t.uploaded}</span>}
+                        {doc.storage_path && <span style={{ color: '#15803d' }}>{t.uploaded}</span>}
                         <span style={{ color: VSTATUS_COLOR[doc.verification_status as DocumentVerificationStatus] ?? T3 }}>
                           {getDocStatusLabel(doc.verification_status ?? 'unverified', lang)}
                         </span>
@@ -310,11 +311,11 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
 
       {/* ── Add / Edit modal ─────────────────────────────────────────────────── */}
       {edit && (
-        <div
-          style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        <ModalPortal><div
+          style={MODAL_OVERLAY}
           onClick={e => { if (e.target === e.currentTarget) setEdit(null); }}
         >
-          <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 560, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className={MODAL_PANEL_CLASS} style={{ ...modalPanel(560), display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY }}>{edit.id ? t.modalEdit : t.modalNew}</div>
 
             {/* 1. Document type */}
@@ -409,7 +410,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
 
             {/* 5. Document details — only for certificate-like types (license, cert, contract...) */}
             {CERT_LIKE_TYPES.has((edit.document_type ?? '营业执照') as DocumentType) && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div style={{ ...formGrid(200), gap: 14 }}>
                 <F label={t.fNumber}><input style={INP} value={edit.document_number ?? ''} onChange={e => setEdit(v => ({ ...v!, document_number: e.target.value }))} /></F>
                 <F label={t.fIssuingAuthority}><input style={INP} value={edit.issuing_authority ?? ''} onChange={e => setEdit(v => ({ ...v!, issuing_authority: e.target.value }))} /></F>
                 <F label={t.fIssueDate}><input style={INP} type="date" value={edit.issue_date ?? ''} onChange={e => setEdit(v => ({ ...v!, issue_date: e.target.value }))} /></F>
@@ -445,17 +446,17 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
                 onClick={handleSave}
                 disabled={!canSave}
                 title={!canSave && !saving ? t.errNoFile : undefined}
-                style={{ flex: 1, padding: '10px 0', background: canSave ? workspace.actionPrimaryBg : '#94a3b8', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: canSave ? 'pointer' : 'not-allowed', transition: 'background .15s' }}
+                style={{ flex: 1, padding: '10px 0', background: canSave ? workspace.actionPrimaryBg : '#94a3b8', color: '#fff', border: 'none', borderRadius: radii.sm, fontWeight: 700, cursor: canSave ? 'pointer' : 'not-allowed', transition: 'background .15s' }}
               >
                 {saveLabel}
               </button>
               <button onClick={() => { setEdit(null); setSelectedFile(null); setSaveErr(null); }}
-                style={{ padding: '10px 20px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T2, fontWeight: 600, cursor: 'pointer' }}>
+                style={{ padding: '10px 20px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: radii.sm, color: T2, fontWeight: 600, cursor: 'pointer' }}>
                 {c0.cancel}
               </button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
     </div>
   );

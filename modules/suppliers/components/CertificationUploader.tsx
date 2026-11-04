@@ -11,22 +11,16 @@ import type { SupplierProduct } from '../types';
 import { uploadSupplierFile, createDocument } from '../lib/documentsCloud';
 import { listProducts } from '../lib/suppliersCloud';
 import { createCertification } from '../lib/certificationsCloud';
-import { workspace, fontSizes } from '@gci/design-system';
+import { workspace, fontSizes, radii } from '@gci/design-system';
+import { INPUT, LABEL, formGrid } from '../lib/ui';
 
 const NAVY = workspace.textPrimary;
 const GOLD = workspace.accent;
 const BORDER = '#CBD5E1';
 const T2 = '#374151';
 const T3 = '#6b7280';
-const INP: React.CSSProperties = {
-  display: 'block', width: '100%', boxSizing: 'border-box',
-  padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${BORDER}`,
-  fontSize: fontSizes.sm, color: NAVY, background: '#fff', outline: 'none',
-};
-const LBL: React.CSSProperties = {
-  display: 'block', fontSize: fontSizes.xs, fontWeight: 700, color: T2,
-  marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em',
-};
+const INP = INPUT;
+const LBL = LABEL;
 
 const CERT_TYPES = [
   'CE','FDA','ISO9001','ISO14001','ISO22000','HACCP','Halal','SGS',
@@ -244,7 +238,7 @@ export default function CertificationUploader({ supplierId, onSaved, onCancel }:
   if (stage === 'done') {
     return (
       <div style={{ padding: '60px 0', textAlign: 'center' }}>
-        <div style={{ fontSize: fontSizes.display, marginBottom: 12, color: '#16a34a' }}>✓</div>
+        <div style={{ fontSize: fontSizes.display, marginBottom: 12, color: '#15803d' }}>✓</div>
         <div style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY }}>{t.done}</div>
       </div>
     );
@@ -273,7 +267,7 @@ export default function CertificationUploader({ supplierId, onSaved, onCancel }:
 
       <div style={{ fontSize: fontSizes.xs, color: T3, marginBottom: 12 }}>{u.fileLabel(file?.name ?? '')}</div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
+      <div style={{ ...formGrid(200), gap: 14, marginBottom: 16 }}>
         <Fld label={t.fType} aiVal={!!fields.certification_type}>
           <select style={aiField(!!fields.certification_type)} value={fields.certification_type ?? ''} onChange={e => fld('certification_type', e.target.value)}>
             <option value="">{c0.pleaseSelect}</option>
@@ -303,7 +297,7 @@ export default function CertificationUploader({ supplierId, onSaved, onCancel }:
         </Fld>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+      <div style={{ ...formGrid(200), gap: 14, marginBottom: 14 }}>
         <Fld label={t.fCoveredProducts} aiVal={coveredProductsText.length > 0}>
           <textarea style={{ ...aiField(coveredProductsText.length > 0), resize: 'vertical', minHeight: 70 }} value={coveredProductsText} onChange={e => setCoveredProductsText(e.target.value)} />
         </Fld>
@@ -346,19 +340,19 @@ export default function CertificationUploader({ supplierId, onSaved, onCancel }:
       <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
         <button
           onClick={handleSave}
-          style={{ flex: 1, padding: '11px 0', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: fontSizes.md, cursor: 'pointer' }}
+          style={{ flex: 1, padding: '11px 0', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: radii.sm, fontWeight: 700, fontSize: fontSizes.md, cursor: 'pointer' }}
         >
           {u.confirmSave}
         </button>
         <button
           onClick={() => fileRef.current?.click()}
-          style={{ padding: '11px 16px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T2, fontSize: fontSizes.sm, fontWeight: 600, cursor: 'pointer' }}
+          style={{ padding: '11px 16px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: radii.sm, color: T2, fontSize: fontSizes.sm, fontWeight: 600, cursor: 'pointer' }}
         >
           {u.reupload}
         </button>
         <button
           onClick={onCancel}
-          style={{ padding: '11px 16px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T3, fontSize: fontSizes.sm, cursor: 'pointer' }}
+          style={{ padding: '11px 16px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: radii.sm, color: T3, fontSize: fontSizes.sm, cursor: 'pointer' }}
         >
           {c0.cancel}
         </button>

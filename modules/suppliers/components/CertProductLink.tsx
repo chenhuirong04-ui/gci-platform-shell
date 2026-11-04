@@ -1,20 +1,25 @@
 import React, { useEffect, useState } from 'react';
+import { useI18n } from '@gci/i18n';
 import type { SupplierCertification, SupplierProduct, CertProductLink as CertProductLinkType } from '../types';
 import { listCertifications } from '../lib/certificationsCloud';
 import { listProducts } from '../lib/suppliersCloud';
 import { createCertProductLink, deleteCertProductLink, listCertProductLinks } from '../lib/certificationsCloud';
-import { workspace, fontSizes } from '@gci/design-system';
+import { workspace, fontSizes, radii } from '@gci/design-system';
+import { INPUT, LABEL, formGrid } from '../lib/ui';
 
 const NAVY = workspace.textPrimary;
 const BORDER = '#CBD5E1';
 const T2 = '#475569';
-const T3 = '#94a3b8';
-const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${BORDER}`, fontSize: fontSizes.sm, color: NAVY, background: '#fff', outline: 'none' };
-const LBL: React.CSSProperties = { display: 'block', fontSize: fontSizes.xs, fontWeight: 700, color: T2, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' };
+const T3 = workspace.textSecondary;
+const INP = INPUT;
+const LBL = LABEL;
 
 interface Props { supplierId: string; }
 
 export default function CertProductLink({ supplierId }: Props) {
+  const { dict } = useI18n();
+  const t = dict.suppliers.certProductLink;
+  const c0 = dict.suppliers.common;
   const [links, setLinks] = useState<CertProductLinkType[]>([]);
   const [certs, setCerts] = useState<SupplierCertification[]>([]);
   const [products, setProducts] = useState<SupplierProduct[]>([]);
@@ -50,38 +55,38 @@ export default function CertProductLink({ supplierId }: Props) {
 
   return (
     <div>
-      <div style={{ fontSize: fontSizes.sm, color: T2, marginBottom: 16 }}>关联认证与产品，追踪哪些产品持有哪些认证</div>
+      <div style={{ fontSize: fontSizes.sm, color: T2, marginBottom: 16 }}>{t.intro}</div>
 
       {/* Add form */}
       <div style={{ background: '#f8fafc', border: `1px solid ${BORDER}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
-        <div style={{ fontSize: fontSizes.xs, fontWeight: 700, color: NAVY, marginBottom: 12 }}>添加认证-产品关联</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+        <div style={{ fontSize: fontSizes.xs, fontWeight: 700, color: NAVY, marginBottom: 12 }}>{t.addTitle}</div>
+        <div style={{ ...formGrid(160), gap: 12, marginBottom: 12 }}>
           <div>
-            <label style={LBL}>认证</label>
+            <label style={LBL}>{t.fCert}</label>
             <select style={INP} value={form.certification_id} onChange={e => setForm(f => ({ ...f, certification_id: e.target.value }))}>
-              <option value="">选择认证</option>
+              <option value="">{t.selectCert}</option>
               {certs.map(c => <option key={c.id} value={c.id!}>{c.certification_name}</option>)}
             </select>
           </div>
           <div>
-            <label style={LBL}>产品</label>
+            <label style={LBL}>{t.fProduct}</label>
             <select style={INP} value={form.supplier_product_id} onChange={e => setForm(f => ({ ...f, supplier_product_id: e.target.value }))}>
-              <option value="">选择产品</option>
+              <option value="">{t.selectProduct}</option>
               {products.map(p => <option key={p.id} value={p.id!}>{p.product_name_cn || p.product_name_en || '—'}</option>)}
             </select>
           </div>
           <div>
-            <label style={LBL}>型号（可选）</label>
-            <input style={INP} value={form.model_number} onChange={e => setForm(f => ({ ...f, model_number: e.target.value }))} placeholder="可填具体型号" />
+            <label style={LBL}>{t.fModel}</label>
+            <input style={INP} value={form.model_number} onChange={e => setForm(f => ({ ...f, model_number: e.target.value }))} placeholder={t.fModelPlaceholder} />
           </div>
         </div>
-        <button onClick={handleAdd} disabled={saving || !form.certification_id || !form.supplier_product_id} style={{ padding: '8px 20px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 7, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer', opacity: (!form.certification_id || !form.supplier_product_id) ? 0.5 : 1 }}>
-          {saving ? '添加中…' : '添加关联'}
+        <button onClick={handleAdd} disabled={saving || !form.certification_id || !form.supplier_product_id} style={{ padding: '8px 20px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: radii.sm, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer', opacity: (!form.certification_id || !form.supplier_product_id) ? 0.5 : 1 }}>
+          {saving ? t.adding : t.addBtn}
         </button>
       </div>
 
-      {loading ? <div style={{ color: T3, textAlign: 'center', padding: 30 }}>加载中…</div>
-       : links.length === 0 ? <div style={{ color: T3, textAlign: 'center', padding: 30 }}>暂无认证-产品关联</div>
+      {loading ? <div style={{ color: T3, textAlign: 'center', padding: 30 }}>{c0.loading}</div>
+       : links.length === 0 ? <div style={{ color: T3, textAlign: 'center', padding: 30 }}>{t.empty}</div>
        : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {links.map(link => (
@@ -94,10 +99,10 @@ export default function CertProductLink({ supplierId }: Props) {
               </div>
               {deleteId === link.id
                 ? <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={async () => { await deleteCertProductLink(link.id!); setDeleteId(null); load(); }} style={{ fontSize: fontSizes.xs, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>确认</button>
-                    <button onClick={() => setDeleteId(null)} style={{ fontSize: fontSizes.xs, color: T2, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>取消</button>
+                    <button onClick={async () => { await deleteCertProductLink(link.id!); setDeleteId(null); load(); }} style={{ fontSize: fontSizes.xs, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.confirm}</button>
+                    <button onClick={() => setDeleteId(null)} style={{ fontSize: fontSizes.xs, color: T2, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.cancel}</button>
                   </div>
-                : <button onClick={() => setDeleteId(link.id!)} style={{ fontSize: fontSizes.xs, color: '#dc2626', background: 'none', border: `1px solid #fca5a5`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>删除</button>
+                : <button onClick={() => setDeleteId(link.id!)} style={{ fontSize: fontSizes.xs, color: '#dc2626', background: 'none', border: `1px solid #fca5a5`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.delete}</button>
               }
             </div>
           ))}

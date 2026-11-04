@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useI18n } from '@gci/i18n';
 import type { SupplierContact } from '../types';
 import { createContact, deleteContact, listContacts, updateContact } from '../lib/suppliersCloud';
-import { workspace, fontSizes } from '@gci/design-system';
+import { workspace, fontSizes, radii } from '@gci/design-system';
+import { INPUT, LABEL, formGrid, MODAL_OVERLAY, MODAL_PANEL_CLASS, modalPanel, ModalPortal } from '../lib/ui';
 
 const NAVY = workspace.textPrimary;
 const GOLD = workspace.accent;
@@ -10,8 +11,8 @@ const BORDER = '#e2e8f0';
 const T2 = '#374151';
 const T3 = '#6b7280';
 
-const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1.5px solid #CBD5E1`, fontSize: fontSizes.sm, color: NAVY, background: '#fff', outline: 'none' };
-const LBL: React.CSSProperties = { display: 'block', fontSize: fontSizes.xs, fontWeight: 700, color: T2, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' };
+const INP = INPUT;
+const LBL = LABEL;
 
 const EMPTY_CONTACT = (supplierId: string): Omit<SupplierContact, 'id'> => ({
   supplier_id: supplierId, full_name: '', job_title: '', department: '',
@@ -67,7 +68,7 @@ export default function ContactManager({ supplierId }: Props) {
         <span style={{ fontSize: fontSizes.sm, color: T2 }}>{t.count(contacts.length)}</span>
         <button
           onClick={() => setEditContact(EMPTY_CONTACT(supplierId))}
-          style={{ padding: '7px 16px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 7, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
+          style={{ padding: '7px 16px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: radii.sm, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
         >
           {t.add}
         </button>
@@ -85,7 +86,7 @@ export default function ContactManager({ supplierId }: Props) {
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     <span style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY }}>{c.full_name}</span>
-                    {c.is_primary && <span style={{ fontSize: fontSizes.xs, fontWeight: 800, color: GOLD, background: GOLD + '18', padding: '2px 7px', borderRadius: 999 }}>{t.primary}</span>}
+                    {c.is_primary && <span style={{ fontSize: fontSizes.xs, fontWeight: 800, color: workspace.accentText, background: GOLD + '18', padding: '2px 7px', borderRadius: 999 }}>{t.primary}</span>}
                     {c.is_decision_maker && <span style={{ fontSize: fontSizes.xs, fontWeight: 700, color: '#7c3aed', background: '#7c3aed18', padding: '2px 7px', borderRadius: 999 }}>{t.decisionMaker}</span>}
                   </div>
                   <div style={{ fontSize: fontSizes.xs, color: T2 }}>{[c.job_title, c.department, c.contact_role].filter(Boolean).join(' · ')}</div>
@@ -121,10 +122,10 @@ export default function ContactManager({ supplierId }: Props) {
 
       {/* Edit modal */}
       {editContact && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => { if (e.target === e.currentTarget) setEditContact(null); }}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 560, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+        <ModalPortal><div style={MODAL_OVERLAY} onClick={e => { if (e.target === e.currentTarget) setEditContact(null); }}>
+          <div className={MODAL_PANEL_CLASS} style={{ ...modalPanel(560) }}>
             <div style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY, marginBottom: 20 }}>{editContact.id ? t.modalEdit : t.modalNew}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+            <div style={{ ...formGrid(200), gap: 14, marginBottom: 14 }}>
               <F label={t.fName}><input style={INP} value={editContact.full_name ?? ''} onChange={e => setEditContact(v => ({ ...v!, full_name: e.target.value }))} /></F>
               <F label={t.fJobTitle}><input style={INP} value={editContact.job_title ?? ''} onChange={e => setEditContact(v => ({ ...v!, job_title: e.target.value }))} /></F>
               <F label={t.fDepartment}><input style={INP} value={editContact.department ?? ''} onChange={e => setEditContact(v => ({ ...v!, department: e.target.value }))} /></F>
@@ -143,11 +144,11 @@ export default function ContactManager({ supplierId }: Props) {
               ))}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '10px 0', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>{saving ? c0.saving : c0.save}</button>
-              <button onClick={() => setEditContact(null)} style={{ padding: '10px 20px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T2, fontWeight: 600, cursor: 'pointer' }}>{c0.cancel}</button>
+              <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '10px 0', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: radii.sm, fontWeight: 700, cursor: 'pointer' }}>{saving ? c0.saving : c0.save}</button>
+              <button onClick={() => setEditContact(null)} style={{ padding: '10px 20px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: radii.sm, color: T2, fontWeight: 600, cursor: 'pointer' }}>{c0.cancel}</button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
     </div>
   );

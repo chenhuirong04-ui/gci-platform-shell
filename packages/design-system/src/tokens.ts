@@ -60,11 +60,14 @@ export const workspace = {
   /** Table header, read-only fields. */
   surfaceSubtle: '#F8F9FB',
   textPrimary: '#0C1B3A',
-  textSecondary: 'rgba(12,27,58,0.6)',
+  textSecondary: 'rgba(12,27,58,0.65)',
   border: 'rgba(12,27,58,0.1)',
   /** Selected-tab underline, focus ring, key figures. Only the dark gold reads
    * well on a light background. */
   accent: colors.goldMuted,
+  /** Gold for small text on a light background (≥4.5:1 on white); `accent`
+   * stays for underlines, borders and icons. */
+  accentText: '#7A5F2A',
   /** Primary button: navy fill, white text. */
   actionPrimaryBg: colors.bgBase,
   actionPrimaryText: '#FFFFFF',

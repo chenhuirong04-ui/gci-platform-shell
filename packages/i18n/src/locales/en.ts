@@ -523,6 +523,15 @@ export const en = {
       fIssueDate: 'Issue Date', fExpireDate: 'Expire Date', fNotes: 'Notes',
       uploaderTitle: 'Upload Certification',
     },
+    certProductLink: {
+      intro: 'Link certifications to products to track which products hold which certifications',
+      addTitle: 'Add certification–product link',
+      fCert: 'Certification', selectCert: 'Select certification',
+      fProduct: 'Product', selectProduct: 'Select product',
+      fModel: 'Model (optional)', fModelPlaceholder: 'Specific model, if any',
+      addBtn: 'Add link', adding: 'Adding…',
+      empty: 'No certification–product links yet',
+    },
     documents: {
       quickUpload: 'Quick Upload',
       uploadLicenseBtn: '📄 Upload Trade License',

@@ -524,6 +524,15 @@ export const zh: typeof en = {
       fIssueDate: '签发日期', fExpireDate: '到期日期', fNotes: '备注',
       uploaderTitle: '上传认证证书',
     },
+    certProductLink: {
+      intro: '关联认证与产品，追踪哪些产品持有哪些认证',
+      addTitle: '添加认证-产品关联',
+      fCert: '认证', selectCert: '选择认证',
+      fProduct: '产品', selectProduct: '选择产品',
+      fModel: '型号（可选）', fModelPlaceholder: '可填具体型号',
+      addBtn: '添加关联', adding: '添加中…',
+      empty: '暂无认证-产品关联',
+    },
     documents: {
       quickUpload: '快速上传',
       uploadLicenseBtn: '📄 上传营业执照',

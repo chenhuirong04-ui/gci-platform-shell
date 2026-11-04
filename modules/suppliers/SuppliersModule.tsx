@@ -8,6 +8,7 @@ import SupplierDetail from './components/SupplierDetail';
 import NotionImportPage from './components/NotionImportPage';
 import SupplierCleanupPage from './components/SupplierCleanupPage';
 import { workspace, fontSizes, fonts } from '@gci/design-system';
+import { tabStyle } from './lib/ui';
 
 // Design System V1: Latin text in Space Grotesk; CJK has no glyphs there and
 // falls through to Noto Sans SC. Codes / amounts opt into fonts.mono locally.
@@ -65,19 +66,7 @@ export default function SuppliersModule() {
               setTopTab(key);
               if (key === 'list') setSub({ kind: 'list' });
             }}
-            style={{
-              padding: '12px 18px',
-              fontSize: fontSizes.sm,
-              fontWeight: topTab === key ? 700 : 500,
-              color: topTab === key ? NAVY : '#475569',
-              border: 'none',
-              borderBottom: topTab === key ? `2px solid ${GOLD}` : '2px solid transparent',
-              background: 'none',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              marginBottom: -1,
-              transition: 'color .15s',
-            }}
+            style={tabStyle(topTab === key)}
           >
             {label}
           </button>
@@ -138,7 +127,7 @@ export default function SuppliersModule() {
 
       {/* DOCS tab */}
       {topTab === 'docs' && (
-        <div style={{ padding: '48px 32px', textAlign: 'center', color: '#94a3b8', fontSize: fontSizes.md }}>
+        <div style={{ padding: '48px 32px', textAlign: 'center', color: workspace.textSecondary, fontSize: fontSizes.md }}>
           <div style={{ fontSize: fontSizes.display, marginBottom: 12 }}>📁</div>
           <div style={{ fontWeight: 700, color: '#475569', marginBottom: 6 }}>{dict.suppliers.module.docsTitle}</div>
           <div>{dict.suppliers.module.docsDesc}</div>
@@ -147,7 +136,7 @@ export default function SuppliersModule() {
 
       {/* QUOTES tab */}
       {topTab === 'quotes' && (
-        <div style={{ padding: '48px 32px', textAlign: 'center', color: '#94a3b8', fontSize: fontSizes.md }}>
+        <div style={{ padding: '48px 32px', textAlign: 'center', color: workspace.textSecondary, fontSize: fontSizes.md }}>
           <div style={{ fontSize: fontSizes.display, marginBottom: 12 }}>📋</div>
           <div style={{ fontWeight: 700, color: '#475569', marginBottom: 6 }}>{dict.suppliers.module.quotesTitle}</div>
           <div>{dict.suppliers.module.quotesDesc}</div>

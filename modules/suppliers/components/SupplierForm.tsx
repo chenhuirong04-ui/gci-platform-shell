@@ -4,7 +4,8 @@ import type { Supplier, SupplierType, SupplierStatus, SupplierRating, DocumentTy
 import { createSupplier, generateShortCode, updateSupplier } from '../lib/suppliersCloud';
 import { createDocument, moveStorageFile, resolveStorageBucket } from '../lib/documentsCloud';
 import { getStatusLabel, getDocTypeLabel, getSupplierTypeLabel } from '../lib/labelMaps';
-import { workspace, fontSizes } from '@gci/design-system';
+import { workspace, fontSizes, radii } from '@gci/design-system';
+import { INPUT, LABEL, formGrid } from '../lib/ui';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 // Progress bars and decorative gradients keep the original gold.
@@ -14,25 +15,18 @@ const NAVY    = workspace.textPrimary;
 const BG      = workspace.surfacePage;
 const CBORDER = workspace.border;
 
-const INP: React.CSSProperties = {
-  display: 'block', width: '100%', boxSizing: 'border-box',
-  padding: '11px 14px', borderRadius: 10, border: '1.5px solid #b0bec5',
-  fontSize: fontSizes.md, color: '#0F172A', background: '#fff', outline: 'none',
-};
+const INP = INPUT;
 const SEL: React.CSSProperties = { ...INP, cursor: 'pointer' };
-const LBL: React.CSSProperties = {
-  display: 'block', fontSize: fontSizes.sm, fontWeight: 600, color: '#334155', marginBottom: 6,
-};
+const LBL = LABEL;
 const CARD: React.CSSProperties = {
   background: '#fff', borderRadius: 24, padding: 28,
   border: `1px solid ${CBORDER}`, boxShadow: '0 1px 4px rgba(12,27,58,0.06)',
 };
 const SEC: React.CSSProperties = {
-  fontSize: fontSizes.xs, fontWeight: 900, color: GOLD,
-  textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 20,
+  fontSize: fontSizes.xs, fontWeight: 900, color: workspace.accentText, marginBottom: 20,
 };
-const R2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 };
-const R3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 18 };
+const R2: React.CSSProperties = { ...formGrid(200), gap: 16, marginBottom: 18 };
+const R3: React.CSSProperties = { ...formGrid(160), gap: 16, marginBottom: 18 };
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
 import { SUPABASE_URL as SUPA_URL, sbAuthHeaders } from '../../../apps/shell/src/lib/supabaseRest';
@@ -395,7 +389,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
   return (
     <div style={{ background: BG, minHeight: '100vh' }}>
       <div style={{ padding: '24px 28px 64px', maxWidth: 1200, margin: '0 auto' }}>
-        <button onClick={onCancel} style={{ fontSize: fontSizes.xs, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 18 }}>
+        <button onClick={onCancel} style={{ fontSize: fontSizes.xs, color: workspace.textSecondary, background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 18 }}>
           {c0.back}
         </button>
 
@@ -432,7 +426,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                       <button key={idx}
                         onClick={() => { setPendingBtn(idx); fileRef.current?.click(); }}
                         style={{
-                          padding: '10px 18px', borderRadius: 10, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer',
+                          padding: '10px 18px', borderRadius: radii.sm, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer',
                           background: idx === 0 ? workspace.actionPrimaryBg : '#fff',
                           color: idx === 0 ? '#fff' : NAVY,
                           border: idx === 0 ? 'none' : `1.5px solid ${CBORDER}`,
@@ -450,7 +444,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                 {uploadStage === 'failed' && !uploadedFile && (
                   <div>
                     <Alert type="error">{uploadError || t.uploadFailedRetry}</Alert>
-                    <button onClick={resetUpload} style={{ marginTop: 10, fontSize: fontSizes.sm, color: NAVY, background: 'none', border: `1px solid ${CBORDER}`, borderRadius: 8, padding: '6px 14px', cursor: 'pointer' }}>{t.reselectFile}</button>
+                    <button onClick={resetUpload} style={{ marginTop: 10, fontSize: fontSizes.sm, color: NAVY, background: 'none', border: `1px solid ${CBORDER}`, borderRadius: radii.sm, padding: '6px 14px', cursor: 'pointer' }}>{t.reselectFile}</button>
                   </div>
                 )}
 
@@ -472,7 +466,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                     }
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: fontSizes.xs, color: '#64748b' }}>📎 {uploadedFile.origName} · {getDocTypeLabel(uploadedFile.docType, lang)}</span>
-                      <button onClick={resetUpload} style={{ fontSize: fontSizes.xs, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>{t.reupload}</button>
+                      <button onClick={resetUpload} style={{ fontSize: fontSizes.xs, color: workspace.textSecondary, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>{t.reupload}</button>
                     </div>
                   </div>
                 )}
@@ -523,7 +517,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                     onChange={e => setL('business_activities', e.target.value)} />
                 </FLD>
 
-                <div style={{ fontSize: fontSizes.xs, color: '#94a3b8', marginTop: 12, lineHeight: 1.6 }}>
+                <div style={{ fontSize: fontSizes.xs, color: workspace.textSecondary, marginTop: 12, lineHeight: 1.6 }}>
                   {t.writeRuleNote}
                 </div>
               </div>
@@ -533,7 +527,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
             {!isEdit && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ flex: 1, height: 1, background: CBORDER }} />
-                <span style={{ fontSize: fontSizes.xs, color: '#94a3b8', whiteSpace: 'nowrap', fontWeight: 600 }}>
+                <span style={{ fontSize: fontSizes.xs, color: workspace.textSecondary, whiteSpace: 'nowrap', fontWeight: 600 }}>
                   {uploadedFile ? t.dividerWithFile : t.dividerNoFile}
                 </span>
                 <div style={{ flex: 1, height: 1, background: CBORDER }} />
@@ -642,7 +636,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
             <div style={{ display: 'flex', gap: 12 }}>
               <button onClick={handleSave} disabled={savingDisabled}
                 style={{
-                  flex: 1, padding: '13px 0', borderRadius: 10, border: 'none',
+                  flex: 1, padding: '13px 0', borderRadius: radii.sm, border: 'none',
                   background: savingDisabled ? '#94a3b8' : workspace.actionPrimaryBg,
                   color: '#fff', fontSize: fontSizes.md, fontWeight: 700,
                   cursor: savingDisabled ? 'not-allowed' : 'pointer',
@@ -651,13 +645,13 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                   : uploadedFile ? t.saveWithFile
                   : isEdit ? t.saveEdit : t.saveNew}
               </button>
-              <button onClick={onCancel} style={{ padding: '13px 28px', borderRadius: 10, border: `1.5px solid ${CBORDER}`, background: '#fff', color: '#475569', fontSize: fontSizes.md, fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={onCancel} style={{ padding: '13px 28px', borderRadius: radii.sm, border: `1.5px solid ${CBORDER}`, background: '#fff', color: '#475569', fontSize: fontSizes.md, fontWeight: 600, cursor: 'pointer' }}>
                 {t.cancel}
               </button>
             </div>
 
             {aiFilledKeys.size > 0 && (
-              <div style={{ fontSize: fontSizes.xs, color: '#94a3b8', textAlign: 'center' }}>
+              <div style={{ fontSize: fontSizes.xs, color: workspace.textSecondary, textAlign: 'center' }}>
                 {t.aiHighlightNote}
               </div>
             )}
@@ -681,8 +675,8 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {checks.map(({ label, done }) => (
                   <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: fontSizes.sm }}>
-                    <span style={{ color: done ? '#16a34a' : '#cbd5e1', fontSize: fontSizes.lg, flexShrink: 0 }}>{done ? '✓' : '○'}</span>
-                    <span style={{ color: done ? '#334155' : '#94a3b8' }}>{label}</span>
+                    <span style={{ color: done ? '#15803d' : '#cbd5e1', fontSize: fontSizes.lg, flexShrink: 0 }}>{done ? '✓' : '○'}</span>
+                    <span style={{ color: done ? '#334155' : workspace.textSecondary }}>{label}</span>
                   </div>
                 ))}
               </div>
@@ -690,7 +684,7 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
               {/* License detail preview */}
               {showLicenseEdit && (
                 <div style={{ borderTop: `1px solid ${CBORDER}`, paddingTop: 16 }}>
-                  <div style={{ fontSize: fontSizes.xs, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+                  <div style={{ fontSize: fontSizes.xs, fontWeight: 700, color: '#64748b', marginBottom: 10 }}>
                     {t.licensePreviewTitle}
                   </div>
                   {([
@@ -703,11 +697,11 @@ export default function SupplierForm({ supplier, onSaved, onCancel }: Props) {
                     [t.vat, licenseFields.vat_number],
                   ] as [string, string][]).filter(([, v]) => v).map(([l, v]) => (
                     <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: fontSizes.xs, marginBottom: 5 }}>
-                      <span style={{ color: '#94a3b8' }}>{l}</span>
+                      <span style={{ color: workspace.textSecondary }}>{l}</span>
                       <span style={{ color: '#334155', fontWeight: 600, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span>
                     </div>
                   ))}
-                  <div style={{ fontSize: fontSizes.xs, color: '#94a3b8', marginTop: 8 }}>{t.savedToNote}</div>
+                  <div style={{ fontSize: fontSizes.xs, color: workspace.textSecondary, marginTop: 8 }}>{t.savedToNote}</div>
                 </div>
               )}
 

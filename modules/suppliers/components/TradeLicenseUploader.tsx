@@ -10,22 +10,16 @@ import { useI18n } from '@gci/i18n';
 import type { Supplier } from '../types';
 import { uploadSupplierFile, createDocument } from '../lib/documentsCloud';
 import { updateSupplier } from '../lib/suppliersCloud';
-import { workspace, fontSizes } from '@gci/design-system';
+import { workspace, fontSizes, radii } from '@gci/design-system';
+import { INPUT, LABEL, formGrid } from '../lib/ui';
 
 const NAVY = workspace.textPrimary;
 const GOLD = workspace.accent;
 const BORDER = '#CBD5E1';
 const T2 = '#374151';
 const T3 = '#6b7280';
-const INP: React.CSSProperties = {
-  display: 'block', width: '100%', boxSizing: 'border-box',
-  padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${BORDER}`,
-  fontSize: fontSizes.sm, color: NAVY, background: '#fff', outline: 'none',
-};
-const LBL: React.CSSProperties = {
-  display: 'block', fontSize: fontSizes.xs, fontWeight: 700, color: T2,
-  marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em',
-};
+const INP = INPUT;
+const LBL = LABEL;
 
 type Stage = 'idle' | 'parsing' | 'confirm' | 'saving' | 'done';
 
@@ -215,7 +209,7 @@ export default function TradeLicenseUploader({ supplier, onSaved, onCancel }: Pr
   if (stage === 'done') {
     return (
       <div style={{ padding: '60px 0', textAlign: 'center' }}>
-        <div style={{ fontSize: fontSizes.display, marginBottom: 12, color: '#16a34a' }}>✓</div>
+        <div style={{ fontSize: fontSizes.display, marginBottom: 12, color: '#15803d' }}>✓</div>
         <div style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY }}>{t.done}</div>
       </div>
     );
@@ -247,7 +241,7 @@ export default function TradeLicenseUploader({ supplier, onSaved, onCancel }: Pr
       <div style={{ fontSize: fontSizes.xs, color: T3, marginBottom: 12 }}>{u.fileLabel(file?.name ?? '')}</div>
 
       {/* Editable fields */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
+      <div style={{ ...formGrid(200), gap: 14, marginBottom: 16 }}>
         <Fld label={t.fLegalName} aiVal={!!fields.legal_name}>
           <input style={aiField(!!fields.legal_name)} value={fields.legal_name ?? ''} onChange={e => fld('legal_name', e.target.value)} />
         </Fld>
@@ -307,19 +301,19 @@ export default function TradeLicenseUploader({ supplier, onSaved, onCancel }: Pr
       <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
         <button
           onClick={handleSave}
-          style={{ flex: 1, padding: '11px 0', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: fontSizes.md, cursor: 'pointer' }}
+          style={{ flex: 1, padding: '11px 0', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: radii.sm, fontWeight: 700, fontSize: fontSizes.md, cursor: 'pointer' }}
         >
           {u.confirmSave}
         </button>
         <button
           onClick={() => fileRef.current?.click()}
-          style={{ padding: '11px 16px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T2, fontSize: fontSizes.sm, fontWeight: 600, cursor: 'pointer' }}
+          style={{ padding: '11px 16px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: radii.sm, color: T2, fontSize: fontSizes.sm, fontWeight: 600, cursor: 'pointer' }}
         >
           {u.reupload}
         </button>
         <button
           onClick={onCancel}
-          style={{ padding: '11px 16px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T3, fontSize: fontSizes.sm, cursor: 'pointer' }}
+          style={{ padding: '11px 16px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: radii.sm, color: T3, fontSize: fontSizes.sm, cursor: 'pointer' }}
         >
           {c0.cancel}
         </button>

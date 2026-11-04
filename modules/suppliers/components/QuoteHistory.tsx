@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useI18n } from '@gci/i18n';
 import { supabase } from '../../../apps/shell/src/lib/supabase';
 import { useAuth } from '../../../apps/shell/src/contexts/AuthContext';
-import { workspace, fontSizes, fonts } from '@gci/design-system';
+import { workspace, fontSizes, fonts, radii } from '@gci/design-system';
 
 const NAVY = workspace.textPrimary;
 const GOLD = workspace.accent;
@@ -70,7 +70,7 @@ export default function QuoteHistory({ supplierId }: Props) {
         {canQuotation && (
         <button
           onClick={handleUploadQuote}
-          style={{ padding: '7px 16px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 7, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
+          style={{ padding: '7px 16px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: radii.sm, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
         >
           {t.upload}
         </button>
@@ -85,7 +85,7 @@ export default function QuoteHistory({ supplierId }: Props) {
           {canQuotation && (
           <button
             onClick={handleUploadQuote}
-            style={{ padding: '9px 20px', background: workspace.actionPrimaryBg, color: workspace.actionPrimaryText, border: 'none', borderRadius: 8, fontWeight: 700, fontSize: fontSizes.sm, cursor: 'pointer' }}
+            style={{ padding: '9px 20px', background: workspace.actionPrimaryBg, color: workspace.actionPrimaryText, border: 'none', borderRadius: radii.sm, fontWeight: 700, fontSize: fontSizes.sm, cursor: 'pointer' }}
           >
             {t.uploadCta}
           </button>
@@ -97,7 +97,7 @@ export default function QuoteHistory({ supplierId }: Props) {
             <thead>
               <tr style={{ borderBottom: `2px solid ${BORDER}` }}>
                 {[t.colNumber, t.colSubject, t.colStatus, t.colAmount, t.colValidUntil, t.colMatch, t.colDate].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '8px 10px', fontSize: fontSizes.xs, fontWeight: 700, color: T2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                  <th key={h} style={{ textAlign: 'left', padding: '8px 10px', fontSize: fontSizes.xs, fontWeight: 700, color: T2 }}>{h}</th>
                 ))}
               </tr>
             </thead>

@@ -57,7 +57,7 @@ export default function CountryDistributionChart({ data, selectedCountry, onSele
         <div style={{ fontWeight: 700, fontSize: fontSizes.md, color: NAVY }}>{t.chartByCountryTitle}</div>
         <div style={{ display: 'flex', gap: 16, fontSize: fontSizes.xs, color: '#64748b' }}>
           <span>{t.filledLabel} <strong style={{ color: NAVY }}>{data.hasCountryCount}</strong></span>
-          <span>{t.notFilledLabel} <strong style={{ color: '#e53e3e' }}>{data.noCountryCount}</strong></span>
+          <span>{t.notFilledLabel} <strong style={{ color: '#c53030' }}>{data.noCountryCount}</strong></span>
           <span>{t.countriesCoveredLabel(data.countryCount)}</span>
         </div>
       </div>
@@ -79,7 +79,7 @@ export default function CountryDistributionChart({ data, selectedCountry, onSele
                 {/* Label — display only, filter key stays as DB value */}
                 <div style={{ width: 130, textAlign: 'right', fontSize: fontSizes.xs, fontWeight: isSelected ? 700 : 500, color: isSelected ? NAVY : '#475569', whiteSpace: 'nowrap', flexShrink: 0 }}>
                   {bar.isBlank ? t.notSpecified : bar.isOther ? t.other : getCountryLabel(bar.country, lang)}
-                  {bar.isOther && <span style={{ marginLeft: 4, fontSize: fontSizes.xs, color: '#94a3b8' }}>{otherExpanded ? '▲' : '▼'}</span>}
+                  {bar.isOther && <span style={{ marginLeft: 4, fontSize: fontSizes.xs, color: workspace.textSecondary }}>{otherExpanded ? '▲' : '▼'}</span>}
                 </div>
 
                 {/* Bar track */}
@@ -111,7 +111,7 @@ export default function CountryDistributionChart({ data, selectedCountry, onSele
                       onClick={() => onSelect(selectedCountry === d.country ? null : d.country)}
                       style={{ fontSize: fontSizes.xs, color: '#475569', cursor: 'pointer', padding: '2px 6px', borderRadius: 4, background: selectedCountry === d.country ? '#e8f0fa' : 'transparent', fontWeight: selectedCountry === d.country ? 700 : 400 }}
                     >
-                      {getCountryLabel(d.country, lang)} <span style={{ color: '#94a3b8' }}>{d.count}</span>
+                      {getCountryLabel(d.country, lang)} <span style={{ color: workspace.textSecondary }}>{d.count}</span>
                     </div>
                   ))}
                 </div>
@@ -125,7 +125,7 @@ export default function CountryDistributionChart({ data, selectedCountry, onSele
         <div style={{ marginTop: 12, textAlign: 'right' }}>
           <button
             onClick={() => { onSelect(null); setOtherExpanded(false); }}
-            style={{ fontSize: fontSizes.xs, color: GOLD, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+            style={{ fontSize: fontSizes.xs, color: workspace.accentText, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
           >
             {t.clearCountryFilter}
           </button>
