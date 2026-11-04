@@ -12,12 +12,11 @@ import { crmOwnerKey } from '../../../../../modules/business-solutions/lib/bsClo
 import { useI18n } from '@gci/i18n';
 
 // i18n: English for this page's fixed UI text (database values are never translated).
-// LANG is set from the language context by the page component on every render.
-let LANG: 'zh' | 'en' = 'zh';
 const EN: Record<string, string> = {
   "证照已识别并保存到合规事项": "Licence recognised and saved to Compliance"
 };
-const tx = (zh: string): string => (LANG === 'en' ? EN[zh] ?? zh : zh);
+// Per-instance translator: each component builds its own from its language context.
+const makeTx = (lang: 'zh' | 'en') => (zh: string): string => (lang === 'en' ? EN[zh] ?? zh : zh);
 
 
 export type CrmFilesTab = 'documents' | 'compliance' | 'persons';
@@ -32,7 +31,8 @@ interface Props {
 type DocInfo = { documentId: string; documentType: string; documentName: string; parsed: Record<string, unknown> };
 
 export function CrmCustomerFiles({ crmCustomerId, customerName, tab, onTabChange }: Props) {
-  LANG = useI18n().lang; // keep tx() in sync with the language toggle
+  const LANG = useI18n().lang;
+  const tx = makeTx(LANG);
   const ownerKey = crmOwnerKey(crmCustomerId);
   const [complianceReloadKey, setComplianceReloadKey] = useState(0);
   const [complianceSavedMsg, setComplianceSavedMsg] = useState<string | null>(null);

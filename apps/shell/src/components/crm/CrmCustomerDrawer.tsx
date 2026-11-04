@@ -16,8 +16,6 @@ import { zIndex, workspaceFontFamily } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
 
 // i18n: English for this page's fixed UI text (database values are never translated).
-// LANG is set from the language context by the page component on every render.
-let LANG: 'zh' | 'en' = 'zh';
 const EN: Record<string, string> = {
   "联系人 (": "Contacts (",
   "项目 (": "Projects (",
@@ -55,7 +53,8 @@ const EN: Record<string, string> = {
   "还没有跟进记录": "No follow-ups yet",
   "下一步：": "Next step: "
 };
-const tx = (zh: string): string => (LANG === 'en' ? EN[zh] ?? zh : zh);
+// Per-instance translator: each component builds its own from its language context.
+const makeTx = (lang: 'zh' | 'en') => (zh: string): string => (lang === 'en' ? EN[zh] ?? zh : zh);
 
 
 interface Props {
@@ -72,7 +71,7 @@ interface Props {
 const GOLD = '#7A5F2A';
 const MUTED = '#475569';
 const BORD = 'rgba(12,27,58,0.09)';
-const SEL = { padding: '6px 10px', borderRadius: 8, fontSize: 12.5, background: 'rgba(12,27,58,0.05)', border: `1px solid ${BORD}`, color: '#0C1B3A', colorScheme: 'dark' as const };
+const SEL = { padding: '6px 10px', borderRadius: 8, fontSize: 12.5, background: 'rgba(12,27,58,0.05)', border: `1px solid ${BORD}`, color: '#0C1B3A', colorScheme: 'light' as const };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -84,7 +83,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export function CrmCustomerDrawer({ customer, onClose, onChanged, onAddFollowup, onOpenGia, reloadKey }: Props) {
-  LANG = useI18n().lang; // keep tx() in sync with the language toggle
+  const LANG = useI18n().lang;
+  const tx = makeTx(LANG);
   const [c, setC] = useState<CrmCustomer | null>(customer);
   const [contacts, setContacts] = useState<CrmContact[]>([]);
   const [projects, setProjects] = useState<CrmProject[]>([]);

@@ -12,8 +12,6 @@ import { ModalPortal } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
 
 // i18n: English for this page's fixed UI text (database values are never translated).
-// LANG is set from the language context by the page component on every render.
-let LANG: 'zh' | 'en' = 'zh';
 const EN: Record<string, string> = {
   "请先选择客户": "Please select a customer first",
   "请填写跟进内容": "Please enter the follow-up notes",
@@ -36,7 +34,8 @@ const EN: Record<string, string> = {
   "下一步行动": "Next action",
   "取消": "Cancel"
 };
-const tx = (zh: string): string => (LANG === 'en' ? EN[zh] ?? zh : zh);
+// Per-instance translator: each component builds its own from its language context.
+const makeTx = (lang: 'zh' | 'en') => (zh: string): string => (lang === 'en' ? EN[zh] ?? zh : zh);
 
 
 export interface FollowupTarget { id: string; customer_name: string }
@@ -59,7 +58,8 @@ const FIELD = 'w-full p-3 border border-gray-300 rounded-md outline-none focus:b
 const LABEL = 'text-xs font-bold text-slate-600  ';
 
 export function CrmFollowupModal({ open, customer, onClose, onSaved }: Props) {
-  LANG = useI18n().lang; // keep tx() in sync with the language toggle
+  const LANG = useI18n().lang;
+  const tx = makeTx(LANG);
   const [picked, setPicked] = useState<FollowupTarget | null>(customer);
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<CustomerSearchHit[]>([]);

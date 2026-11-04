@@ -16,8 +16,6 @@ import { useI18n } from '@gci/i18n';
 import { workspaceFontFamily } from '@gci/design-system';
 
 // i18n: English for this page's fixed UI text (database values are never translated).
-// LANG is set from the language context by the page component on every render.
-let LANG: 'zh' | 'en' = 'zh';
 const EN: Record<string, string> = {
   "客户名录": "Customer Directory",
   "今日跟进": "Today's Follow-ups",
@@ -66,7 +64,8 @@ const EN: Record<string, string> = {
   "详情": "Details",
   "+ 跟进": "+ Follow-up"
 };
-const tx = (zh: string): string => (LANG === 'en' ? EN[zh] ?? zh : zh);
+// Per-instance translator: each component builds its own from its language context.
+const makeTx = (lang: 'zh' | 'en') => (zh: string): string => (lang === 'en' ? EN[zh] ?? zh : zh);
 
 
 const GOLD = '#7A5F2A';
@@ -116,7 +115,8 @@ function fmtDate(d: string | null): string {
 }
 
 export function CrmCustomers() {
-  LANG = useI18n().lang; // keep tx() in sync with the language toggle
+  const LANG = useI18n().lang;
+  const tx = makeTx(LANG);
   const navigate = useNavigate();
   const [view, setView] = useState<ViewKey>('directory');
   const [rows, setRows] = useState<CrmCustomerWithContact[] | CrmOverdueCustomer[]>([]);
@@ -400,7 +400,7 @@ export function CrmCustomers() {
                       disabled={rowBusy === r.id || view === 'archived'}
                       onBlur={(e) => handleNextDateBlur(r.id, r.next_follow_up_at || null, e.currentTarget.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                      style={{ padding: '3px 6px', borderRadius: 7, fontSize: 11.5, background: 'rgba(12,27,58,0.04)', border: `1px solid ${view === 'overdue' ? RED : BORD}`, color: view === 'overdue' ? RED : MUTED, colorScheme: 'dark' }}
+                      style={{ padding: '3px 6px', borderRadius: 7, fontSize: 11.5, background: 'rgba(12,27,58,0.04)', border: `1px solid ${view === 'overdue' ? RED : BORD}`, color: view === 'overdue' ? RED : MUTED, colorScheme: 'light' }}
                     />
                     {view === 'overdue' && r.overdueDays ? <span style={{ marginLeft: 6, fontSize: 11 }}>{tx('逾期')}{r.overdueDays}{tx('天')}</span> : null}
                   </td>

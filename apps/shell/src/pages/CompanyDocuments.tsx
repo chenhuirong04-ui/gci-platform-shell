@@ -19,8 +19,6 @@ import {
 import { workspaceFontFamily } from '@gci/design-system';
 
 // i18n: English for this page's fixed UI text (database values are never translated).
-// LANG is set from the language context by the page component on every render.
-let LANG: 'zh' | 'en' = 'zh';
 const EN: Record<string, string> = {
   "确认删除文件《": "Delete file “",
   "》？此操作不可恢复。": "”? This cannot be undone.",
@@ -95,7 +93,8 @@ const EN: Record<string, string> = {
   "AI 识别": "AI recognise",
   "删除": "Delete"
 };
-const tx = (zh: string): string => (LANG === 'en' ? EN[zh] ?? zh : zh);
+// Per-instance translator: each component builds its own from its language context.
+const makeTx = (lang: 'zh' | 'en') => (zh: string): string => (lang === 'en' ? EN[zh] ?? zh : zh);
 
 
 const ADD_CATEGORY_VALUE = '__add_new__';
@@ -181,11 +180,11 @@ function formatBytes(n: number | null): string {
 // touched by AI" (no badge) from an actual recognition outcome.
 function aiStatusBadge(status: string | null, isZh: boolean): { label: string; color: string } | null {
   switch (status) {
-    case 'completed': return { label: isZh ? tx('✓ 已识别') : '✓ Recognized', color: '#15803D' };
-    case 'needs_review': return { label: isZh ? tx('⚠ 待复核') : '⚠ Needs Review', color: '#B45309' };
-    case 'failed': return { label: isZh ? tx('✕ 识别失败') : '✕ Failed', color: '#C53030' };
-    case 'processing': return { label: isZh ? tx('识别中…') : 'Recognizing…', color: '#475569' };
-    case 'pending': return { label: isZh ? tx('待识别') : 'Pending', color: '#475569' };
+    case 'completed': return { label: isZh ? '✓ 已识别' : '✓ Recognized', color: '#15803D' };
+    case 'needs_review': return { label: isZh ? '⚠ 待复核' : '⚠ Needs Review', color: '#B45309' };
+    case 'failed': return { label: isZh ? '✕ 识别失败' : '✕ Failed', color: '#C53030' };
+    case 'processing': return { label: isZh ? '识别中…' : 'Recognizing…', color: '#475569' };
+    case 'pending': return { label: isZh ? '待识别' : 'Pending', color: '#475569' };
     default: return null;
   }
 }
@@ -208,7 +207,8 @@ interface UploadFormState {
 const EMPTY_UPLOAD: UploadFormState = { file: null, category: '', document_name: '', expiry_date: '', notes: '' };
 
 export function CompanyDocuments() {
-  LANG = useI18n().lang; // keep tx() in sync with the language toggle
+  const LANG = useI18n().lang;
+  const tx = makeTx(LANG);
   const navigate = useNavigate();
   const { profile } = useAuth();
   // Mirrors public.is_active_admin() (role_label='Admin' AND is_active=true) — AuthContext's own
