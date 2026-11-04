@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import { useI18n } from '@gci/i18n';
 import type { Supplier, SupplierRating } from '../types';
 import { updateSupplier } from '../lib/suppliersCloud';
+import { fontSizes } from '@gci/design-system';
 
 const NAVY = '#0B1F44';
 const GOLD = '#C9A84C';
 const BORDER = '#e2e8f0';
 const T2 = '#374151';
 const T3 = '#6b7280';
-const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1.5px solid #CBD5E1`, fontSize: 13, color: NAVY, background: '#fff', outline: 'none' };
-const LBL: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: T2, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' };
+const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1.5px solid #CBD5E1`, fontSize: fontSizes.sm, color: NAVY, background: '#fff', outline: 'none' };
+const LBL: React.CSSProperties = { display: 'block', fontSize: fontSizes.xs, fontWeight: 700, color: T2, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' };
 
 const RATINGS: SupplierRating[] = ['A', 'B', 'C', 'D'];
 
@@ -56,14 +57,14 @@ export default function RatingNotes({ supplier, onUpdated }: Props) {
             key={r}
             onClick={() => setRating(r)}
             style={{
-              flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 800, fontSize: 16, cursor: 'pointer',
+              flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 800, fontSize: fontSizes.lg, cursor: 'pointer',
               border: rating === r ? `2px solid ${GOLD}` : `1.5px solid ${BORDER}`,
               background: rating === r ? NAVY : '#fff',
               color: rating === r ? GOLD : T2,
             }}
           >
             {r}
-            <div style={{ fontSize: 11, fontWeight: 500, marginTop: 2, color: rating === r ? '#f0ead2' : '#94a3b8' }}>{RATING_DESC[r]}</div>
+            <div style={{ fontSize: fontSizes.xs, fontWeight: 500, marginTop: 2, color: rating === r ? '#f0ead2' : '#94a3b8' }}>{RATING_DESC[r]}</div>
           </button>
         ))}
       </div>
@@ -92,7 +93,7 @@ export default function RatingNotes({ supplier, onUpdated }: Props) {
       <button
         onClick={handleSave}
         disabled={saving}
-        style={{ padding: '10px 32px', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+        style={{ padding: '10px 32px', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: fontSizes.md, cursor: 'pointer' }}
       >
         {saving ? dict.suppliers.common.saving : saved ? dict.suppliers.common.saved : t.save}
       </button>

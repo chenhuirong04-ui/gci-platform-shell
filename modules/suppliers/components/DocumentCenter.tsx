@@ -5,7 +5,7 @@ import {
   createDocument, deleteDocument, deleteStorageObject, listDocuments, updateDocument,
   getDocumentUrl, resolveStorageBucket, uploadSupplierFile,
 } from '../lib/documentsCloud';
-import { workspace } from '@gci/design-system';
+import { workspace, fontSizes } from '@gci/design-system';
 import { getDocStatusLabel, getDocTypeLabel } from '../lib/labelMaps';
 import TradeLicenseUploader from './TradeLicenseUploader';
 
@@ -14,8 +14,8 @@ const NAVY = '#0c1b3a';
 const BORDER = workspace.border;
 const T2 = '#334155';
 const T3 = '#94a3b8';
-const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #b0bec5', fontSize: 14, color: '#0F172A', background: '#fff', outline: 'none' };
-const LBL: React.CSSProperties = { display: 'block', fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 6 };
+const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #b0bec5', fontSize: fontSizes.md, color: '#0F172A', background: '#fff', outline: 'none' };
+const LBL: React.CSSProperties = { display: 'block', fontSize: fontSizes.sm, fontWeight: 600, color: '#334155', marginBottom: 6 };
 
 const DOC_TYPES: DocumentType[] = [
   '营业执照','公司注册文件','VAT文件','税务文件','公司简介',
@@ -219,7 +219,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
   if (showLicenseUploader && supplier) {
     return (
       <div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: NAVY, marginBottom: 16 }}>{t.uploadLicenseTitle}</div>
+        <div style={{ fontSize: fontSizes.md, fontWeight: 700, color: NAVY, marginBottom: 16 }}>{t.uploadLicenseTitle}</div>
         <TradeLicenseUploader
           supplier={supplier}
           onSaved={() => { setShowLicenseUploader(false); load(); }}
@@ -235,31 +235,31 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
   return (
     <div>
       {successMsg && (
-        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, fontWeight: 700, color: '#166534' }}>
+        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: fontSizes.sm, fontWeight: 700, color: '#166534' }}>
           ✓ {successMsg}
         </div>
       )}
 
       {/* Primary upload actions */}
       <div style={{ background: '#fffbf0', border: `1.5px dashed ${GOLD}`, borderRadius: 10, padding: '16px 20px', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t.quickUpload}</span>
+        <span style={{ fontSize: fontSizes.xs, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t.quickUpload}</span>
         <button
           onClick={() => setShowLicenseUploader(true)}
-          style={{ padding: '9px 18px', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+          style={{ padding: '9px 18px', background: NAVY, color: '#fff', border: 'none', borderRadius: 8, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
         >
           {t.uploadLicenseBtn}
         </button>
         <button
           onClick={() => openEdit({ ...EMPTY(supplierId), document_type: '产品目录' as DocumentType })}
-          style={{ padding: '9px 18px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, fontSize: 13, fontWeight: 600, color: NAVY, cursor: 'pointer' }}
+          style={{ padding: '9px 18px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, fontSize: fontSizes.sm, fontWeight: 600, color: NAVY, cursor: 'pointer' }}
         >
           {t.uploadOtherBtn}
         </button>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ fontSize: 13, color: T2 }}>{t.count(docs.length)}</span>
-        <button onClick={() => openEdit(EMPTY(supplierId))} style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{t.add}</button>
+        <span style={{ fontSize: fontSizes.sm, color: T2 }}>{t.count(docs.length)}</span>
+        <button onClick={() => openEdit(EMPTY(supplierId))} style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}>{t.add}</button>
       </div>
 
       {loading ? <div style={{ color: T3, textAlign: 'center', padding: 40 }}>{c0.loading}</div>
@@ -268,16 +268,16 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {Object.entries(groups).map(([type, items]) => (
             <div key={type}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{getDocTypeLabel(type, lang)}</div>
+              <div style={{ fontSize: fontSizes.xs, fontWeight: 800, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{getDocTypeLabel(type, lang)}</div>
               {items.map(doc => {
                 const ec = expiryColor(doc.expire_date);
                 return (
                   <div key={doc.id} style={{ background: '#f8fafc', border: `1px solid ${BORDER}`, borderRadius: 9, padding: '10px 14px', marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <span style={{ fontWeight: 600, color: NAVY, fontSize: 13 }}>{doc.document_name}</span>
-                      {doc.document_number && <span style={{ fontSize: 11, color: T3, marginLeft: 8 }}>#{doc.document_number}</span>}
-                      {doc.file_size && <span style={{ fontSize: 10, color: T3, marginLeft: 8 }}>{formatBytes(doc.file_size)}</span>}
-                      <div style={{ fontSize: 11, color: T3, marginTop: 3, display: 'flex', gap: 10 }}>
+                      <span style={{ fontWeight: 600, color: NAVY, fontSize: fontSizes.sm }}>{doc.document_name}</span>
+                      {doc.document_number && <span style={{ fontSize: fontSizes.xs, color: T3, marginLeft: 8 }}>#{doc.document_number}</span>}
+                      {doc.file_size && <span style={{ fontSize: fontSizes.xs, color: T3, marginLeft: 8 }}>{formatBytes(doc.file_size)}</span>}
+                      <div style={{ fontSize: fontSizes.xs, color: T3, marginTop: 3, display: 'flex', gap: 10 }}>
                         {doc.storage_path && doc.created_at && (
                           <span>{t.uploadedAt(new Date(doc.created_at).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }))}</span>
                         )}
@@ -291,13 +291,13 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
                     </div>
                     <div style={{ display: 'flex', gap: 6 }}>
                       {(doc.storage_path || doc.file_url) && (
-                        <button onClick={() => handleView(doc)} style={{ fontSize: 12, color: NAVY, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{isPreviewable(doc) ? t.viewBtn : t.downloadBtn}</button>
+                        <button onClick={() => handleView(doc)} style={{ fontSize: fontSizes.xs, color: NAVY, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{isPreviewable(doc) ? t.viewBtn : t.downloadBtn}</button>
                       )}
-                      <button onClick={() => openEdit({ ...doc })} style={{ fontSize: 12, color: NAVY, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.edit}</button>
+                      <button onClick={() => openEdit({ ...doc })} style={{ fontSize: fontSizes.xs, color: NAVY, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.edit}</button>
                       {deleteId === doc.id
-                        ? <><button onClick={async () => { await deleteDocument(doc.id!); setDeleteId(null); load(); }} style={{ fontSize: 12, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.confirm}</button>
-                            <button onClick={() => setDeleteId(null)} style={{ fontSize: 12, color: T2, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.cancel}</button></>
-                        : <button onClick={() => setDeleteId(doc.id!)} style={{ fontSize: 12, color: '#dc2626', background: 'none', border: `1px solid #fca5a5`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.delete}</button>
+                        ? <><button onClick={async () => { await deleteDocument(doc.id!); setDeleteId(null); load(); }} style={{ fontSize: fontSizes.xs, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.confirm}</button>
+                            <button onClick={() => setDeleteId(null)} style={{ fontSize: fontSizes.xs, color: T2, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.cancel}</button></>
+                        : <button onClick={() => setDeleteId(doc.id!)} style={{ fontSize: fontSizes.xs, color: '#dc2626', background: 'none', border: `1px solid #fca5a5`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.delete}</button>
                       }
                     </div>
                   </div>
@@ -315,7 +315,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
           onClick={e => { if (e.target === e.currentTarget) setEdit(null); }}
         >
           <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 560, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: NAVY }}>{edit.id ? t.modalEdit : t.modalNew}</div>
+            <div style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY }}>{edit.id ? t.modalEdit : t.modalNew}</div>
 
             {/* 1. Document type */}
             <F label={t.fType}>
@@ -331,7 +331,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
 
               {/* Existing file indicator */}
               {edit.storage_path && !selectedFile && (
-                <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#166534', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '8px 12px', fontSize: fontSizes.xs, color: '#166534', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span>{t.hasExisting}</span>
                   <span style={{ color: T3 }}>{t.hasExistingSub}</span>
                 </div>
@@ -355,12 +355,12 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
               >
                 {selectedFile ? (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                    <span style={{ fontSize: 24 }}>📎</span>
-                    <span style={{ fontWeight: 700, color: NAVY, fontSize: 13 }}>{selectedFile.name}</span>
-                    <span style={{ fontSize: 11, color: T3 }}>{formatBytes(selectedFile.size)}</span>
+                    <span style={{ fontSize: fontSizes.xxl }}>📎</span>
+                    <span style={{ fontWeight: 700, color: NAVY, fontSize: fontSizes.sm }}>{selectedFile.name}</span>
+                    <span style={{ fontSize: fontSizes.xs, color: T3 }}>{formatBytes(selectedFile.size)}</span>
                     <button
                       onClick={e => { e.stopPropagation(); setSelectedFile(null); setSaveErr(null); }}
-                      style={{ marginTop: 6, fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                      style={{ marginTop: 6, fontSize: fontSizes.xs, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
                     >
                       {t.dropRemove}
                     </button>
@@ -368,8 +368,8 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                     <span style={{ fontSize: 28, opacity: 0.5 }}>📂</span>
-                    <span style={{ fontSize: 13, color: T2, fontWeight: 600 }}>{t.dropPrompt}</span>
-                    <span style={{ fontSize: 11, color: T3 }}>{t.dropSupport}</span>
+                    <span style={{ fontSize: fontSizes.sm, color: T2, fontWeight: 600 }}>{t.dropPrompt}</span>
+                    <span style={{ fontSize: fontSizes.xs, color: T3 }}>{t.dropSupport}</span>
                   </div>
                 )}
               </div>
@@ -383,7 +383,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
 
               {/* Upload progress indicator */}
               {stageLabel && (
-                <div style={{ marginTop: 8, background: '#f0f4ff', border: '1px solid #c7d7ff', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: NAVY, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ marginTop: 8, background: '#f0f4ff', border: '1px solid #c7d7ff', borderRadius: 8, padding: '8px 12px', fontSize: fontSizes.xs, color: NAVY, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid #c7d7ff', borderTopColor: NAVY, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                   {stageLabel}
                   <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -434,7 +434,7 @@ export default function DocumentCenter({ supplierId, supplier }: Props) {
 
             {/* Error */}
             {saveErr && (
-              <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#dc2626' }}>
+              <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '8px 12px', fontSize: fontSizes.xs, color: '#dc2626' }}>
                 ⚠ {saveErr}
               </div>
             )}

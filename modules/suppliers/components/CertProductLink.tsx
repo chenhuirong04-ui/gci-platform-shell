@@ -3,13 +3,14 @@ import type { SupplierCertification, SupplierProduct, CertProductLink as CertPro
 import { listCertifications } from '../lib/certificationsCloud';
 import { listProducts } from '../lib/suppliersCloud';
 import { createCertProductLink, deleteCertProductLink, listCertProductLinks } from '../lib/certificationsCloud';
+import { fontSizes } from '@gci/design-system';
 
 const NAVY = '#0B1F44';
 const BORDER = '#CBD5E1';
 const T2 = '#475569';
 const T3 = '#94a3b8';
-const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${BORDER}`, fontSize: 13, color: NAVY, background: '#fff', outline: 'none' };
-const LBL: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: T2, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' };
+const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${BORDER}`, fontSize: fontSizes.sm, color: NAVY, background: '#fff', outline: 'none' };
+const LBL: React.CSSProperties = { display: 'block', fontSize: fontSizes.xs, fontWeight: 700, color: T2, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' };
 
 interface Props { supplierId: string; }
 
@@ -49,11 +50,11 @@ export default function CertProductLink({ supplierId }: Props) {
 
   return (
     <div>
-      <div style={{ fontSize: 13, color: T2, marginBottom: 16 }}>关联认证与产品，追踪哪些产品持有哪些认证</div>
+      <div style={{ fontSize: fontSizes.sm, color: T2, marginBottom: 16 }}>关联认证与产品，追踪哪些产品持有哪些认证</div>
 
       {/* Add form */}
       <div style={{ background: '#f8fafc', border: `1px solid ${BORDER}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: NAVY, marginBottom: 12 }}>添加认证-产品关联</div>
+        <div style={{ fontSize: fontSizes.xs, fontWeight: 700, color: NAVY, marginBottom: 12 }}>添加认证-产品关联</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
           <div>
             <label style={LBL}>认证</label>
@@ -74,7 +75,7 @@ export default function CertProductLink({ supplierId }: Props) {
             <input style={INP} value={form.model_number} onChange={e => setForm(f => ({ ...f, model_number: e.target.value }))} placeholder="可填具体型号" />
           </div>
         </div>
-        <button onClick={handleAdd} disabled={saving || !form.certification_id || !form.supplier_product_id} style={{ padding: '8px 20px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: (!form.certification_id || !form.supplier_product_id) ? 0.5 : 1 }}>
+        <button onClick={handleAdd} disabled={saving || !form.certification_id || !form.supplier_product_id} style={{ padding: '8px 20px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer', opacity: (!form.certification_id || !form.supplier_product_id) ? 0.5 : 1 }}>
           {saving ? '添加中…' : '添加关联'}
         </button>
       </div>
@@ -85,18 +86,18 @@ export default function CertProductLink({ supplierId }: Props) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {links.map(link => (
             <div key={link.id} style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: 13 }}>
+              <div style={{ fontSize: fontSizes.sm }}>
                 <span style={{ fontWeight: 700, color: NAVY }}>{certMap[link.certification_id] ?? link.certification_id}</span>
                 <span style={{ color: T3, margin: '0 8px' }}>→</span>
                 <span style={{ color: T2 }}>{prodMap[link.supplier_product_id] ?? link.supplier_product_id}</span>
-                {link.model_number && <span style={{ color: T3, fontSize: 12, marginLeft: 8 }}>({link.model_number})</span>}
+                {link.model_number && <span style={{ color: T3, fontSize: fontSizes.xs, marginLeft: 8 }}>({link.model_number})</span>}
               </div>
               {deleteId === link.id
                 ? <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={async () => { await deleteCertProductLink(link.id!); setDeleteId(null); load(); }} style={{ fontSize: 12, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>确认</button>
-                    <button onClick={() => setDeleteId(null)} style={{ fontSize: 12, color: T2, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>取消</button>
+                    <button onClick={async () => { await deleteCertProductLink(link.id!); setDeleteId(null); load(); }} style={{ fontSize: fontSizes.xs, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>确认</button>
+                    <button onClick={() => setDeleteId(null)} style={{ fontSize: fontSizes.xs, color: T2, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>取消</button>
                   </div>
-                : <button onClick={() => setDeleteId(link.id!)} style={{ fontSize: 12, color: '#dc2626', background: 'none', border: `1px solid #fca5a5`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>删除</button>
+                : <button onClick={() => setDeleteId(link.id!)} style={{ fontSize: fontSizes.xs, color: '#dc2626', background: 'none', border: `1px solid #fca5a5`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>删除</button>
               }
             </div>
           ))}

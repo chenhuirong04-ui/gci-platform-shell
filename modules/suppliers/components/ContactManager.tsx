@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useI18n } from '@gci/i18n';
 import type { SupplierContact } from '../types';
 import { createContact, deleteContact, listContacts, updateContact } from '../lib/suppliersCloud';
+import { fontSizes } from '@gci/design-system';
 
 const NAVY = '#0B1F44';
 const GOLD = '#C9A84C';
@@ -9,8 +10,8 @@ const BORDER = '#e2e8f0';
 const T2 = '#374151';
 const T3 = '#6b7280';
 
-const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1.5px solid #CBD5E1`, fontSize: 13, color: NAVY, background: '#fff', outline: 'none' };
-const LBL: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: T2, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' };
+const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1.5px solid #CBD5E1`, fontSize: fontSizes.sm, color: NAVY, background: '#fff', outline: 'none' };
+const LBL: React.CSSProperties = { display: 'block', fontSize: fontSizes.xs, fontWeight: 700, color: T2, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' };
 
 const EMPTY_CONTACT = (supplierId: string): Omit<SupplierContact, 'id'> => ({
   supplier_id: supplierId, full_name: '', job_title: '', department: '',
@@ -63,10 +64,10 @@ export default function ContactManager({ supplierId }: Props) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ fontSize: 13, color: T2 }}>{t.count(contacts.length)}</span>
+        <span style={{ fontSize: fontSizes.sm, color: T2 }}>{t.count(contacts.length)}</span>
         <button
           onClick={() => setEditContact(EMPTY_CONTACT(supplierId))}
-          style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+          style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
         >
           {t.add}
         </button>
@@ -83,18 +84,18 @@ export default function ContactManager({ supplierId }: Props) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: NAVY }}>{c.full_name}</span>
-                    {c.is_primary && <span style={{ fontSize: 10, fontWeight: 800, color: GOLD, background: GOLD + '18', padding: '2px 7px', borderRadius: 999 }}>{t.primary}</span>}
-                    {c.is_decision_maker && <span style={{ fontSize: 10, fontWeight: 700, color: '#7c3aed', background: '#7c3aed18', padding: '2px 7px', borderRadius: 999 }}>{t.decisionMaker}</span>}
+                    <span style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY }}>{c.full_name}</span>
+                    {c.is_primary && <span style={{ fontSize: fontSizes.xs, fontWeight: 800, color: GOLD, background: GOLD + '18', padding: '2px 7px', borderRadius: 999 }}>{t.primary}</span>}
+                    {c.is_decision_maker && <span style={{ fontSize: fontSizes.xs, fontWeight: 700, color: '#7c3aed', background: '#7c3aed18', padding: '2px 7px', borderRadius: 999 }}>{t.decisionMaker}</span>}
                   </div>
-                  <div style={{ fontSize: 12, color: T2 }}>{[c.job_title, c.department, c.contact_role].filter(Boolean).join(' · ')}</div>
-                  <div style={{ fontSize: 12, color: T3, marginTop: 4, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: fontSizes.xs, color: T2 }}>{[c.job_title, c.department, c.contact_role].filter(Boolean).join(' · ')}</div>
+                  <div style={{ fontSize: fontSizes.xs, color: T3, marginTop: 4, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                     {c.mobile && <span>📱 {c.mobile}</span>}
                     {c.whatsapp && <span>💬 WhatsApp: {c.whatsapp}</span>}
                     {c.wechat && <span>{t.fWechat}: {c.wechat}</span>}
                     {c.email && <span>✉ {c.email}</span>}
                   </div>
-                  <div style={{ fontSize: 11, color: T3, marginTop: 4, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: fontSizes.xs, color: T3, marginTop: 4, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {c.is_commercial_contact && <span>{t.commercial}</span>}
                     {c.is_technical_contact && <span>{t.technical}</span>}
                     {c.is_finance_contact && <span>{t.finance}</span>}
@@ -102,14 +103,14 @@ export default function ContactManager({ supplierId }: Props) {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => setEditContact({ ...c })} style={{ fontSize: 12, color: NAVY, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.edit}</button>
+                  <button onClick={() => setEditContact({ ...c })} style={{ fontSize: fontSizes.xs, color: NAVY, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.edit}</button>
                   {confirmDeleteId === c.id ? (
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <button onClick={() => handleDelete(c.id!)} style={{ fontSize: 12, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.confirmDelete}</button>
-                      <button onClick={() => setConfirmDeleteId(null)} style={{ fontSize: 12, color: T2, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.cancel}</button>
+                      <button onClick={() => handleDelete(c.id!)} style={{ fontSize: fontSizes.xs, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.confirmDelete}</button>
+                      <button onClick={() => setConfirmDeleteId(null)} style={{ fontSize: fontSizes.xs, color: T2, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.cancel}</button>
                     </div>
                   ) : (
-                    <button onClick={() => setConfirmDeleteId(c.id!)} style={{ fontSize: 12, color: '#dc2626', background: 'none', border: `1px solid #fca5a5`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.delete}</button>
+                    <button onClick={() => setConfirmDeleteId(c.id!)} style={{ fontSize: fontSizes.xs, color: '#dc2626', background: 'none', border: `1px solid #fca5a5`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.delete}</button>
                   )}
                 </div>
               </div>
@@ -122,7 +123,7 @@ export default function ContactManager({ supplierId }: Props) {
       {editContact && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => { if (e.target === e.currentTarget) setEditContact(null); }}>
           <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 560, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: NAVY, marginBottom: 20 }}>{editContact.id ? t.modalEdit : t.modalNew}</div>
+            <div style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY, marginBottom: 20 }}>{editContact.id ? t.modalEdit : t.modalNew}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
               <F label={t.fName}><input style={INP} value={editContact.full_name ?? ''} onChange={e => setEditContact(v => ({ ...v!, full_name: e.target.value }))} /></F>
               <F label={t.fJobTitle}><input style={INP} value={editContact.job_title ?? ''} onChange={e => setEditContact(v => ({ ...v!, job_title: e.target.value }))} /></F>
@@ -135,7 +136,7 @@ export default function ContactManager({ supplierId }: Props) {
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
               {([['is_primary',t.primary],['is_decision_maker',t.decisionMaker],['is_commercial_contact',t.commercial],['is_technical_contact',t.technical],['is_finance_contact',t.finance],['is_logistics_contact',t.logistics]] as [keyof SupplierContact, string][]).map(([k, l]) => (
-                <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, color: NAVY, fontWeight: 600 }}>
+                <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: fontSizes.sm, color: NAVY, fontWeight: 600 }}>
                   <input type="checkbox" checked={!!(editContact as any)[k]} onChange={e => setEditContact(v => ({ ...v!, [k]: e.target.checked }))} />
                   {l}
                 </label>

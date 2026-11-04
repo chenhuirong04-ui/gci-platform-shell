@@ -2,13 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useI18n } from '@gci/i18n';
 import type { SupplierProduct } from '../types';
 import { createProduct, deleteProduct, listProducts, updateProduct } from '../lib/suppliersCloud';
+import { fontSizes } from '@gci/design-system';
 
 const NAVY = '#0B1F44';
 const BORDER = '#CBD5E1';
 const T2 = '#475569';
 const T3 = '#94a3b8';
-const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${BORDER}`, fontSize: 13, color: NAVY, background: '#fff', outline: 'none' };
-const LBL: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: T2, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' };
+const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${BORDER}`, fontSize: fontSizes.sm, color: NAVY, background: '#fff', outline: 'none' };
+const LBL: React.CSSProperties = { display: 'block', fontSize: fontSizes.xs, fontWeight: 700, color: T2, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' };
 
 const EMPTY = (sid: string): Omit<SupplierProduct, 'id'> => ({
   supplier_id: sid, product_name_cn: '', product_name_en: '', supplier_sku: '',
@@ -47,8 +48,8 @@ export default function ProductManager({ supplierId }: Props) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ fontSize: 13, color: T2 }}>{t.count(products.length)}</span>
-        <button onClick={() => setEdit(EMPTY(supplierId))} style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{t.add}</button>
+        <span style={{ fontSize: fontSizes.sm, color: T2 }}>{t.count(products.length)}</span>
+        <button onClick={() => setEdit(EMPTY(supplierId))} style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}>{t.add}</button>
       </div>
       {loading ? <div style={{ color: T3, textAlign: 'center', padding: 40 }}>{c0.loading}</div>
        : products.length === 0 ? <div style={{ color: T3, textAlign: 'center', padding: 40 }}>{t.empty}</div>
@@ -57,22 +58,22 @@ export default function ProductManager({ supplierId }: Props) {
           {products.map(p => (
             <div key={p.id} style={{ background: '#f8fafc', border: `1px solid ${BORDER}`, borderRadius: 10, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <div style={{ fontWeight: 700, color: NAVY, fontSize: 14 }}>{p.product_name_cn || p.product_name_en || c0.notSet}</div>
-                <div style={{ fontSize: 12, color: T2, marginTop: 3 }}>
+                <div style={{ fontWeight: 700, color: NAVY, fontSize: fontSizes.md }}>{p.product_name_cn || p.product_name_en || c0.notSet}</div>
+                <div style={{ fontSize: fontSizes.xs, color: T2, marginTop: 3 }}>
                   {[p.category, p.model, p.unit && t.unit(p.unit), p.moq && t.moq(p.moq)].filter(Boolean).join(' · ')}
                 </div>
                 {(p.indicative_price_min || p.indicative_price_max) && (
-                  <div style={{ fontSize: 12, color: T3, marginTop: 2 }}>
+                  <div style={{ fontSize: fontSizes.xs, color: T3, marginTop: 2 }}>
                     {t.refPrice}：{p.indicative_price_min}–{p.indicative_price_max} {p.default_currency}
                   </div>
                 )}
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => setEdit({ ...p })} style={{ fontSize: 12, color: NAVY, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.edit}</button>
+                <button onClick={() => setEdit({ ...p })} style={{ fontSize: fontSizes.xs, color: NAVY, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.edit}</button>
                 {deleteId === p.id
-                  ? <><button onClick={async () => { await deleteProduct(p.id!); setDeleteId(null); load(); }} style={{ fontSize: 12, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.confirm}</button>
-                      <button onClick={() => setDeleteId(null)} style={{ fontSize: 12, color: T2, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.cancel}</button></>
-                  : <button onClick={() => setDeleteId(p.id!)} style={{ fontSize: 12, color: '#dc2626', background: 'none', border: `1px solid #fca5a5`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.delete}</button>
+                  ? <><button onClick={async () => { await deleteProduct(p.id!); setDeleteId(null); load(); }} style={{ fontSize: fontSizes.xs, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.confirm}</button>
+                      <button onClick={() => setDeleteId(null)} style={{ fontSize: fontSizes.xs, color: T2, background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.cancel}</button></>
+                  : <button onClick={() => setDeleteId(p.id!)} style={{ fontSize: fontSizes.xs, color: '#dc2626', background: 'none', border: `1px solid #fca5a5`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{c0.delete}</button>
                 }
               </div>
             </div>
@@ -83,7 +84,7 @@ export default function ProductManager({ supplierId }: Props) {
       {edit && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => { if (e.target === e.currentTarget) setEdit(null); }}>
           <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 580, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: NAVY }}>{edit.id ? t.modalEdit : t.modalNew}</div>
+            <div style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY }}>{edit.id ? t.modalEdit : t.modalNew}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <F label={t.fNameCn}><input style={INP} value={edit.product_name_cn ?? ''} onChange={e => setEdit(v => ({ ...v!, product_name_cn: e.target.value }))} /></F>
               <F label={t.fNameEn}><input style={INP} value={edit.product_name_en ?? ''} onChange={e => setEdit(v => ({ ...v!, product_name_en: e.target.value }))} /></F>
@@ -100,7 +101,7 @@ export default function ProductManager({ supplierId }: Props) {
             </div>
             <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
               {([['oem_available',t.fOem],['odm_available',t.fOdm],['private_label_available',t.fPrivateLabel]] as [keyof SupplierProduct, string][]).map(([k, l]) => (
-                <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: NAVY, cursor: 'pointer' }}>
+                <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: fontSizes.sm, fontWeight: 600, color: NAVY, cursor: 'pointer' }}>
                   <input type="checkbox" checked={!!(edit as any)[k]} onChange={e => setEdit(v => ({ ...v!, [k]: e.target.checked }))} />{l}
                 </label>
               ))}

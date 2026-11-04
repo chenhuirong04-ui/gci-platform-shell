@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useI18n } from '@gci/i18n';
 import { getCountryLabel } from '../lib/labelMaps';
-import { workspace } from '@gci/design-system';
+import { workspace, fontSizes } from '@gci/design-system';
 
 const NAVY = '#0c1b3a';
 const GOLD = '#C9A84C';
@@ -54,8 +54,8 @@ export default function CountryDistributionChart({ data, selectedCountry, onSele
   return (
     <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${CARD_BORDER}`, padding: '20px 24px', boxShadow: '0 1px 4px rgba(12,27,58,0.05)' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
-        <div style={{ fontWeight: 700, fontSize: 14, color: NAVY }}>{t.chartByCountryTitle}</div>
-        <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#64748b' }}>
+        <div style={{ fontWeight: 700, fontSize: fontSizes.md, color: NAVY }}>{t.chartByCountryTitle}</div>
+        <div style={{ display: 'flex', gap: 16, fontSize: fontSizes.xs, color: '#64748b' }}>
           <span>{t.filledLabel} <strong style={{ color: NAVY }}>{data.hasCountryCount}</strong></span>
           <span>{t.notFilledLabel} <strong style={{ color: '#e53e3e' }}>{data.noCountryCount}</strong></span>
           <span>{t.countriesCoveredLabel(data.countryCount)}</span>
@@ -77,9 +77,9 @@ export default function CountryDistributionChart({ data, selectedCountry, onSele
                 onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
               >
                 {/* Label — display only, filter key stays as DB value */}
-                <div style={{ width: 130, textAlign: 'right', fontSize: 12, fontWeight: isSelected ? 700 : 500, color: isSelected ? NAVY : '#475569', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                <div style={{ width: 130, textAlign: 'right', fontSize: fontSizes.xs, fontWeight: isSelected ? 700 : 500, color: isSelected ? NAVY : '#475569', whiteSpace: 'nowrap', flexShrink: 0 }}>
                   {bar.isBlank ? t.notSpecified : bar.isOther ? t.other : getCountryLabel(bar.country, lang)}
-                  {bar.isOther && <span style={{ marginLeft: 4, fontSize: 10, color: '#94a3b8' }}>{otherExpanded ? '▲' : '▼'}</span>}
+                  {bar.isOther && <span style={{ marginLeft: 4, fontSize: fontSizes.xs, color: '#94a3b8' }}>{otherExpanded ? '▲' : '▼'}</span>}
                 </div>
 
                 {/* Bar track */}
@@ -97,7 +97,7 @@ export default function CountryDistributionChart({ data, selectedCountry, onSele
                 </div>
 
                 {/* Count */}
-                <div style={{ width: 36, fontSize: 12, fontWeight: 700, color: isSelected ? NAVY : '#64748b', textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ width: 36, fontSize: fontSizes.xs, fontWeight: 700, color: isSelected ? NAVY : '#64748b', textAlign: 'right', flexShrink: 0 }}>
                   {bar.count}
                 </div>
               </div>
@@ -109,7 +109,7 @@ export default function CountryDistributionChart({ data, selectedCountry, onSele
                     <div
                       key={d.country}
                       onClick={() => onSelect(selectedCountry === d.country ? null : d.country)}
-                      style={{ fontSize: 12, color: '#475569', cursor: 'pointer', padding: '2px 6px', borderRadius: 4, background: selectedCountry === d.country ? '#e8f0fa' : 'transparent', fontWeight: selectedCountry === d.country ? 700 : 400 }}
+                      style={{ fontSize: fontSizes.xs, color: '#475569', cursor: 'pointer', padding: '2px 6px', borderRadius: 4, background: selectedCountry === d.country ? '#e8f0fa' : 'transparent', fontWeight: selectedCountry === d.country ? 700 : 400 }}
                     >
                       {getCountryLabel(d.country, lang)} <span style={{ color: '#94a3b8' }}>{d.count}</span>
                     </div>
@@ -125,7 +125,7 @@ export default function CountryDistributionChart({ data, selectedCountry, onSele
         <div style={{ marginTop: 12, textAlign: 'right' }}>
           <button
             onClick={() => { onSelect(null); setOtherExpanded(false); }}
-            style={{ fontSize: 11, color: GOLD, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+            style={{ fontSize: fontSizes.xs, color: GOLD, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
           >
             {t.clearCountryFilter}
           </button>

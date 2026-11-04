@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useI18n } from '@gci/i18n';
 import { supabase } from '../../../apps/shell/src/lib/supabase';
 import { useAuth } from '../../../apps/shell/src/contexts/AuthContext';
+import { fontSizes, fonts } from '@gci/design-system';
 
 const NAVY = '#0B1F44';
 const GOLD = '#C9A84C';
@@ -65,11 +66,11 @@ export default function QuoteHistory({ supplierId }: Props) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ fontSize: 13, color: T2 }}>{t.subtitle}</span>
+        <span style={{ fontSize: fontSizes.sm, color: T2 }}>{t.subtitle}</span>
         {canQuotation && (
         <button
           onClick={handleUploadQuote}
-          style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+          style={{ padding: '7px 16px', background: NAVY, color: '#fff', border: 'none', borderRadius: 7, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}
         >
           {t.upload}
         </button>
@@ -80,11 +81,11 @@ export default function QuoteHistory({ supplierId }: Props) {
         <div style={{ color: T3, textAlign: 'center', padding: 40 }}>{dict.suppliers.common.loading}</div>
       ) : quotes.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '48px 0' }}>
-          <div style={{ color: T3, fontSize: 14, marginBottom: 12 }}>{t.empty}</div>
+          <div style={{ color: T3, fontSize: fontSizes.md, marginBottom: 12 }}>{t.empty}</div>
           {canQuotation && (
           <button
             onClick={handleUploadQuote}
-            style={{ padding: '9px 20px', background: GOLD, color: NAVY, border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+            style={{ padding: '9px 20px', background: GOLD, color: NAVY, border: 'none', borderRadius: 8, fontWeight: 700, fontSize: fontSizes.sm, cursor: 'pointer' }}
           >
             {t.uploadCta}
           </button>
@@ -92,11 +93,11 @@ export default function QuoteHistory({ supplierId }: Props) {
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fontSizes.sm }}>
             <thead>
               <tr style={{ borderBottom: `2px solid ${BORDER}` }}>
                 {[t.colNumber, t.colSubject, t.colStatus, t.colAmount, t.colValidUntil, t.colMatch, t.colDate].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '8px 10px', fontSize: 11, fontWeight: 700, color: T2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                  <th key={h} style={{ textAlign: 'left', padding: '8px 10px', fontSize: fontSizes.xs, fontWeight: 700, color: T2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -109,17 +110,17 @@ export default function QuoteHistory({ supplierId }: Props) {
                     onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                     onMouseLeave={e => (e.currentTarget.style.background = '')}
                   >
-                    <td style={{ padding: '10px', color: NAVY, fontWeight: 600 }}>{q.supplier_quote_no || '—'}</td>
+                    <td style={{ padding: '10px', color: NAVY, fontWeight: 600, fontFamily: fonts.mono }}>{q.supplier_quote_no || '—'}</td>
                     <td style={{ padding: '10px', color: T2 }}>{q.category || '—'}</td>
                     <td style={{ padding: '10px' }}>
-                      <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 999, background: '#f1f5f9', color: T2, fontWeight: 600 }}>{q.status ?? '—'}</span>
+                      <span style={{ fontSize: fontSizes.xs, padding: '2px 7px', borderRadius: 999, background: '#f1f5f9', color: T2, fontWeight: 600 }}>{q.status ?? '—'}</span>
                     </td>
-                    <td style={{ padding: '10px', color: T2, fontWeight: 600 }}>
+                    <td style={{ padding: '10px', color: T2, fontWeight: 600, fontFamily: fonts.mono }}>
                       {q.total_cost != null ? `${q.total_cost.toLocaleString()} ${q.currency ?? 'USD'}` : '—'}
                     </td>
                     <td style={{ padding: '10px', color: T3 }}>{q.valid_until?.slice(0, 10) ?? '—'}</td>
                     <td style={{ padding: '10px' }}>
-                      <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 999, background: mb.bg, color: mb.text, fontWeight: 700 }}>{mb.label}</span>
+                      <span style={{ fontSize: fontSizes.xs, padding: '2px 7px', borderRadius: 999, background: mb.bg, color: mb.text, fontWeight: 700 }}>{mb.label}</span>
                     </td>
                     <td style={{ padding: '10px', color: T3 }}>{q.created_at ? q.created_at.slice(0, 10) : '—'}</td>
                   </tr>
