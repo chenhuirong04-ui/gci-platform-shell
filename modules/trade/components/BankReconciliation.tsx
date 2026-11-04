@@ -227,15 +227,15 @@ export default function BankReconciliation() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-wrap items-end gap-4">
+      <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6 flex flex-wrap items-end gap-4">
         <div className="space-y-1.5">
-          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5"><Landmark className="w-3 h-3" /> Bank Account</label>
-          <select value={accountId} onChange={e => setAccountId(e.target.value)} className="p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700 text-sm min-w-[220px]">
+          <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5"><Landmark className="w-3 h-3" /> Bank Account</label>
+          <select value={accountId} onChange={e => setAccountId(e.target.value)} className="p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700 text-sm min-w-[220px]">
             {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
           </select>
         </div>
         <div className="space-y-1.5">
-          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">上传银行对账单 (CSV / PDF / 图片)</label>
+          <label className="text-xs font-bold text-slate-600 ">上传银行对账单 (CSV / PDF / 图片)</label>
           <input
             ref={fileRef}
             type="file"
@@ -245,14 +245,14 @@ export default function BankReconciliation() {
             className="text-sm"
           />
         </div>
-        {uploading && <span className="text-xs font-black text-[#CBA85C] uppercase">AI 解析中…</span>}
-        {uploadError && <span className="text-xs font-bold text-red-500">{uploadError}</span>}
+        {uploading && <span className="text-xs font-bold text-[#7A5F2A] ">AI 解析中…</span>}
+        {uploadError && <span className="text-xs font-bold text-red-600">{uploadError}</span>}
       </div>
 
       {drafts.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-            <span className="font-black text-gray-800 uppercase text-xs tracking-[0.2em]">{currentImport?.file_name} — {drafts.length} 笔</span>
+            <span className="font-bold text-gray-800 text-xs ">{currentImport?.file_name} — {drafts.length} 笔</span>
           </div>
           <div className="divide-y divide-gray-50">
             {drafts.map(draft => {
@@ -262,17 +262,17 @@ export default function BankReconciliation() {
                 : [...MANUAL_EXPENSE_CATEGORIES, { value: 'SUPPLIER_PAYMENT', label: 'Supplier Payment / 供应商付款' }, ...TRANSFER_CATEGORIES];
               return (
                 <div key={r.id} className="p-5 flex flex-wrap items-center gap-3">
-                  <span className="text-[11px] font-mono text-gray-400 w-24 shrink-0">{r.line_date || '—'}</span>
-                  <span className={`text-[9px] px-2 py-1 rounded-md font-black uppercase w-12 text-center shrink-0 ${r.direction === 'in' ? 'bg-[#3F7D58]/10 text-[#3F7D58]' : 'bg-[#E0846A]/10 text-[#E0846A]'}`}>{r.direction}</span>
-                  <span className="font-mono font-black text-sm w-24 text-right shrink-0">{r.amount.toFixed(2)}</span>
-                  <span className="text-xs text-gray-500 flex-1 min-w-[140px] truncate" title={r.bank_description}>{r.bank_description}</span>
+                  <span className="text-xs font-mono-label text-slate-600 w-24 shrink-0">{r.line_date || '—'}</span>
+                  <span className={`text-xs px-2 py-1 rounded-md font-bold w-12 text-center shrink-0 ${r.direction === 'in' ? 'bg-[#3F7D58]/10 text-[#3F7D58]' : 'bg-[#E0846A]/10 text-[#c53030]'}`}>{r.direction}</span>
+                  <span className="font-mono-label font-bold text-sm w-24 text-right shrink-0">{r.amount.toFixed(2)}</span>
+                  <span className="text-xs text-slate-600 flex-1 min-w-[140px] truncate" title={r.bank_description}>{r.bank_description}</span>
 
                   {r.status === 'pending' ? (
                     <>
                       <select
                         value={draft.category}
                         onChange={e => updateDraft(r.id, { category: e.target.value })}
-                        className="p-2 border border-gray-300 rounded-lg outline-none focus:border-[#CBA85C] text-xs font-bold text-gray-700 max-w-[160px]"
+                        className="p-2 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] text-xs font-bold text-gray-700 max-w-[160px]"
                       >
                         <option value="">科目…</option>
                         {allCategories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
@@ -284,7 +284,7 @@ export default function BankReconciliation() {
                           if (r.direction === 'in') updateDraft(r.id, { customerName: e.target.value, customerId: '' });
                           else updateDraft(r.id, { supplierName: e.target.value, supplierId: '' });
                         }}
-                        className="p-2 border border-gray-300 rounded-lg outline-none focus:border-[#CBA85C] text-xs font-bold text-gray-700 w-28"
+                        className="p-2 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] text-xs font-bold text-gray-700 w-28"
                       />
                       <input
                         ref={el => { attachRefs.current[r.id] = el; }}
@@ -292,32 +292,32 @@ export default function BankReconciliation() {
                         className="hidden"
                         onChange={e => { const f = e.target.files?.[0]; if (f) attachToLine(r.id, f); }}
                       />
-                      <button onClick={() => attachRefs.current[r.id]?.click()} className={`p-2 rounded-lg ${r.storage_path ? 'text-[#3F7D58]' : 'text-gray-300 hover:text-gray-500'}`} title="上传补充凭证">
+                      <button onClick={() => attachRefs.current[r.id]?.click()} className={`p-2 rounded-md ${r.storage_path ? 'text-[#3F7D58]' : 'text-slate-600 hover:text-gray-500'}`} title="上传补充凭证">
                         <Paperclip className="w-4 h-4" />
                       </button>
-                      <button onClick={() => confirmLine(draft)} disabled={draft.busy} className="px-3 py-2 rounded-lg bg-[#080D1E] text-white text-[10px] font-black uppercase flex items-center gap-1 disabled:opacity-40">
+                      <button onClick={() => confirmLine(draft)} disabled={draft.busy} className="px-3 py-2 rounded-md bg-[#080D1E] text-white text-xs font-bold flex items-center gap-1 disabled:opacity-40">
                         <Check className="w-3.5 h-3.5" /> 确认入账
                       </button>
-                      <button onClick={() => setMatchingLineId(matchingLineId === r.id ? null : r.id)} className="px-3 py-2 rounded-lg bg-gray-100 text-gray-500 text-[10px] font-black uppercase flex items-center gap-1">
+                      <button onClick={() => setMatchingLineId(matchingLineId === r.id ? null : r.id)} className="px-3 py-2 rounded-md bg-gray-100 text-slate-600 text-xs font-bold flex items-center gap-1">
                         <Link2 className="w-3.5 h-3.5" /> 关联已有
                       </button>
-                      <button onClick={() => ignoreLine(draft)} className="p-2 rounded-lg text-gray-300 hover:text-red-500" title="忽略">
+                      <button onClick={() => ignoreLine(draft)} className="p-2 rounded-md text-slate-600 hover:text-red-500" title="忽略">
                         <XCircle className="w-4 h-4" />
                       </button>
                     </>
                   ) : (
-                    <span className={`text-[10px] px-3 py-1.5 rounded-full font-black uppercase ${r.status === 'confirmed' ? 'bg-[#3F7D58]/10 text-[#3F7D58]' : r.status === 'matched' ? 'bg-[#4A6090]/10 text-[#4A6090]' : 'bg-gray-100 text-gray-400'}`}>{r.status}</span>
+                    <span className={`text-xs px-3 py-1.5 rounded-full font-bold ${r.status === 'confirmed' ? 'bg-[#3F7D58]/10 text-[#3F7D58]' : r.status === 'matched' ? 'bg-[#4A6090]/10 text-[#4A6090]' : 'bg-gray-100 text-slate-600'}`}>{r.status}</span>
                   )}
 
                   {matchingLineId === r.id && (
                     <div className="w-full pl-24 pt-2 space-y-1">
                       {candidateMatches(draft).map(({ txn, tier }) => (
-                        <button key={txn.id} onClick={() => linkToExisting(draft, txn)} className="w-full text-left text-xs bg-gray-50 hover:bg-gray-100 rounded-lg p-2 font-bold text-gray-600 flex items-center gap-2">
-                          <span className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase shrink-0 ${tier === 'same_day' ? 'bg-[#3F7D58]/10 text-[#3F7D58]' : tier === 'within_1_day' ? 'bg-[#CBA85C]/10 text-[#8A6D2F]' : 'bg-gray-200 text-gray-500'}`}>{TIER_LABEL[tier]}</span>
+                        <button key={txn.id} onClick={() => linkToExisting(draft, txn)} className="w-full text-left text-xs bg-gray-50 hover:bg-gray-100 rounded-md p-2 font-bold text-gray-600 flex items-center gap-2">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-bold shrink-0 ${tier === 'same_day' ? 'bg-[#3F7D58]/10 text-[#3F7D58]' : tier === 'within_1_day' ? 'bg-[#CBA85C]/10 text-[#7A5F2A]' : 'bg-gray-200 text-slate-600'}`}>{TIER_LABEL[tier]}</span>
                           <span>{txn.date} · {txn.amount.toFixed(2)} · {txn.note} · {txn.ref_type}</span>
                         </button>
                       ))}
-                      {candidateMatches(draft).length === 0 && <p className="text-[11px] text-gray-300">3天内没有找到金额/账户/方向匹配的现有记录。</p>}
+                      {candidateMatches(draft).length === 0 && <p className="text-xs text-slate-600">3天内没有找到金额/账户/方向匹配的现有记录。</p>}
                     </div>
                   )}
                 </div>

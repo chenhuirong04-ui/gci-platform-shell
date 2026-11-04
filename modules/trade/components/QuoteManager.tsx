@@ -16,12 +16,15 @@ import { QuoteRecord, QuoteItemRecord } from '../types';
 import { roundTo2, calculateTradeTotals } from '../services/currencyUtils';
 import { persistence } from '../services/persistenceService';
 import { exportElementToPdf } from '../services/pdfExport';
-import { colors } from '@gci/design-system';
+import { colors, ModalPortal, workspace } from '@gci/design-system';
 // Customer/Project Linking V1 (2026-09-15) — PI's customer picker now reads
 // crm_customers (the confirmed Source of Truth) instead of querying Notion
 // directly. getAllCustomerNames() already filters to is_active=true and
 // returns exactly the {id, customer_name} shape this dropdown needs.
 import { getAllCustomerNames } from '../../../apps/shell/src/lib/crmSupabase';
+
+// Printable / exported documents keep the body font they have always used.
+const DOC_FONT = "var(--font-body), var(--font-display), 'Segoe UI', system-ui, sans-serif";
 
 // V2 baseline colors — used only in the editable workbench (dropdowns,
 // left input panel, Review & Edit Line Items modal). The live invoice
@@ -105,7 +108,7 @@ const CustomerDropdown: React.FC<{
     <div ref={wrapRef} className="relative">
       <input
         type="text"
-        className="w-full p-4 border-2 border-[#CBA85C]/20 rounded-2xl outline-none focus:border-[#CBA85C] font-bold bg-[#CBA85C]/5 text-[#0F1E45] uppercase"
+        className="w-full p-4 border-2 border-[#CBA85C]/20 rounded-md outline-none focus:border-[#CBA85C] font-bold bg-[#CBA85C]/5 text-[#0F1E45] "
         placeholder={t.selectCustomerPlaceholder}
         value={q}
         onFocus={() => { setOpen(true); setQ(''); }}
@@ -113,11 +116,11 @@ const CustomerDropdown: React.FC<{
         onKeyDown={handleKey}
       />
       {open && filtered.length > 0 && (
-        <ul className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+        <ul className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-[10px] shadow-lg max-h-60 overflow-y-auto">
           {filtered.map((o, i) => (
             <li
               key={o.id}
-              className={`px-4 py-3 cursor-pointer text-sm font-bold uppercase ${i === hi ? 'bg-[#CBA85C]/15 text-[#8A6D2F]' : 'text-gray-700 hover:bg-gray-50'}`}
+              className={`px-4 py-3 cursor-pointer text-sm font-bold ${i === hi ? 'bg-[#CBA85C]/15 text-[#7A5F2A]' : 'text-gray-700 hover:bg-gray-50'}`}
               onMouseDown={() => select(o)}
               onMouseEnter={() => setHi(i)}
             >{o.name}</li>
@@ -125,7 +128,7 @@ const CustomerDropdown: React.FC<{
         </ul>
       )}
       {open && filtered.length === 0 && q && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-3 text-sm text-gray-400">{t.noMatchingCustomer}</div>
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-[10px] shadow-lg px-4 py-3 text-sm text-slate-600">{t.noMatchingCustomer}</div>
       )}
     </div>
   );
@@ -175,7 +178,7 @@ const ProductDropdown: React.FC<{
     <div ref={wrapRef} className="relative">
       <input
         type="text"
-        className="w-full p-4 border-2 border-[#CBA85C]/20 rounded-2xl outline-none focus:border-[#CBA85C] font-bold bg-[#CBA85C]/5 text-[#0F1E45]"
+        className="w-full p-4 border-2 border-[#CBA85C]/20 rounded-md outline-none focus:border-[#CBA85C] font-bold bg-[#CBA85C]/5 text-[#0F1E45]"
         placeholder={placeholder || t.searchProductPlaceholder}
         value={q}
         onFocus={() => { setOpen(true); setQ(''); }}
@@ -183,7 +186,7 @@ const ProductDropdown: React.FC<{
         onKeyDown={handleKey}
       />
       {open && filtered.length > 0 && (
-        <ul className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-72 overflow-y-auto">
+        <ul className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-[10px] shadow-lg max-h-72 overflow-y-auto">
           {filtered.map((o, i) => (
             <li
               key={o.productId || o.name}
@@ -193,7 +196,7 @@ const ProductDropdown: React.FC<{
             >
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold" style={{ color: i === hi ? '#8A6D2F' : '#1f2937' }}>{o.name}</span>
-                <span className="text-xs font-black px-2 py-0.5 rounded-full" style={
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={
                   o.stock <= 0 ? { backgroundColor: 'rgba(224,132,106,0.16)', color: colors.statusDanger }
                   : o.stock <= 10 ? { backgroundColor: 'rgba(217,180,90,0.16)', color: colors.statusWarning }
                   : { backgroundColor: 'rgba(111,191,142,0.16)', color: colors.statusSuccess }
@@ -202,14 +205,14 @@ const ProductDropdown: React.FC<{
                 </span>
               </div>
               {o.targetPrice > 0 && (
-                <div className="text-[10px] text-gray-400 mt-0.5">{t.cost} AED {o.targetPrice.toFixed(2)}</div>
+                <div className="text-xs text-slate-600 mt-0.5">{t.cost} AED {o.targetPrice.toFixed(2)}</div>
               )}
             </li>
           ))}
         </ul>
       )}
       {open && filtered.length === 0 && q && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-3 text-sm text-gray-400">{t.noProductsFound}</div>
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-[10px] shadow-lg px-4 py-3 text-sm text-slate-600">{t.noProductsFound}</div>
       )}
     </div>
   );
@@ -818,37 +821,37 @@ const QuoteManager: React.FC = () => {
 
         {/* Project PI banner — only shown when inbound from Quotation App */}
         {inboundPI && (
-          <div className="bg-gradient-to-r from-[#0C1B3A] to-[#0F2551] p-5 rounded-[24px] border border-[#C9A84C]/30 shadow-lg">
+          <div className="bg-gradient-to-r from-[#0C1B3A] to-[#0F2551] p-5 rounded-[10px] border border-[#C9A84C]/30 shadow-lg">
             <div className="flex items-center gap-2 mb-2">
-              <span className="bg-[#C9A84C] text-[#0C1B3A] text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">
+              <span className="bg-[#C9A84C] text-[#0C1B3A] text-xs font-bold px-2 py-0.5 rounded-full ">
                 {inboundPI.piType} PI
               </span>
-              <span className="text-[9px] text-white/50 font-bold uppercase tracking-wider">from Quotation App</span>
+              <span className="text-xs text-white/50 font-bold ">from Quotation App</span>
             </div>
-            <p className="text-white font-black text-sm leading-tight">{inboundPI.projectName}</p>
-            <p className="text-[#C9A84C] text-[10px] font-bold mt-1">Ref: {inboundPI.quoteRef}</p>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-[9px]">
+            <p className="text-white font-bold text-sm leading-tight">{inboundPI.projectName}</p>
+            <p className="text-[#C9A84C] text-xs font-bold mt-1">Ref: {inboundPI.quoteRef}</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
               <div className="bg-white/5 rounded-lg p-2">
                 <span className="text-white/40 block">Cost</span>
-                <span className="text-white font-black">AED {inboundPI.costAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                <span className="text-white font-bold">AED {inboundPI.costAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
               </div>
               <div className="bg-white/5 rounded-lg p-2">
                 <span className="text-white/40 block">Margin {inboundPI.marginRate}%</span>
-                <span className="text-[#C9A84C] font-black">AED {inboundPI.profitAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                <span className="text-[#C9A84C] font-bold">AED {inboundPI.profitAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
               </div>
             </div>
             {inboundPI.notes && (
               <div className="mt-3 bg-white/5 rounded-lg p-3">
-                <span className="text-white/40 text-[8px] font-black uppercase tracking-widest block mb-1">Terms &amp; Notes</span>
-                <p className="text-white/70 text-[9px] leading-relaxed whitespace-pre-line">{inboundPI.notes}</p>
+                <span className="text-white/40 text-xs font-bold block mb-1">Terms &amp; Notes</span>
+                <p className="text-white/70 text-xs leading-relaxed whitespace-pre-line">{inboundPI.notes}</p>
               </div>
             )}
-            <p className="text-white/30 text-[8px] font-bold mt-2 uppercase">No inventory deduction · Project channel</p>
+            <p className="text-white/30 text-xs font-bold mt-2 ">No inventory deduction · Project channel</p>
           </div>
         )}
 
-        <div className="bg-white p-8 rounded-[32px] shadow-sm" style={{ border: `1px solid ${GOLD}30` }}>
-          <label className="text-[10px] font-black uppercase tracking-widest block mb-4" style={{ color: GOLD }}>1. {t.customerSelection}</label>
+        <div className="bg-white p-8 rounded-[10px] shadow-sm" style={{ border: `1px solid ${GOLD}30` }}>
+          <label className="text-xs font-bold block mb-4" style={{ color: workspace.accentText }}>1. {t.customerSelection}</label>
           <CustomerDropdown
             options={customerOptions}
             value={customerName}
@@ -857,12 +860,12 @@ const QuoteManager: React.FC = () => {
           {custError ? (
             <p className="mt-2 text-[13px] font-bold" style={{ color: colors.statusDanger }}>{t.custLoadFailed}</p>
           ) : !customerName && (
-            <p className="mt-2 text-[11px] font-bold text-gray-300 uppercase">{t.noCustomerSelected}</p>
+            <p className="mt-2 text-xs font-bold text-slate-600 ">{t.noCustomerSelected}</p>
           )}
         </div>
 
-        <div className="bg-white p-8 rounded-[32px] shadow-sm" style={{ border: `1px solid ${GOLD}30` }}>
-          <label className="text-[10px] font-black uppercase tracking-widest block mb-4" style={{ color: GOLD }}>2. {t.inventoryLookup}</label>
+        <div className="bg-white p-8 rounded-[10px] shadow-sm" style={{ border: `1px solid ${GOLD}30` }}>
+          <label className="text-xs font-bold block mb-4" style={{ color: workspace.accentText }}>2. {t.inventoryLookup}</label>
           <ProductDropdown
             items={inventoryData}
             value={searchProduct}
@@ -881,41 +884,41 @@ const QuoteManager: React.FC = () => {
           />
 
           <div className="mt-4 grid grid-cols-3 gap-3">
-            <div className="bg-gray-50 p-4 rounded-xl text-center border border-gray-100">
-              <span className="text-[8px] font-black text-gray-400 block uppercase mb-1">{t.availableStock}</span>
-              <span className="text-lg font-black text-gray-700">{tempStock}</span>
+            <div className="bg-gray-50 p-4 rounded-[10px] text-center border border-gray-100">
+              <span className="text-xs font-bold text-slate-600 block mb-1">{t.availableStock}</span>
+              <span className="text-lg font-bold text-gray-700">{tempStock}</span>
             </div>
-            <div className="bg-gray-50 p-4 rounded-xl text-center border border-gray-100">
-              <span className="text-[8px] font-black text-gray-400 block uppercase mb-1">{t.unit}</span>
-              <span className="text-lg font-black text-gray-700">{tempUnit}</span>
+            <div className="bg-gray-50 p-4 rounded-[10px] text-center border border-gray-100">
+              <span className="text-xs font-bold text-slate-600 block mb-1">{t.unit}</span>
+              <span className="text-lg font-bold text-gray-700">{tempUnit}</span>
             </div>
-            <div className="p-4 rounded-xl text-center" style={{ backgroundColor: `${GOLD}15`, border: `1px solid ${GOLD}30` }}>
-              <span className="text-[8px] font-black block uppercase mb-1" style={{ color: GOLD }}>{t.cost}</span>
-              <span className="text-lg font-black font-mono" style={{ color: '#6B4E15' }}>{tempTargetPrice.toFixed(2)}</span>
+            <div className="p-4 rounded-[10px] text-center" style={{ backgroundColor: `${GOLD}15`, border: `1px solid ${GOLD}30` }}>
+              <span className="text-xs font-bold block mb-1" style={{ color: workspace.accentText }}>{t.cost}</span>
+              <span className="text-lg font-bold font-mono-label" style={{ color: '#6B4E15' }}>{tempTargetPrice.toFixed(2)}</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-8 rounded-[32px] shadow-sm border-2 border-[#CBA85C]/30">
-          <label className="text-[10px] font-black text-[#0F1E45] uppercase tracking-widest block mb-4">3. {t.commercialControl}</label>
+        <div className="bg-white p-8 rounded-[10px] shadow-sm border-2 border-[#CBA85C]/30">
+          <label className="text-xs font-bold text-[#0F1E45] block mb-4">3. {t.commercialControl}</label>
 
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div className="flex flex-col gap-1">
-              <span className="text-[9px] font-black text-gray-400 uppercase">{t.offerPrice}</span>
+              <span className="text-xs font-bold text-slate-600 ">{t.offerPrice}</span>
               <input
                 type="text"
                 value={livePrice}
                 onChange={e => setLivePrice(e.target.value.replace(/[^0-9.]/g, ''))}
-                className="w-full p-4 border-2 border-[#CBA85C] rounded-xl font-black text-right outline-none text-[#0F1E45]"
+                className="w-full p-4 border-2 border-[#CBA85C] rounded-md font-bold text-right outline-none text-[#0F1E45]"
               />
             </div>
 
             <div className="flex flex-col gap-1">
-              <span className="text-[9px] font-black text-gray-400 uppercase">{t.quantity}</span>
-              <div className="flex items-center border-2 border-[#CBA85C]/40 rounded-xl overflow-hidden h-[56px]">
+              <span className="text-xs font-bold text-slate-600 ">{t.quantity}</span>
+              <div className="flex items-center border-2 border-[#CBA85C]/40 rounded-[10px] overflow-hidden h-[56px]">
                 <button
                   onClick={() => setLiveQty(q => Math.max(1, parseInt(q || "0") - 1).toString())}
-                  className="w-10 h-full bg-[#CBA85C]/15 text-[#CBA85C] hover:bg-[#CBA85C]/25 font-black"
+                  className="w-10 h-full bg-[#CBA85C]/15 text-[#7A5F2A] hover:bg-[#CBA85C]/25 font-bold"
                 >
                   -
                 </button>
@@ -923,11 +926,11 @@ const QuoteManager: React.FC = () => {
                   type="number"
                   value={liveQty}
                   onChange={e => setLiveQty(e.target.value.replace(/[^0-9]/g, ''))}
-                  className="flex-1 text-center font-black text-[#0F1E45] outline-none bg-transparent"
+                  className="flex-1 text-center font-bold text-[#0F1E45] outline-none bg-transparent"
                 />
                 <button
                   onClick={() => setLiveQty(q => (parseInt(q || "0") + 1).toString())}
-                  className="w-10 h-full bg-[#CBA85C]/15 text-[#CBA85C] hover:bg-[#CBA85C]/25 font-black"
+                  className="w-10 h-full bg-[#CBA85C]/15 text-[#7A5F2A] hover:bg-[#CBA85C]/25 font-bold"
                 >
                   +
                 </button>
@@ -938,31 +941,31 @@ const QuoteManager: React.FC = () => {
           {/* 付款条件与账期 */}
           <div className="mb-6 space-y-4 pt-4 border-t border-gray-100">
             <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                <CreditCard className="w-3 h-3 text-[#CBA85C]" /> {t.paymentTerms}
+              <label className="text-xs font-bold text-slate-600 flex items-center gap-2">
+                <CreditCard className="w-3 h-3 text-[#7A5F2A]" /> {t.paymentTerms}
               </label>
               <input
                 type="text"
                 value={paymentTerms}
                 onChange={e => setPaymentTerms(e.target.value)}
                 placeholder={t.paymentTermsPlaceholder}
-                className="w-full p-4 border-2 border-[#CBA85C]/20 rounded-xl font-bold text-gray-700 outline-none focus:border-[#CBA85C]"
+                className="w-full p-4 border-2 border-[#CBA85C]/20 rounded-md font-bold text-gray-700 outline-none focus:border-[#CBA85C]"
               />
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-600 flex items-center justify-between">
                 <span>{t.dueDateCalculation}</span>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setTermMode('DAYS')}
-                    className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${termMode === 'DAYS' ? 'bg-[#0F1E45] text-white shadow-sm' : 'bg-gray-100 text-gray-400'}`}
+                    className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${termMode === 'DAYS' ? 'bg-[#0F1E45] text-white shadow-sm' : 'bg-gray-100 text-slate-600'}`}
                   >
                     {t.byDays}
                   </button>
                   <button
                     onClick={() => setTermMode('DATE')}
-                    className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${termMode === 'DATE' ? 'bg-[#0F1E45] text-white shadow-sm' : 'bg-gray-100 text-gray-400'}`}
+                    className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${termMode === 'DATE' ? 'bg-[#0F1E45] text-white shadow-sm' : 'bg-gray-100 text-slate-600'}`}
                   >
                     {t.manualDate}
                   </button>
@@ -971,41 +974,41 @@ const QuoteManager: React.FC = () => {
 
               <div className="flex gap-2 items-center">
                 <div className="flex-1">
-                  <span className="text-[8px] font-black text-gray-300 uppercase block mb-1">{t.baseDate}</span>
+                  <span className="text-xs font-bold text-slate-600 block mb-1">{t.baseDate}</span>
                   <input
                     type="date"
                     value={docDate}
                     onChange={e => setDocDate(e.target.value)}
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl font-mono text-xs font-bold outline-none"
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-md font-mono-label text-xs font-bold outline-none"
                   />
                 </div>
 
                 {termMode === 'DAYS' ? (
                   <div className="flex-1">
-                    <span className="text-[8px] font-black text-gray-300 uppercase block mb-1">{t.daysCount}</span>
+                    <span className="text-xs font-bold text-slate-600 block mb-1">{t.daysCount}</span>
                     <input
                       type="number"
                       value={termDays}
                       onChange={e => setTermDays(e.target.value)}
-                      className="w-full p-3 border-2 border-[#CBA85C]/30 rounded-xl font-mono font-black text-[#0F1E45] outline-none"
+                      className="w-full p-3 border-2 border-[#CBA85C]/30 rounded-md font-mono-label font-bold text-[#0F1E45] outline-none"
                     />
                   </div>
                 ) : (
                   <div className="flex-1">
-                    <span className="text-[8px] font-black text-gray-300 uppercase block mb-1">{t.pickDueDate}</span>
+                    <span className="text-xs font-bold text-slate-600 block mb-1">{t.pickDueDate}</span>
                     <input
                       type="date"
                       value={manualDueDate}
                       onChange={e => setManualDueDate(e.target.value)}
-                      className="w-full p-3 border-2 border-[#CBA85C]/30 rounded-xl font-mono font-black text-[#0F1E45] outline-none"
+                      className="w-full p-3 border-2 border-[#CBA85C]/30 rounded-md font-mono-label font-bold text-[#0F1E45] outline-none"
                     />
                   </div>
                 )}
               </div>
 
-              <div className="mt-2 p-3 rounded-xl flex items-center justify-between" style={{ backgroundColor: `${GOLD}15`, border: `1px solid ${GOLD}30` }}>
-                <span className="text-[9px] font-black uppercase" style={{ color: GOLD }}>{t.calculatedDue}:</span>
-                <span className="text-xs font-black font-mono tracking-widest" style={{ color: NAVY }}>{calculatedDueDate}</span>
+              <div className="mt-2 p-3 rounded-[10px] flex items-center justify-between" style={{ backgroundColor: `${GOLD}15`, border: `1px solid ${GOLD}30` }}>
+                <span className="text-xs font-bold " style={{ color: workspace.accentText }}>{t.calculatedDue}:</span>
+                <span className="text-xs font-bold font-mono-label " style={{ color: NAVY }}>{calculatedDueDate}</span>
               </div>
             </div>
           </div>
@@ -1013,8 +1016,8 @@ const QuoteManager: React.FC = () => {
           <button
             disabled={!searchProduct.trim() || isSyncing}
             onClick={handleAddItem}
-            className="w-full text-white rounded-2xl font-black uppercase text-xs py-5 shadow-xl hover:opacity-90 mb-4 transition-all active:scale-[0.98]"
-            style={{ backgroundColor: GOLD }}
+            className="w-full text-white rounded-md font-bold text-xs py-5 shadow-xl hover:opacity-90 mb-4 transition-all active:scale-[0.98]"
+            style={{ backgroundColor: workspace.actionPrimaryBg }}
           >
             {t.addItem}
           </button>
@@ -1022,7 +1025,7 @@ const QuoteManager: React.FC = () => {
           <button
             onClick={() => items.length > 0 && setIsDocModalOpen(true)}
             disabled={items.length === 0}
-            className="w-full py-6 text-white rounded-2xl font-black text-[11px] uppercase tracking-[0.3em] hover:bg-black transition-all shadow-xl active:scale-[0.98]"
+            className="w-full py-6 text-white rounded-md font-bold text-xs hover:bg-black transition-all shadow-xl active:scale-[0.98]"
             style={{ backgroundColor: NAVY }}
           >
             🚀 {t.generatePI}
@@ -1031,10 +1034,10 @@ const QuoteManager: React.FC = () => {
       </section>
 
       {/* 右侧实时预览 — 正式PI单据格式，固定英文，不随APP语言切换 */}
-      <aside className="w-[60%] h-full flex flex-col no-print bg-white rounded-[40px] border border-gray-100 shadow-2xl relative overflow-hidden">
-        <div className="absolute top-6 left-8 text-[10px] font-black uppercase tracking-widest text-gray-300 no-print">{t.preview}</div>
+      <aside className="w-[60%] h-full flex flex-col no-print bg-white rounded-[10px] border border-gray-100 shadow-2xl relative overflow-hidden">
+        <div className="absolute top-6 left-8 text-xs font-bold text-slate-600 no-print">{t.preview}</div>
         <div className="p-8 pb-32 h-full overflow-y-auto custom-scrollbar flex flex-col items-center">
-          <div id="home-live-preview" style={{ width: '595px', padding: '40px', backgroundColor: 'white' }} className="shadow-sm border border-gray-50 flex flex-col">
+          <div id="home-live-preview" style={{ fontFamily: DOC_FONT, width: '595px', padding: '40px', backgroundColor: 'white' }} className="shadow-sm border border-gray-50 flex flex-col">
             <div className="flex flex-col items-center text-center w-full mb-10 border-b-2 border-[#1a237e] pb-6">
               <h1 className="text-xl font-black text-[#1a237e] uppercase tracking-tighter mb-1">Globalcare Info General Trading FZCO</h1>
               <div className="text-[9px] font-black text-gray-400 uppercase tracking-widest">TEL: +971585566809 | EMAIL: CHRISCHEN1579@GMAIL.COM</div>
@@ -1089,14 +1092,14 @@ const QuoteManager: React.FC = () => {
 
       {/* 单据中心 */}
       {isDocModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-3xl z-[3000] flex items-center justify-center p-8 no-print animate-in fade-in">
-          <div className="bg-white w-full h-full max-w-[1400px] rounded-[50px] overflow-hidden shadow-2xl flex flex-col border-4 border-white/20">
+        <ModalPortal><div className="fixed inset-0 bg-[rgba(8,13,30,0.5)] z-[1100] flex items-center justify-center p-4 max-sm:p-0 max-sm:items-start max-sm:overflow-y-auto no-print animate-in fade-in">
+          <div className="bg-white w-full h-full max-w-[1400px] rounded-[14px] overflow-hidden shadow-2xl flex flex-col border-4 border-white/20 max-sm:w-full max-sm:min-h-full max-sm:my-0 max-sm:max-w-none max-sm:max-h-none max-sm:rounded-none">
             <div className="bg-white p-8 border-b border-gray-100 flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <ReceiptText className="w-6 h-6 text-[#1a237e]" />
-                <h2 className="text-xl font-black text-[#1a237e] uppercase tracking-widest leading-none">{t.docCenterTitle}</h2>
+                <h2 className="text-xl font-bold text-[#1a237e] leading-none">{t.docCenterTitle}</h2>
               </div>
-              <button onClick={() => setIsDocModalOpen(false)} className="p-2 text-gray-400 hover:text-red-500 transition-all">
+              <button onClick={() => setIsDocModalOpen(false)} className="p-2 text-slate-600 hover:text-red-500 transition-all">
                 <X className="w-6 h-6" />
               </button>
             </div>
@@ -1110,29 +1113,29 @@ const QuoteManager: React.FC = () => {
                   className="shadow-2xl flex flex-col min-h-[842px]"
                 >
                   <div className="flex flex-col items-center text-center w-full mb-10 border-b-2 border-[#1a237e] pb-4">
-                    <h1 className="text-xl font-black text-[#1a237e] uppercase tracking-tighter">Globalcare Info General Trading FZCO</h1>
-                    <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">
+                    <h1 className="text-xl font-bold text-[#1a237e] tracking-tighter">Globalcare Info General Trading FZCO</h1>
+                    <div className="text-xs font-bold text-slate-600 mt-2">
                       TEL: +971585566809 | EMAIL: CHRISCHEN1579@GMAIL.COM | ADDRESS: DUBAI TRADERS MARKET F5245
                     </div>
-                    <h2 className="text-sm font-black text-white bg-[#1a237e] px-8 py-2 uppercase tracking-[0.2em] w-full text-center mt-4">
+                    <h2 className="text-sm font-bold text-white bg-[#1a237e] px-8 py-2 w-full text-center mt-4">
                       PERFORMANCE INVOICE / SALES ORDER
                     </h2>
-                    <div className="flex justify-between w-full mt-4 text-[9px] font-bold font-mono text-gray-600 uppercase">
+                    <div className="flex justify-between w-full mt-4 text-xs font-bold font-mono-label text-gray-600 ">
                       <span>REF: {orderId}</span>
                       <span>DATE: {docDate.replace(/-/g, '/')}</span>
                     </div>
                   </div>
 
                   <div className="mb-10 text-center">
-                    <span className="text-[9px] font-black text-gray-300 uppercase block mb-1">Consignee</span>
-                    <p className="text-xl font-black text-gray-800 uppercase border-b border-gray-200 pb-2 px-10 inline-block min-w-[300px]">
+                    <span className="text-xs font-bold text-slate-600 block mb-1">Consignee</span>
+                    <p className="text-xl font-bold text-gray-800 border-b border-gray-200 pb-2 px-10 inline-block min-w-[300px]">
                       {customerName || 'VALUED CLIENT'}
                     </p>
                   </div>
 
                   <table className="w-full mb-10 border-collapse">
                     <thead>
-                      <tr className="text-[9px] font-black text-gray-400 uppercase border-b-2 border-[#1a237e]">
+                      <tr className="text-xs font-bold text-slate-600 border-b-2 border-[#1a237e]">
                         <th className="text-left pb-2">Description</th>
                         <th className="text-right pb-2 w-16 px-2">Qty</th>
                         <th className="text-right pb-2 w-24">Unit Price</th>
@@ -1142,10 +1145,10 @@ const QuoteManager: React.FC = () => {
                     <tbody>
                       {items.map((it, i) => (
                         <tr key={i} className="border-b border-gray-50">
-                          <td className="py-3 text-[10px] font-bold uppercase text-gray-700">{it.desc}</td>
-                          <td className="text-right py-3 text-[10px] font-mono font-bold text-gray-400">{it.qty}</td>
-                          <td className="text-right py-3 text-[10px] font-mono font-bold text-gray-400">{it.unit_price.toFixed(2)}</td>
-                          <td className="text-right py-3 text-[10px] font-mono font-black text-gray-900">
+                          <td className="py-3 text-xs font-bold text-gray-700">{it.desc}</td>
+                          <td className="text-right py-3 text-xs font-mono-label font-bold text-slate-600">{it.qty}</td>
+                          <td className="text-right py-3 text-xs font-mono-label font-bold text-slate-600">{it.unit_price.toFixed(2)}</td>
+                          <td className="text-right py-3 text-xs font-mono-label font-bold text-gray-900">
                             AED {(roundTo2(it.unit_price * it.qty)).toFixed(2)}
                           </td>
                         </tr>
@@ -1156,31 +1159,31 @@ const QuoteManager: React.FC = () => {
                   <div className="mt-4 pt-4 border-t border-dashed border-gray-100 flex flex-col gap-2">
                     <div className="flex justify-between items-start">
                       <div className="space-y-1">
-                        <p className="text-[9px] font-black text-gray-400 uppercase">Payment Terms:</p>
-                        <p className="text-[11px] font-black text-gray-800 uppercase">{paymentTerms}</p>
+                        <p className="text-xs font-bold text-slate-600 ">Payment Terms:</p>
+                        <p className="text-xs font-bold text-gray-800 ">{paymentTerms}</p>
                       </div>
                       <div className="text-right space-y-1">
-                        <p className="text-[9px] font-black text-[#1a237e] uppercase">Due Date:</p>
-                        <p className="text-[11px] font-black text-[#1a237e] font-mono">{calculatedDueDate}</p>
+                        <p className="text-xs font-bold text-[#1a237e] ">Due Date:</p>
+                        <p className="text-xs font-bold text-[#1a237e] font-mono-label">{calculatedDueDate}</p>
                       </div>
                     </div>
                     {logisticsInfo ? (
-                      <div className="text-[10px] font-bold text-gray-500 italic pt-2">
+                      <div className="text-xs font-bold text-slate-600 italic pt-2">
                         Note: {logisticsInfo}
                       </div>
                     ) : null}
                   </div>
 
                   <div className="mt-auto pt-8 border-t-2 border-[#1a237e] w-full flex flex-col items-end space-y-2">
-                    <div className="flex justify-between w-full max-w-[200px] text-[9px] font-black text-gray-400 uppercase">
-                      <span>Subtotal</span><span className="font-mono">AED {subtotal.toFixed(2)}</span>
+                    <div className="flex justify-between w-full max-w-[200px] text-xs font-bold text-slate-600 ">
+                      <span>Subtotal</span><span className="font-mono-label">AED {subtotal.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between w-full max-w-[200px] text-[9px] font-black text-gray-400 uppercase">
-                      <span>VAT (5%)</span><span className="font-mono">AED {vatAmount.toFixed(2)}</span>
+                    <div className="flex justify-between w-full max-w-[200px] text-xs font-bold text-slate-600 ">
+                      <span>VAT (5%)</span><span className="font-mono-label">AED {vatAmount.toFixed(2)}</span>
                     </div>
                     <div className="pt-2 border-t border-dashed border-gray-100 w-full max-w-[200px] flex flex-col items-end">
-                      <span className="text-[9px] font-black text-[#1a237e] uppercase tracking-widest">Grand Total (AED)</span>
-                      <span className="text-4xl font-black text-[#1a237e] font-mono tracking-tighter leading-none">
+                      <span className="text-xs font-bold text-[#1a237e] ">Grand Total (AED)</span>
+                      <span className="text-4xl font-bold text-[#1a237e] font-mono-label tracking-tighter leading-none">
                         AED {total.toFixed(2)}
                       </span>
                     </div>
@@ -1191,19 +1194,19 @@ const QuoteManager: React.FC = () => {
               {/* 右：操作区 */}
               <div className="w-[400px] bg-white p-10 flex flex-col gap-6 shadow-xl border-l border-gray-100">
                 <div className="space-y-4">
-                  <h3 className="text-xs font-black text-gray-400 uppercase border-b pb-2 tracking-widest">{t.outputControl}</h3>
+                  <h3 className="text-xs font-bold text-slate-600 border-b pb-2 ">{t.outputControl}</h3>
                   <textarea
                     placeholder={t.notesPlaceholder}
                     value={logisticsInfo}
                     onChange={e => setLogisticsInfo(e.target.value)}
-                    className="w-full h-32 p-5 bg-gray-50 border-2 border-gray-100 rounded-[24px] outline-none font-bold text-gray-700 text-xs focus:border-[#1a237e] transition-all"
+                    className="w-full h-32 p-5 bg-gray-50 border-2 border-gray-100 rounded-md outline-none font-bold text-gray-700 text-xs focus:border-[#1a237e] transition-all"
                   />
                 </div>
 
                 <div className="mt-auto flex flex-col gap-3">
                   <button
                     onClick={handleOpenReview}
-                    className="w-full py-4 bg-orange-50 border-2 border-orange-100 text-orange-700 rounded-[20px] font-black text-[10px] uppercase flex items-center justify-center gap-3 hover:bg-orange-100 transition-all shadow-sm"
+                    className="w-full py-4 bg-orange-50 border-2 border-orange-100 text-orange-700 rounded-md font-bold text-xs flex items-center justify-center gap-3 hover:bg-orange-100 transition-all shadow-sm"
                   >
                     <Edit3 className="w-4 h-4" /> {t.reviewAndEdit}
                   </button>
@@ -1211,14 +1214,14 @@ const QuoteManager: React.FC = () => {
                   {/* ✅ 这里已修复：不再 window.print() 打整页，而是只打正式单据 */}
                   <button
                     onClick={handlePrintPDF}
-                    className="w-full py-4 bg-white border-2 border-indigo-100 text-indigo-900 rounded-[20px] font-black text-[10px] uppercase flex items-center justify-center gap-3 hover:bg-indigo-50 shadow-sm transition-all"
+                    className="w-full py-4 bg-white border-2 border-indigo-100 text-indigo-900 rounded-md font-bold text-xs flex items-center justify-center gap-3 hover:bg-indigo-50 shadow-sm transition-all"
                   >
                     <Printer className="w-4 h-4" /> {t.printPreview}
                   </button>
 
                   <button
                     onClick={handleExportHTML}
-                    className="w-full py-5 bg-indigo-50 text-indigo-900 rounded-[20px] font-black text-[10px] uppercase flex items-center justify-center gap-3 hover:bg-indigo-100 border border-indigo-200 shadow-sm transition-all shadow-indigo-100"
+                    className="w-full py-5 bg-indigo-50 text-indigo-900 rounded-md font-bold text-xs flex items-center justify-center gap-3 hover:bg-indigo-100 border border-indigo-200 shadow-sm transition-all shadow-indigo-100"
                   >
                     <Download className="w-4 h-4" /> {t.downloadHtml}
                   </button>
@@ -1231,7 +1234,7 @@ const QuoteManager: React.FC = () => {
                         alert(t.savedSuccess);
                       }
                     }}
-                    className="w-full py-7 bg-[#1a237e] text-white rounded-[28px] font-black text-[11px] uppercase tracking-[0.4em] flex items-center justify-center gap-4 shadow-2xl mt-4 border-t-4 border-indigo-400 hover:bg-black transition-all active:scale-95 shadow-indigo-100"
+                    className="w-full py-7 bg-[#1a237e] text-white rounded-md font-bold text-xs flex items-center justify-center gap-4 shadow-2xl mt-4 border-t-4 border-indigo-400 hover:bg-black transition-all active:scale-95 shadow-indigo-100"
                   >
                     <CheckCircle className="w-5 h-5" /> {t.confirmAndSave}
                   </button>
@@ -1239,31 +1242,31 @@ const QuoteManager: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
 
       {/* Review Modal */}
       {isReviewOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-2xl z-[4000] flex items-center justify-center p-8 animate-in zoom-in-95">
-          <div className="bg-white w-full max-w-4xl rounded-[50px] overflow-hidden shadow-2xl flex flex-col border-4 border-white/20">
+        <ModalPortal><div className="fixed inset-0 bg-[rgba(8,13,30,0.5)] z-[1100] flex items-center justify-center p-4 max-sm:p-0 max-sm:items-start max-sm:overflow-y-auto animate-in zoom-in-95">
+          <div className="bg-white w-full max-w-4xl rounded-[14px] overflow-hidden shadow-2xl flex flex-col border-4 border-white/20 max-sm:w-full max-sm:min-h-full max-sm:my-0 max-sm:max-w-none max-sm:max-h-none max-sm:rounded-none">
             <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
               <div className="flex items-center gap-3">
-                <div className="p-3 rounded-2xl" style={{ backgroundColor: `${GOLD}18`, color: GOLD }}>
+                <div className="p-3 rounded-[10px]" style={{ backgroundColor: `${GOLD}18`, color: workspace.accentText }}>
                   <Edit3 className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-black text-gray-800 uppercase tracking-widest">{t.reviewModalTitle}</h2>
-                  <p className="text-[9px] font-bold text-gray-400 uppercase mt-0.5">{t.reviewModalSubtitle}</p>
+                  <h2 className="text-sm font-bold text-gray-800 ">{t.reviewModalTitle}</h2>
+                  <p className="text-xs font-bold text-slate-600 mt-0.5">{t.reviewModalSubtitle}</p>
                 </div>
               </div>
-              <button onClick={() => setIsReviewOpen(false)} className="p-2 text-gray-400 hover:text-gray-600 transition-all">
+              <button onClick={() => setIsReviewOpen(false)} className="p-2 text-slate-600 hover:text-gray-600 transition-all">
                 <X className="w-6 h-6" />
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-10">
               <table className="w-full text-left">
-                <thead className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
+                <thead className="text-xs font-bold text-slate-600 border-b border-gray-100">
                   <tr>
                     <th className="pb-4">{t.colDescription}</th>
                     <th className="pb-4 text-center w-32">{t.colQty}</th>
@@ -1275,7 +1278,7 @@ const QuoteManager: React.FC = () => {
                 <tbody className="divide-y divide-gray-50">
                   {reviewItems.map((it, idx) => (
                     <tr key={idx} className="group hover:bg-gray-50/50 transition-colors">
-                      <td className="py-6 text-[11px] font-black text-gray-700 uppercase leading-tight pr-6">{it.desc}</td>
+                      <td className="py-6 text-xs font-bold text-gray-700 leading-tight pr-6">{it.desc}</td>
                       <td className="py-6 text-center">
                         <input
                           type="number"
@@ -1283,7 +1286,7 @@ const QuoteManager: React.FC = () => {
                           onChange={(e) => handleUpdateReviewItem(idx, { qty: Math.max(1, parseInt(e.target.value) || 0) })}
                           onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
                           onKeyDown={(e) => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault(); }}
-                          className="w-20 p-2 border-2 border-gray-100 rounded-xl font-black text-center text-xs outline-none focus:border-[#CBA85C] transition-all"
+                          className="w-20 p-2 border-2 border-gray-100 rounded-md font-bold text-center text-xs outline-none focus:border-[#CBA85C] transition-all"
                         />
                       </td>
                       <td className="py-6 text-center">
@@ -1293,18 +1296,18 @@ const QuoteManager: React.FC = () => {
                             step="0.01"
                             value={it.unit_price}
                             onChange={(e) => handleUpdateReviewItem(idx, { unit_price: parseFloat(e.target.value) || 0 })}
-                            className="w-full p-2 border-2 border-gray-100 rounded-xl font-black text-center text-xs outline-none focus:border-[#CBA85C] transition-all pr-4"
+                            className="w-full p-2 border-2 border-gray-100 rounded-md font-bold text-center text-xs outline-none focus:border-[#CBA85C] transition-all pr-4"
                           />
                         </div>
                       </td>
-                      <td className="py-6 text-right font-mono font-black text-gray-800 text-xs">
+                      <td className="py-6 text-right font-mono-label font-bold text-gray-800 text-xs">
                         AED {(roundTo2(it.unit_price * it.qty)).toFixed(2)}
                       </td>
                       <td className="py-6 text-right">
                         <button
                           onClick={() => handleRemoveReviewItem(idx)}
                           title={t.remove}
-                          className="p-2 text-gray-300 hover:text-red-500 transition-all"
+                          className="p-2 text-slate-600 hover:text-red-500 transition-all"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1318,19 +1321,19 @@ const QuoteManager: React.FC = () => {
             <div className="p-8 border-t border-gray-100 bg-white flex justify-end gap-4">
               <button
                 onClick={() => setIsReviewOpen(false)}
-                className="px-8 py-4 bg-gray-100 text-gray-400 rounded-[20px] font-black uppercase text-[10px] tracking-widest hover:bg-gray-200 transition-all"
+                className="px-8 py-4 bg-gray-100 text-slate-600 rounded-md font-bold text-xs hover:bg-gray-200 transition-all"
               >
                 {t.cancel}
               </button>
               <button
                 onClick={handleApplyReviewChanges}
-                className="px-10 py-4 bg-[#080D1E] text-white rounded-[20px] font-black uppercase text-[10px] tracking-widest shadow-xl shadow-slate-200 hover:bg-black transition-all flex items-center gap-2"
+                className="px-10 py-4 bg-[#080D1E] text-white rounded-md font-bold text-xs shadow-xl shadow-slate-200 hover:bg-black transition-all flex items-center gap-2"
               >
                 <SaveIcon className="w-4 h-4" /> {t.applyChanges}
               </button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
     </div>
     </>

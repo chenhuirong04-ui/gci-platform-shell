@@ -18,7 +18,7 @@ export default function Bookkeeping() {
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>记账与对账 / Bookkeeping &amp; Reconciliation</h1>
 
-      <div className="bg-white p-2 rounded-2xl border border-gray-200 shadow-md flex gap-2 w-fit">
+      <div className="bg-white p-2 rounded-[10px] border border-gray-200 shadow-md flex gap-2 w-fit">
         {[
           { id: 'bank' as Tab, label: '银行对账', icon: Landmark },
           { id: 'voucher' as Tab, label: '凭证录入', icon: FileImage },
@@ -29,7 +29,7 @@ export default function Bookkeeping() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${isActive ? 'text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-md text-xs font-bold transition-all ${isActive ? 'text-white shadow-lg' : 'text-slate-600 hover:bg-gray-50'}`}
               style={isActive ? { background: colors.bgBase } : undefined}
             >
               <Icon className="w-4 h-4" />

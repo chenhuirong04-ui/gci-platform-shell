@@ -183,7 +183,7 @@ export default function FinanceReportingOverview() {
   );
 
   if (loading) {
-    return <div className="h-[calc(100vh-250px)] flex items-center justify-center text-gray-300 text-xs font-black uppercase tracking-widest">Loading...</div>;
+    return <div className="h-[calc(100vh-250px)] flex items-center justify-center text-slate-600 text-xs font-bold ">Loading...</div>;
   }
 
   return (
@@ -193,7 +193,7 @@ export default function FinanceReportingOverview() {
         <select
           value={month}
           onChange={e => setMonth(e.target.value)}
-          className="p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] bg-white font-black text-gray-700 text-sm font-mono"
+          className="p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700 text-sm font-mono-label"
         >
           {monthOptions.map(m => <option key={m} value={m}>{m}</option>)}
         </select>
@@ -201,92 +201,92 @@ export default function FinanceReportingOverview() {
 
       {/* Top stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5 text-[#3F7D58]" /> 本月经营现金流入</p>
-          <p className="text-xl font-black font-mono text-[#3F7D58]">+{monthOperatingInflow.toFixed(2)}</p>
+        <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
+          <p className="text-xs font-bold text-slate-600 mb-1 flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5 text-[#3F7D58]" /> 本月经营现金流入</p>
+          <p className="text-xl font-bold font-mono-label text-[#3F7D58]">+{monthOperatingInflow.toFixed(2)}</p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><TrendingDown className="w-3.5 h-3.5 text-[#E0846A]" /> 本月经营现金流出</p>
-          <p className="text-xl font-black font-mono text-[#E0846A]">-{monthOperatingOutflow.toFixed(2)}</p>
+        <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
+          <p className="text-xs font-bold text-slate-600 mb-1 flex items-center gap-1.5"><TrendingDown className="w-3.5 h-3.5 text-[#c53030]" /> 本月经营现金流出</p>
+          <p className="text-xl font-bold font-mono-label text-[#c53030]">-{monthOperatingOutflow.toFixed(2)}</p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">净经营现金流</p>
-          <p className={`text-xl font-black font-mono ${monthNetOperating >= 0 ? 'text-gray-800' : 'text-[#E0846A]'}`}>{monthNetOperating >= 0 ? '+' : ''}{monthNetOperating.toFixed(2)}</p>
+        <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
+          <p className="text-xs font-bold text-slate-600 mb-1">净经营现金流</p>
+          <p className={`text-xl font-bold font-mono-label ${monthNetOperating >= 0 ? 'text-gray-800' : 'text-[#c53030]'}`}>{monthNetOperating >= 0 ? '+' : ''}{monthNetOperating.toFixed(2)}</p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5" /> AR / 应收</p>
-          <p className="text-xl font-black font-mono text-gray-800">{ar.toFixed(2)}</p>
+        <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
+          <p className="text-xs font-bold text-slate-600 mb-1 flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5" /> AR / 应收</p>
+          <p className="text-xl font-bold font-mono-label text-gray-800">{ar.toFixed(2)}</p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><FileStack className="w-3.5 h-3.5" /> AP / 应付</p>
-          <p className="text-xl font-black font-mono text-gray-800">{ap.toFixed(2)}</p>
+        <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
+          <p className="text-xs font-bold text-slate-600 mb-1 flex items-center gap-1.5"><FileStack className="w-3.5 h-3.5" /> AP / 应付</p>
+          <p className="text-xl font-bold font-mono-label text-gray-800">{ap.toFixed(2)}</p>
         </div>
       </div>
 
       {/* Bank balances */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Landmark className="w-4 h-4 text-[#CBA85C]" /> 银行账户余额 / Bank Balances</h3>
+      <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6">
+        <h3 className="font-bold text-gray-800 flex items-center gap-2 text-xs mb-4"><Landmark className="w-4 h-4 text-[#7A5F2A]" /> 银行账户余额 / Bank Balances</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {accounts.map(a => (
-            <div key={a.id} className="p-4 bg-gray-50 rounded-xl">
-              <p className="text-[10px] font-black text-gray-400 uppercase truncate">{a.account_name}</p>
-              <p className="text-sm font-black font-mono text-gray-800 mt-1">{a.currency} {balanceForAccount(a.id).toFixed(2)}</p>
+            <div key={a.id} className="p-4 bg-gray-50 rounded-[10px]">
+              <p className="text-xs font-bold text-slate-600 truncate">{a.account_name}</p>
+              <p className="text-sm font-bold font-mono-label text-gray-800 mt-1">{a.currency} {balanceForAccount(a.id).toFixed(2)}</p>
             </div>
           ))}
-          {accounts.length === 0 && <p className="text-xs text-gray-300 font-black uppercase col-span-full text-center py-4">No bank accounts yet</p>}
+          {accounts.length === 0 && <p className="text-xs text-slate-600 font-bold col-span-full text-center py-4">No bank accounts yet</p>}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="font-black text-gray-800 uppercase text-xs tracking-widest mb-4">收入分类汇总 / Income by Category</h3>
+        <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6">
+          <h3 className="font-bold text-gray-800 text-xs mb-4">收入分类汇总 / Income by Category</h3>
           <div className="space-y-2">
             {incomeBreakdown.map(([cat, amt]) => (
               <div key={cat} className="flex items-center justify-between text-sm">
                 <span className="font-bold text-gray-600">{categoryLabel(cat)}</span>
-                <span className="font-mono font-black text-[#3F7D58]">{amt.toFixed(2)}</span>
+                <span className="font-mono-label font-bold text-[#3F7D58]">{amt.toFixed(2)}</span>
               </div>
             ))}
-            {incomeBreakdown.length === 0 && <p className="text-xs text-gray-300 font-black uppercase text-center py-4">No income this month</p>}
+            {incomeBreakdown.length === 0 && <p className="text-xs text-slate-600 font-bold text-center py-4">No income this month</p>}
           </div>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="font-black text-gray-800 uppercase text-xs tracking-widest mb-4">支出分类汇总 / Expense by Category</h3>
+        <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6">
+          <h3 className="font-bold text-gray-800 text-xs mb-4">支出分类汇总 / Expense by Category</h3>
           <div className="space-y-2">
             {expenseBreakdown.map(([cat, amt]) => (
               <div key={cat} className="flex items-center justify-between text-sm">
                 <span className="font-bold text-gray-600">{categoryLabel(cat)}</span>
-                <span className="font-mono font-black text-[#E0846A]">{amt.toFixed(2)}</span>
+                <span className="font-mono-label font-bold text-[#c53030]">{amt.toFixed(2)}</span>
               </div>
             ))}
-            {expenseBreakdown.length === 0 && <p className="text-xs text-gray-300 font-black uppercase text-center py-4">No expense this month</p>}
+            {expenseBreakdown.length === 0 && <p className="text-xs text-slate-600 font-bold text-center py-4">No expense this month</p>}
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Trophy className="w-4 h-4 text-[#CBA85C]" /> 客户回款排行 / Top Customers</h3>
+        <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6">
+          <h3 className="font-bold text-gray-800 flex items-center gap-2 text-xs mb-4"><Trophy className="w-4 h-4 text-[#7A5F2A]" /> 客户回款排行 / Top Customers</h3>
           <div className="space-y-2">
             {topCustomers.map((r, i) => (
               <div key={r.key} className="flex items-center justify-between text-sm">
-                <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-[9px] text-gray-300 ml-1">Legacy / 未关联ID</span>}</span>
-                <span className="font-mono font-black text-gray-800">{r.amount.toFixed(2)}</span>
+                <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-xs text-slate-600 ml-1">Legacy / 未关联ID</span>}</span>
+                <span className="font-mono-label font-bold text-gray-800">{r.amount.toFixed(2)}</span>
               </div>
             ))}
-            {topCustomers.length === 0 && <p className="text-xs text-gray-300 font-black uppercase text-center py-4">No data this month</p>}
+            {topCustomers.length === 0 && <p className="text-xs text-slate-600 font-bold text-center py-4">No data this month</p>}
           </div>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Wallet className="w-4 h-4 text-[#CBA85C]" /> 供应商付款排行 / Top Suppliers</h3>
+        <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6">
+          <h3 className="font-bold text-gray-800 flex items-center gap-2 text-xs mb-4"><Wallet className="w-4 h-4 text-[#7A5F2A]" /> 供应商付款排行 / Top Suppliers</h3>
           <div className="space-y-2">
             {topSuppliers.map((r, i) => (
               <div key={r.key} className="flex items-center justify-between text-sm">
-                <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-[9px] text-gray-300 ml-1">Legacy / 未关联ID</span>}</span>
-                <span className="font-mono font-black text-gray-800">{r.amount.toFixed(2)}</span>
+                <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-xs text-slate-600 ml-1">Legacy / 未关联ID</span>}</span>
+                <span className="font-mono-label font-bold text-gray-800">{r.amount.toFixed(2)}</span>
               </div>
             ))}
-            {topSuppliers.length === 0 && <p className="text-xs text-gray-300 font-black uppercase text-center py-4">No data this month</p>}
+            {topSuppliers.length === 0 && <p className="text-xs text-slate-600 font-bold text-center py-4">No data this month</p>}
           </div>
         </div>
       </div>

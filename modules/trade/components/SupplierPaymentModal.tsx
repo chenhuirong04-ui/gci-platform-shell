@@ -7,6 +7,7 @@ import {
   PaymentMethodFields, emptyPaymentMethodValue, type PaymentMethodFormValue,
 } from './PaymentMethodFields';
 import type { SupplierPayable, BankAccount } from '../types';
+import { ModalPortal } from '@gci/design-system';
 
 interface SupplierPaymentModalProps {
   payable: SupplierPayable;
@@ -57,73 +58,73 @@ export default function SupplierPaymentModal({ payable, accounts, onClose, onSuc
   };
 
   return createPortal(
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-2xl z-[5000] flex items-center justify-center p-8">
-      <div className="bg-white w-full max-w-xl rounded-[40px] overflow-hidden flex flex-col shadow-2xl max-h-[90dvh]">
+    <ModalPortal><div className="fixed inset-0 bg-[rgba(8,13,30,0.5)] z-[1100] flex items-center justify-center p-4 max-sm:p-0 max-sm:items-start max-sm:overflow-y-auto">
+      <div className="bg-white w-full max-w-xl rounded-[14px] overflow-hidden flex flex-col shadow-2xl max-h-[90dvh] max-sm:w-full max-sm:min-h-full max-sm:my-0 max-sm:max-w-none max-sm:max-h-none max-sm:rounded-none">
         <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
           <div>
-            <h3 className="text-sm font-black text-gray-800 uppercase tracking-widest">供应商付款 / Supplier Payment</h3>
-            <p className="text-xs font-bold text-gray-400 mt-1">{payable.supplier_name} — {payable.invoice_no || payable.reference_no || payable.id.slice(0, 8)}</p>
+            <h3 className="text-sm font-bold text-gray-800 ">供应商付款 / Supplier Payment</h3>
+            <p className="text-xs font-bold text-slate-600 mt-1">{payable.supplier_name} — {payable.invoice_no || payable.reference_no || payable.id.slice(0, 8)}</p>
           </div>
-          <button onClick={onClose} className="p-3 hover:bg-red-50 text-gray-300 hover:text-red-500 rounded-full transition-all">
+          <button onClick={onClose} className="p-3 hover:bg-red-50 text-slate-600 hover:text-red-500 rounded-full transition-all">
             <X className="w-6 h-6" />
           </button>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto p-8 space-y-5">
-          <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-2xl">
+          <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-[10px]">
             <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">应付金额</p>
-              <p className="text-lg font-black font-mono text-gray-700">AED {payable.amount.toFixed(2)}</p>
+              <p className="text-xs font-bold text-slate-600 ">应付金额</p>
+              <p className="text-lg font-bold font-mono-label text-gray-700">AED {payable.amount.toFixed(2)}</p>
             </div>
             <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">未付余额</p>
-              <p className="text-lg font-black font-mono text-[#E0846A]">AED {payable.outstanding_amount.toFixed(2)}</p>
+              <p className="text-xs font-bold text-slate-600 ">未付余额</p>
+              <p className="text-lg font-bold font-mono-label text-[#c53030]">AED {payable.outstanding_amount.toFixed(2)}</p>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">本次付款金额 (AED)</label>
+            <label className="text-xs font-bold text-slate-600 ">本次付款金额 (AED)</label>
             <input
               type="number"
               step="0.01"
               value={amount}
               onChange={e => setAmount(e.target.value)}
-              className={`w-full p-4 border rounded-xl outline-none font-black font-mono text-lg ${overOutstanding ? 'border-red-400 text-red-500' : 'border-gray-300 focus:border-[#CBA85C] text-gray-700'}`}
+              className={`w-full p-4 border rounded-md outline-none font-bold font-mono-label text-lg ${overOutstanding ? 'border-red-400 text-red-600' : 'border-gray-300 focus:border-[#CBA85C] text-gray-700'}`}
             />
             {overOutstanding && (
-              <p className="text-[11px] text-red-500 font-bold px-1">⚠️ 不能大于未付余额 AED {payable.outstanding_amount.toFixed(2)}</p>
+              <p className="text-xs text-red-600 font-bold px-1">⚠️ 不能大于未付余额 AED {payable.outstanding_amount.toFixed(2)}</p>
             )}
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Payment Date</label>
+            <label className="text-xs font-bold text-slate-600 ">Payment Date</label>
             <input
               type="date"
               value={paymentDate}
               onChange={e => setPaymentDate(e.target.value)}
-              className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono"
+              className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono-label"
             />
           </div>
 
           <PaymentMethodFields value={pmValue} onChange={setPmValue} accounts={accounts} type="out" />
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Reference No / 单据参考号（可选）</label>
+            <label className="text-xs font-bold text-slate-600 ">Reference No / 单据参考号（可选）</label>
             <input
               type="text"
               value={referenceNo}
               onChange={e => setReferenceNo(e.target.value)}
-              className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+              className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">备注（可选）</label>
+            <label className="text-xs font-bold text-slate-600 ">备注（可选）</label>
             <input
               type="text"
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+              className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
             />
           </div>
         </div>
@@ -132,13 +133,13 @@ export default function SupplierPaymentModal({ payable, accounts, onClose, onSuc
           <button
             onClick={submit}
             disabled={submitting || overOutstanding || amtNum <= 0}
-            className="w-full py-5 bg-[#080D1E] text-white rounded-2xl font-black uppercase text-xs tracking-wide shadow-lg hover:bg-[#CBA85C] transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-40"
+            className="w-full py-5 bg-[#080D1E] text-white rounded-md font-bold text-xs shadow-lg hover:bg-[#CBA85C] transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-40"
           >
             <Save className="w-4 h-4" /> {submitting ? '提交中…' : '确认付款'}
           </button>
         </div>
       </div>
-    </div>,
+    </div></ModalPortal>,
     document.body
   );
 }

@@ -52,7 +52,7 @@ export default function FinanceCenter({ initialSubTab }: FinanceCenterProps) {
 
   return (
     <div className="min-h-screen">
-      <div className="bg-white p-2 rounded-2xl border border-gray-200 shadow-md flex gap-2 mb-6 w-fit">
+      <div className="bg-white p-2 rounded-[10px] border border-gray-200 shadow-md flex gap-2 mb-6 w-fit max-w-full overflow-x-auto *:shrink-0">
         {SUB_TABS.map(tab => {
           const Icon = tab.icon;
           const isActive = activeSubTab === tab.id;
@@ -60,8 +60,8 @@ export default function FinanceCenter({ initialSubTab }: FinanceCenterProps) {
             <button
               key={tab.id}
               onClick={() => setActiveSubTab(tab.id)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${
-                isActive ? 'text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-md text-xs font-bold transition-all ${
+                isActive ? 'text-white shadow-lg' : 'text-slate-600 hover:bg-gray-50'
               }`}
               style={isActive ? { background: colors.bgBase } : undefined}
             >

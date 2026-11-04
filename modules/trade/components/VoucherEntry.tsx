@@ -214,18 +214,18 @@ export default function VoucherEntry() {
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
+      <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6 space-y-5">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">凭证类型 / Voucher Type</label>
+            <label className="text-xs font-bold text-slate-600 ">凭证类型 / Voucher Type</label>
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => setDirection('in')} className={`p-3 rounded-xl text-xs font-black uppercase tracking-widest ${direction === 'in' ? 'bg-[#3F7D58] text-white' : 'bg-gray-100 text-gray-400'}`}>收入凭证 / In</button>
-              <button onClick={() => setDirection('out')} className={`p-3 rounded-xl text-xs font-black uppercase tracking-widest ${direction === 'out' ? 'bg-[#A85D45] text-white' : 'bg-gray-100 text-gray-400'}`}>支出凭证 / Out</button>
+              <button onClick={() => setDirection('in')} className={`p-3 rounded-md text-xs font-bold ${direction === 'in' ? 'bg-[#3F7D58] text-white' : 'bg-gray-100 text-slate-600'}`}>收入凭证 / In</button>
+              <button onClick={() => setDirection('out')} className={`p-3 rounded-md text-xs font-bold ${direction === 'out' ? 'bg-[#A85D45] text-white' : 'bg-gray-100 text-slate-600'}`}>支出凭证 / Out</button>
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Payment Context</label>
-            <select value={context} onChange={e => setContext(e.target.value as PaymentContext)} className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700 text-sm">
+            <label className="text-xs font-bold text-slate-600 ">Payment Context</label>
+            <select value={context} onChange={e => setContext(e.target.value as PaymentContext)} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700 text-sm">
               <option value="CASH">Cash</option>
               <option value="BANK_TRANSFER">Bank Account</option>
               <option value="CHEQUE">Cheque</option>
@@ -235,8 +235,8 @@ export default function VoucherEntry() {
 
         {context === 'BANK_TRANSFER' && (
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Bank Account</label>
-            <select value={bankAccountId} onChange={e => setBankAccountId(e.target.value)} className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700 text-sm">
+            <label className="text-xs font-bold text-slate-600 ">Bank Account</label>
+            <select value={bankAccountId} onChange={e => setBankAccountId(e.target.value)} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700 text-sm">
               <option value="">选择账户…</option>
               {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
             </select>
@@ -244,58 +244,58 @@ export default function VoucherEntry() {
         )}
 
         <div className="space-y-1.5">
-          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">上传发票 / 小票 / 付款截图 / 收款截图</label>
+          <label className="text-xs font-bold text-slate-600 ">上传发票 / 小票 / 付款截图 / 收款截图</label>
           <input ref={fileRef} type="file" accept="application/pdf,image/*" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} disabled={parsing} className="text-sm" />
-          {parsing && <p className="text-xs font-black text-[#CBA85C] uppercase flex items-center gap-1.5 pt-1"><FileClock className="w-3.5 h-3.5" /> AI 解析中…</p>}
-          {parseError && <p className="text-xs font-bold text-red-500 pt-1">{parseError}</p>}
+          {parsing && <p className="text-xs font-bold text-[#7A5F2A] flex items-center gap-1.5 pt-1"><FileClock className="w-3.5 h-3.5" /> AI 解析中…</p>}
+          {parseError && <p className="text-xs font-bold text-red-600 pt-1">{parseError}</p>}
         </div>
       </div>
 
       {file && !done && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
+        <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6 space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</label>
-              <input type="date" value={fields.date || ''} onChange={e => setFields(f => ({ ...f, date: e.target.value }))} className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono" />
+              <label className="text-xs font-bold text-slate-600 ">Date</label>
+              <input type="date" value={fields.date || ''} onChange={e => setFields(f => ({ ...f, date: e.target.value }))} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono-label" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Amount</label>
-              <input type="number" step="0.01" value={fields.amount ?? ''} onChange={e => setFields(f => ({ ...f, amount: Number(e.target.value) }))} className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-black text-gray-700 font-mono" />
+              <label className="text-xs font-bold text-slate-600 ">Amount</label>
+              <input type="number" step="0.01" value={fields.amount ?? ''} onChange={e => setFields(f => ({ ...f, amount: Number(e.target.value) }))} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono-label" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Invoice No</label>
-              <input value={fields.invoice_no || ''} onChange={e => setFields(f => ({ ...f, invoice_no: e.target.value }))} className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700" />
+              <label className="text-xs font-bold text-slate-600 ">Invoice No</label>
+              <input value={fields.invoice_no || ''} onChange={e => setFields(f => ({ ...f, invoice_no: e.target.value }))} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">VAT Amount</label>
-              <input type="number" step="0.01" value={fields.vat_amount ?? ''} onChange={e => setFields(f => ({ ...f, vat_amount: Number(e.target.value) }))} className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono" />
+              <label className="text-xs font-bold text-slate-600 ">VAT Amount</label>
+              <input type="number" step="0.01" value={fields.vat_amount ?? ''} onChange={e => setFields(f => ({ ...f, vat_amount: Number(e.target.value) }))} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono-label" />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">用途 / 备注 / Purpose</label>
-            <input value={purposeNote} onChange={e => setPurposeNote(e.target.value)} className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700" />
+            <label className="text-xs font-bold text-slate-600 ">用途 / 备注 / Purpose</label>
+            <input value={purposeNote} onChange={e => setPurposeNote(e.target.value)} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">科目 Category *</label>
-              <select value={category} onChange={e => setCategory(e.target.value)} className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700">
+              <label className="text-xs font-bold text-slate-600 ">科目 Category *</label>
+              <select value={category} onChange={e => setCategory(e.target.value)} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700">
                 <option value="">选择分类…</option>
                 {categoryOptions.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Subcategory（可选）</label>
-              <input value={subcategory} onChange={e => setSubcategory(e.target.value)} className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700" />
+              <label className="text-xs font-bold text-slate-600 ">Subcategory（可选）</label>
+              <input value={subcategory} onChange={e => setSubcategory(e.target.value)} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700" />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">关联 Link（可选）</label>
+            <label className="text-xs font-bold text-slate-600 ">关联 Link（可选）</label>
             <div className="grid grid-cols-3 gap-2">
               {(['none', 'customer', 'supplier'] as const).map(m => (
-                <button key={m} onClick={() => setLinkMode(m)} className={`p-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${linkMode === m ? 'bg-[#080D1E] text-white' : 'bg-gray-100 text-gray-400'}`}>
+                <button key={m} onClick={() => setLinkMode(m)} className={`p-2.5 rounded-md text-xs font-bold ${linkMode === m ? 'bg-[#080D1E] text-white' : 'bg-gray-100 text-slate-600'}`}>
                   {m === 'none' ? '不关联' : m === 'customer' ? '客户/项目' : '供应商'}
                 </button>
               ))}
@@ -306,15 +306,15 @@ export default function VoucherEntry() {
 
           {linkMode === 'supplier' && (
             <div className="space-y-1.5 relative">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Supplier</label>
+              <label className="text-xs font-bold text-slate-600 ">Supplier</label>
               <input
                 value={selectedSupplier ? selectedSupplier.supplier_name_display : supplierQuery}
                 onChange={e => { setSupplierQuery(e.target.value); setSelectedSupplier(null); }}
                 placeholder="搜索供应商名称…"
-                className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
               />
               {!selectedSupplier && supplierQuery.trim() && filteredSuppliers.length > 0 && (
-                <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl">
+                <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-[10px] shadow-xl">
                   {filteredSuppliers.map(s => (
                     <button key={s.id} onClick={() => { setSelectedSupplier(s); setSupplierQuery(''); }} className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-50 last:border-0 text-sm font-bold text-gray-700">
                       {s.supplier_name_display}
@@ -324,19 +324,19 @@ export default function VoucherEntry() {
               )}
               {direction === 'out' && selectedSupplier && (
                 <div className="pt-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Due Date（未付款时使用，可选）</label>
-                  <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono mt-1" />
+                  <label className="text-xs font-bold text-slate-600 ">Due Date（未付款时使用，可选）</label>
+                  <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono-label mt-1" />
                 </div>
               )}
             </div>
           )}
 
           <div className="flex gap-3 pt-2">
-            <button onClick={submitAsPaid} disabled={submitting} className="flex-1 flex items-center justify-center gap-2 py-4 rounded-xl bg-[#080D1E] text-white font-black uppercase text-xs tracking-widest disabled:opacity-40">
+            <button onClick={submitAsPaid} disabled={submitting} className="flex-1 flex items-center justify-center gap-2 py-4 rounded-md bg-[#080D1E] text-white font-bold text-xs disabled:opacity-40">
               <Check className="w-4 h-4" /> {submitting ? '处理中…' : '已付款 → 生成正式账'}
             </button>
             {direction === 'out' && linkMode === 'supplier' && selectedSupplier && (
-              <button onClick={submitAsPayable} disabled={submitting} className="flex-1 flex items-center justify-center gap-2 py-4 rounded-xl bg-gray-100 text-gray-700 font-black uppercase text-xs tracking-widest disabled:opacity-40">
+              <button onClick={submitAsPayable} disabled={submitting} className="flex-1 flex items-center justify-center gap-2 py-4 rounded-md bg-gray-100 text-gray-700 font-bold text-xs disabled:opacity-40">
                 <Upload className="w-4 h-4" /> {submitting ? '处理中…' : '未付款 → 生成应付账款'}
               </button>
             )}
@@ -345,9 +345,9 @@ export default function VoucherEntry() {
       )}
 
       {done && (
-        <div className="bg-[#3F7D58]/5 border border-[#3F7D58]/20 rounded-2xl p-6 flex items-center justify-between">
+        <div className="bg-[#3F7D58]/5 border border-[#3F7D58]/20 rounded-[10px] p-6 flex items-center justify-between">
           <p className="text-sm font-bold text-[#3F7D58]">{done === 'transaction' ? '已生成正式 transaction。' : '已生成供应商应付账款（Payable）。'}</p>
-          <button onClick={reset} className="px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-600 text-xs font-black uppercase">继续录入下一笔</button>
+          <button onClick={reset} className="px-4 py-2 rounded-md bg-white border border-gray-200 text-gray-600 text-xs font-bold ">继续录入下一笔</button>
         </div>
       )}
     </div>

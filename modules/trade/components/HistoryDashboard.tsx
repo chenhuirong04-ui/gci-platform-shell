@@ -27,6 +27,10 @@ import {
   PaymentMethodFields, emptyPaymentMethodValue, validatePaymentMethodValue, buildPaymentMethodPayload,
   type PaymentMethodFormValue,
 } from './PaymentMethodFields';
+import { ModalPortal } from '@gci/design-system';
+
+// Printable / exported documents keep the body font they have always used.
+const DOC_FONT = "var(--font-body), var(--font-display), 'Segoe UI', system-ui, sans-serif";
 
 // New isolated interface for consignment settlements (Consignment_Settlements storage)
 interface ConsignmentSettlementRecord {
@@ -1471,7 +1475,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
   return (
     <div className="flex flex-col gap-8 animate-in fade-in duration-500 pb-20">
       {/* Top Tabs */}
-      <div className="flex bg-white p-2 rounded-[30px] shadow-sm border border-gray-100 w-fit self-center no-print relative">
+      <div className="flex bg-white p-2 rounded-[10px] shadow-sm border border-gray-100 w-fit max-w-full overflow-x-auto *:shrink-0 self-center no-print relative">
         {[
           { id: 'history', label: t.tabHistory, icon: ClipboardList },
           { id: 'orders', label: t.tabOrders, icon: PackageCheck },
@@ -1480,7 +1484,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
           <button
             key={tab.id}
             onClick={() => { setActiveSubTab(tab.id as any); setSearchTerm(''); }}
-            className={`px-8 py-4 rounded-[22px] text-sm font-bold transition-all flex items-center gap-3 ${activeSubTab === tab.id ? 'bg-[#080D1E] text-white shadow-xl' : 'text-gray-400 hover:bg-gray-50'}`}
+            className={`px-8 py-4 rounded-md text-sm font-bold transition-all flex items-center gap-3 ${activeSubTab === tab.id ? 'bg-[#080D1E] text-white shadow-xl' : 'text-slate-600 hover:bg-gray-50'}`}
           >
             <tab.icon className="w-4 h-4" /> {tab.label}
           </button>
@@ -1489,7 +1493,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
         {/* Manual Refresh */}
         <button
           onClick={loadLocalData}
-          className="ml-2 px-5 py-4 rounded-[22px] text-xs font-bold transition-all flex items-center gap-2 bg-gray-50 text-gray-400 hover:bg-gray-100"
+          className="ml-2 px-5 py-4 rounded-md text-xs font-bold transition-all flex items-center gap-2 bg-gray-50 text-slate-600 hover:bg-gray-100"
           title={t.refresh}
         >
           <RefreshCw className="w-4 h-4" /> {t.refresh}
@@ -1500,42 +1504,42 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
       {activeSubTab === 'analytics' && (
         <div className="space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <div className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm relative group overflow-hidden">
+            <div className="bg-white p-10 rounded-[10px] border border-gray-100 shadow-sm relative group overflow-hidden">
               <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-20 transition-all">
                 <ReceiptText className="w-16 h-16" />
               </div>
-              <p className="text-xs font-black text-gray-400 uppercase tracking-wide mb-2">Total Quoted (AED)</p>
-              <p className="text-4xl font-black text-[#080D1E] font-mono leading-none tracking-tighter">{stats.totalQuotedVal.toFixed(2)}</p>
+              <p className="text-xs font-bold text-slate-600 mb-2">Total Quoted (AED)</p>
+              <p className="text-4xl font-bold text-[#080D1E] font-mono-label leading-none tracking-tighter">{stats.totalQuotedVal.toFixed(2)}</p>
             </div>
 
-            <div className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm relative group overflow-hidden">
-              <p className="text-xs font-black text-gray-400 uppercase tracking-wide mb-2">Conversion Rate</p>
-              <p className="text-4xl font-black text-[#3F7D58] font-mono leading-none tracking-tighter">{stats.convRate.toFixed(1)}%</p>
+            <div className="bg-white p-10 rounded-[10px] border border-gray-100 shadow-sm relative group overflow-hidden">
+              <p className="text-xs font-bold text-slate-600 mb-2">Conversion Rate</p>
+              <p className="text-4xl font-bold text-[#3F7D58] font-mono-label leading-none tracking-tighter">{stats.convRate.toFixed(1)}%</p>
             </div>
 
-            <div className="bg-[#080D1E] p-10 rounded-[40px] shadow-2xl text-white relative group overflow-hidden">
-              <p className="text-xs font-black text-[#CBA85C]/60 uppercase tracking-wide mb-2">Internal Orders (AED)</p>
-              <p className="text-4xl font-black font-mono leading-none tracking-tighter">{stats.totalOrderVal.toFixed(2)}</p>
+            <div className="bg-[#080D1E] p-10 rounded-[10px] shadow-2xl text-white relative group overflow-hidden">
+              <p className="text-xs font-bold text-[#7A5F2A] mb-2">Internal Orders (AED)</p>
+              <p className="text-4xl font-bold font-mono-label leading-none tracking-tighter">{stats.totalOrderVal.toFixed(2)}</p>
             </div>
 
-            <div className="bg-red-50 p-10 rounded-[40px] border border-red-100 shadow-sm relative group overflow-hidden">
-              <p className="text-xs font-black text-red-400 uppercase tracking-wide mb-2">Outstanding AR</p>
-              <p className="text-4xl font-black text-red-600 font-mono leading-none tracking-tighter">{stats.totalOutstandingVal.toFixed(2)}</p>
+            <div className="bg-red-50 p-10 rounded-[10px] border border-red-100 shadow-sm relative group overflow-hidden">
+              <p className="text-xs font-bold text-red-600 mb-2">Outstanding AR</p>
+              <p className="text-4xl font-bold text-red-600 font-mono-label leading-none tracking-tighter">{stats.totalOutstandingVal.toFixed(2)}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white p-10 rounded-[50px] border border-gray-100 shadow-sm">
-              <h3 className="text-xs font-black text-gray-800 uppercase tracking-[0.2em] mb-10 flex items-center gap-3">
-                <PieChartIcon className="w-5 h-5 text-[#CBA85C]" /> Best Selling Product Mix (Revenue)
+            <div className="bg-white p-10 rounded-[10px] border border-gray-100 shadow-sm">
+              <h3 className="text-xs font-bold text-gray-800 mb-10 flex items-center gap-3">
+                <PieChartIcon className="w-5 h-5 text-[#7A5F2A]" /> Best Selling Product Mix (Revenue)
               </h3>
 
               <div className="space-y-6">
                 {stats.topProducts.map(([name, data], idx) => (
                   <div key={idx} className="flex flex-col gap-2">
                     <div className="flex justify-between items-end">
-                      <span className="text-sm font-black text-gray-600 truncate pr-6">{name}</span>
-                      <span className="text-xs font-black text-[#CBA85C] font-mono">AED {data.revenue.toFixed(2)}</span>
+                      <span className="text-sm font-bold text-gray-600 truncate pr-6">{name}</span>
+                      <span className="text-xs font-bold text-[#7A5F2A] font-mono-label">AED {data.revenue.toFixed(2)}</span>
                     </div>
                     <div className="w-full bg-gray-50 h-2 rounded-full overflow-hidden">
                       <div
@@ -1543,20 +1547,20 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                         style={{ width: `${(data.revenue / (stats.topProducts[0]?.[1]?.revenue || 1)) * 100}%` }}
                       />
                     </div>
-                    <span className="text-xs font-bold text-gray-400 font-mono">Qty: {data.qty}</span>
+                    <span className="text-xs font-bold text-slate-600 font-mono-label">Qty: {data.qty}</span>
                   </div>
                 ))}
                 {stats.topProducts.length === 0 && (
-                  <div className="py-20 text-center text-gray-300 uppercase text-xs font-black tracking-wide">
+                  <div className="py-20 text-center text-slate-600 text-xs font-bold ">
                     No transaction data recorded
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="bg-gray-900 p-10 rounded-[50px] text-white flex flex-col h-full relative overflow-hidden group">
+            <div className="bg-gray-900 p-10 rounded-[10px] text-white flex flex-col h-full relative overflow-hidden group">
               <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-[#CBA85C]/5 rounded-full blur-3xl group-hover:bg-[#CBA85C]/10 transition-all"></div>
-              <h3 className="text-xs font-black text-[#CBA85C]/60 uppercase tracking-wide mb-12 flex items-center gap-3 relative z-10">
+              <h3 className="text-xs font-bold text-[#7A5F2A] mb-12 flex items-center gap-3 relative z-10">
                 <PieChartIcon className="w-5 h-5" /> Product Portfolio Share
               </h3>
 
@@ -1564,16 +1568,16 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                 {stats.topProducts.slice(0, 5).map(([name, data], idx) => {
                   const share = (data.revenue / (stats.totalOrderVal || 1)) * 100;
                   return (
-                    <div key={idx} className="flex items-center gap-5 bg-white/5 p-5 rounded-[30px] border border-white/5 backdrop-blur-md hover:bg-white/10 transition-all cursor-default">
-                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm" style={{ backgroundColor: `hsl(${220 + idx * 30}, 75%, 55%)` }}>
+                    <div key={idx} className="flex items-center gap-5 bg-white/5 p-5 rounded-[10px] border border-white/5 backdrop-blur-md hover:bg-white/10 transition-all cursor-default">
+                      <div className="w-12 h-12 rounded-[10px] flex items-center justify-center font-bold text-sm" style={{ backgroundColor: `hsl(${220 + idx * 30}, 75%, 55%)` }}>
                         {idx + 1}
                       </div>
                       <div className="flex-1 overflow-hidden">
-                        <p className="text-sm font-black truncate text-white/80">{name}</p>
-                        <p className="text-xs font-bold text-gray-400">{share.toFixed(1)}% Revenue Share</p>
+                        <p className="text-sm font-bold truncate text-white/80">{name}</p>
+                        <p className="text-xs font-bold text-slate-600">{share.toFixed(1)}% Revenue Share</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-black font-mono">AED {data.revenue.toFixed(2)}</p>
+                        <p className="text-sm font-bold font-mono-label">AED {data.revenue.toFixed(2)}</p>
                       </div>
                     </div>
                   );
@@ -1587,26 +1591,26 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
       {/* ===== history ===== */}
       {activeSubTab === 'history' && (
-        <div className="bg-white rounded-[50px] border border-gray-100 shadow-2xl overflow-hidden flex flex-col min-h-[650px]">
+        <div className="bg-white rounded-[10px] border border-gray-100 shadow-2xl overflow-hidden flex flex-col min-h-[650px]">
           <div className="p-10 bg-gray-50/50 border-b flex flex-col md:flex-row items-center gap-6">
             <div className="relative flex-1">
-              <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300" />
+              <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-600" />
               <input
                 type="text"
                 placeholder={t.searchPlaceholder}
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-16 p-5 bg-white border-2 border-gray-100 rounded-[30px] font-bold text-sm outline-none focus:border-[#CBA85C] shadow-sm transition-all"
+                className="w-full pl-16 p-5 bg-white border-2 border-gray-100 rounded-md font-bold text-sm outline-none focus:border-[#CBA85C] shadow-sm transition-all"
               />
             </div>
 
-            <div className="flex items-center bg-white p-2 rounded-2xl border border-gray-100 shadow-sm shrink-0">
-              <span className="px-4 text-xs font-black text-gray-400 uppercase border-r mr-2">{t.statusLabel}</span>
+            <div className="flex items-center bg-white p-2 rounded-[10px] border border-gray-100 shadow-sm shrink-0">
+              <span className="px-4 text-xs font-bold text-slate-600 border-r mr-2">{t.statusLabel}</span>
               {(['ALL', 'QUOTED', 'CONVERTED'] as const).map(f => (
                 <button
                   key={f}
                   onClick={() => setStatusFilter(f)}
-                  className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${statusFilter === f ? 'bg-[#080D1E] text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                  className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${statusFilter === f ? 'bg-[#080D1E] text-white shadow-md' : 'text-slate-600 hover:text-gray-600'}`}
                 >
                   {f === 'ALL' ? t.filterAll : f === 'QUOTED' ? t.filterQuoted : t.filterConverted}
                 </button>
@@ -1616,7 +1620,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
             {/* 归档记录 toggle */}
             <button
               onClick={() => setShowArchived(v => !v)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border text-xs font-black uppercase tracking-wide transition-all shadow-sm shrink-0 ${showArchived ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-gray-400 border-gray-100 hover:text-amber-600 hover:border-amber-300'}`}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-md border text-xs font-bold transition-all shadow-sm shrink-0 ${showArchived ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-slate-600 border-gray-100 hover:text-amber-600 hover:border-amber-300'}`}
               title={showArchived ? t.backToDefaultList : t.showArchivedTooltip}
             >
               <Archive className="w-4 h-4" />
@@ -1625,7 +1629,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
             <button
               onClick={handleExportAllData}
-              className="p-4 bg-white border border-gray-100 rounded-2xl text-[#CBA85C] hover:bg-[#080D1E] hover:text-white transition-all shadow-sm"
+              className="p-4 bg-white border border-gray-100 rounded-md text-[#7A5F2A] hover:bg-[#080D1E] hover:text-white transition-all shadow-sm"
               title={t.exportBackup}
             >
               <DownloadIcon className="w-5 h-5" />
@@ -1634,7 +1638,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
           <div className="flex-1 overflow-auto custom-scrollbar">
             <table className="w-full text-left">
-              <thead className="bg-gray-50 text-xs font-black text-gray-400 uppercase tracking-wide sticky top-0 z-10 shadow-sm">
+              <thead className="bg-gray-50 text-xs font-bold text-slate-600 sticky top-0 z-10 shadow-sm">
                 <tr>
                   <th className="px-10 py-6">{t.colIdDate}</th>
                   <th className="px-10 py-6">{t.colCustomer}</th>
@@ -1648,41 +1652,41 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
               <tbody className="divide-y divide-gray-50">
                 {filteredQuotes.map(q => (
                   <tr key={q.id} className="hover:bg-[#CBA85C]/5 transition-all group">
-                    <td className="px-10 py-8 font-mono font-black text-sm text-[#CBA85C]">
+                    <td className="px-10 py-8 font-mono-label font-bold text-sm text-[#7A5F2A]">
                       {safeStr(q.id)}
                       <br />
-                      <span className="text-gray-400 font-bold text-xs">
+                      <span className="text-slate-600 font-bold text-xs">
                         {q.createdAt ? new Date(q.createdAt).toLocaleDateString() : '--'}
                       </span>
                     </td>
-                    <td className="px-10 py-8 font-black text-gray-700 text-sm">
+                    <td className="px-10 py-8 font-bold text-gray-700 text-sm">
                       {safeStr(q.customerName) || '--'}
                     </td>
                     <td className="px-10 py-8 text-center">
-                      <span className="px-3 py-1 bg-gray-50 rounded-lg text-xs font-black text-gray-500 border border-gray-100">
+                      <span className="px-3 py-1 bg-gray-50 rounded-lg text-xs font-bold text-slate-600 border border-gray-100">
                         {safeStr(q.dueDate) || '--'}
                       </span>
                     </td>
                     <td className="px-10 py-8">
                       <div className="flex flex-col gap-1">
-                        <span className={`px-4 py-1.5 rounded-full text-xs font-black tracking-wide shadow-sm border inline-block whitespace-nowrap ${q.status === 'CONVERTED' ? 'bg-[#3F7D58] text-white border-[#3F7D58]' : 'bg-white text-gray-400 border-gray-100'}`}>
+                        <span className={`px-4 py-1.5 rounded-full text-xs font-bold shadow-sm border inline-block whitespace-nowrap ${q.status === 'CONVERTED' ? 'bg-[#3F7D58] text-white border-[#3F7D58]' : 'bg-white text-slate-600 border-gray-100'}`}>
                           {QUOTE_STATUS_LABEL[safeStr(q.status)] ?? safeStr(q.status)}
                         </span>
                         {((q as any).archivedAt || (q as any).hiddenFromDefault || (q as any).deletedAt || (q as any).status === 'DELETED') && (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-50 text-amber-600 border border-amber-200 inline-block">
+                          <span className="px-2 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 inline-block">
                             {t.archivedBadge}
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-10 py-8 text-right font-black font-mono text-gray-800 text-sm">
+                    <td className="px-10 py-8 text-right font-bold font-mono-label text-gray-800 text-sm">
                       {(q.grandTotal ?? 0).toFixed(2)}
                     </td>
                     <td className="px-10 py-8 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => setSelectedQuote(q)}
-                          className="p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:bg-[#080D1E] hover:text-white transition-all"
+                          className="p-4 bg-white border border-gray-100 rounded-md shadow-sm hover:bg-[#080D1E] hover:text-white transition-all"
                           title={t.viewQuote}
                         >
                           <Eye className="w-5 h-5" />
@@ -1690,7 +1694,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                         {!showArchived && (
                           <button
                             onClick={() => handleArchiveQuote(q.id)}
-                            className="p-4 bg-white border border-amber-100 rounded-2xl shadow-sm hover:bg-amber-600 hover:text-white transition-all text-amber-400"
+                            className="p-4 bg-white border border-amber-100 rounded-md shadow-sm hover:bg-amber-600 hover:text-white transition-all text-amber-400"
                             title={t.archiveQuote}
                           >
                             <Archive className="w-4 h-4" />
@@ -1703,7 +1707,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
                 {filteredQuotes.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-20 text-center text-gray-300 font-black uppercase text-xs">
+                    <td colSpan={6} className="py-20 text-center text-slate-600 font-bold text-xs">
                       {showArchived ? t.emptyNoArchived : t.emptyNoMatch}
                     </td>
                   </tr>
@@ -1716,29 +1720,29 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
       {/* ===== orders ===== */}
       {activeSubTab === 'orders' && (
-        <div className="bg-white rounded-[50px] border border-gray-100 shadow-2xl overflow-hidden flex flex-col min-h-[650px]">
+        <div className="bg-white rounded-[10px] border border-gray-100 shadow-2xl overflow-hidden flex flex-col min-h-[650px]">
           <div className="p-10 bg-gray-50/50 border-b flex flex-col md:flex-row items-center gap-6">
             <div className="relative flex-1">
-              <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300" />
+              <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-600" />
               <input
                 type="text"
                 placeholder="搜索订单..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-16 p-5 bg-white border-2 border-gray-100 rounded-[30px] font-bold text-sm outline-none focus:border-[#CBA85C] shadow-sm transition-all"
+                className="w-full pl-16 p-5 bg-white border-2 border-gray-100 rounded-md font-bold text-sm outline-none focus:border-[#CBA85C] shadow-sm transition-all"
               />
             </div>
 
-            <div className="flex items-center bg-white p-2 rounded-2xl border border-gray-100 shadow-sm shrink-0">
+            <div className="flex items-center bg-white p-2 rounded-[10px] border border-gray-100 shadow-sm shrink-0">
               <button
                 onClick={() => setOrderViewFilter('ALL')}
-                className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${orderViewFilter === 'ALL' ? 'bg-[#080D1E] text-white' : 'text-gray-400'}`}
+                className={`px-6 py-2 rounded-md text-xs font-bold transition-all ${orderViewFilter === 'ALL' ? 'bg-[#080D1E] text-white' : 'text-slate-600'}`}
               >
                 全部订单
               </button>
               <button
                 onClick={() => setOrderViewFilter('CONSIGNMENT')}
-                className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${orderViewFilter === 'CONSIGNMENT' ? 'bg-[#D4A843] text-white' : 'text-gray-400'}`}
+                className={`px-6 py-2 rounded-md text-xs font-bold transition-all ${orderViewFilter === 'CONSIGNMENT' ? 'bg-[#D4A843] text-white' : 'text-slate-600'}`}
               >
                 代售订单
               </button>
@@ -1747,7 +1751,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
           <div className="flex-1 overflow-auto custom-scrollbar">
             <table className="w-full text-left">
-              <thead className="bg-gray-50 text-xs font-black text-gray-400 uppercase tracking-wide sticky top-0 z-10 shadow-sm">
+              <thead className="bg-gray-50 text-xs font-bold text-slate-600 sticky top-0 z-10 shadow-sm">
                 <tr>
                   <th className="px-10 py-6">Order No.</th>
                   <th className="px-10 py-6">Customer</th>
@@ -1762,42 +1766,42 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
               <tbody className="divide-y divide-gray-50">
                 {filteredOrders.map(o => (
                   <tr key={o.id} className="hover:bg-[#CBA85C]/5 transition-all">
-                    <td className="px-10 py-8 font-mono font-black text-sm text-[#080D1E]">
+                    <td className="px-10 py-8 font-mono-label font-bold text-sm text-[#080D1E]">
                       {safeStr(o.id)}
                       <br />
-                      <span className="text-gray-400 font-bold text-xs">
+                      <span className="text-slate-600 font-bold text-xs">
                         {o.createdAt ? new Date(o.createdAt).toLocaleDateString() : '--'}
                       </span>
                     </td>
-                    <td className="px-10 py-8 font-black text-gray-700 text-sm">
+                    <td className="px-10 py-8 font-bold text-gray-700 text-sm">
                       {safeStr(o.customerName) || '--'}
                     </td>
                     <td className="px-10 py-8 text-center">
-                      <span className={`px-3 py-1 rounded-lg text-xs font-black ${o.transactionMode === 'Consignment' ? 'bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20' : 'bg-gray-50 text-gray-400 border border-gray-100'}`}>
+                      <span className={`px-3 py-1 rounded-lg text-xs font-bold ${o.transactionMode === 'Consignment' ? 'bg-[#D4A843]/10 text-[#7A5F2A] border border-[#D4A843]/20' : 'bg-gray-50 text-slate-600 border border-gray-100'}`}>
                         {safeStr(o.transactionMode || 'Direct')}
                       </span>
                     </td>
                     <td className="px-10 py-8 text-center">
-                      <span className={`px-4 py-1.5 rounded-full text-xs font-black tracking-wide border ${
+                      <span className={`px-4 py-1.5 rounded-full text-xs font-bold border ${
                         o.status === 'PAID' ? 'bg-[#3F7D58] text-white border-[#3F7D58]' :
-                        o.status === 'VOIDED' ? 'bg-gray-200 text-gray-400 border-gray-200 line-through' :
-                        o.status === 'CONSIGNMENT' ? 'bg-[#D4A843]/10 text-[#D4A843] border-[#D4A843]/30' :
-                        'bg-[#CBA85C]/10 text-[#CBA85C] border-[#CBA85C]/20'
+                        o.status === 'VOIDED' ? 'bg-gray-200 text-slate-600 border-gray-200 line-through' :
+                        o.status === 'CONSIGNMENT' ? 'bg-[#D4A843]/10 text-[#7A5F2A] border-[#D4A843]/30' :
+                        'bg-[#CBA85C]/10 text-[#7A5F2A] border-[#CBA85C]/20'
                       }`}>
                         {safeStr(o.status)}
                       </span>
                     </td>
-                    <td className="px-10 py-8 text-right font-mono text-[#3F7D58] font-bold">
+                    <td className="px-10 py-8 text-right font-mono-label text-[#3F7D58] font-bold">
                       {(o.paidAmount ?? 0).toFixed(2)}
                     </td>
-                    <td className="px-10 py-8 text-right font-black font-mono text-gray-800">
+                    <td className="px-10 py-8 text-right font-bold font-mono-label text-gray-800">
                       {(o.grandTotal ?? 0).toFixed(2)}
                     </td>
                     <td className="px-10 py-8 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => setSelectedOrder(o)}
-                          className="p-3 bg-white border border-gray-100 rounded-xl shadow-sm hover:bg-[#080D1E] hover:text-white transition-all"
+                          className="p-3 bg-white border border-gray-100 rounded-md shadow-sm hover:bg-[#080D1E] hover:text-white transition-all"
                           title="View Order"
                         >
                           <Eye className="w-4 h-4" />
@@ -1808,7 +1812,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                               ? handleVoidAdjustment(o.id)
                               : handleVoidOrder(o.id)
                             }
-                            className="p-3 bg-white border border-red-100 rounded-xl shadow-sm hover:bg-red-600 hover:text-white transition-all text-red-400"
+                            className="p-3 bg-white border border-red-100 rounded-md shadow-sm hover:bg-red-600 hover:text-white transition-all text-red-600"
                             title={(o as any).order_type === 'ADJUSTMENT' ? 'Void Adjustment' : 'Void Order'}
                           >
                             <Ban className="w-4 h-4" />
@@ -1821,7 +1825,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
                 {filteredOrders.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-20 text-center text-gray-300 font-black uppercase text-xs">
+                    <td colSpan={7} className="py-20 text-center text-slate-600 font-bold text-xs">
                       没有匹配的订单
                     </td>
                   </tr>
@@ -1837,18 +1841,18 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
         <div className="space-y-6">
           {/* AR mode toggle */}
           <div className="flex items-center justify-center gap-2">
-            <div className="flex bg-white p-2 rounded-[22px] shadow-sm border border-gray-100 w-fit">
+            <div className="flex bg-white p-2 rounded-[10px] shadow-sm border border-gray-100 w-fit max-w-full overflow-x-auto *:shrink-0">
               <button
                 type="button"
                 onClick={() => setArMode('OUTSTANDING')}
-                className={`px-6 py-3 rounded-[16px] text-xs font-black uppercase tracking-wide transition-all ${arMode === 'OUTSTANDING' ? 'bg-[#080D1E] text-white shadow-md' : 'text-gray-400 hover:bg-gray-50'}`}
+                className={`px-6 py-3 rounded-md text-xs font-bold transition-all ${arMode === 'OUTSTANDING' ? 'bg-[#080D1E] text-white shadow-md' : 'text-slate-600 hover:bg-gray-50'}`}
               >
                 仅应收(未结清)
               </button>
               <button
                 type="button"
                 onClick={() => setArMode('ALL')}
-                className={`px-6 py-3 rounded-[16px] text-xs font-black uppercase tracking-wide transition-all ${arMode === 'ALL' ? 'bg-[#080D1E] text-white shadow-md' : 'text-gray-400 hover:bg-gray-50'}`}
+                className={`px-6 py-3 rounded-md text-xs font-bold transition-all ${arMode === 'ALL' ? 'bg-[#080D1E] text-white shadow-md' : 'text-slate-600 hover:bg-gray-50'}`}
               >
                 全部订单(含已结清)
               </button>
@@ -1862,57 +1866,57 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
               const isOverdue = !isPaid && o?.dueDate ? (new Date() > new Date(o.dueDate)) : false;
 
               return (
-                <div key={o.id} className="bg-white border border-gray-100 rounded-[50px] p-10 shadow-sm hover:shadow-2xl transition-all relative overflow-hidden group">
+                <div key={o.id} className="bg-white border border-gray-100 rounded-[10px] p-10 shadow-sm hover:shadow-2xl transition-all relative overflow-hidden group">
                   {isPaid ? (
-                    <div className="absolute top-0 right-0 bg-[#3F7D58] text-white px-8 py-2 rounded-bl-[30px] text-xs font-black uppercase tracking-wide">
+                    <div className="absolute top-0 right-0 bg-[#3F7D58] text-white px-8 py-2 rounded-bl-[30px] text-xs font-bold ">
                       PAID
                     </div>
                   ) : isOverdue ? (
-                    <div className="absolute top-0 right-0 bg-red-600 text-white px-8 py-2 rounded-bl-[30px] text-xs font-black uppercase tracking-wide flex items-center gap-2 animate-pulse">
+                    <div className="absolute top-0 right-0 bg-red-600 text-white px-8 py-2 rounded-bl-[30px] text-xs font-bold flex items-center gap-2 animate-pulse">
                       <AlertCircle className="w-3 h-3" /> OVERDUE
                     </div>
                   ) : (
-                    <div className="absolute top-0 right-0 bg-[#080D1E] text-white px-8 py-2 rounded-bl-[30px] text-xs font-black uppercase tracking-wide">
+                    <div className="absolute top-0 right-0 bg-[#080D1E] text-white px-8 py-2 rounded-bl-[30px] text-xs font-bold ">
                       PENDING
                     </div>
                   )}
 
                   <div className="mb-8">
-                    <h4 className="text-sm font-black text-gray-500 mb-1">{safeStr(o.customerName) || '--'}</h4>
-                    <p className="text-lg font-black text-gray-800 font-mono tracking-tighter">{safeStr(o.id)}</p>
+                    <h4 className="text-sm font-bold text-slate-600 mb-1">{safeStr(o.customerName) || '--'}</h4>
+                    <p className="text-lg font-bold text-gray-800 font-mono-label tracking-tighter">{safeStr(o.id)}</p>
                   </div>
 
                   <div className="space-y-4 mb-10">
                     <div className="flex justify-between items-center py-3 border-b border-gray-50">
-                      <span className="text-xs font-black text-gray-400 uppercase">Total Value</span>
-                      <span className="font-mono font-black text-gray-800">AED {(o.grandTotal ?? 0).toFixed(2)}</span>
+                      <span className="text-xs font-bold text-slate-600 ">Total Value</span>
+                      <span className="font-mono-label font-bold text-gray-800">AED {(o.grandTotal ?? 0).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center py-3 border-b border-gray-50">
-                      <span className="text-xs font-black text-gray-400 uppercase">Collected</span>
-                      <span className="font-mono font-black text-[#3F7D58]">AED {(o.paidAmount ?? 0).toFixed(2)}</span>
+                      <span className="text-xs font-bold text-slate-600 ">Collected</span>
+                      <span className="font-mono-label font-bold text-[#3F7D58]">AED {(o.paidAmount ?? 0).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center pt-4">
-                      <span className={`text-xs font-black uppercase ${isPaid ? 'text-[#6FBF8E]' : 'text-[#E0846A]'}`}>
+                      <span className={`text-xs font-bold ${isPaid ? 'text-[#15803d]' : 'text-[#c53030]'}`}>
                         Outstanding
                       </span>
-                      <span className={`text-3xl font-black font-mono tracking-tighter leading-none ${isPaid ? 'text-[#3F7D58]' : 'text-[#E0846A]'}`}>
+                      <span className={`text-3xl font-bold font-mono-label tracking-tighter leading-none ${isPaid ? 'text-[#3F7D58]' : 'text-[#c53030]'}`}>
                         AED {(o.outstandingAmount ?? 0).toFixed(2)}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs font-black text-gray-400 uppercase tracking-wide mb-8">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-600 mb-8">
                     <div className="flex items-center gap-2">
                       <Calendar className="w-3 h-3" /> Due: {safeStr(o.dueDate) || '--'}
                     </div>
-                    <div className="flex items-center gap-1 font-mono">{safeStr(o.paymentTerms).slice(0, 15)}...</div>
+                    <div className="flex items-center gap-1 font-mono-label">{safeStr(o.paymentTerms).slice(0, 15)}...</div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
                       onClick={() => setSelectedOrder(o)}
-                      className="w-full py-5 bg-white border border-gray-100 text-gray-700 rounded-[28px] font-black uppercase text-xs tracking-wide shadow-sm flex items-center justify-center gap-3 hover:bg-gray-50 transition-all active:scale-95"
+                      className="w-full py-5 bg-white border border-gray-100 text-gray-700 rounded-md font-bold text-xs shadow-sm flex items-center justify-center gap-3 hover:bg-gray-50 transition-all active:scale-95"
                     >
                       <Eye className="w-4 h-4" /> 查看详情
                     </button>
@@ -1921,7 +1925,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                       type="button"
                       disabled={isPaid}
                       onClick={() => { setShowPaymentModal({ orderId: o.id, total: o.outstandingAmount }); setPaymentMethodValue(emptyPaymentMethodValue()); }}
-                      className={`w-full py-5 rounded-[28px] font-black uppercase text-xs tracking-wide shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 ${isPaid ? 'bg-gray-100 text-gray-300 cursor-not-allowed shadow-none' : 'bg-gray-900 text-white hover:bg-[#3F7D58]'}`}
+                      className={`w-full py-5 rounded-md font-bold text-xs shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 ${isPaid ? 'bg-gray-100 text-slate-600 cursor-not-allowed shadow-none' : 'bg-gray-900 text-white hover:bg-[#3F7D58]'}`}
                     >
                       <CreditCard className="w-4 h-4" /> 录入收款
                     </button>
@@ -1931,7 +1935,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
             })}
 
             {arLedger.length === 0 && (
-              <div className="col-span-full py-40 text-center text-gray-300 uppercase text-xs font-black tracking-wide">
+              <div className="col-span-full py-40 text-center text-slate-600 text-xs font-bold ">
                 {arMode === 'OUTSTANDING' ? '完美！所有应收已结清。' : '暂无任何订单记录。'}
               </div>
             )}
@@ -1941,28 +1945,28 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
       {/* ===== Quote Detail Modal (Invoice-style) ===== */}
       {selectedQuote && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-2xl z-[5000] flex items-center justify-center p-8 animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-6xl rounded-[60px] overflow-hidden flex flex-col shadow-2xl h-[85vh] border-4 border-white/20">
+        <ModalPortal><div className="fixed inset-0 bg-[rgba(8,13,30,0.5)] z-[1100] flex items-center justify-center p-4 max-sm:p-0 max-sm:items-start max-sm:overflow-y-auto animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-6xl rounded-[14px] overflow-hidden flex flex-col shadow-2xl h-[85vh] border-4 border-white/20 max-sm:w-full max-sm:min-h-full max-sm:my-0 max-sm:max-w-none max-sm:max-h-none max-sm:rounded-none">
             <div className="p-10 border-b border-gray-100 flex justify-between items-center bg-gray-50/50" data-no-pdf="true">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-[#CBA85C]/10 rounded-2xl">
-                  <ClipboardList className="w-6 h-6 text-[#CBA85C]" />
+                <div className="p-3 bg-[#CBA85C]/10 rounded-[10px]">
+                  <ClipboardList className="w-6 h-6 text-[#7A5F2A]" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-gray-800 uppercase tracking-widest">PI Summary: {safeStr(selectedQuote.id)}</h3>
-                  <p className="text-xs font-bold text-gray-400 font-mono mt-0.5">
+                  <h3 className="text-sm font-bold text-gray-800 ">PI Summary: {safeStr(selectedQuote.id)}</h3>
+                  <p className="text-xs font-bold text-slate-600 font-mono-label mt-0.5">
                     Finalized on {selectedQuote.createdAt ? new Date(selectedQuote.createdAt).toLocaleDateString() : '--'}
                   </p>
                 </div>
               </div>
-              <button onClick={() => setSelectedQuote(null)} className="p-3 hover:bg-red-50 text-gray-300 hover:text-red-500 rounded-full transition-all group">
+              <button onClick={() => setSelectedQuote(null)} className="p-3 hover:bg-red-50 text-slate-600 hover:text-red-500 rounded-full transition-all group">
                 <X className="w-8 h-8 group-hover:scale-110 transition-transform" />
               </button>
             </div>
 
             {/* ✅ On-screen = invoice-like, and export uses same view (WYSIWYG) */}
             <div className="flex-1 overflow-auto custom-scrollbar bg-white">
-              <div id="pi-export-view">
+              <div id="pi-export-view" style={{ fontFamily: DOC_FONT }}>
                 <InvoiceLikeView
                   docNo={safeStr(selectedQuote.id)}
                   consignee={safeStr(selectedQuote.customerName) || 'VALUED CLIENT'}
@@ -1981,7 +1985,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleDownloadPiPDF}
-                  className="px-8 py-5 bg-white border-2 border-gray-100 text-gray-600 rounded-[28px] font-black uppercase text-xs tracking-wide hover:bg-gray-50 transition-all flex items-center gap-3"
+                  className="px-8 py-5 bg-white border-2 border-gray-100 text-gray-600 rounded-md font-bold text-xs hover:bg-gray-50 transition-all flex items-center gap-3"
                 >
                   <DownloadIcon className="w-4 h-4" /> Download
                 </button>
@@ -1990,23 +1994,23 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
               <div className="flex items-center gap-6">
                 {selectedQuote.status === 'CONVERTED' ? (
                   <div className="flex flex-col items-end">
-                    <div className="px-10 py-5 bg-[#6FBF8E]/10 text-[#3F7D58] rounded-[24px] font-black uppercase text-xs tracking-widest flex items-center gap-3 border border-[#6FBF8E]/20">
+                    <div className="px-10 py-5 bg-[#6FBF8E]/10 text-[#3F7D58] rounded-[10px] font-bold text-xs flex items-center gap-3 border border-[#6FBF8E]/20">
                       <PackageCheck className="w-5 h-5" /> 已转为订单
                     </div>
-                    <span className="text-xs font-black text-[#6FBF8E] mt-2 font-mono">SO Ref: {safeStr((selectedQuote as any).convertedOrderId)}</span>
+                    <span className="text-xs font-bold text-[#15803d] mt-2 font-mono-label">SO Ref: {safeStr((selectedQuote as any).convertedOrderId)}</span>
                   </div>
                 ) : (
                   <>
-                    <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200 shadow-inner">
+                    <div className="flex bg-gray-100 p-1.5 rounded-[10px] border border-gray-200 shadow-inner">
                       <button
                         onClick={() => setConversionMode('Direct Sale')}
-                        className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${conversionMode === 'Direct Sale' ? 'bg-white text-[#080D1E] shadow-sm' : 'text-gray-400'}`}
+                        className={`px-5 py-2.5 rounded-md text-xs font-bold transition-all ${conversionMode === 'Direct Sale' ? 'bg-white text-[#080D1E] shadow-sm' : 'text-slate-600'}`}
                       >
                         Direct
                       </button>
                       <button
                         onClick={() => setConversionMode('Consignment')}
-                        className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${conversionMode === 'Consignment' ? 'bg-[#D4A843] text-white shadow-sm' : 'text-gray-400'}`}
+                        className={`px-5 py-2.5 rounded-md text-xs font-bold transition-all ${conversionMode === 'Consignment' ? 'bg-[#D4A843] text-white shadow-sm' : 'text-slate-600'}`}
                       >
                         Consignment
                       </button>
@@ -2015,7 +2019,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                     <button
                       onClick={() => convertQuoteToOrder(selectedQuote, conversionMode)}
                       disabled={isConverting}
-                      className={`px-12 py-6 ${conversionMode === 'Consignment' ? 'bg-[#D4A843]' : 'bg-[#080D1E]'} text-white rounded-[32px] font-black uppercase text-xs tracking-[0.4em] flex items-center gap-4 hover:bg-black transition-all shadow-2xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100`}
+                      className={`px-12 py-6 ${conversionMode === 'Consignment' ? 'bg-[#D4A843]' : 'bg-[#080D1E]'} text-white rounded-md font-bold text-xs flex items-center gap-4 hover:bg-black transition-all shadow-2xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100`}
                     >
                       <Zap className={`w-5 h-5 fill-white ${isConverting ? 'animate-spin' : ''}`} />
                       {isConverting ? '正在生成，请勿重复点击...' : (conversionMode === 'Consignment' ? '生成代售订单' : '生成直售订单')}
@@ -2025,31 +2029,31 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
               </div>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
 
       {/* ===== Order Detail Modal (Invoice-style) ===== */}
       {selectedOrder && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-2xl z-[5000] flex items-center justify-center p-8 animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-6xl rounded-[60px] overflow-hidden flex flex-col shadow-2xl h-[85vh] border-4 border-white/20">
+        <ModalPortal><div className="fixed inset-0 bg-[rgba(8,13,30,0.5)] z-[1100] flex items-center justify-center p-4 max-sm:p-0 max-sm:items-start max-sm:overflow-y-auto animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-6xl rounded-[14px] overflow-hidden flex flex-col shadow-2xl h-[85vh] border-4 border-white/20 max-sm:w-full max-sm:min-h-full max-sm:my-0 max-sm:max-w-none max-sm:max-h-none max-sm:rounded-none">
             <div className="p-10 border-b border-gray-100 flex justify-between items-center bg-gray-50/50" data-no-pdf="true">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-[#CBA85C]/10 rounded-2xl"><PackageCheck className="w-6 h-6 text-[#CBA85C]" /></div>
+                <div className="p-3 bg-[#CBA85C]/10 rounded-[10px]"><PackageCheck className="w-6 h-6 text-[#7A5F2A]" /></div>
                 <div>
-                  <h3 className="text-sm font-black text-gray-800 uppercase tracking-widest">Order Detail: {safeStr(selectedOrder.id)}</h3>
-                  <p className="text-xs font-bold text-gray-400 font-mono mt-0.5">
+                  <h3 className="text-sm font-bold text-gray-800 ">Order Detail: {safeStr(selectedOrder.id)}</h3>
+                  <p className="text-xs font-bold text-slate-600 font-mono-label mt-0.5">
                     Created on {selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleDateString() : '--'}
                   </p>
                 </div>
               </div>
-              <button onClick={() => setSelectedOrder(null)} className="p-3 hover:bg-red-50 text-gray-300 hover:text-red-500 rounded-full transition-all">
+              <button onClick={() => setSelectedOrder(null)} className="p-3 hover:bg-red-50 text-slate-600 hover:text-red-500 rounded-full transition-all">
                 <X className="w-8 h-8" />
               </button>
             </div>
 
             <div className="flex-1 overflow-auto custom-scrollbar bg-white">
               {/* ✅ Export uses same invoice-like view */}
-              <div id="order-export-view">
+              <div id="order-export-view" style={{ fontFamily: DOC_FONT }}>
                 <InvoiceLikeView
                   docNo={safeStr(selectedOrder.id)}
                   consignee={safeStr(selectedOrder.customerName) || 'VALUED CLIENT'}
@@ -2069,20 +2073,20 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                   const orderPays = (payments || []).filter(p => p.orderId === selectedOrder.id);
                   if (orderPays.length === 0) return null;
                   return (
-                    <div className="mt-8 p-8 bg-[#6FBF8E]/5 rounded-[40px] border border-[#6FBF8E]/20">
-                      <h4 className="text-xs font-black text-[#3F7D58] uppercase tracking-wide mb-6 flex items-center gap-2">
+                    <div className="mt-8 p-8 bg-[#6FBF8E]/5 rounded-[10px] border border-[#6FBF8E]/20">
+                      <h4 className="text-xs font-bold text-[#3F7D58] mb-6 flex items-center gap-2">
                         <CreditCard className="w-4 h-4" /> 收款记录 / Payment History
                       </h4>
                       <div className="space-y-2">
                         {orderPays.map(p => (
-                          <div key={p.id} className="flex items-center justify-between bg-white rounded-2xl px-6 py-4 border border-[#6FBF8E]/10 shadow-sm">
-                            <span className="text-xs font-black text-gray-400 font-mono">{p.date || '--'}</span>
-                            <span className="text-xs font-black text-gray-500">{p.method}</span>
-                            <span className="font-mono font-black text-[#3F7D58] text-sm">AED {(p.amount ?? 0).toFixed(2)}</span>
-                            <span className="text-xs text-gray-400 truncate max-w-[100px]">{p.note || '--'}</span>
+                          <div key={p.id} className="flex items-center justify-between bg-white rounded-[10px] px-6 py-4 border border-[#6FBF8E]/10 shadow-sm">
+                            <span className="text-xs font-bold text-slate-600 font-mono-label">{p.date || '--'}</span>
+                            <span className="text-xs font-bold text-slate-600">{p.method}</span>
+                            <span className="font-mono-label font-bold text-[#3F7D58] text-sm">AED {(p.amount ?? 0).toFixed(2)}</span>
+                            <span className="text-xs text-slate-600 truncate max-w-[100px]">{p.note || '--'}</span>
                             <button
                               onClick={() => handleDeletePayment(p.id)}
-                              className="p-2 text-red-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                              className="p-2 text-red-300 hover:text-red-600 hover:bg-red-50 rounded-md transition-all"
                               title="Delete Payment"
                             >
                               <Trash2 className="w-3 h-3" />
@@ -2099,35 +2103,35 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                   const curItems = (orderItems || []).filter(i => i.orderId === selectedOrder.id);
                   if (curItems.length === 0) return null;
                   return (
-                    <div className="mt-8 p-8 bg-gray-50/30 rounded-[40px] border border-gray-100">
-                      <h4 className="text-xs font-black text-gray-500 uppercase tracking-wide mb-4 flex items-center gap-2">
+                    <div className="mt-8 p-8 bg-gray-50/30 rounded-[10px] border border-gray-100">
+                      <h4 className="text-xs font-bold text-slate-600 mb-4 flex items-center gap-2">
                         <Edit3 className="w-4 h-4" /> 订单明细 · 产品名修正
                       </h4>
                       <div className="space-y-2">
                         {curItems.map((item, idx) => {
                           const itemId = (item as any).id || `${item.orderId}-${idx}`;
                           return (
-                            <div key={itemId} className="flex items-center gap-3 bg-white rounded-2xl px-5 py-3 border border-gray-100 shadow-sm">
+                            <div key={itemId} className="flex items-center gap-3 bg-white rounded-[10px] px-5 py-3 border border-gray-100 shadow-sm">
                               {editingItemId === itemId ? (
                                 <>
                                   <input
                                     value={editingItemDesc}
                                     onChange={e => setEditingItemDesc(e.target.value)}
-                                    className="flex-1 border border-[#CBA85C]/30 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-[#CBA85C]"
+                                    className="flex-1 border border-[#CBA85C]/30 rounded-md px-3 py-2 text-sm font-bold outline-none focus:border-[#CBA85C]"
                                     autoFocus
                                     onKeyDown={e => { if (e.key === 'Enter') handleSaveItemDesc(item, editingItemDesc); if (e.key === 'Escape') setEditingItemId(null); }}
                                   />
-                                  <button onClick={() => handleSaveItemDesc(item, editingItemDesc)} className="px-3 py-1.5 bg-[#080D1E] text-white rounded-lg text-xs font-black shrink-0">保存</button>
-                                  <button onClick={() => setEditingItemId(null)} className="px-3 py-1.5 bg-gray-100 text-gray-500 rounded-lg text-xs font-black shrink-0">取消</button>
+                                  <button onClick={() => handleSaveItemDesc(item, editingItemDesc)} className="px-3 py-1.5 bg-[#080D1E] text-white rounded-md text-xs font-bold shrink-0">保存</button>
+                                  <button onClick={() => setEditingItemId(null)} className="px-3 py-1.5 bg-gray-100 text-slate-600 rounded-md text-xs font-bold shrink-0">取消</button>
                                 </>
                               ) : (
                                 <>
                                   <span className="flex-1 text-sm font-bold text-gray-700 truncate">{item.desc || '--'}</span>
-                                  <span className="text-xs text-gray-400 font-mono shrink-0">×{item.qty}</span>
-                                  <span className="text-xs font-mono text-gray-500 shrink-0">AED {(Number(item.lineTotal) || 0).toFixed(2)}</span>
+                                  <span className="text-xs text-slate-600 font-mono-label shrink-0">×{item.qty}</span>
+                                  <span className="text-xs font-mono-label text-slate-600 shrink-0">AED {(Number(item.lineTotal) || 0).toFixed(2)}</span>
                                   <button
                                     onClick={() => { setEditingItemId(itemId); setEditingItemDesc(item.desc || ''); }}
-                                    className="p-1.5 text-gray-300 hover:text-[#CBA85C] hover:bg-[#CBA85C]/10 rounded-lg transition-all shrink-0"
+                                    className="p-1.5 text-slate-600 hover:text-[#CBA85C] hover:bg-[#CBA85C]/10 rounded-md transition-all shrink-0"
                                     title="修改产品名"
                                   ><Edit3 className="w-3.5 h-3.5" /></button>
                                 </>
@@ -2141,19 +2145,19 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                 })()}
 
                 {/* Consignment tracking section */}
-                <div className="mt-8 p-10 bg-[#D4A843]/5 rounded-[50px] border-2 border-[#D4A843]/20 relative overflow-hidden">
+                <div className="mt-8 p-10 bg-[#D4A843]/5 rounded-[10px] border-2 border-[#D4A843]/20 relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-2 h-full bg-[#D4A843]"></div>
-                  <h4 className="text-xs font-black text-[#D4A843] uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
+                  <h4 className="text-xs font-bold text-[#7A5F2A] mb-8 flex items-center gap-3">
                     <Box className="w-5 h-5" /> 寄售发货跟踪 / Consignment Tracking
                   </h4>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     <div className="space-y-3">
-                      <label className="text-xs font-black text-[#D4A843] uppercase tracking-wide ml-1">交易模式</label>
+                      <label className="text-xs font-bold text-[#7A5F2A] ml-1">交易模式</label>
                       <select
                         value={selectedOrder.transactionMode || 'Direct Sale'}
                         onChange={(e) => handleUpdateOrderMetadata(selectedOrder.id, { transactionMode: e.target.value as any })}
-                        className="w-full p-4 bg-white border-2 border-[#D4A843]/20 rounded-2xl font-black text-xs uppercase outline-none focus:border-[#D4A843] shadow-sm transition-all"
+                        className="w-full p-4 bg-white border-2 border-[#D4A843]/20 rounded-md font-bold text-xs outline-none focus:border-[#D4A843] shadow-sm transition-all"
                       >
                         <option value="Direct Sale">Direct Sale (直售)</option>
                         <option value="Consignment">Consignment (代售)</option>
@@ -2163,11 +2167,11 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                     {selectedOrder.transactionMode === 'Consignment' && (
                       <>
                         <div className="space-y-3 animate-in fade-in slide-in-from-left-4">
-                          <label className="text-xs font-black text-[#D4A843] uppercase tracking-wide ml-1">代售状态</label>
+                          <label className="text-xs font-bold text-[#7A5F2A] ml-1">代售状态</label>
                           <select
                             value={(selectedOrder as any).consignmentStatus || 'Sent'}
                             onChange={(e) => handleUpdateOrderMetadata(selectedOrder.id, { consignmentStatus: e.target.value as any } as any)}
-                            className="w-full p-4 bg-white border-2 border-[#D4A843]/20 rounded-2xl font-black text-xs uppercase outline-none focus:border-[#D4A843] shadow-sm transition-all"
+                            className="w-full p-4 bg-white border-2 border-[#D4A843]/20 rounded-md font-bold text-xs outline-none focus:border-[#D4A843] shadow-sm transition-all"
                           >
                             <option value="Sent">已发货 (Sent)</option>
                             <option value="On Sale">上架销售中 (On Sale)</option>
@@ -2178,7 +2182,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                         </div>
 
                         <div className="space-y-3 animate-in fade-in slide-in-from-left-8">
-                          <label className="text-xs font-black text-[#D4A843] uppercase tracking-wide ml-1">代售已售数量</label>
+                          <label className="text-xs font-bold text-[#7A5F2A] ml-1">代售已售数量</label>
                           <input
                             type="number"
                             value={(selectedOrder as any).consignmentSoldQty === 0 ? '' : (selectedOrder as any).consignmentSoldQty}
@@ -2186,7 +2190,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                               const val = e.target.value.replace(/[^0-9]/g, '');
                               handleUpdateOrderMetadata(selectedOrder.id, { consignmentSoldQty: val === '' ? 0 : parseInt(val) } as any);
                             }}
-                            className="w-full p-4 bg-white border-2 border-[#D4A843]/20 rounded-2xl font-black text-sm outline-none focus:border-[#D4A843] shadow-sm transition-all font-mono"
+                            className="w-full p-4 bg-white border-2 border-[#D4A843]/20 rounded-md font-bold text-sm outline-none focus:border-[#D4A843] shadow-sm transition-all font-mono-label"
                             placeholder="0"
                           />
                         </div>
@@ -2194,59 +2198,59 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                     )}
                   </div>
 
-                  <div className="mt-8 flex items-center gap-2 text-xs font-bold text-[#D4A843]/70">
+                  <div className="mt-8 flex items-center gap-2 text-xs font-bold text-[#7A5F2A]">
                     <Info className="w-3 h-3" /> 本栏仅记录发货状态，不产生收款、不影响应收。客户实际卖出后，请在下方「寄售销售结算」录入销售数量和收款。
                   </div>
                 </div>
 
                 {/* Consignment Settlement Tracker */}
                 {selectedOrder.transactionMode === 'Consignment' && (
-                  <div className="mt-12 p-10 bg-[#CBA85C]/5 rounded-[50px] border-2 border-[#CBA85C]/20 relative overflow-hidden animate-in fade-in slide-in-from-bottom-8">
+                  <div className="mt-12 p-10 bg-[#CBA85C]/5 rounded-[10px] border-2 border-[#CBA85C]/20 relative overflow-hidden animate-in fade-in slide-in-from-bottom-8">
                     <div className="absolute top-0 left-0 w-2 h-full bg-[#080D1E]"></div>
                     <div className="flex justify-between items-start mb-8">
                       <div>
-                        <h4 className="text-xs font-black text-[#080D1E] uppercase tracking-[0.2em] flex items-center gap-3">
+                        <h4 className="text-xs font-bold text-[#080D1E] flex items-center gap-3">
                           <History className="w-5 h-5" /> 寄售销售结算 / Consignment Settlement
                         </h4>
-                        <p className="text-xs font-bold text-[#CBA85C]/70 mt-2">
+                        <p className="text-xs font-bold text-[#7A5F2A] mt-2">
                           客户实际卖出寄售商品后，在此录入销售数量、结算金额与收款状态。数据保存至结算台账，供对账查询使用。
                         </p>
                       </div>
                     </div>
 
                     {settlementTotals.sold_qty > deliveredQty && (
-                      <div className="mb-6 p-4 bg-[#D4A843]/15 border border-[#D4A843]/30 rounded-2xl flex items-center gap-3 text-[#D4A843] text-xs font-black animate-pulse">
+                      <div className="mb-6 p-4 bg-[#D4A843]/15 border border-[#D4A843]/30 rounded-[10px] flex items-center gap-3 text-[#7A5F2A] text-xs font-bold animate-pulse">
                         <AlertTriangle className="w-4 h-4" />
                         ⚠️ 注意：结算总销售数量已超过发货数量（发货量：{deliveredQty}件），请核实。
                       </div>
                     )}
 
                     <div className="grid grid-cols-4 gap-6 mb-10">
-                      <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm">
-                        <p className="text-xs font-black text-gray-400 uppercase mb-1">累计销售数量</p>
-                        <p className="text-xl font-black text-[#080D1E] font-mono">{settlementTotals.sold_qty} 件</p>
+                      <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
+                        <p className="text-xs font-bold text-slate-600 mb-1">累计销售数量</p>
+                        <p className="text-xl font-bold text-[#080D1E] font-mono-label">{settlementTotals.sold_qty} 件</p>
                       </div>
-                      <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm">
-                        <p className="text-xs font-black text-gray-400 uppercase mb-1">应收结算金额</p>
-                        <p className="text-xl font-black text-[#080D1E] font-mono">AED {settlementTotals.should_collect.toFixed(2)}</p>
+                      <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
+                        <p className="text-xs font-bold text-slate-600 mb-1">应收结算金额</p>
+                        <p className="text-xl font-bold text-[#080D1E] font-mono-label">AED {settlementTotals.should_collect.toFixed(2)}</p>
                       </div>
-                      <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm">
-                        <p className="text-xs font-black text-[#6FBF8E] uppercase mb-1">已收金额</p>
-                        <p className="text-xl font-black text-[#3F7D58] font-mono">AED {settlementTotals.paid.toFixed(2)}</p>
+                      <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
+                        <p className="text-xs font-bold text-[#15803d] mb-1">已收金额</p>
+                        <p className="text-xl font-bold text-[#3F7D58] font-mono-label">AED {settlementTotals.paid.toFixed(2)}</p>
                       </div>
-                      <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm">
-                        <p className="text-xs font-black text-[#E0846A] uppercase mb-1">未收余额</p>
-                        <p className="text-xl font-black text-[#E0846A] font-mono">AED {settlementTotals.outstanding.toFixed(2)}</p>
+                      <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
+                        <p className="text-xs font-bold text-[#c53030] mb-1">未收余额</p>
+                        <p className="text-xl font-bold text-[#c53030] font-mono-label">AED {settlementTotals.outstanding.toFixed(2)}</p>
                       </div>
                     </div>
 
-                    <div className="bg-white/60 backdrop-blur p-8 rounded-[32px] border border-[#CBA85C]/20 mb-10">
-                      <h5 className="text-xs font-black text-[#CBA85C]/70 uppercase tracking-wide mb-6 flex items-center gap-2">
+                    <div className="bg-white/60 backdrop-blur p-8 rounded-[10px] border border-[#CBA85C]/20 mb-10">
+                      <h5 className="text-xs font-bold text-[#7A5F2A] mb-6 flex items-center gap-2">
                         <Plus className="w-3 h-3" /> 新增结算记录 / Add Settlement
                       </h5>
 
-                      <div className="mb-8 p-6 bg-gray-50 border border-gray-100 rounded-3xl space-y-3">
-                        <label className="text-xs font-black text-gray-400 uppercase tracking-wide ml-1">结算商品（选择本次销售的产品）</label>
+                      <div className="mb-8 p-6 bg-gray-50 border border-gray-100 rounded-[10px] space-y-3">
+                        <label className="text-xs font-bold text-slate-600 ml-1">结算商品（选择本次销售的产品）</label>
                         <select
                           value={setForm.selectedItemName}
                           onChange={(e) => {
@@ -2266,7 +2270,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                               }));
                             }
                           }}
-                          className="w-full p-4 bg-white border-2 border-[#CBA85C]/20 rounded-2xl font-black text-xs uppercase outline-none focus:border-[#CBA85C] shadow-sm transition-all"
+                          className="w-full p-4 bg-white border-2 border-[#CBA85C]/20 rounded-md font-bold text-xs outline-none focus:border-[#CBA85C] shadow-sm transition-all"
                         >
                           {(orderItems || []).filter(it => it.orderId === selectedOrder.id).map((it, idx) => (
                             <option key={idx} value={safeStr(it.desc)}>
@@ -2277,20 +2281,20 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                       </div>
 
                       {/* VAT 价格分解说明栏 */}
-                      <div className="flex items-center gap-3 mb-6 px-4 py-3 bg-[#D4A843]/10 border border-[#D4A843]/20 rounded-2xl text-xs font-bold text-[#D4A843]">
+                      <div className="flex items-center gap-3 mb-6 px-4 py-3 bg-[#D4A843]/10 border border-[#D4A843]/20 rounded-[10px] text-xs font-bold text-[#7A5F2A]">
                         <span>未税单价</span>
-                        <span className="font-mono text-sm font-black">AED {(setForm.unit_price || 0).toFixed(2)}</span>
-                        <span className="text-[#D4A843]/70">×</span>
-                        <span className="px-2 py-0.5 bg-[#D4A843]/15 rounded-full font-black text-[#D4A843]">VAT 5%</span>
-                        <span className="text-[#D4A843]/70">=</span>
+                        <span className="font-mono-label text-sm font-bold">AED {(setForm.unit_price || 0).toFixed(2)}</span>
+                        <span className="text-[#7A5F2A]">×</span>
+                        <span className="px-2 py-0.5 bg-[#D4A843]/15 rounded-full font-bold text-[#7A5F2A]">VAT 5%</span>
+                        <span className="text-[#7A5F2A]">=</span>
                         <span>含税单价</span>
-                        <span className="font-mono text-sm font-black text-[#3F7D58]">AED {(setForm.tax_inclusive_price || roundTo2((setForm.unit_price || 0) * 1.05)).toFixed(2)}</span>
+                        <span className="font-mono-label text-sm font-bold text-[#3F7D58]">AED {(setForm.tax_inclusive_price || roundTo2((setForm.unit_price || 0) * 1.05)).toFixed(2)}</span>
                       </div>
 
                       {/* Row 1: 数量 + 含税单价(只读) + 确认销售金额(只读) */}
                       <div className="grid grid-cols-3 gap-6 mb-6">
                         <div className="space-y-2">
-                          <label className="text-xs font-black text-gray-400 uppercase">本次销售数量</label>
+                          <label className="text-xs font-bold text-slate-600 ">本次销售数量</label>
                           <input
                             type="number"
                             value={setForm.sold_qty || ''}
@@ -2304,31 +2308,31 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                                 paid_amount: roundTo2(qty * incl),
                               }));
                             }}
-                            className="w-full p-4 bg-white border border-[#CBA85C]/20 rounded-2xl font-black text-sm outline-none focus:border-[#CBA85C]"
+                            className="w-full p-4 bg-white border border-[#CBA85C]/20 rounded-md font-bold text-sm outline-none focus:border-[#CBA85C]"
                             placeholder="0 件"
                           />
                         </div>
 
                         <div className="space-y-2">
-                          <label className="text-xs font-black text-gray-400 uppercase">含税单价 (AED) <span className="text-[#D4A843]/70 normal-case font-normal">= 未税 × 1.05</span></label>
+                          <label className="text-xs font-bold text-slate-600 ">含税单价 (AED) <span className="text-[#7A5F2A] normal-case font-normal">= 未税 × 1.05</span></label>
                           <input
                             type="number"
                             step="0.01"
                             value={(setForm.tax_inclusive_price || roundTo2((setForm.unit_price || 0) * 1.05)) || ''}
                             readOnly
-                            className="w-full p-4 bg-[#D4A843]/10 border border-[#D4A843]/20 rounded-2xl font-black text-sm outline-none font-mono text-[#D4A843] cursor-not-allowed"
+                            className="w-full p-4 bg-[#D4A843]/10 border border-[#D4A843]/20 rounded-md font-bold text-sm outline-none font-mono-label text-[#7A5F2A] cursor-not-allowed"
                             placeholder="0.00"
                           />
                         </div>
 
                         <div className="space-y-2">
-                          <label className="text-xs font-black text-gray-400 uppercase">本次确认销售金额 (AED) <span className="text-[#CBA85C]/70 normal-case font-normal">自动</span></label>
+                          <label className="text-xs font-bold text-slate-600 ">本次确认销售金额 (AED) <span className="text-[#7A5F2A] normal-case font-normal">自动</span></label>
                           <input
                             type="number"
                             step="0.01"
                             value={setForm.amount || ''}
                             readOnly
-                            className="w-full p-4 bg-[#CBA85C]/5 border border-[#CBA85C]/20 rounded-2xl font-black text-sm outline-none font-mono text-[#080D1E] cursor-not-allowed"
+                            className="w-full p-4 bg-[#CBA85C]/5 border border-[#CBA85C]/20 rounded-md font-bold text-sm outline-none font-mono-label text-[#080D1E] cursor-not-allowed"
                             placeholder="0.00"
                           />
                         </div>
@@ -2337,24 +2341,24 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                       {/* Row 2: 实收金额 + 备注 */}
                       <div className="grid grid-cols-2 gap-6 mb-8">
                         <div className="space-y-2">
-                          <label className="text-xs font-black text-gray-400 uppercase">本次实收金额 (AED) <span className="text-red-400 normal-case font-normal">必须 &gt; 0</span></label>
+                          <label className="text-xs font-bold text-slate-600 ">本次实收金额 (AED) <span className="text-red-600 normal-case font-normal">必须 &gt; 0</span></label>
                           <input
                             type="number"
                             step="0.01"
                             value={setForm.paid_amount || ''}
                             onChange={e => setSetForm(prev => ({ ...prev, paid_amount: parseFloat(e.target.value) || 0 }))}
-                            className="w-full p-4 bg-white border-2 border-[#6FBF8E]/30 rounded-2xl font-black text-sm outline-none focus:border-[#CBA85C] font-mono text-[#3F7D58]"
+                            className="w-full p-4 bg-white border-2 border-[#6FBF8E]/30 rounded-md font-bold text-sm outline-none focus:border-[#CBA85C] font-mono-label text-[#3F7D58]"
                             placeholder="0.00"
                           />
                         </div>
 
                         <div className="space-y-2">
-                          <label className="text-xs font-black text-gray-400 uppercase">备注</label>
+                          <label className="text-xs font-bold text-slate-600 ">备注</label>
                           <input
                             type="text"
                             value={setForm.memo}
                             onChange={e => setSetForm(prev => ({ ...prev, memo: e.target.value }))}
-                            className="w-full p-4 bg-white border border-[#CBA85C]/20 rounded-2xl font-bold text-sm outline-none focus:border-[#CBA85C]"
+                            className="w-full p-4 bg-white border border-[#CBA85C]/20 rounded-md font-bold text-sm outline-none focus:border-[#CBA85C]"
                             placeholder="本次结算备注（可选）"
                           />
                         </div>
@@ -2373,15 +2377,15 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                       <button
                         type="button"
                         onClick={handleAddSettlement}
-                        className="w-full py-5 bg-[#080D1E] text-white rounded-2xl font-black uppercase text-xs tracking-wide shadow-lg hover:bg-[#CBA85C] transition-all active:scale-95 flex items-center justify-center gap-3"
+                        className="w-full py-5 bg-[#080D1E] text-white rounded-md font-bold text-xs shadow-lg hover:bg-[#CBA85C] transition-all active:scale-95 flex items-center justify-center gap-3"
                       >
                         <Save className="w-4 h-4" /> 新增结算记录
                       </button>
                     </div>
 
-                    <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
+                    <div className="bg-white rounded-[10px] border border-gray-100 overflow-hidden shadow-sm">
                       <table className="w-full text-left">
-                        <thead className="bg-gray-50 text-xs font-black text-gray-400 uppercase tracking-wide border-b">
+                        <thead className="bg-gray-50 text-xs font-bold text-slate-600 border-b">
                           <tr>
                             <th className="px-6 py-4">录入时间</th>
                             <th className="px-6 py-4">结算商品</th>
@@ -2403,23 +2407,23 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
                             return (
                               <tr key={s.id} className={`text-xs font-bold ${s.voided ? 'opacity-40 line-through' : 'text-gray-700'}`}>
-                                <td className="px-6 py-4 font-mono text-gray-400">
+                                <td className="px-6 py-4 font-mono-label text-slate-600">
                                   {s.created_at ? (new Date(s.created_at).toLocaleDateString() + ' ' + new Date(s.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) : '--'}
                                 </td>
-                                <td className="px-6 py-4 uppercase text-[#080D1E] truncate max-w-[150px]">{itemName}</td>
+                                <td className="px-6 py-4 text-[#080D1E] truncate max-w-[150px]">{itemName}</td>
                                 <td className="px-6 py-4">{s.sold_qty} 件</td>
-                                <td className="px-6 py-4 text-right font-mono text-[#D4A843]">{inclPrice.toFixed(2)}</td>
-                                <td className="px-6 py-4 text-right font-mono">{(s.amount ?? 0).toFixed(2)}</td>
-                                <td className="px-6 py-4 text-right font-mono text-[#3F7D58] font-black">{(s.paid_amount ?? 0).toFixed(2)}</td>
-                                <td className="px-6 py-4 text-gray-400 truncate max-w-[120px]">{displayMemo || '--'}</td>
+                                <td className="px-6 py-4 text-right font-mono-label text-[#7A5F2A]">{inclPrice.toFixed(2)}</td>
+                                <td className="px-6 py-4 text-right font-mono-label">{(s.amount ?? 0).toFixed(2)}</td>
+                                <td className="px-6 py-4 text-right font-mono-label text-[#3F7D58] font-bold">{(s.paid_amount ?? 0).toFixed(2)}</td>
+                                <td className="px-6 py-4 text-slate-600 truncate max-w-[120px]">{displayMemo || '--'}</td>
                                 <td className="px-6 py-4">
                                   {!s.voided && (settlDelConfirm === s.id ? (
                                     <div className="flex items-center gap-1">
-                                      <button onClick={() => handleVoidSettlement(s.id)} className="px-2 py-1 bg-red-500 text-white rounded text-xs font-black">确认作废</button>
-                                      <button onClick={() => setSettlDelConfirm(null)} className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-black">取消</button>
+                                      <button onClick={() => handleVoidSettlement(s.id)} className="px-2 py-1 bg-red-500 text-white rounded text-xs font-bold">确认作废</button>
+                                      <button onClick={() => setSettlDelConfirm(null)} className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-bold">取消</button>
                                     </div>
                                   ) : (
-                                    <button onClick={() => setSettlDelConfirm(s.id)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="作废此结算记录">
+                                    <button onClick={() => setSettlDelConfirm(s.id)} className="p-1.5 text-slate-600 hover:text-red-500 hover:bg-red-50 rounded-md transition-all" title="作废此结算记录">
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
                                   ))}
@@ -2430,7 +2434,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
                           {(orderSettlements || []).length === 0 && (
                             <tr>
-                              <td colSpan={7} className="py-12 text-center text-gray-400 text-xs font-black tracking-wide">
+                              <td colSpan={7} className="py-12 text-center text-slate-600 text-xs font-bold ">
                                 暂无结算记录 — 客户卖出并收到款后，在上方录入
                               </td>
                             </tr>
@@ -2446,43 +2450,43 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
             {/* Adjustment Overlay */}
             {showAdjForm && (
-              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[6000] flex items-center justify-center p-8 animate-in zoom-in-95" data-no-pdf="true">
-                <div className="bg-white p-12 rounded-[50px] shadow-2xl max-w-lg w-full border-2 border-[#D4A843]/20">
-                  <h3 className="text-sm font-black text-[#D4A843] uppercase tracking-widest mb-10 flex items-center gap-3">
+              <div className="fixed inset-0 bg-[rgba(8,13,30,0.5)] z-[1110] flex items-center justify-center p-4 max-sm:p-0 max-sm:items-start max-sm:overflow-y-auto animate-in zoom-in-95" data-no-pdf="true">
+                <div className="bg-white p-12 rounded-[14px] shadow-2xl max-w-lg w-full border-2 border-[#D4A843]/20 max-sm:w-full max-sm:min-h-full max-sm:my-0 max-sm:max-w-none max-sm:max-h-none max-sm:rounded-none max-sm:p-6">
+                  <h3 className="text-sm font-bold text-[#7A5F2A] mb-10 flex items-center gap-3">
                     <RefreshCw className="w-5 h-5" /> 订单冲账 / Create Adjustment
                   </h3>
 
                   <div className="space-y-8">
                     <div className="space-y-3">
-                      <label className="text-xs font-black text-gray-400 uppercase tracking-wide ml-4">冲账金额 (正数, 将自动转负)</label>
+                      <label className="text-xs font-bold text-slate-600 ml-4">冲账金额 (正数, 将自动转负)</label>
                       <input
                         type="number"
                         step="0.01"
                         value={adjAmount}
                         onChange={e => setAdjAmount(e.target.value)}
-                        className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-[28px] font-black text-2xl outline-none focus:border-[#D4A843] shadow-inner transition-all"
+                        className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-md font-bold text-2xl outline-none focus:border-[#D4A843] shadow-inner transition-all"
                         placeholder="0.00"
                         autoFocus
                       />
                     </div>
 
                     <div className="space-y-3">
-                      <label className="text-xs font-black text-gray-400 uppercase tracking-wide ml-4">冲账原因 / Reason</label>
+                      <label className="text-xs font-bold text-slate-600 ml-4">冲账原因 / Reason</label>
                       <input
                         type="text"
                         value={adjReason}
                         onChange={e => setAdjReason(e.target.value)}
-                        className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-[28px] font-bold text-sm outline-none focus:border-[#D4A843] shadow-inner transition-all"
+                        className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-md font-bold text-sm outline-none focus:border-[#D4A843] shadow-inner transition-all"
                         placeholder="退货、价格调整、重复收款..."
                       />
                     </div>
 
                     <div className="space-y-3">
-                      <label className="text-xs font-black text-gray-400 uppercase tracking-wide ml-4">结算状态</label>
+                      <label className="text-xs font-bold text-slate-600 ml-4">结算状态</label>
                       <select
                         value={adjStatus}
                         onChange={e => setAdjStatus(e.target.value as any)}
-                        className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-[28px] font-black text-xs uppercase tracking-widest outline-none focus:border-[#D4A843] appearance-none shadow-inner cursor-pointer"
+                        className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-md font-bold text-xs outline-none focus:border-[#D4A843] appearance-none shadow-inner cursor-pointer"
                       >
                         <option value="PENDING">PENDING (挂账，进入应收)</option>
                         <option value="PAID">PAID (直接平账，不进应收)</option>
@@ -2492,13 +2496,13 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                     <div className="grid grid-cols-2 gap-4 pt-8">
                       <button
                         onClick={() => { setShowAdjForm(false); setAdjAmount(''); }}
-                        className="py-5 bg-gray-100 text-gray-400 rounded-[24px] font-black uppercase text-xs tracking-wide hover:bg-gray-200 transition-all"
+                        className="py-5 bg-gray-100 text-slate-600 rounded-md font-bold text-xs hover:bg-gray-200 transition-all"
                       >
                         取消
                       </button>
                       <button
                         onClick={handleCreateAdjustment}
-                        className="py-5 bg-[#D4A843] text-white rounded-[24px] font-black uppercase text-xs tracking-wide shadow-xl hover:bg-black transition-all"
+                        className="py-5 bg-[#D4A843] text-white rounded-md font-bold text-xs shadow-xl hover:bg-black transition-all"
                       >
                         确认创建冲账单
                       </button>
@@ -2509,15 +2513,15 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
             )}
 
             <div className="p-10 border-t border-gray-100 bg-gray-50/30 flex justify-between items-center" data-no-pdf="true">
-              <div className="flex items-center gap-4 text-gray-400">
+              <div className="flex items-center gap-4 text-slate-600">
                 <Clock className="w-4 h-4" />
-                <span className="text-xs font-black uppercase tracking-wide">Operator: {safeStr(selectedOrder.userId) || '--'}</span>
+                <span className="text-xs font-bold ">Operator: {safeStr(selectedOrder.userId) || '--'}</span>
               </div>
 
               <div className="flex items-center gap-4">
                 <button
                   onClick={handleDownloadOrderPDF}
-                  className="px-6 py-5 bg-white border-2 border-gray-100 text-gray-600 rounded-[28px] font-black uppercase text-xs tracking-wide hover:bg-gray-50 transition-all flex items-center gap-3"
+                  className="px-6 py-5 bg-white border-2 border-gray-100 text-gray-600 rounded-md font-bold text-xs hover:bg-gray-50 transition-all flex items-center gap-3"
                 >
                   <DownloadIcon className="w-4 h-4" /> Download
                 </button>
@@ -2530,14 +2534,14 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                         setAdjReason('');
                         setShowAdjForm(true);
                       }}
-                      className="px-6 py-5 bg-[#D4A843]/15 text-[#D4A843] rounded-[28px] font-black uppercase text-xs tracking-wide hover:bg-[#D4A843]/25 transition-all flex items-center gap-3"
+                      className="px-6 py-5 bg-[#D4A843]/15 text-[#7A5F2A] rounded-md font-bold text-xs hover:bg-[#D4A843]/25 transition-all flex items-center gap-3"
                     >
                       <RefreshCw className="w-4 h-4" /> 冲账
                     </button>
 
                     <button
                       onClick={() => handleVoidOrder(selectedOrder.id)}
-                      className="px-6 py-5 bg-red-50 text-red-500 rounded-[28px] font-black uppercase text-xs tracking-wide hover:bg-red-600 hover:text-white transition-all flex items-center gap-3"
+                      className="px-6 py-5 bg-red-50 text-red-600 rounded-md font-bold text-xs hover:bg-red-600 hover:text-white transition-all flex items-center gap-3"
                     >
                       <Ban className="w-4 h-4" /> 作废
                     </button>
@@ -2546,35 +2550,35 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
 
                 <button
                   onClick={() => setSelectedOrder(null)}
-                  className="px-10 py-5 bg-[#080D1E] text-white rounded-[28px] font-black uppercase text-xs tracking-wide shadow-xl hover:bg-black transition-all flex items-center gap-3"
+                  className="px-10 py-5 bg-[#080D1E] text-white rounded-md font-bold text-xs shadow-xl hover:bg-black transition-all flex items-center gap-3"
                 >
                   <Save className="w-4 h-4" /> Close
                 </button>
               </div>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
 
       {/* ===== Payment Modal ===== */}
       {showPaymentModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xl z-[6000] flex items-center justify-center p-8 animate-in zoom-in-95 duration-300">
-          <div className="bg-white p-12 rounded-[60px] shadow-2xl max-w-md w-full border-4 border-white/20">
-            <div className="w-20 h-20 bg-[#6FBF8E]/10 rounded-[30px] flex items-center justify-center mx-auto mb-8">
+        <ModalPortal><div className="fixed inset-0 bg-[rgba(8,13,30,0.5)] z-[1100] flex items-center justify-center p-4 max-sm:p-0 max-sm:items-start max-sm:overflow-y-auto animate-in zoom-in-95 duration-300">
+          <div className="bg-white p-12 rounded-[14px] shadow-2xl max-w-md w-full border-4 border-white/20 max-sm:w-full max-sm:min-h-full max-sm:my-0 max-sm:max-w-none max-sm:max-h-none max-sm:rounded-none">
+            <div className="w-20 h-20 bg-[#6FBF8E]/10 rounded-[10px] flex items-center justify-center mx-auto mb-8">
               <CreditCard className="w-10 h-10 text-[#3F7D58]" />
             </div>
 
-            <h3 className="text-sm font-black text-[#080D1E] uppercase tracking-[0.3em] mb-10 text-center">登记收款金额</h3>
+            <h3 className="text-sm font-bold text-[#080D1E] mb-10 text-center">登记收款金额</h3>
 
             <div className="space-y-8">
               <div className="space-y-3">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-wide ml-4">核销金额 (AED)</label>
+                <label className="text-xs font-bold text-slate-600 ml-4">核销金额 (AED)</label>
                 <input
                   id="pay-amount-ar"
                   type="number"
                   step="0.01"
                   defaultValue={(showPaymentModal.total ?? 0).toFixed(2)}
-                  className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-[28px] font-black text-2xl outline-none focus:border-[#CBA85C] shadow-inner transition-all"
+                  className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-md font-bold text-2xl outline-none focus:border-[#CBA85C] shadow-inner transition-all"
                 />
               </div>
 
@@ -2587,7 +2591,7 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
               <div className="grid grid-cols-2 gap-4 pt-8">
                 <button
                   onClick={() => { setShowPaymentModal(null); setPaymentMethodValue(emptyPaymentMethodValue()); }}
-                  className="py-5 bg-gray-100 text-gray-400 rounded-[24px] font-black uppercase text-xs tracking-wide hover:bg-gray-200 transition-all"
+                  className="py-5 bg-gray-100 text-slate-600 rounded-md font-bold text-xs hover:bg-gray-200 transition-all"
                 >
                   取消
                 </button>
@@ -2599,14 +2603,14 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ currentUserId }) =>
                     await recordPayment(amt, "Received from client", paymentMethodValue);
                     setPaymentMethodValue(emptyPaymentMethodValue());
                   }}
-                  className="py-5 bg-[#3F7D58] text-white rounded-[24px] font-black uppercase text-xs tracking-wide shadow-xl hover:bg-black transition-all disabled:opacity-40"
+                  className="py-5 bg-[#3F7D58] text-white rounded-md font-bold text-xs shadow-xl hover:bg-black transition-all disabled:opacity-40"
                 >
                   确认核销
                 </button>
               </div>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
 
     </div>

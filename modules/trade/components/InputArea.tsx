@@ -21,7 +21,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onGenerate, isLoading }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div className="flex flex-col h-full bg-white rounded-[10px] shadow-sm border border-gray-200 overflow-hidden">
       <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
         <h2 className="font-semibold text-gray-700 flex items-center gap-2">
           <MessageSquare className="w-4 h-4 text-brand-600" />
@@ -29,7 +29,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onGenerate, isLoading }) => {
         </h2>
         <button 
           onClick={handleClear}
-          className="text-xs text-gray-500 hover:text-red-500 flex items-center gap-1 transition-colors"
+          className="text-xs text-slate-600 hover:text-red-500 flex items-center gap-1 transition-colors"
           type="button"
         >
           <Eraser className="w-3 h-3" />
@@ -39,7 +39,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onGenerate, isLoading }) => {
       
       <form onSubmit={handleSubmit} className="flex-1 flex flex-col p-4">
         <textarea
-          className="flex-1 w-full p-3 text-sm text-gray-700 placeholder-gray-400 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-none transition-all outline-none font-mono"
+          className="flex-1 w-full p-3 text-sm text-gray-700 placeholder-gray-400 bg-gray-50 border border-gray-200 rounded-md focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-none transition-all outline-none font-mono-label"
           placeholder="在此粘贴聊天记录... 例如：&#10;客户: 订购 200 个 iCare Pro。&#10;我: 单价 $50。另外有一笔 $30 的样品快递费支出需要记录。&#10;客户: 好的，定金 30%。"
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -50,7 +50,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onGenerate, isLoading }) => {
           <button
             type="submit"
             disabled={isLoading || !text.trim()}
-            className={`w-full py-2.5 px-4 rounded-lg text-white font-medium flex items-center justify-center gap-2 transition-all shadow-md
+            className={`w-full py-2.5 px-4 rounded-md text-white font-medium flex items-center justify-center gap-2 transition-all shadow-md
               ${isLoading || !text.trim() 
                 ? 'bg-gray-400 cursor-not-allowed' 
                 : 'bg-brand-600 hover:bg-brand-700 hover:shadow-lg active:scale-[0.98]'

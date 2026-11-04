@@ -276,15 +276,15 @@ const HomeDashboard: React.FC<Props> = () => {
       {/* ── Header bar ──────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-base font-semibold uppercase tracking-wide text-[#0F1E45]" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>Trade Intelligence · Command Center</h2>
-          <p className="font-mono-label text-xs text-gray-500 mt-0.5">
+          <h2 className="text-base font-semibold text-[#0F1E45]" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>Trade Intelligence · Command Center</h2>
+          <p className="font-mono-label text-xs text-slate-600 mt-0.5">
             GCI Global Operations · {lastRefresh.toLocaleTimeString()}
-            {invState === 'error' && <span className="ml-2 text-[#A6822E]">· 库存来自缓存</span>}
+            {invState === 'error' && <span className="ml-2 text-[#7A5F2A]">· 库存来自缓存</span>}
           </p>
         </div>
         <button
           onClick={() => setRefreshKey(k => k + 1)}
-          className="font-mono-label flex items-center gap-2 px-4 py-2 bg-white border rounded-[14px] text-xs font-bold uppercase tracking-wide text-gray-500 hover:text-[#0F1E45] hover:shadow-md transition-all shadow-sm"
+          className="font-mono-label flex items-center gap-2 px-4 py-2 bg-white border rounded-md text-xs font-bold text-slate-600 hover:text-[#0F1E45] hover:shadow-md transition-all shadow-sm"
           style={{ borderColor: '#0F1E4520' }}
         >
           <RefreshCw className={`w-3 h-3 ${salesState === 'loading' ? 'animate-spin' : ''}`} />刷新
@@ -295,7 +295,7 @@ const HomeDashboard: React.FC<Props> = () => {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
 
         {/* ── Hero Chart Card (3/5) ── */}
-        <div className="lg:col-span-3 relative bg-gradient-to-br from-[#0C1B3A] via-[#0F2551] to-[#162B5E] rounded-[18px] p-6 md:p-7 overflow-hidden shadow-2xl shadow-[#0C1B3A]/25 group cursor-default">
+        <div className="lg:col-span-3 relative bg-gradient-to-br from-[#0C1B3A] via-[#0F2551] to-[#162B5E] rounded-[10px] p-6 md:p-7 overflow-hidden shadow-2xl shadow-[#0C1B3A]/25 group cursor-default">
 
           {/* Ambient glow orbs */}
           <div className="absolute -top-16 -right-16 w-72 h-72 bg-[#C9A84C]/6 rounded-full blur-3xl pointer-events-none" />
@@ -305,12 +305,12 @@ const HomeDashboard: React.FC<Props> = () => {
           {/* Top row */}
           <div className="flex items-start justify-between mb-5 relative z-10">
             <div>
-              <div className="font-mono-label text-xs uppercase tracking-wide text-[#C9A84C]/90 mb-1.5">Trade Intelligence</div>
-              <div className="text-white/65 text-sm font-semibold tracking-wide">本月销售概览 · 6M Trend</div>
+              <div className="font-mono-label text-xs text-[#C9A84C]/90 mb-1.5">Trade Intelligence</div>
+              <div className="text-white/65 text-sm font-semibold ">本月销售概览 · 6M Trend</div>
             </div>
             <div className="flex items-center gap-2 bg-white/5 border border-white/8 rounded-lg px-3 py-1.5 backdrop-blur-sm">
               <div className={`w-1.5 h-1.5 rounded-full ${salesState === 'ok' ? 'bg-[#6FBF8E] animate-pulse' : salesState === 'loading' ? 'bg-[#D9B45A] animate-pulse' : 'bg-gray-500'}`} />
-              <span className="font-mono-label text-xs uppercase tracking-wide text-white/70">
+              <span className="font-mono-label text-xs text-white/70">
                 {salesState === 'loading' ? 'SYNCING' : 'LIVE'}
               </span>
             </div>
@@ -320,7 +320,7 @@ const HomeDashboard: React.FC<Props> = () => {
           <div className="relative z-10 mb-5">
             {salesState === 'loading' ? (
               <div className="space-y-2">
-                <div className="h-14 w-60 bg-white/8 rounded-2xl animate-pulse" />
+                <div className="h-14 w-60 bg-white/8 rounded-[10px] animate-pulse" />
                 <div className="h-4 w-36 bg-white/5 rounded-lg animate-pulse" />
               </div>
             ) : (
@@ -341,14 +341,14 @@ const HomeDashboard: React.FC<Props> = () => {
           {/* Separator */}
           <div className="relative z-10 mb-4 flex items-center gap-3">
             <div className="flex-1 h-px bg-white/8" />
-            <span className="font-mono-label text-xs uppercase tracking-wide text-white/50">6-Month Revenue Trend</span>
+            <span className="font-mono-label text-xs text-white/50">6-Month Revenue Trend</span>
             <div className="flex-1 h-px bg-white/8" />
           </div>
 
           {/* Dark-themed chart */}
           <div className="relative z-10 -mx-1">
             {salesState === 'loading' ? (
-              <div className="h-[155px] bg-white/5 rounded-2xl animate-pulse" />
+              <div className="h-[155px] bg-white/5 rounded-[10px] animate-pulse" />
             ) : (
               <ResponsiveContainer width="100%" height={160}>
                 <ComposedChart data={monthlyTrend} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
@@ -453,7 +453,7 @@ const TrendBadgeDark: React.FC<{ trend: TrendData }> = ({ trend }) => {
     return <span className="inline-flex items-center gap-0.5 text-xs font-bold text-white/55"><Minus className="w-3 h-3" />持平</span>;
   const up = trend.dir === 'up';
   return (
-    <span className={`inline-flex items-center gap-1 text-xs font-black px-2 py-0.5 rounded-full border ${
+    <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border ${
       up
         ? 'text-[#9FD9B8] bg-[#6FBF8E]/12 border-[#6FBF8E]/20'
         : 'text-[#E8A893] bg-[#E0846A]/12 border-[#E0846A]/20'
@@ -484,35 +484,35 @@ const CommandStatCard: React.FC<{
 }> = ({ label, sub, value, loading, accent, alert, badge, trend, sourceMeta }) => {
   const s = CSTAT_MAP[accent];
   return (
-    <div className={`relative ${s.bg} border ${s.border} rounded-[18px] p-4 overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 group ${alert ? 'ring-1 ring-[#E0846A]/40' : ''}`}>
+    <div className={`relative ${s.bg} border ${s.border} rounded-[10px] p-4 overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 group ${alert ? 'ring-1 ring-[#E0846A]/40' : ''}`}>
       {/* Left accent bar */}
       <div className={`absolute top-3 bottom-3 left-0 w-[3px] ${s.bar} rounded-r-full`} />
       <div className="pl-3">
-        <div className={`font-mono-label text-xs uppercase tracking-wide ${s.sub} mb-1`}>{sub}</div>
+        <div className={`font-mono-label text-xs ${s.sub} mb-1`}>{sub}</div>
         {loading ? (
           <div className="h-7 w-28 bg-gray-100 rounded-lg animate-pulse my-1" />
         ) : (
           <div className={`text-xl md:text-[26px] font-bold leading-tight ${s.val}`} style={{ fontFamily: "'Space Grotesk',sans-serif" }}>{value}</div>
         )}
         <div className="flex items-center justify-between mt-1.5 gap-1">
-          <div className="text-xs text-gray-500 font-semibold">{label}</div>
+          <div className="text-xs text-slate-600 font-semibold">{label}</div>
           <div className="flex items-center gap-1">
             {trend && trend.dir !== 'flat' && (
-              <span className={`text-xs font-black px-1.5 py-0.5 rounded-full ${
+              <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
                 trend.dir === 'up' ? 'text-[#3F7D58] bg-[#6FBF8E]/15' : 'text-[#A85D45] bg-[#E0846A]/15'
               }`}>
                 {trend.dir === 'up' ? '↑' : '↓'}{Math.abs(trend.pct).toFixed(1)}%
               </span>
             )}
             {badge && (
-              <span className="text-xs font-black bg-[#E0846A]/15 text-[#A85D45] border border-[#E0846A]/25 px-1.5 py-0.5 rounded-full">
+              <span className="text-xs font-bold bg-[#E0846A]/15 text-[#A85D45] border border-[#E0846A]/25 px-1.5 py-0.5 rounded-full">
                 {badge}
               </span>
             )}
           </div>
         </div>
         {sourceMeta && (
-          <div className="font-mono-label text-xs text-gray-400 mt-0.5 tracking-wide truncate">{sourceMeta}</div>
+          <div className="font-mono-label text-xs text-slate-600 mt-0.5 truncate">{sourceMeta}</div>
         )}
       </div>
     </div>
@@ -528,16 +528,16 @@ const CustomerMixCard: React.FC<{ slices: MixSlice[]; loading: boolean }> = ({ s
   const hasData = slices.length > 0;
 
   return (
-    <div className="bg-white rounded-[18px] border shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col" style={{ borderColor: '#0F1E4514' }}>
+    <div className="bg-white rounded-[10px] border shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col" style={{ borderColor: '#0F1E4514' }}>
       {/* Header */}
       <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2.5">
         <div className="w-2 h-2 rounded-full bg-[#94A3B8]" />
-        <span className="font-mono-label text-sm uppercase tracking-wide text-gray-700">客户结构</span>
-        <span className="font-mono-label text-xs text-gray-400 uppercase">Customer Segment</span>
-        <span className={`ml-auto text-xs font-black px-2 py-0.5 rounded-full border ${
+        <span className="font-mono-label text-sm text-gray-700">客户结构</span>
+        <span className="font-mono-label text-xs text-slate-600 ">Customer Segment</span>
+        <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full border ${
           hasData
             ? 'bg-[#6FBF8E]/12 text-[#3F7D58] border-[#6FBF8E]/25'
-            : 'bg-[#D9B45A]/12 text-[#A6822E] border-[#D9B45A]/25'
+            : 'bg-[#D9B45A]/12 text-[#7A5F2A] border-[#D9B45A]/25'
         }`}>
           {hasData ? '实时' : '待录入'}
         </span>
@@ -575,8 +575,8 @@ const CustomerMixCard: React.FC<{ slices: MixSlice[]; loading: boolean }> = ({ s
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-[10px] font-black text-gray-400 uppercase">客户</span>
-                <span className="text-xs font-black text-gray-700 font-mono">{totalCount}</span>
+                <span className="text-xs font-bold text-slate-600 ">客户</span>
+                <span className="text-xs font-bold text-gray-700 font-mono-label">{totalCount}</span>
               </div>
             </div>
 
@@ -587,14 +587,14 @@ const CustomerMixCard: React.FC<{ slices: MixSlice[]; loading: boolean }> = ({ s
                   <div key={i} className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: s.color }} />
                     <span className="text-xs font-bold text-gray-600 flex-1 truncate">{s.name}</span>
-                    <span className="text-xs font-mono text-gray-500">{s.value}家</span>
-                    <span className="text-xs font-black text-gray-400 font-mono">{pct.toFixed(1)}%</span>
+                    <span className="text-xs font-mono-label text-slate-600">{s.value}家</span>
+                    <span className="text-xs font-bold text-slate-600 font-mono-label">{pct.toFixed(1)}%</span>
                   </div>
                 );
               })}
             </div>
 
-            <p className="text-[10px] text-gray-400 font-mono self-start">
+            <p className="text-xs text-slate-600 font-mono-label self-start">
               Notion Customer Master · 按客户数量统计
             </p>
           </>
@@ -615,20 +615,20 @@ const CustomerMixCard: React.FC<{ slices: MixSlice[]; loading: boolean }> = ({ s
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-xs font-black text-gray-400 text-center leading-tight">
+                <span className="text-xs font-bold text-slate-600 text-center leading-tight">
                   待<br/>录入
                 </span>
               </div>
             </div>
 
-            <div className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 space-y-2">
-              <p className="text-xs font-black text-slate-500 uppercase tracking-wide">接入方式</p>
-              <p className="text-xs text-slate-400 leading-relaxed">
+            <div className="w-full bg-slate-50 border border-slate-100 rounded-[10px] p-3 space-y-2">
+              <p className="text-xs font-bold text-slate-600 ">接入方式</p>
+              <p className="text-xs text-slate-600 leading-relaxed">
                 在 PI 报价单录入客户类型（customerType），分析图自动更新
               </p>
               <div className="flex flex-wrap gap-1 pt-1">
                 {(['超市零售','批发贸易','工程项目','酒店餐饮','政府机构'] as const).map((t, i) => (
-                  <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-full font-black bg-slate-100 text-slate-500">
+                  <span key={i} className="text-xs px-1.5 py-0.5 rounded-full font-bold bg-slate-100 text-slate-600">
                     {t}
                   </span>
                 ))}
@@ -645,19 +645,19 @@ const CustomerMixCard: React.FC<{ slices: MixSlice[]; loading: boolean }> = ({ s
 const RISK_STYLE: Record<RiskLevel, { bg: string; border: string; dot: string; text: string }> = {
   red:    { bg: 'bg-[#E0846A]/10', border: 'border-[#E0846A]/20', dot: 'bg-[#E0846A]', text: 'text-[#A85D45]' },
   orange: { bg: 'bg-[#D9B45A]/12', border: 'border-[#D9B45A]/22', dot: 'bg-[#D9B45A]', text: 'text-[#8A6B2A]' },
-  yellow: { bg: 'bg-[#D9B45A]/8',  border: 'border-[#D9B45A]/15', dot: 'bg-[#D9B45A]', text: 'text-[#A6822E]' },
+  yellow: { bg: 'bg-[#D9B45A]/8',  border: 'border-[#D9B45A]/15', dot: 'bg-[#D9B45A]', text: 'text-[#7A5F2A]' },
 };
 
 const RiskAlertsPanel: React.FC<{ alerts: RiskAlert[]; loading: boolean }> = ({ alerts, loading }) => (
   <Card tone="light" className="overflow-hidden hover:shadow-md transition-shadow">
     <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2.5">
       <div className="w-7 h-7 rounded-lg bg-[#D9B45A]/12 flex items-center justify-center">
-        <AlertTriangle className="w-3.5 h-3.5 text-[#A6822E]" />
+        <AlertTriangle className="w-3.5 h-3.5 text-[#7A5F2A]" />
       </div>
-      <span className="font-mono-label text-sm uppercase tracking-wide text-gray-700">经营风险提醒</span>
-      <span className="font-mono-label text-xs text-gray-400 uppercase ml-1">Risk Alerts</span>
+      <span className="font-mono-label text-sm text-gray-700">经营风险提醒</span>
+      <span className="font-mono-label text-xs text-slate-600 ml-1">Risk Alerts</span>
       {alerts.length > 0 && (
-        <span className="ml-auto text-[11px] font-black bg-[#D9B45A]/15 text-[#8A6B2A] border border-[#D9B45A]/25 px-2 py-0.5 rounded-full">
+        <span className="ml-auto text-xs font-bold bg-[#D9B45A]/15 text-[#8A6B2A] border border-[#D9B45A]/25 px-2 py-0.5 rounded-full">
           {alerts.length} 项
         </span>
       )}
@@ -665,17 +665,17 @@ const RiskAlertsPanel: React.FC<{ alerts: RiskAlert[]; loading: boolean }> = ({ 
     <div className="p-4 space-y-2 min-h-[140px]">
       {loading ? (
         <div className="animate-pulse space-y-2">
-          {[1,2].map(i => <div key={i} className="h-9 bg-gray-100 rounded-xl" />)}
+          {[1,2].map(i => <div key={i} className="h-9 bg-gray-100 rounded-[10px]" />)}
         </div>
       ) : alerts.length === 0 ? (
-        <div className="flex items-center gap-3 px-4 py-3 bg-[#6FBF8E]/10 border border-[#6FBF8E]/20 rounded-xl">
+        <div className="flex items-center gap-3 px-4 py-3 bg-[#6FBF8E]/10 border border-[#6FBF8E]/20 rounded-[10px]">
           <CheckCircle2 className="w-4 h-4 text-[#3F7D58] flex-shrink-0" />
           <span className="text-sm font-semibold text-[#3F7D58]">当前暂无高风险事项</span>
         </div>
       ) : alerts.map((a, i) => {
         const st = RISK_STYLE[a.level];
         return (
-          <div key={i} className={`flex items-start gap-3 px-4 py-2.5 ${st.bg} border ${st.border} rounded-xl`}>
+          <div key={i} className={`flex items-start gap-3 px-4 py-2.5 ${st.bg} border ${st.border} rounded-[10px]`}>
             <div className={`w-1.5 h-1.5 rounded-full ${st.dot} mt-1.5 flex-shrink-0`} />
             <span className={`text-sm font-semibold ${st.text}`}>{a.message}</span>
           </div>
@@ -688,7 +688,7 @@ const RiskAlertsPanel: React.FC<{ alerts: RiskAlert[]; loading: boolean }> = ({ 
 // ── Today Actions Panel ───────────────────────────────────────────────────
 const P_CLS = [
   'bg-[#E0846A]/15 text-[#A85D45]', 'bg-[#D9B45A]/15 text-[#8A6B2A]',
-  'bg-[#D9B45A]/10 text-[#A6822E]', 'bg-gray-100 text-gray-500',
+  'bg-[#D9B45A]/10 text-[#7A5F2A]', 'bg-gray-100 text-gray-500',
 ];
 
 const TodayActionsPanel: React.FC<{ actions: string[]; loading: boolean }> = ({ actions, loading }) => {
@@ -700,23 +700,23 @@ const TodayActionsPanel: React.FC<{ actions: string[]; loading: boolean }> = ({ 
           <div className="w-7 h-7 rounded-lg bg-[#0F1E45]/8 flex items-center justify-center">
             <Zap className="w-3.5 h-3.5 text-[#0F1E45]" />
           </div>
-          <span className="font-mono-label text-sm uppercase tracking-wide text-gray-700">近期待处理事项</span>
+          <span className="font-mono-label text-sm text-gray-700">近期待处理事项</span>
         </div>
-        <span className="text-xs text-gray-400 font-semibold">{today}</span>
+        <span className="text-xs text-slate-600 font-semibold">{today}</span>
       </div>
       <div className="p-4 space-y-2 min-h-[140px]">
         {loading ? (
           <div className="animate-pulse space-y-2">
-            {[1,2,3].map(i => <div key={i} className="h-9 bg-gray-100 rounded-xl" />)}
+            {[1,2,3].map(i => <div key={i} className="h-9 bg-gray-100 rounded-[10px]" />)}
           </div>
         ) : actions.length === 0 ? (
-          <div className="flex items-center gap-3 px-4 py-2.5 bg-[#6FBF8E]/10 border border-[#6FBF8E]/20 rounded-xl">
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-[#6FBF8E]/10 border border-[#6FBF8E]/20 rounded-[10px]">
             <CheckCircle2 className="w-4 h-4 text-[#3F7D58] flex-shrink-0" />
             <span className="text-sm font-semibold text-[#3F7D58]">近期暂无紧急待办，正常开单即可</span>
           </div>
         ) : actions.map((a, i) => (
-          <div key={i} className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl hover:bg-[#C9A84C]/8 hover:border-[#C9A84C]/20 transition-all cursor-default">
-            <span className={`text-xs font-black px-1.5 py-0.5 rounded-full flex-shrink-0 min-w-[22px] text-center ${P_CLS[i] ?? P_CLS[3]}`}>
+          <div key={i} className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-[10px] hover:bg-[#C9A84C]/8 hover:border-[#C9A84C]/20 transition-all cursor-default">
+            <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 min-w-[22px] text-center ${P_CLS[i] ?? P_CLS[3]}`}>
               P{i + 1}
             </span>
             <span className="text-sm font-semibold text-gray-700">{a}</span>
