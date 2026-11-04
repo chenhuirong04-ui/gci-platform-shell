@@ -2,14 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { useI18n } from '@gci/i18n';
 import type { SupplierProduct } from '../types';
 import { createProduct, deleteProduct, listProducts, updateProduct } from '../lib/suppliersCloud';
-import { workspace, fontSizes } from '@gci/design-system';
+import { workspace, fontSizes, radii } from '@gci/design-system';
+import { INPUT, LABEL, formGrid, MODAL_OVERLAY, MODAL_PANEL_CLASS, modalPanel, ModalPortal } from '../lib/ui';
 
 const NAVY = workspace.textPrimary;
 const BORDER = '#CBD5E1';
 const T2 = '#475569';
-const T3 = '#94a3b8';
-const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${BORDER}`, fontSize: fontSizes.sm, color: NAVY, background: '#fff', outline: 'none' };
-const LBL: React.CSSProperties = { display: 'block', fontSize: fontSizes.xs, fontWeight: 700, color: T2, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' };
+const T3 = workspace.textSecondary;
+const INP = INPUT;
+const LBL = LABEL;
 
 const EMPTY = (sid: string): Omit<SupplierProduct, 'id'> => ({
   supplier_id: sid, product_name_cn: '', product_name_en: '', supplier_sku: '',
@@ -49,7 +50,7 @@ export default function ProductManager({ supplierId }: Props) {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <span style={{ fontSize: fontSizes.sm, color: T2 }}>{t.count(products.length)}</span>
-        <button onClick={() => setEdit(EMPTY(supplierId))} style={{ padding: '7px 16px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 7, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}>{t.add}</button>
+        <button onClick={() => setEdit(EMPTY(supplierId))} style={{ padding: '7px 16px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: radii.sm, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}>{t.add}</button>
       </div>
       {loading ? <div style={{ color: T3, textAlign: 'center', padding: 40 }}>{c0.loading}</div>
        : products.length === 0 ? <div style={{ color: T3, textAlign: 'center', padding: 40 }}>{t.empty}</div>
@@ -82,10 +83,10 @@ export default function ProductManager({ supplierId }: Props) {
       )}
 
       {edit && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => { if (e.target === e.currentTarget) setEdit(null); }}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 580, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <ModalPortal><div style={MODAL_OVERLAY} onClick={e => { if (e.target === e.currentTarget) setEdit(null); }}>
+          <div className={MODAL_PANEL_CLASS} style={{ ...modalPanel(580), display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY }}>{edit.id ? t.modalEdit : t.modalNew}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div style={{ ...formGrid(200), gap: 14 }}>
               <F label={t.fNameCn}><input style={INP} value={edit.product_name_cn ?? ''} onChange={e => setEdit(v => ({ ...v!, product_name_cn: e.target.value }))} /></F>
               <F label={t.fNameEn}><input style={INP} value={edit.product_name_en ?? ''} onChange={e => setEdit(v => ({ ...v!, product_name_en: e.target.value }))} /></F>
               <F label={t.fCategory}><input style={INP} value={edit.category ?? ''} onChange={e => setEdit(v => ({ ...v!, category: e.target.value }))} /></F>
@@ -108,11 +109,11 @@ export default function ProductManager({ supplierId }: Props) {
             </div>
             <F label={t.fNotes}><textarea style={{ ...INP, resize: 'vertical', minHeight: 60 }} value={edit.notes ?? ''} onChange={e => setEdit(v => ({ ...v!, notes: e.target.value }))} /></F>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '10px 0', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>{saving ? c0.saving : c0.save}</button>
-              <button onClick={() => setEdit(null)} style={{ padding: '10px 20px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T2, fontWeight: 600, cursor: 'pointer' }}>{c0.cancel}</button>
+              <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '10px 0', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: radii.sm, fontWeight: 700, cursor: 'pointer' }}>{saving ? c0.saving : c0.save}</button>
+              <button onClick={() => setEdit(null)} style={{ padding: '10px 20px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: radii.sm, color: T2, fontWeight: 600, cursor: 'pointer' }}>{c0.cancel}</button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
     </div>
   );

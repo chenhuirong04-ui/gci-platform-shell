@@ -2,15 +2,16 @@ import React, { useState } from 'react';
 import { useI18n } from '@gci/i18n';
 import type { Supplier, SupplierRating } from '../types';
 import { updateSupplier } from '../lib/suppliersCloud';
-import { workspace, fontSizes } from '@gci/design-system';
+import { workspace, fontSizes, radii } from '@gci/design-system';
+import { INPUT, LABEL, formGrid } from '../lib/ui';
 
 const NAVY = workspace.textPrimary;
 const GOLD = workspace.accent;
 const BORDER = '#e2e8f0';
 const T2 = '#374151';
 const T3 = '#6b7280';
-const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1.5px solid #CBD5E1`, fontSize: fontSizes.sm, color: NAVY, background: '#fff', outline: 'none' };
-const LBL: React.CSSProperties = { display: 'block', fontSize: fontSizes.xs, fontWeight: 700, color: T2, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' };
+const INP = INPUT;
+const LBL = LABEL;
 
 const RATINGS: SupplierRating[] = ['A', 'B', 'C', 'D'];
 
@@ -57,19 +58,19 @@ export default function RatingNotes({ supplier, onUpdated }: Props) {
             key={r}
             onClick={() => setRating(r)}
             style={{
-              flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 800, fontSize: fontSizes.lg, cursor: 'pointer',
+              flex: 1, padding: '10px 0', borderRadius: radii.sm, fontWeight: 800, fontSize: fontSizes.lg, cursor: 'pointer',
               border: rating === r ? `2px solid ${GOLD}` : `1.5px solid ${BORDER}`,
               background: rating === r ? workspace.actionPrimaryBg : '#fff',
-              color: rating === r ? GOLD : T2,
+              color: rating === r ? workspace.accentText : T2,
             }}
           >
             {r}
-            <div style={{ fontSize: fontSizes.xs, fontWeight: 500, marginTop: 2, color: rating === r ? '#f0ead2' : '#94a3b8' }}>{RATING_DESC[r]}</div>
+            <div style={{ fontSize: fontSizes.xs, fontWeight: 500, marginTop: 2, color: rating === r ? '#f0ead2' : workspace.textSecondary }}>{RATING_DESC[r]}</div>
           </button>
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+      <div style={{ ...formGrid(200), gap: 16, marginBottom: 16 }}>
         <div>
           <label style={LBL}>{t.fScore}</label>
           <input style={INP} type="number" min={0} max={100} value={score} onChange={e => setScore(e.target.value)} />
@@ -93,7 +94,7 @@ export default function RatingNotes({ supplier, onUpdated }: Props) {
       <button
         onClick={handleSave}
         disabled={saving}
-        style={{ padding: '10px 32px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: fontSizes.md, cursor: 'pointer' }}
+        style={{ padding: '10px 32px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: radii.sm, fontWeight: 700, fontSize: fontSizes.md, cursor: 'pointer' }}
       >
         {saving ? dict.suppliers.common.saving : saved ? dict.suppliers.common.saved : t.save}
       </button>

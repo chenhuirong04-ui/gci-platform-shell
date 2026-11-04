@@ -45,10 +45,10 @@ export default function CategoryDistributionChart({ data, selectedCategory, onSe
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
         <div style={{ fontWeight: 700, fontSize: fontSizes.md, color: NAVY }}>{t.chartByCategoryTitle}</div>
         <div style={{ fontSize: fontSizes.xs, color: '#64748b' }}>
-          {t.uncategorized} <strong style={{ color: '#e53e3e' }}>{data.noCategory}</strong>
+          {t.uncategorized} <strong style={{ color: '#c53030' }}>{data.noCategory}</strong>
         </div>
       </div>
-      <div style={{ fontSize: fontSizes.xs, color: '#94a3b8', marginBottom: 14 }}>
+      <div style={{ fontSize: fontSizes.xs, color: workspace.textSecondary, marginBottom: 14 }}>
         {t.categoryNote}
       </div>
 
@@ -98,7 +98,7 @@ export default function CategoryDistributionChart({ data, selectedCategory, onSe
         <div style={{ marginTop: 12, textAlign: 'right' }}>
           <button
             onClick={() => onSelect(null)}
-            style={{ fontSize: fontSizes.xs, color: GOLD, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+            style={{ fontSize: fontSizes.xs, color: workspace.accentText, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
           >
             {t.clearCategoryFilter}
           </button>

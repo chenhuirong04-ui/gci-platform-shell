@@ -2,14 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { useI18n } from '@gci/i18n';
 import type { SupplierService } from '../types';
 import { createService, deleteService, listServices, updateService } from '../lib/suppliersCloud';
-import { workspace, fontSizes } from '@gci/design-system';
+import { workspace, fontSizes, radii } from '@gci/design-system';
+import { INPUT, LABEL, formGrid, MODAL_OVERLAY, MODAL_PANEL_CLASS, modalPanel, ModalPortal } from '../lib/ui';
 
 const NAVY = workspace.textPrimary;
 const BORDER = '#CBD5E1';
 const T2 = '#475569';
-const T3 = '#94a3b8';
-const INP: React.CSSProperties = { display: 'block', width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${BORDER}`, fontSize: fontSizes.sm, color: NAVY, background: '#fff', outline: 'none' };
-const LBL: React.CSSProperties = { display: 'block', fontSize: fontSizes.xs, fontWeight: 700, color: T2, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' };
+const T3 = workspace.textSecondary;
+const INP = INPUT;
+const LBL = LABEL;
 
 const PRICING = ['fixed', 'hourly', 'percentage', 'project', 'custom'];
 
@@ -54,7 +55,7 @@ export default function ServiceManager({ supplierId }: Props) {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <span style={{ fontSize: fontSizes.sm, color: T2 }}>{t.count(services.length)}</span>
-        <button onClick={() => setEdit(EMPTY(supplierId))} style={{ padding: '7px 16px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 7, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}>{t.add}</button>
+        <button onClick={() => setEdit(EMPTY(supplierId))} style={{ padding: '7px 16px', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: radii.sm, fontSize: fontSizes.sm, fontWeight: 700, cursor: 'pointer' }}>{t.add}</button>
       </div>
       {loading ? <div style={{ color: T3, textAlign: 'center', padding: 40 }}>{c0.loading}</div>
        : services.length === 0 ? <div style={{ color: T3, textAlign: 'center', padding: 40 }}>{t.empty}</div>
@@ -87,10 +88,10 @@ export default function ServiceManager({ supplierId }: Props) {
       )}
 
       {edit && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => { if (e.target === e.currentTarget) setEdit(null); }}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: 28, width: 520, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <ModalPortal><div style={MODAL_OVERLAY} onClick={e => { if (e.target === e.currentTarget) setEdit(null); }}>
+          <div className={MODAL_PANEL_CLASS} style={{ ...modalPanel(520), display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ fontSize: fontSizes.lg, fontWeight: 700, color: NAVY }}>{edit.id ? t.modalEdit : t.modalNew}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div style={{ ...formGrid(200), gap: 14 }}>
               <F label={t.fName}><input style={INP} value={edit.service_name ?? ''} onChange={e => setEdit(v => ({ ...v!, service_name: e.target.value }))} /></F>
               <F label={t.fCategory}><select style={INP} value={edit.service_category ?? ''} onChange={e => setEdit(v => ({ ...v!, service_category: e.target.value }))}><option value="">{c0.pleaseSelect}</option>{CATS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></F>
               <F label={t.fPricingModel}><select style={INP} value={edit.pricing_model ?? 'fixed'} onChange={e => setEdit(v => ({ ...v!, pricing_model: e.target.value }))}>{PRICING.map(p => <option key={p}>{p}</option>)}</select></F>
@@ -101,11 +102,11 @@ export default function ServiceManager({ supplierId }: Props) {
             <F label={t.fArea}><input style={INP} value={edit.service_area ?? ''} onChange={e => setEdit(v => ({ ...v!, service_area: e.target.value }))} placeholder={t.fAreaPlaceholder} /></F>
             <F label={t.fDescription}><textarea style={{ ...INP, resize: 'vertical', minHeight: 60 }} value={edit.service_description ?? ''} onChange={e => setEdit(v => ({ ...v!, service_description: e.target.value }))} /></F>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '10px 0', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>{saving ? c0.saving : c0.save}</button>
-              <button onClick={() => setEdit(null)} style={{ padding: '10px 20px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: 8, color: T2, fontWeight: 600, cursor: 'pointer' }}>{c0.cancel}</button>
+              <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '10px 0', background: workspace.actionPrimaryBg, color: '#fff', border: 'none', borderRadius: radii.sm, fontWeight: 700, cursor: 'pointer' }}>{saving ? c0.saving : c0.save}</button>
+              <button onClick={() => setEdit(null)} style={{ padding: '10px 20px', background: '#fff', border: `1.5px solid ${BORDER}`, borderRadius: radii.sm, color: T2, fontWeight: 600, cursor: 'pointer' }}>{c0.cancel}</button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
     </div>
   );

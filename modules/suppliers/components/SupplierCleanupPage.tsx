@@ -3,7 +3,8 @@ import { useI18n, type Dictionary } from '@gci/i18n';
 import CountryDistributionChart from './CountryDistributionChart';
 import CategoryDistributionChart from './CategoryDistributionChart';
 import { getCountryLabel, getCategoryLabel } from '../lib/labelMaps';
-import { workspace, fontSizes, fonts } from '@gci/design-system';
+import { workspace, fontSizes, fonts, radii } from '@gci/design-system';
+import { tabStyle, MODAL_OVERLAY, ModalPortal } from '../lib/ui';
 
 // Progress bars and decorative gradients keep the original gold.
 const CHART_GOLD = '#C9A84C';
@@ -108,15 +109,17 @@ interface SummaryData {
 
 function CompletenessBar({ pct, label }: { pct: number; label: string }) {
   const color = pct >= 80 ? '#16a34a' : pct >= 50 ? '#d97706' : '#dc2626';
+  // Same hue, darker shade for the percentage text (≥4.5:1); the bar keeps `color`.
+  const textColor = pct >= 80 ? '#15803d' : pct >= 50 ? '#b45309' : '#dc2626';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 110 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <div style={{ flex: 1, height: 6, background: '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
           <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3, transition: 'width .3s' }} />
         </div>
-        <span style={{ fontSize: fontSizes.xs, fontWeight: 700, color, flexShrink: 0 }}>{pct}%</span>
+        <span style={{ fontSize: fontSizes.xs, fontWeight: 700, color: textColor, flexShrink: 0 }}>{pct}%</span>
       </div>
-      <span style={{ fontSize: fontSizes.xs, color: '#94a3b8' }}>{label}</span>
+      <span style={{ fontSize: fontSizes.xs, color: workspace.textSecondary }}>{label}</span>
     </div>
   );
 }
@@ -145,7 +148,7 @@ function StatCard({ label, value, sub, accent, onClick, active }: {
     >
       <div style={{ fontSize: fontSizes.xxl, fontWeight: 800, color: accent ? '#dc2626' : NAVY, lineHeight: 1 }}>{value}</div>
       <div style={{ fontSize: fontSizes.xs, color: '#64748b', marginTop: 4, fontWeight: 600 }}>{label}</div>
-      {sub && <div style={{ fontSize: fontSizes.xs, color: '#94a3b8', marginTop: 2 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: fontSizes.xs, color: workspace.textSecondary, marginTop: 2 }}>{sub}</div>}
     </div>
   );
 }
@@ -309,7 +312,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
 
   if (loading) {
     return (
-      <div style={{ padding: '80px 32px', textAlign: 'center', color: '#94a3b8', fontSize: fontSizes.md }}>
+      <div style={{ padding: '80px 32px', textAlign: 'center', color: workspace.textSecondary, fontSize: fontSizes.md }}>
         <div style={{ fontSize: 28, marginBottom: 12 }}>⏳</div>
         {t.loadingText}
       </div>
@@ -320,7 +323,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
     return (
       <div style={{ padding: '80px 32px', textAlign: 'center' }}>
         <div style={{ color: '#dc2626', fontWeight: 700, marginBottom: 12 }}>{t.loadFailed(error)}</div>
-        <button onClick={load} style={{ padding: '8px 20px', borderRadius: 8, background: workspace.actionPrimaryBg, color: '#fff', border: 'none', cursor: 'pointer' }}>{t.retry}</button>
+        <button onClick={load} style={{ padding: '8px 20px', borderRadius: radii.sm, background: workspace.actionPrimaryBg, color: '#fff', border: 'none', cursor: 'pointer' }}>{t.retry}</button>
       </div>
     );
   }
@@ -340,17 +343,17 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
       <div style={{ background: '#fff', borderBottom: `1px solid ${CARD_BORDER}`, padding: '14px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
         <button
           onClick={onBack}
-          style={{ fontSize: fontSizes.sm, color: '#64748b', background: 'none', border: `1px solid ${CARD_BORDER}`, borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 600 }}
+          style={{ fontSize: fontSizes.sm, color: '#64748b', background: 'none', border: `1px solid ${CARD_BORDER}`, borderRadius: radii.sm, padding: '6px 14px', cursor: 'pointer', fontWeight: 600 }}
         >
           {dict.suppliers.common.back}
         </button>
         <div style={{ fontWeight: 800, fontSize: fontSizes.lg, color: NAVY }}>{t.title}</div>
-        <div style={{ fontSize: fontSizes.xs, color: '#94a3b8', marginLeft: 4 }}>
+        <div style={{ fontSize: fontSizes.xs, color: workspace.textSecondary, marginLeft: 4 }}>
           {t.scopeNote}
         </div>
         <button
           onClick={load}
-          style={{ marginLeft: 'auto', fontSize: fontSizes.xs, color: '#64748b', background: 'none', border: `1px solid ${CARD_BORDER}`, borderRadius: 8, padding: '6px 12px', cursor: 'pointer' }}
+          style={{ marginLeft: 'auto', fontSize: fontSizes.xs, color: '#64748b', background: 'none', border: `1px solid ${CARD_BORDER}`, borderRadius: radii.sm, padding: '6px 12px', cursor: 'pointer' }}
         >
           {t.refresh}
         </button>
@@ -391,16 +394,9 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                 { key: 'country' as const,  label: `${t.analysisByCountry}（${data.countryTable?.length ?? 0}）` },
                 { key: 'category' as const, label: `${t.analysisByCategory}（${data.categoryTable?.length ?? 0}）` },
               ]).map(tb => (
-                <button key={tb.key} onClick={() => setAnalysisTab(tb.key)} style={{
-                  padding: '12px 20px', fontSize: fontSizes.sm,
-                  fontWeight: analysisTab === tb.key ? 700 : 500,
-                  color: analysisTab === tb.key ? NAVY : '#64748b',
-                  border: 'none',
-                  borderBottom: analysisTab === tb.key ? `2px solid ${GOLD}` : '2px solid transparent',
-                  background: 'none', cursor: 'pointer', marginBottom: -1,
-                }}>{tb.label}</button>
+                <button key={tb.key} onClick={() => setAnalysisTab(tb.key)} style={tabStyle(analysisTab === tb.key)}>{tb.label}</button>
               ))}
-              <span style={{ marginLeft: 'auto', fontSize: fontSizes.xs, color: '#94a3b8', whiteSpace: 'nowrap' }}>
+              <span style={{ marginLeft: 'auto', fontSize: fontSizes.xs, color: workspace.textSecondary, whiteSpace: 'nowrap' }}>
                 {t.scopeRangeLabel(stats.total)}
                 {stats.dbTotal != null && stats.archivedCount != null && stats.archivedCount > 0
                   ? t.archivedNote(stats.dbTotal, stats.archivedCount)
@@ -418,7 +414,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                 return ctySort.dir === 'asc' ? (av as number) - (bv as number) : (bv as number) - (av as number);
               });
               const SH = ({ col, label }: { col: CtyKey; label: string }) => (
-                <th onClick={() => toggleCtySort(col)} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: fontSizes.xs, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none' }}>
+                <th onClick={() => toggleCtySort(col)} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: fontSizes.xs, borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none' }}>
                   {label}{ctySort.key === col ? (ctySort.dir === 'desc' ? ' ↓' : ' ↑') : ''}
                 </th>
               );
@@ -452,7 +448,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                         <tr key={row.country} style={{ borderBottom: `1px solid ${CARD_BORDER}` }}
                           onMouseEnter={e => (e.currentTarget.style.background = '#faf8f5')}
                           onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                          <td style={{ padding: '11px 14px', fontWeight: 700, color: row.country === '未填写' ? '#94a3b8' : NAVY }}>
+                          <td style={{ padding: '11px 14px', fontWeight: 700, color: row.country === '未填写' ? workspace.textSecondary : NAVY }}>
                             {row.country === '未填写' ? t.notSpecified : getCountryLabel(row.country, lang)}
                           </td>
                           <td style={{ padding: '11px 14px', fontWeight: 700, color: NAVY }}>{row.supplierCount}</td>
@@ -464,15 +460,15 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                               <span>{row.percentage}%</span>
                             </div>
                           </td>
-                          <td style={{ padding: '11px 14px', color: row.preferredCount > 0 ? GOLD : '#94a3b8', fontWeight: row.preferredCount > 0 ? 700 : 400 }}>{row.preferredCount}</td>
+                          <td style={{ padding: '11px 14px', color: row.preferredCount > 0 ? workspace.accentText : workspace.textSecondary, fontWeight: row.preferredCount > 0 ? 700 : 400 }}>{row.preferredCount}</td>
                           <td style={{ padding: '11px 14px', color: '#475569' }}>{row.contactCount}</td>
-                          <td style={{ padding: '11px 14px', color: row.missingCategoryCount > 0 ? '#dc2626' : '#94a3b8', fontWeight: row.missingCategoryCount > 0 ? 700 : 400 }}>{row.missingCategoryCount}</td>
-                          <td style={{ padding: '11px 14px', color: row.missingBizLicenseCount > 0 ? '#d97706' : '#94a3b8', fontWeight: row.missingBizLicenseCount > 0 ? 700 : 400 }}>{row.missingBizLicenseCount}</td>
-                          <td style={{ padding: '11px 14px', color: row.missingCatalogCount > 0 ? '#d97706' : '#94a3b8', fontWeight: row.missingCatalogCount > 0 ? 700 : 400 }}>{row.missingCatalogCount}</td>
+                          <td style={{ padding: '11px 14px', color: row.missingCategoryCount > 0 ? '#dc2626' : workspace.textSecondary, fontWeight: row.missingCategoryCount > 0 ? 700 : 400 }}>{row.missingCategoryCount}</td>
+                          <td style={{ padding: '11px 14px', color: row.missingBizLicenseCount > 0 ? '#b45309' : workspace.textSecondary, fontWeight: row.missingBizLicenseCount > 0 ? 700 : 400 }}>{row.missingBizLicenseCount}</td>
+                          <td style={{ padding: '11px 14px', color: row.missingCatalogCount > 0 ? '#b45309' : workspace.textSecondary, fontWeight: row.missingCatalogCount > 0 ? 700 : 400 }}>{row.missingCatalogCount}</td>
                           <td style={{ padding: '11px 14px' }}>
                             <button
                               onClick={() => onGoToFilteredList?.({ country: row.country })}
-                              style={{ fontSize: fontSizes.xs, padding: '5px 12px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}
+                              style={{ fontSize: fontSizes.xs, padding: '5px 12px', borderRadius: radii.sm, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}
                             >
                               {t.viewSuppliers}
                             </button>
@@ -486,12 +482,12 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                           {t.totalRowLabel(totals.countryCount)}
                         </td>
                         <td style={{ padding: '10px 14px', fontWeight: 800, color: NAVY }}>{totals.supplierCount}</td>
-                        <td style={{ padding: '10px 14px', color: '#64748b' }}>100%</td>
-                        <td style={{ padding: '10px 14px', fontWeight: 700, color: GOLD }}>{totals.preferredCount}</td>
+                        <td style={{ padding: '10px 14px', color: '#475569' }}>100%</td>
+                        <td style={{ padding: '10px 14px', fontWeight: 700, color: workspace.accentText }}>{totals.preferredCount}</td>
                         <td style={{ padding: '10px 14px', fontWeight: 700, color: '#475569' }}>{totals.contactCount}</td>
-                        <td style={{ padding: '10px 14px', fontWeight: 700, color: totals.missingCategoryCount > 0 ? '#dc2626' : '#94a3b8' }}>{totals.missingCategoryCount}</td>
-                        <td style={{ padding: '10px 14px', fontWeight: 700, color: totals.missingBizLicenseCount > 0 ? '#d97706' : '#94a3b8' }}>{totals.missingBizLicenseCount}</td>
-                        <td style={{ padding: '10px 14px', fontWeight: 700, color: totals.missingCatalogCount > 0 ? '#d97706' : '#94a3b8' }}>{totals.missingCatalogCount}</td>
+                        <td style={{ padding: '10px 14px', fontWeight: 700, color: totals.missingCategoryCount > 0 ? '#dc2626' : workspace.textSecondary }}>{totals.missingCategoryCount}</td>
+                        <td style={{ padding: '10px 14px', fontWeight: 700, color: totals.missingBizLicenseCount > 0 ? '#b45309' : workspace.textSecondary }}>{totals.missingBizLicenseCount}</td>
+                        <td style={{ padding: '10px 14px', fontWeight: 700, color: totals.missingCatalogCount > 0 ? '#b45309' : workspace.textSecondary }}>{totals.missingCatalogCount}</td>
                         <td style={{ padding: '10px 14px' }} />
                       </tr>
                     </tfoot>
@@ -508,13 +504,13 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                 return catSort.dir === 'asc' ? (av as number) - (bv as number) : (bv as number) - (av as number);
               });
               const SH = ({ col, label }: { col: CatKey; label: string }) => (
-                <th onClick={() => toggleCatSort(col)} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: fontSizes.xs, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none' }}>
+                <th onClick={() => toggleCatSort(col)} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: fontSizes.xs, borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none' }}>
                   {label}{catSort.key === col ? (catSort.dir === 'desc' ? ' ↓' : ' ↑') : ''}
                 </th>
               );
               return (
                 <div style={{ overflowX: 'auto' }}>
-                  <div style={{ padding: '8px 24px 0', fontSize: fontSizes.xs, color: '#94a3b8' }}>
+                  <div style={{ padding: '8px 24px 0', fontSize: fontSizes.xs, color: workspace.textSecondary }}>
                     {t.categoryNote}
                   </div>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fontSizes.xs }}>
@@ -537,15 +533,15 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                           onMouseLeave={e => (e.currentTarget.style.background = '')}>
                           <td style={{ padding: '11px 14px', fontWeight: 700, color: NAVY }}>{row.category === '未分类' ? t.uncategorized : getCategoryLabel(row.category, lang)}</td>
                           <td style={{ padding: '11px 14px', fontWeight: 700, color: NAVY }}>{row.supplierCount}</td>
-                          <td style={{ padding: '11px 14px', color: row.preferredCount > 0 ? GOLD : '#94a3b8', fontWeight: row.preferredCount > 0 ? 700 : 400 }}>{row.preferredCount}</td>
+                          <td style={{ padding: '11px 14px', color: row.preferredCount > 0 ? workspace.accentText : workspace.textSecondary, fontWeight: row.preferredCount > 0 ? 700 : 400 }}>{row.preferredCount}</td>
                           <td style={{ padding: '11px 14px', color: '#475569' }}>{row.contactCount}</td>
                           <td style={{ padding: '11px 14px', color: '#475569' }}>{row.catalogCount}</td>
                           <td style={{ padding: '11px 14px', color: '#475569' }}>{row.certificationCount}</td>
-                          <td style={{ padding: '11px 14px', color: row.missingCountryCount > 0 ? '#d97706' : '#94a3b8', fontWeight: row.missingCountryCount > 0 ? 700 : 400 }}>{row.missingCountryCount}</td>
+                          <td style={{ padding: '11px 14px', color: row.missingCountryCount > 0 ? '#b45309' : workspace.textSecondary, fontWeight: row.missingCountryCount > 0 ? 700 : 400 }}>{row.missingCountryCount}</td>
                           <td style={{ padding: '11px 14px' }}>
                             <button
                               onClick={() => onGoToFilteredList?.({ category: row.category })}
-                              style={{ fontSize: fontSizes.xs, padding: '5px 12px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}
+                              style={{ fontSize: fontSizes.xs, padding: '5px 12px', borderRadius: radii.sm, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}
                             >
                               {t.viewSuppliers}
                             </button>
@@ -566,17 +562,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
           <div style={{ display: 'flex', borderBottom: `1px solid ${CARD_BORDER}`, padding: '0 24px' }}>
             <button
               onClick={() => setActiveTab('pending')}
-              style={{
-                padding: '12px 20px',
-                fontSize: fontSizes.sm,
-                fontWeight: 700,
-                color: NAVY,
-                border: 'none',
-                borderBottom: `2px solid ${GOLD}`,
-                background: 'none',
-                cursor: 'pointer',
-                marginBottom: -1,
-              }}
+              style={tabStyle(true)}
             >
               {t.pendingTabLabel(filteredPending.length)}
             </button>
@@ -633,7 +619,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                   {(activeFlags.size > 0 || preferredFirst) && (
                     <button
                       onClick={() => { setActiveFlags(new Set()); setPreferredFirst(false); }}
-                      style={{ fontSize: fontSizes.xs, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer' }}
+                      style={{ fontSize: fontSizes.xs, color: workspace.textSecondary, background: 'none', border: 'none', cursor: 'pointer' }}
                     >
                       {t.clearFilters}
                     </button>
@@ -647,14 +633,14 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                   <thead>
                     <tr style={{ background: workspace.surfaceSubtle }}>
                       {[t.pendingColName, t.pendingColCode, t.pendingColLocation, t.pendingColCategory, t.pendingColContact, t.pendingColPreferred, t.pendingColCompleteness, t.pendingColMissing, t.pendingColAction].map(h => (
-                        <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: fontSizes.xs, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap' }}>{h}</th>
+                        <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: fontSizes.xs, borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {filteredPending.length === 0 ? (
                       <tr>
-                        <td colSpan={9} style={{ padding: '48px', textAlign: 'center', color: '#94a3b8' }}>
+                        <td colSpan={9} style={{ padding: '48px', textAlign: 'center', color: workspace.textSecondary }}>
                           {t.noMatchingSuppliers}
                         </td>
                       </tr>
@@ -674,7 +660,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                         <td style={{ padding: '12px 14px', color: '#64748b', fontFamily: fonts.mono }}>{s.short_code}</td>
                         <td style={{ padding: '12px 14px', color: s.country ? '#475569' : '#dc2626' }}>
                           {s.country ?? <span style={{ fontStyle: 'italic' }}>{t.missingCountryInline}</span>}
-                          {s.city && <span style={{ color: '#94a3b8' }}> / {s.city}</span>}
+                          {s.city && <span style={{ color: workspace.textSecondary }}> / {s.city}</span>}
                         </td>
                         <td style={{ padding: '12px 14px', color: '#475569', maxWidth: 160 }}>
                           <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -690,7 +676,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                         <td style={{ padding: '12px 14px' }}>
                           <CompletenessBar pct={s.completeness} label={COMPLETENESS_LABEL[s.completenessStatus] ?? s.completenessStatus} />
                         </td>
-                        <td style={{ padding: '12px 14px', color: '#94a3b8', fontSize: fontSizes.xs, maxWidth: 200 }}>
+                        <td style={{ padding: '12px 14px', color: workspace.textSecondary, fontSize: fontSizes.xs, maxWidth: 200 }}>
                           <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {s.missingFields.map(f => MISSING_FIELD_LABEL[f] ?? f).join(' · ')}
                           </div>
@@ -698,7 +684,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                         <td style={{ padding: '12px 14px' }}>
                           <button
                             onClick={() => onOpenDetail(s.id)}
-                            style={{ fontSize: fontSizes.xs, padding: '5px 12px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}
+                            style={{ fontSize: fontSizes.xs, padding: '5px 12px', borderRadius: radii.sm, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}
                           >
                             {t.fixInfoBtn}
                           </button>
@@ -710,7 +696,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
               </div>
 
               {filteredPending.length > 0 && (
-                <div style={{ padding: '10px 24px', fontSize: fontSizes.xs, color: '#94a3b8', borderTop: `1px solid ${CARD_BORDER}` }}>
+                <div style={{ padding: '10px 24px', fontSize: fontSizes.xs, color: workspace.textSecondary, borderTop: `1px solid ${CARD_BORDER}` }}>
                   {t.showingCountLabel(filteredPending.length, pendingCleanup.length)}
                 </div>
               )}
@@ -727,7 +713,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                 <span style={{ fontSize: fontSizes.sm, fontWeight: 700, color: '#64748b' }}>
                   {t.dupSectionTitle(activeDuplicates.length)}
                 </span>
-                <span style={{ fontSize: fontSizes.xs, color: '#94a3b8' }}>{dupSectionOpen ? t.dupCollapse : t.dupExpand}</span>
+                <span style={{ fontSize: fontSizes.xs, color: workspace.textSecondary }}>{dupSectionOpen ? t.dupCollapse : t.dupExpand}</span>
               </button>
               {dupSectionOpen && (
                 <div style={{ padding: '0 24px 20px', display: 'flex', flexDirection: 'column', gap: 16, borderTop: `1px solid ${CARD_BORDER}`, paddingTop: 16 }}>
@@ -750,14 +736,14 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                                   [t.dupColCreatedAt, rec.created_at ? rec.created_at.slice(0, 10) : '—'],
                                 ].map(([k, v]) => (
                                   <tr key={k}>
-                                    <td style={{ padding: '2px 0', color: '#94a3b8', width: 56, verticalAlign: 'top' }}>{k}</td>
+                                    <td style={{ padding: '2px 0', color: workspace.textSecondary, width: 56, verticalAlign: 'top' }}>{k}</td>
                                     <td style={{ padding: '2px 0', fontWeight: 500 }}>{v}</td>
                                   </tr>
                                 ))}
                               </tbody>
                             </table>
                             <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-                              <button onClick={() => onOpenDetail(rec.id)} style={{ fontSize: fontSizes.xs, padding: '4px 10px', borderRadius: 7, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, cursor: 'pointer', fontWeight: 600 }}>{t.viewBtn}</button>
+                              <button onClick={() => onOpenDetail(rec.id)} style={{ fontSize: fontSizes.xs, padding: '4px 10px', borderRadius: radii.sm, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: NAVY, cursor: 'pointer', fontWeight: 600 }}>{t.viewBtn}</button>
                               {confirmArchiveId === rec.id ? (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                                   <span style={{ fontSize: fontSizes.xs, color: '#dc2626' }}>{t.confirmArchiveQ}</span>
@@ -765,7 +751,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
                                   <button onClick={() => setConfirmArchiveId(null)} style={{ fontSize: fontSizes.xs, padding: '3px 8px', borderRadius: 5, background: '#f1f5f9', color: '#475569', border: 'none', cursor: 'pointer' }}>{t.cancelBtn}</button>
                                 </div>
                               ) : (
-                                <button onClick={() => setConfirmArchiveId(rec.id)} style={{ fontSize: fontSizes.xs, padding: '4px 10px', borderRadius: 7, border: '1px solid #fca5a5', background: '#fff', color: '#dc2626', cursor: 'pointer', fontWeight: 600 }}>{t.archiveBtn}</button>
+                                <button onClick={() => setConfirmArchiveId(rec.id)} style={{ fontSize: fontSizes.xs, padding: '4px 10px', borderRadius: radii.sm, border: '1px solid #fca5a5', background: '#fff', color: '#dc2626', cursor: 'pointer', fontWeight: 600 }}>{t.archiveBtn}</button>
                               )}
                             </div>
                           </div>
@@ -781,24 +767,24 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
 
       {/* Archive confirmation dialog */}
       {confirmArchiveId && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#fff', borderRadius: 16, padding: '28px 32px', maxWidth: 420, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
+        <ModalPortal><div style={MODAL_OVERLAY}>
+          <div style={{ background: '#fff', borderRadius: radii.lg, padding: '24px 28px', maxWidth: 420, width: 'calc(100% - 32px)', boxSizing: 'border-box', boxShadow: '0 20px 60px rgba(8,13,30,0.2)' }}>
             <div style={{ fontWeight: 800, fontSize: fontSizes.lg, color: NAVY, marginBottom: 10 }}>{t.archiveDialogTitle}</div>
             <div style={{ fontSize: fontSizes.sm, color: '#475569', lineHeight: 1.6, marginBottom: 20 }}>
               {t.archiveDialogDesc}
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button onClick={() => setConfirmArchiveId(null)} style={{ padding: '8px 20px', borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: '#475569', cursor: 'pointer', fontWeight: 600 }}>{t.cancelBtn}</button>
+              <button onClick={() => setConfirmArchiveId(null)} style={{ padding: '8px 20px', borderRadius: radii.sm, border: `1px solid ${CARD_BORDER}`, background: '#fff', color: '#475569', cursor: 'pointer', fontWeight: 600 }}>{t.cancelBtn}</button>
               <button
                 onClick={() => handleArchive(confirmArchiveId)}
                 disabled={!!archivingId}
-                style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', cursor: 'pointer', fontWeight: 700 }}
+                style={{ padding: '8px 20px', borderRadius: radii.sm, border: 'none', background: '#dc2626', color: '#fff', cursor: 'pointer', fontWeight: 700 }}
               >
                 {archivingId ? t.archiving : t.confirmArchiveBtn}
               </button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
     </div>
   );

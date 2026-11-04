@@ -58,9 +58,10 @@
   --ws-surface-card: #ffffff;
   --ws-surface-subtle: #f8f9fb;
   --ws-text-primary: #0c1b3a;
-  --ws-text-secondary: rgba(12, 27, 58, 0.6);
+  --ws-text-secondary: rgba(12, 27, 58, 0.65);
   --ws-border: rgba(12, 27, 58, 0.1);
   --ws-accent: var(--gold-muted);
+  --ws-accent-text: #7a5f2a;
   --ws-action-primary-bg: var(--bg-base);
   --ws-action-primary-text: #ffffff;
 
