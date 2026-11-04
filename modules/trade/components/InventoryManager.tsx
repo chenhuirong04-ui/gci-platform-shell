@@ -9,7 +9,7 @@ import {
   RefreshCw, Search, Package, AlertCircle, Clock,
   CheckCircle, Filter, Edit3, X, Save, ChevronDown
 } from 'lucide-react';
-import { colors } from '@gci/design-system';
+import { colors, ModalPortal, workspace } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
 
 const GOLD = colors.goldBase;
@@ -129,7 +129,7 @@ function syncToLocalCache(rows: InventoryRow[]) {
 type Badge = { label: string; cls: string };
 function getBadge(row: InventoryRow, t: { statusOutOfStock: string; statusLowStock: string; statusNormal: string }): Badge {
   if (row.currentQty <= 0)  return { label: t.statusOutOfStock, cls: 'bg-[#E0846A]/15 text-[#A85D45] border border-[#E0846A]/30' };
-  if (row.currentQty <= 10) return { label: t.statusLowStock, cls: 'bg-[#D9B45A]/15 text-[#8A6D2F] border border-[#D9B45A]/30' };
+  if (row.currentQty <= 10) return { label: t.statusLowStock, cls: 'bg-[#D9B45A]/15 text-[#7A5F2A] border border-[#D9B45A]/30' };
   return { label: t.statusNormal,   cls: 'bg-[#6FBF8E]/15 text-[#3F7D58] border border-[#6FBF8E]/30' };
 }
 
@@ -294,20 +294,20 @@ const InventoryManager: React.FC = () => {
 
   // ── Render ───────────────────────────────────────────────────────────────
   if (loading) return (
-    <div className="flex items-center justify-center h-[60vh] gap-3" style={{ color: GOLD }}>
+    <div className="flex items-center justify-center h-[60vh] gap-3" style={{ color: workspace.accentText }}>
       <RefreshCw className="w-6 h-6 animate-spin" />
-      <span className="text-sm font-black uppercase tracking-widest">{t.loadingFromNotion}</span>
+      <span className="text-sm font-bold ">{t.loadingFromNotion}</span>
     </div>
   );
 
   if (error) return (
     <div className="flex flex-col items-center justify-center h-[60vh] gap-4 text-center">
       <AlertCircle className="w-10 h-10" style={{ color: colors.statusDanger }} />
-      <p className="text-sm font-black" style={{ color: colors.statusDanger }}>{error}</p>
-      <p className="text-[10px] text-gray-400 max-w-sm">
+      <p className="text-sm font-bold" style={{ color: colors.statusDanger }}>{error}</p>
+      <p className="text-xs text-slate-600 max-w-sm">
         {t.loadFailedHint}
       </p>
-      <button onClick={load} className="px-6 py-2 text-white rounded-xl text-xs font-black" style={{ backgroundColor: NAVY }}>{t.retry}</button>
+      <button onClick={load} className="px-6 py-2 text-white rounded-md text-xs font-bold" style={{ backgroundColor: NAVY }}>{t.retry}</button>
     </div>
   );
 
@@ -317,14 +317,14 @@ const InventoryManager: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h2 className="text-lg font-black uppercase tracking-widest text-[#080D1E]">{t.pageTitle}</h2>
-          <p className="text-xs text-gray-500 font-bold mt-0.5 uppercase tracking-wide">
+          <h2 className="text-lg font-bold text-[#080D1E]">{t.pageTitle}</h2>
+          <p className="text-xs text-slate-600 font-bold mt-0.5 ">
             {t.sourceLine.replace('{n}', String(rows.length)).replace('{time}', refreshed.toLocaleTimeString())}
           </p>
         </div>
         <button
           onClick={load}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-[#080D1E] transition-all shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-md text-xs font-bold text-slate-600 hover:text-[#080D1E] transition-all shadow-sm"
         >
           <RefreshCw className="w-3 h-3" />{t.refreshFromNotion}
         </button>
@@ -332,7 +332,7 @@ const InventoryManager: React.FC = () => {
 
       {/* OPERATIONS 分区"库存流水"入口暂时指向这个页面，直到独立的明细查看
           页面做出来——只是一个轻提示，不涉及任何数据/逻辑改动。 */}
-      <div className="px-4 py-2.5 rounded-xl text-[11px] font-bold" style={{ backgroundColor: `${colors.statusWarning}1F`, border: `1px solid ${colors.statusWarning}40`, color: '#8A6D2F' }}>
+      <div className="px-4 py-2.5 rounded-[10px] text-xs font-bold" style={{ backgroundColor: `${colors.statusWarning}1F`, border: `1px solid ${colors.statusWarning}40`, color: workspace.accentText }}>
         {t.enhancementNotice}
       </div>
 
@@ -346,9 +346,9 @@ const InventoryManager: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-wrap gap-3 items-center">
-        <div className="flex items-center gap-2 flex-1 min-w-[180px] bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
-          <Search className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+      <div className="bg-white rounded-[10px] p-4 shadow-sm border border-gray-100 flex flex-wrap gap-3 items-center">
+        <div className="flex items-center gap-2 flex-1 min-w-[180px] bg-gray-50 border border-gray-200 rounded-[10px] px-3 py-2">
+          <Search className="w-3.5 h-3.5 text-slate-600 flex-shrink-0" />
           <input
             value={search} onChange={e => setSearch(e.target.value)}
             placeholder={t.searchPlaceholder}
@@ -358,7 +358,7 @@ const InventoryManager: React.FC = () => {
 
         <select
           value={filterCat} onChange={e => setFilterCat(e.target.value)}
-          className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-600 outline-none"
+          className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-xs font-bold text-gray-600 outline-none"
         >
           <option value="">{t.allCategories}</option>
           {categories.map(c => <option key={c} value={c}>{c}</option>)}
@@ -366,13 +366,13 @@ const InventoryManager: React.FC = () => {
 
         <select
           value={filterWH} onChange={e => setFilterWH(e.target.value)}
-          className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-600 outline-none"
+          className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-xs font-bold text-gray-600 outline-none"
         >
           <option value="">{t.allWarehouses}</option>
           {warehouses.map(w => <option key={w} value={w}>{w}</option>)}
         </select>
 
-        <label className="flex items-center gap-2 text-xs font-black text-gray-600 uppercase cursor-pointer select-none">
+        <label className="flex items-center gap-2 text-xs font-bold text-gray-600 cursor-pointer select-none">
           <input
             type="checkbox" checked={showZero} onChange={e => setShowZero(e.target.checked)}
             className="accent-[#080D1E]"
@@ -380,51 +380,51 @@ const InventoryManager: React.FC = () => {
           {t.showZeroStock}
         </label>
 
-        <span className="text-xs font-black text-gray-500 ml-auto">
+        <span className="text-xs font-bold text-slate-600 ml-auto">
           {t.showingRecords.replace('{shown}', String(filtered.length)).replace('{total}', String(rows.length))}
         </span>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 {[t.colProductName, t.colSku, t.colCurrentStock, t.colUnit, t.colCostPrice, t.colWholesale, t.colInventoryValue, t.colCategory, t.colWarehouse, t.colStatus, t.colActions].map((h, i) => (
-                  <th key={i} className="px-4 py-3 text-left font-black text-xs uppercase tracking-wide text-gray-500 whitespace-nowrap">{h}</th>
+                  <th key={i} className="px-4 py-3 text-left font-bold text-xs text-slate-600 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={11} className="py-12 text-center text-gray-500 text-sm font-bold">{t.noData}</td></tr>
+                <tr><td colSpan={11} className="py-12 text-center text-slate-600 text-sm font-bold">{t.noData}</td></tr>
               )}
               {filtered.map(row => {
                 const badge = getBadge(row, t);
                 return (
                   <tr key={row.invPageId} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 font-medium text-gray-800 max-w-[220px]">
-                      <div className="font-black text-gray-800 truncate" title={row.name}>{row.name || '—'}</div>
+                      <div className="font-bold text-gray-800 truncate" title={row.name}>{row.name || '—'}</div>
                       {row.nameEN && row.nameEN !== row.name && (
-                        <div className="text-xs text-gray-400 truncate mt-0.5" title={row.nameEN}>{row.nameEN}</div>
+                        <div className="text-xs text-slate-600 truncate mt-0.5" title={row.nameEN}>{row.nameEN}</div>
                       )}
                     </td>
-                    <td className="px-4 py-3 font-mono text-gray-600 whitespace-nowrap">{row.sku || '—'}</td>
-                    <td className="px-4 py-3 font-black font-mono text-[#080D1E] whitespace-nowrap text-right text-base">
+                    <td className="px-4 py-3 font-mono-label text-gray-600 whitespace-nowrap">{row.sku || '—'}</td>
+                    <td className="px-4 py-3 font-bold font-mono-label text-[#080D1E] whitespace-nowrap text-right text-base">
                       {fmtQty(row.currentQty)}
                     </td>
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{unitLabel(row.unit, lang)}</td>
-                    <td className="px-4 py-3 font-mono text-gray-600 whitespace-nowrap text-right">
+                    <td className="px-4 py-3 font-mono-label text-gray-600 whitespace-nowrap text-right">
                       {row.costPrice > 0 ? fmt2(row.costPrice) : '—'}
                     </td>
-                    <td className="px-4 py-3 font-mono text-gray-600 whitespace-nowrap text-right">
+                    <td className="px-4 py-3 font-mono-label text-gray-600 whitespace-nowrap text-right">
                       {row.wholesale > 0 ? fmt2(row.wholesale) : '—'}
                     </td>
-                    <td className="px-4 py-3 font-mono whitespace-nowrap text-right text-base">
+                    <td className="px-4 py-3 font-mono-label whitespace-nowrap text-right text-base">
                       {row.currentQty > 0 && row.costPrice > 0
-                        ? <span className="text-[#080D1E] font-black">{fmt2(row.currentQty * row.costPrice)}</span>
-                        : <span className="text-gray-300">—</span>
+                        ? <span className="text-[#080D1E] font-bold">{fmt2(row.currentQty * row.costPrice)}</span>
+                        : <span className="text-slate-600">—</span>
                       }
                     </td>
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
@@ -432,12 +432,12 @@ const InventoryManager: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{row.warehouse}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <span className={`text-xs px-2 py-1 rounded-lg font-black ${badge.cls}`}>{badge.label}</span>
+                      <span className={`text-xs px-2 py-1 rounded-lg font-bold ${badge.cls}`}>{badge.label}</span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <button
                         onClick={() => { setAdjRow(row); setAdjDelta(''); setAdjNote(''); setAdjMsg(''); setAdjType('入库'); }}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-[#CBA85C]/15 text-[#8A6D2F] rounded-lg text-xs font-black hover:bg-[#CBA85C]/25 transition-all"
+                        className="flex items-center gap-1 px-3 py-1.5 bg-[#CBA85C]/15 text-[#7A5F2A] rounded-md text-xs font-bold hover:bg-[#CBA85C]/25 transition-all"
                       >
                         <Edit3 className="w-3 h-3" />{t.adjustStock}
                       </button>
@@ -452,35 +452,35 @@ const InventoryManager: React.FC = () => {
 
       {/* Adjust Modal */}
       {adjRow && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-md space-y-4">
+        <ModalPortal><div className="fixed inset-0 bg-[rgba(8,13,30,0.5)] z-[1100] flex items-center justify-center p-4 max-sm:p-0 max-sm:items-start max-sm:overflow-y-auto">
+          <div className="bg-white rounded-[14px] shadow-2xl p-6 w-full max-w-md space-y-4 max-sm:w-full max-sm:min-h-full max-sm:my-0 max-sm:max-w-none max-sm:max-h-none max-sm:rounded-none">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-black text-[#080D1E] text-sm">{t.adjustStock}</h3>
-                <p className="text-[10px] text-gray-400 mt-0.5 font-bold uppercase tracking-widest">{t.adjustModalSubtitle}</p>
+                <h3 className="font-bold text-[#080D1E] text-sm">{t.adjustStock}</h3>
+                <p className="text-xs text-slate-600 mt-0.5 font-bold ">{t.adjustModalSubtitle}</p>
               </div>
-              <button onClick={() => setAdjRow(null)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setAdjRow(null)} className="text-slate-600 hover:text-gray-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="bg-gray-50 rounded-2xl p-4 space-y-1">
-              <p className="font-black text-gray-800 text-sm truncate">{adjRow.name}</p>
-              <p className="text-[10px] text-gray-400 font-mono">{adjRow.sku}</p>
-              <p className="text-xs font-bold text-[#8A6D2F] mt-1">
-                {t.currentStockLabel}<span className="font-black font-mono">{fmtQty(adjRow.currentQty)}</span> {unitLabel(adjRow.unit, lang)}
+            <div className="bg-gray-50 rounded-[10px] p-4 space-y-1">
+              <p className="font-bold text-gray-800 text-sm truncate">{adjRow.name}</p>
+              <p className="text-xs text-slate-600 font-mono-label">{adjRow.sku}</p>
+              <p className="text-xs font-bold text-[#7A5F2A] mt-1">
+                {t.currentStockLabel}<span className="font-bold font-mono-label">{fmtQty(adjRow.currentQty)}</span> {unitLabel(adjRow.unit, lang)}
               </p>
             </div>
 
             <div className="space-y-3">
               <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 block mb-1">{t.changeTypeLabel}</label>
+                <label className="text-xs font-bold text-slate-600 block mb-1">{t.changeTypeLabel}</label>
                 <div className="flex gap-2">
                   {(['入库', '盘点调整'] as const).map(at => (
                     <button
                       key={at}
                       onClick={() => setAdjType(at)}
-                      className={`flex-1 py-2 rounded-xl text-[10px] font-black border transition-all ${
+                      className={`flex-1 py-2 rounded-md text-xs font-bold border transition-all ${
                         adjType === at
                           ? 'bg-[#080D1E] text-white border-[#080D1E]'
                           : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
@@ -493,37 +493,37 @@ const InventoryManager: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 block mb-1">
-                  {t.changeQtyLabel} <span className="text-gray-400 normal-case font-medium">{t.changeQtyHint}</span>
+                <label className="text-xs font-bold text-slate-600 block mb-1">
+                  {t.changeQtyLabel} <span className="text-slate-600 normal-case font-medium">{t.changeQtyHint}</span>
                 </label>
                 <input
                   type="number"
                   value={adjDelta}
                   onChange={e => setAdjDelta(e.target.value)}
                   placeholder={t.changeQtyPlaceholder}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono outline-none focus:border-[#CBA85C] bg-gray-50"
+                  className="w-full border border-gray-200 rounded-md px-4 py-2.5 text-sm font-mono-label outline-none focus:border-[#CBA85C] bg-gray-50"
                 />
                 {adjDelta && !isNaN(parseFloat(adjDelta)) && (
-                  <p className="text-[10px] text-[#8A6D2F] font-bold mt-1 pl-1">
+                  <p className="text-xs text-[#7A5F2A] font-bold mt-1 pl-1">
                     {t.estimatedAfter}{fmtQty(adjRow.currentQty + parseFloat(adjDelta))} {unitLabel(adjRow.unit, lang)}
                   </p>
                 )}
               </div>
 
               <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 block mb-1">{t.noteLabel}</label>
+                <label className="text-xs font-bold text-slate-600 block mb-1">{t.noteLabel}</label>
                 <input
                   type="text"
                   value={adjNote}
                   onChange={e => setAdjNote(e.target.value)}
                   placeholder={t.notePlaceholder}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#CBA85C] bg-gray-50"
+                  className="w-full border border-gray-200 rounded-md px-4 py-2.5 text-sm outline-none focus:border-[#CBA85C] bg-gray-50"
                 />
               </div>
             </div>
 
             {adjMsg && (
-              <div className={`text-[10px] font-bold rounded-xl p-3 ${
+              <div className={`text-xs font-bold rounded-[10px] p-3 ${
                 adjMsg.startsWith('✅') ? 'bg-[#6FBF8E]/15 text-[#3F7D58]' : 'bg-[#E0846A]/15 text-[#A85D45]'
               }`}>
                 {adjMsg}
@@ -533,21 +533,21 @@ const InventoryManager: React.FC = () => {
             <div className="flex gap-2">
               <button
                 onClick={() => setAdjRow(null)}
-                className="flex-1 py-3 border border-gray-200 rounded-2xl text-xs font-black text-gray-500 hover:bg-gray-50"
+                className="flex-1 py-3 border border-gray-200 rounded-md text-xs font-bold text-slate-600 hover:bg-gray-50"
               >
                 {t.cancel}
               </button>
               <button
                 onClick={handleAdjSubmit}
                 disabled={adjSaving || !adjDelta}
-                className="flex-1 py-3 bg-[#080D1E] text-white rounded-2xl text-xs font-black flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-black transition-all"
+                className="flex-1 py-3 bg-[#080D1E] text-white rounded-md text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-black transition-all"
               >
                 {adjSaving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                 {adjSaving ? t.writing : t.confirmWrite}
               </button>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
 
     </div>
@@ -561,11 +561,11 @@ const InventoryManager: React.FC = () => {
 // 'amber', reusing one color across two warning-type stats rather than
 // inventing a 6th hue. ──────────────────────────────────────────────────
 const C = {
-  indigo:  { border: 'border-[#CBA85C]/30',  bg: 'bg-[#CBA85C]/15',  icon: 'text-[#CBA85C]',  val: 'text-[#080D1E]' },
+  indigo:  { border: 'border-[#CBA85C]/30',  bg: 'bg-[#CBA85C]/15',  icon: 'text-[#7A5F2A]',  val: 'text-[#080D1E]' },
   emerald: { border: 'border-[#6FBF8E]/30', bg: 'bg-[#6FBF8E]/15', icon: 'text-[#3F7D58]', val: 'text-[#3F7D58]' },
-  amber:   { border: 'border-[#D9B45A]/30',   bg: 'bg-[#D9B45A]/15',   icon: 'text-[#8A6D2F]',   val: 'text-[#8A6D2F]' },
+  amber:   { border: 'border-[#D9B45A]/30',   bg: 'bg-[#D9B45A]/15',   icon: 'text-[#7A5F2A]',   val: 'text-[#7A5F2A]' },
   red:     { border: 'border-[#E0846A]/30',     bg: 'bg-[#E0846A]/15',     icon: 'text-[#A85D45]',     val: 'text-[#A85D45]' },
-  orange:  { border: 'border-[#D9B45A]/30',  bg: 'bg-[#D9B45A]/15',  icon: 'text-[#8A6D2F]',  val: 'text-[#8A6D2F]' },
+  orange:  { border: 'border-[#D9B45A]/30',  bg: 'bg-[#D9B45A]/15',  icon: 'text-[#7A5F2A]',  val: 'text-[#7A5F2A]' },
 } as const;
 
 const StatCard: React.FC<{
@@ -573,11 +573,11 @@ const StatCard: React.FC<{
 }> = ({ label, value, color, icon }) => {
   const s = C[color];
   return (
-    <div className={`bg-white rounded-2xl p-4 shadow-sm border ${s.border}`}>
-      <div className={`inline-flex p-2 rounded-xl ${s.bg} ${s.icon}`}>{icon}</div>
+    <div className={`bg-white rounded-[10px] p-4 shadow-sm border ${s.border}`}>
+      <div className={`inline-flex p-2 rounded-[10px] ${s.bg} ${s.icon}`}>{icon}</div>
       <div className="mt-3">
-        <div className="text-xs font-black uppercase tracking-wide text-gray-500">{label}</div>
-        <div className={`font-black font-mono mt-1.5 text-xl ${s.val}`}>{value}</div>
+        <div className="text-xs font-bold text-slate-600">{label}</div>
+        <div className={`font-bold font-mono-label mt-1.5 text-xl ${s.val}`}>{value}</div>
       </div>
     </div>
   );

@@ -23,6 +23,10 @@ import {
   isIncomeCategory, isTransferCategory, classifyTransaction,
 } from '../services/transactionCategories';
 import type { TransactionRecord, BankAccount } from '../types';
+import { ModalPortal } from '@gci/design-system';
+
+// Printable / exported documents keep the body font they have always used.
+const DOC_FONT = "var(--font-body), var(--font-display), 'Segoe UI', system-ui, sans-serif";
 
 /** Finance V1 (2026-09) — a cheque only counts toward any account's balance
  * once it has actually cleared; PENDING/BOUNCED/CANCELLED never do. Shared
@@ -178,19 +182,19 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
   if (!can('finance')) {
     return (
       <div className="h-[calc(100vh-250px)] flex items-center justify-center">
-        <div className="bg-white p-12 rounded-[40px] shadow-2xl border border-gray-100 max-w-md w-full text-center space-y-8">
-          <div className="w-20 h-20 bg-[#CBA85C]/10 rounded-full flex items-center justify-center mx-auto text-[#CBA85C]">
+        <div className="bg-white p-12 rounded-[10px] shadow-2xl border border-gray-100 max-w-md w-full text-center space-y-8">
+          <div className="w-20 h-20 bg-[#CBA85C]/10 rounded-full flex items-center justify-center mx-auto text-[#7A5F2A]">
             <Lock className="w-10 h-10" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-xl font-black text-[#080D1E] uppercase tracking-tighter">Private Area</h2>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+            <h2 className="text-xl font-bold text-[#080D1E] tracking-tighter">Private Area</h2>
+            <p className="text-xs font-bold text-slate-600 ">
               你的账号没有财务权限，请联系管理员开通 “finance” 权限
             </p>
           </div>
           <button
             onClick={onCancel}
-            className="w-full py-4 rounded-[20px] bg-[#080D1E] text-white font-black text-[10px] uppercase"
+            className="w-full py-4 rounded-md bg-[#080D1E] text-white font-bold text-xs "
           >
             Back
           </button>
@@ -426,7 +430,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
   };
 
   if (loading) {
-    return <div className="h-[calc(100vh-250px)] flex items-center justify-center text-gray-300 text-xs font-black uppercase tracking-widest">Loading...</div>;
+    return <div className="h-[calc(100vh-250px)] flex items-center justify-center text-slate-600 text-xs font-bold ">Loading...</div>;
   }
 
   return (
@@ -438,7 +442,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
             <button
               onClick={handleExportAllCorporate}
               disabled={exportingAll}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-[11px] font-black uppercase tracking-widest hover:border-[#CBA85C] transition-all disabled:opacity-40"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-md text-xs font-bold hover:border-[#CBA85C] transition-all disabled:opacity-40"
               title="导出全部 Corporate 账户的银行信息（Cash/Personal/Other 不包含）"
             >
               <FileDown className="w-4 h-4" />
@@ -447,7 +451,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
           )}
           <button
             onClick={() => setShowAddAccount(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#080D1E] text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-[#CBA85C] transition-all"
+            className="flex items-center gap-2 px-4 py-2 bg-[#080D1E] text-white rounded-md text-xs font-bold hover:bg-[#CBA85C] transition-all"
           >
             <Plus className="w-4 h-4" /> 新增账户
           </button>
@@ -458,7 +462,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
           same BankDetailsCard template as the on-screen view modal, laid
           out off-screen so html2canvas can capture each one. Not visible,
           not interactive. */}
-      <div style={{ position: 'fixed', left: -99999, top: 0, pointerEvents: 'none' }} aria-hidden="true">
+      <div style={{ fontFamily: DOC_FONT, position: 'fixed', left: -99999, top: 0, pointerEvents: 'none' }} aria-hidden="true">
         {activeCorporateAccounts.map(acc => (
           <BankDetailsCard key={acc.id} account={acc} ref={(el) => { exportAllCardRefs.current[acc.id] = el; }} />
         ))}
@@ -466,34 +470,34 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
 
       {/* Top summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">总银行余额</p>
-          <p className="text-xl font-black font-mono text-gray-800">AED {stats.bankTotal.toFixed(2)}</p>
+        <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
+          <p className="text-xs font-bold text-slate-600 mb-1">总银行余额</p>
+          <p className="text-xl font-bold font-mono-label text-gray-800">AED {stats.bankTotal.toFixed(2)}</p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Cash 余额</p>
-          <p className="text-xl font-black font-mono text-gray-800">AED {stats.cashTotal.toFixed(2)}</p>
+        <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
+          <p className="text-xs font-bold text-slate-600 mb-1">Cash 余额</p>
+          <p className="text-xl font-bold font-mono-label text-gray-800">AED {stats.cashTotal.toFixed(2)}</p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">本月收款</p>
-          <p className="text-xl font-black font-mono text-[#3F7D58]">+{stats.monthIncome.toFixed(2)}</p>
+        <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
+          <p className="text-xs font-bold text-slate-600 mb-1">本月收款</p>
+          <p className="text-xl font-bold font-mono-label text-[#3F7D58]">+{stats.monthIncome.toFixed(2)}</p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">本月付款</p>
-          <p className="text-xl font-black font-mono text-[#E0846A]">-{stats.monthExpense.toFixed(2)}</p>
+        <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
+          <p className="text-xs font-bold text-slate-600 mb-1">本月付款</p>
+          <p className="text-xl font-bold font-mono-label text-[#c53030]">-{stats.monthExpense.toFixed(2)}</p>
         </div>
       </div>
 
       {accounts.length === 0 ? (
-        <div className="bg-white p-12 rounded-2xl border border-gray-100 shadow-sm text-center space-y-4">
-          <Landmark className="w-10 h-10 text-gray-300 mx-auto" />
-          <p className="text-sm font-black text-gray-500">还没有任何银行账户</p>
-          <p className="text-xs text-gray-400">点右上角「新增账户」先建一个对公/对私/现金账户，才能开始记流水</p>
+        <div className="bg-white p-12 rounded-[10px] border border-gray-100 shadow-sm text-center space-y-4">
+          <Landmark className="w-10 h-10 text-slate-600 mx-auto" />
+          <p className="text-sm font-bold text-slate-600">还没有任何银行账户</p>
+          <p className="text-xs text-slate-600">点右上角「新增账户」先建一个对公/对私/现金账户，才能开始记流水</p>
         </div>
       ) : (
         <>
           {/* Account picker — replaces the old hardcoded Corporate/Personal/Cash tabs */}
-          <div className="bg-white p-2 rounded-2xl border border-gray-200 shadow-md flex flex-wrap gap-2">
+          <div className="bg-white p-2 rounded-[10px] border border-gray-200 shadow-md flex flex-wrap gap-2">
             {accounts.map((acc) => {
               const Icon = ACCOUNT_ICON[acc.account_type] || Landmark;
               const isActive = activeAccountId === acc.id;
@@ -501,15 +505,15 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                 <button
                   key={acc.id}
                   onClick={() => setActiveAccountId(acc.id)}
-                  className={`flex-1 min-w-[180px] flex items-center justify-between gap-2 py-3 px-4 rounded-xl text-xs font-black transition-all ${
-                    isActive ? 'bg-[#080D1E] text-white shadow-lg' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                  className={`flex-1 min-w-[180px] flex items-center justify-between gap-2 py-3 px-4 rounded-md text-xs font-bold transition-all ${
+                    isActive ? 'bg-[#080D1E] text-white shadow-lg' : 'bg-gray-50 text-slate-600 hover:bg-gray-100'
                   }`}
                 >
                   <span className="flex items-center gap-2 truncate">
-                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-gray-400'}`} />
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-600'}`} />
                     <span className="truncate">{acc.account_name}</span>
                   </span>
-                  <span className="font-mono opacity-80 shrink-0">{balanceForAccount(acc.id).toFixed(2)}</span>
+                  <span className="font-mono-label opacity-80 shrink-0">{balanceForAccount(acc.id).toFixed(2)}</span>
                 </button>
               );
             })}
@@ -518,10 +522,10 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
           {/* Pending cheques (Finance V1, 2026-09) — account-independent,
               since a PENDING cheque has no bank_account_id yet. */}
           {pendingCheques.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+            <div className="bg-white rounded-[10px] shadow-xl border border-gray-100 overflow-hidden">
               <div className="p-6 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-                <span className="font-black text-gray-800 uppercase text-xs tracking-[0.2em]">待清算支票 / Pending Cheques</span>
-                <span className="text-[10px] px-3 py-1 bg-white border border-gray-200 rounded-full text-gray-600 font-black tracking-widest">{pendingCheques.length}</span>
+                <span className="font-bold text-gray-800 text-xs ">待清算支票 / Pending Cheques</span>
+                <span className="text-xs px-3 py-1 bg-white border border-gray-200 rounded-full text-gray-600 font-bold ">{pendingCheques.length}</span>
               </div>
               <div className="divide-y divide-gray-50">
                 {pendingCheques.map(t => {
@@ -532,12 +536,12 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                       <div className="flex items-center justify-between flex-wrap gap-3">
                         <div>
                           <p className="text-sm font-bold text-gray-700">
-                            <span className={`inline-block px-2 py-0.5 mr-2 rounded-md text-[9px] font-black uppercase tracking-widest align-middle ${isOut ? 'bg-[#A85D45]/10 text-[#A85D45]' : 'bg-[#3F7D58]/10 text-[#3F7D58]'}`}>
+                            <span className={`inline-block px-2 py-0.5 mr-2 rounded-md text-xs font-bold align-middle ${isOut ? 'bg-[#A85D45]/10 text-[#A85D45]' : 'bg-[#3F7D58]/10 text-[#3F7D58]'}`}>
                               {isOut ? '付款 OUT' : '收款 IN'}
                             </span>
-                            {t.note} — <span className="font-mono">{t.cheque_bank}</span> #{t.cheque_number}
+                            {t.note} — <span className="font-mono-label">{t.cheque_bank}</span> #{t.cheque_number}
                           </p>
-                          <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">
+                          <p className="text-xs text-slate-600 mt-1">
                             {t.date} · {t.cheque_date} · AED {(t.cheque_amount ?? t.amount).toFixed(2)}
                             {isOut && (issuedFromAccount ? ` · Issued From ${issuedFromAccount.account_name}` : ' · ⚠️ 缺少 Issued From 账户')}
                           </p>
@@ -552,28 +556,28 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                                 setClearingDepositAccount('');
                               }
                             }}
-                            className="px-4 py-2 rounded-xl bg-[#3F7D58] text-white text-[10px] font-black uppercase tracking-widest hover:bg-[#2d5c40]"
+                            className="px-4 py-2 rounded-md bg-[#3F7D58] text-white text-xs font-bold hover:bg-[#2d5c40]"
                           >
                             标记已清算
                           </button>
                           <button
                             onClick={() => markChequeStatus(t, 'BOUNCED')}
-                            className="px-4 py-2 rounded-xl bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-widest hover:bg-gray-200"
+                            className="px-4 py-2 rounded-md bg-gray-100 text-slate-600 text-xs font-bold hover:bg-gray-200"
                           >
                             退票
                           </button>
                           <button
                             onClick={() => markChequeStatus(t, 'CANCELLED')}
-                            className="px-4 py-2 rounded-xl bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-widest hover:bg-gray-200"
+                            className="px-4 py-2 rounded-md bg-gray-100 text-slate-600 text-xs font-bold hover:bg-gray-200"
                           >
                             作废
                           </button>
                         </div>
                       </div>
                       {!isOut && clearingChequeId === t.id && (
-                        <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-4">
+                        <div className="flex items-center gap-3 bg-gray-50 rounded-[10px] p-4">
                           <select
-                            className="flex-1 p-3 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700 text-sm"
+                            className="flex-1 p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700 text-sm"
                             value={clearingDepositAccount}
                             onChange={e => setClearingDepositAccount(e.target.value)}
                           >
@@ -588,7 +592,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                               setClearingChequeId(null);
                             }}
                             disabled={!clearingDepositAccount}
-                            className="px-5 py-3 rounded-xl bg-[#080D1E] text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
+                            className="px-5 py-3 rounded-md bg-[#080D1E] text-white text-xs font-bold disabled:opacity-40"
                           >
                             确认
                           </button>
@@ -603,33 +607,33 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
 
           <div className="flex-1 flex flex-col lg:flex-row gap-8">
             <div className="lg:w-2/5 flex flex-col gap-6">
-              <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100 relative overflow-hidden group">
+              <div className="bg-white p-8 rounded-[10px] shadow-xl border border-gray-100 relative overflow-hidden group">
                 <div className={`absolute top-0 left-0 w-1.5 h-full transition-colors ${activeBalance >= 0 ? 'bg-[#6FBF8E]' : 'bg-[#E0846A]'}`} />
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">
+                    <p className="text-xs font-bold text-slate-600 mb-1">
                       Current Balance ({activeAccount?.account_name || '-'})
                     </p>
-                    <p className={`text-4xl font-black font-mono tracking-tighter ${activeBalance >= 0 ? 'text-gray-800' : 'text-[#E0846A]'}`}>
+                    <p className={`text-4xl font-bold font-mono-label tracking-tighter ${activeBalance >= 0 ? 'text-gray-800' : 'text-[#c53030]'}`}>
                       {activeAccount?.currency || 'AED'} {activeBalance.toFixed(2)}
                     </p>
                   </div>
-                  <div className={`p-4 rounded-2xl ${activeBalance >= 0 ? 'bg-[#6FBF8E]/10 text-[#3F7D58]' : 'bg-[#E0846A]/10 text-[#E0846A]'}`}>
+                  <div className={`p-4 rounded-[10px] ${activeBalance >= 0 ? 'bg-[#6FBF8E]/10 text-[#3F7D58]' : 'bg-[#E0846A]/10 text-[#c53030]'}`}>
                     <DollarSign className="w-8 h-8" />
                   </div>
                 </div>
 
                 <div className="mt-8 grid grid-cols-2 gap-6 border-t border-gray-50 pt-6">
                   <div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Income</p>
-                    <p className="text-lg font-black text-[#3F7D58] flex items-center gap-1.5 font-mono">
+                    <p className="text-xs font-bold text-slate-600 mb-1">Income</p>
+                    <p className="text-lg font-bold text-[#3F7D58] flex items-center gap-1.5 font-mono-label">
                       <TrendingUp className="w-4 h-4" />
                       {activeIncome.toFixed(2)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Expense</p>
-                    <p className="text-lg font-black text-[#E0846A] flex items-center gap-1.5 font-mono">
+                    <p className="text-xs font-bold text-slate-600 mb-1">Expense</p>
+                    <p className="text-lg font-bold text-[#c53030] flex items-center gap-1.5 font-mono-label">
                       <TrendingDown className="w-4 h-4" />
                       {activeExpense.toFixed(2)}
                     </p>
@@ -639,17 +643,17 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                 {activeAccount?.account_type === 'Corporate' && (
                   <button
                     onClick={() => setShowBankDetailsFor(activeAccount)}
-                    className="mt-6 w-full flex items-center justify-center gap-2 py-3.5 rounded-xl border border-gray-200 text-gray-700 font-black text-[10px] uppercase tracking-widest hover:border-[#CBA85C] hover:text-[#CBA85C] transition-all"
+                    className="mt-6 w-full flex items-center justify-center gap-2 py-3.5 rounded-md border border-gray-200 text-gray-700 font-bold text-xs hover:border-[#CBA85C] hover:text-[#CBA85C] transition-all"
                   >
                     <CreditCard className="w-4 h-4" /> 银行信息 / Bank Details
                   </button>
                 )}
               </div>
 
-              <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
+              <div className="bg-white rounded-[10px] shadow-xl border border-gray-100 p-8">
                 <div className="flex justify-between items-center mb-8 pb-4 border-b border-gray-50">
-                  <h3 className="font-black text-gray-800 flex items-center gap-3 uppercase text-sm tracking-widest">
-                    <PlusCircle className="w-5 h-5 text-[#CBA85C]" />
+                  <h3 className="font-bold text-gray-800 flex items-center gap-3 text-sm ">
+                    <PlusCircle className="w-5 h-5 text-[#7A5F2A]" />
                     Quick Entry
                   </h3>
                 </div>
@@ -664,9 +668,9 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                       one of the two submit buttons below — addTransaction()
                       cross-checks the pick against whichever was clicked. */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Category / 分类 *</label>
+                    <label className="text-xs font-bold text-slate-600 ">Category / 分类 *</label>
                     <select
-                      className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700"
+                      className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700"
                       value={category}
                       onChange={e => setCategory(e.target.value)}
                     >
@@ -687,10 +691,10 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Subcategory / 子分类（可选）</label>
+                    <label className="text-xs font-bold text-slate-600 ">Subcategory / 子分类（可选）</label>
                     <input
                       type="text"
-                      className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                      className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
                       value={subcategory}
                       onChange={e => setSubcategory(e.target.value)}
                     />
@@ -700,14 +704,14 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                       real supplier, never both (a manual entry is either
                       sales-adjacent or supplier-adjacent). */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">关联 Link（可选）</label>
+                    <label className="text-xs font-bold text-slate-600 ">关联 Link（可选）</label>
                     <div className="grid grid-cols-3 gap-2">
                       {(['none', 'customer', 'supplier'] as const).map(m => (
                         <button
                           key={m}
                           type="button"
                           onClick={() => setLinkMode(m)}
-                          className={`p-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${linkMode === m ? 'bg-[#080D1E] text-white' : 'bg-gray-100 text-gray-400'}`}
+                          className={`p-2.5 rounded-md text-xs font-bold transition-all ${linkMode === m ? 'bg-[#080D1E] text-white' : 'bg-gray-100 text-slate-600'}`}
                         >
                           {m === 'none' ? '不关联' : m === 'customer' ? '客户/项目' : '供应商'}
                         </button>
@@ -721,16 +725,16 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
 
                   {linkMode === 'supplier' && (
                     <div className="space-y-1.5 relative">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Supplier / 供应商</label>
+                      <label className="text-xs font-bold text-slate-600 ">Supplier / 供应商</label>
                       <input
                         type="text"
-                        className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                        className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
                         placeholder="搜索供应商名称…"
                         value={selectedSupplier ? selectedSupplier.supplier_name_display : supplierQuery}
                         onChange={e => { setSupplierQuery(e.target.value); setSelectedSupplier(null); }}
                       />
                       {!selectedSupplier && supplierQuery.trim() && filteredSuppliers.length > 0 && (
-                        <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl">
+                        <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-[10px] shadow-xl">
                           {filteredSuppliers.map(s => (
                             <button
                               key={s.id}
@@ -754,19 +758,19 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                       actually moved. */}
                   {paymentMethodValue.payment_method === 'CHEQUE' && (
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cheque Direction / 支票方向</label>
+                      <label className="text-xs font-bold text-slate-600 ">Cheque Direction / 支票方向</label>
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"
                           onClick={() => setChequeDirection('in')}
-                          className={`p-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${chequeDirection === 'in' ? 'bg-[#3F7D58] text-white' : 'bg-gray-100 text-gray-400'}`}
+                          className={`p-3 rounded-md text-xs font-bold transition-all ${chequeDirection === 'in' ? 'bg-[#3F7D58] text-white' : 'bg-gray-100 text-slate-600'}`}
                         >
                           收款支票 / In
                         </button>
                         <button
                           type="button"
                           onClick={() => setChequeDirection('out')}
-                          className={`p-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${chequeDirection === 'out' ? 'bg-[#A85D45] text-white' : 'bg-gray-100 text-gray-400'}`}
+                          className={`p-3 rounded-md text-xs font-bold transition-all ${chequeDirection === 'out' ? 'bg-[#A85D45] text-white' : 'bg-gray-100 text-slate-600'}`}
                         >
                           付款支票 / Out
                         </button>
@@ -781,12 +785,12 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                   />
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Transaction Date</label>
+                    <label className="text-xs font-bold text-slate-600 ">Transaction Date</label>
                     <div className="relative">
-                      <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
                       <input
                         type="date"
-                        className="w-full pl-10 p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] focus:ring-4 focus:ring-[#CBA85C]/20 bg-white font-bold text-gray-700 font-mono"
+                        className="w-full pl-10 p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] focus:ring-4 focus:ring-[#CBA85C]/20 bg-white font-bold text-gray-700 font-mono-label"
                         value={date}
                         onChange={e => setDate(e.target.value)}
                       />
@@ -794,12 +798,12 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Memo / Note</label>
+                    <label className="text-xs font-bold text-slate-600 ">Memo / Note</label>
                     <div className="relative">
-                      <FileText className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <FileText className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
                       <input
                         type="text"
-                        className="w-full pl-10 p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] focus:ring-4 focus:ring-[#CBA85C]/20 bg-white font-bold text-gray-700"
+                        className="w-full pl-10 p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] focus:ring-4 focus:ring-[#CBA85C]/20 bg-white font-bold text-gray-700"
                         placeholder="e.g. Sales Deposit"
                         value={note}
                         onChange={e => setNote(e.target.value)}
@@ -808,13 +812,13 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Amount</label>
+                    <label className="text-xs font-bold text-slate-600 ">Amount</label>
                     <div className="relative">
-                      <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
                       <input
                         type="number"
                         step="0.01"
-                        className="w-full pl-10 p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] focus:ring-4 focus:ring-[#CBA85C]/20 bg-white font-bold text-gray-700 font-mono text-xl"
+                        className="w-full pl-10 p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] focus:ring-4 focus:ring-[#CBA85C]/20 bg-white font-bold text-gray-700 font-mono-label text-xl"
                         placeholder="0.00"
                         value={amount}
                         onChange={e => setAmount(e.target.value)}
@@ -826,14 +830,14 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                     <button
                       onClick={() => addTransaction('in')}
                       disabled={!note || !amount || !category}
-                      className="flex items-center justify-center gap-2 p-4 rounded-xl bg-[#3F7D58] text-white hover:bg-[#2d5c40] shadow-lg font-black uppercase text-xs tracking-widest disabled:opacity-40"
+                      className="flex items-center justify-center gap-2 p-4 rounded-md bg-[#3F7D58] text-white hover:bg-[#2d5c40] shadow-lg font-bold text-xs disabled:opacity-40"
                     >
                       <TrendingUp className="w-4 h-4" /> Income
                     </button>
                     <button
                       onClick={() => addTransaction('out')}
                       disabled={!note || !amount || !category}
-                      className="flex items-center justify-center gap-2 p-4 rounded-xl bg-[#A85D45] text-white hover:bg-[#8b4c37] shadow-lg font-black uppercase text-xs tracking-widest disabled:opacity-40"
+                      className="flex items-center justify-center gap-2 p-4 rounded-md bg-[#A85D45] text-white hover:bg-[#8b4c37] shadow-lg font-bold text-xs disabled:opacity-40"
                     >
                       <TrendingDown className="w-4 h-4" /> Expense
                     </button>
@@ -842,20 +846,20 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
               </div>
             </div>
 
-            <div className="flex-1 bg-white rounded-2xl shadow-xl border border-gray-100 flex flex-col overflow-hidden">
+            <div className="flex-1 bg-white rounded-[10px] shadow-xl border border-gray-100 flex flex-col overflow-hidden">
               <div className="p-6 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-                <span className="font-black text-gray-800 uppercase text-xs tracking-[0.2em] flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-[#CBA85C]" />
+                <span className="font-bold text-gray-800 text-xs flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-[#7A5F2A]" />
                   {activeAccount?.account_name || '-'} Ledger
                 </span>
-                <span className="text-[10px] px-3 py-1 bg-white border border-gray-200 rounded-full text-gray-600 font-black tracking-widest">
+                <span className="text-xs px-3 py-1 bg-white border border-gray-200 rounded-full text-gray-600 font-bold ">
                   {currentTransactions.length} ENTRIES
                 </span>
               </div>
 
               <div className="flex-1 overflow-auto custom-scrollbar">
                 <table className="w-full text-left">
-                  <thead className="bg-gray-50/50 text-[10px] font-black text-gray-400 uppercase tracking-widest sticky top-0 shadow-sm z-10">
+                  <thead className="bg-gray-50/50 text-xs font-bold text-slate-600 sticky top-0 shadow-sm z-10">
                     <tr>
                       <th className="px-6 py-4">Date</th>
                       <th className="px-6 py-4">Memo</th>
@@ -866,31 +870,31 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                   <tbody className="divide-y divide-gray-50">
                     {currentTransactions.map(t => (
                       <tr key={t.id} className="hover:bg-[#CBA85C]/5 transition-colors group">
-                        <td className="px-6 py-5 text-gray-400 font-mono text-[11px] whitespace-nowrap">{t.date}</td>
+                        <td className="px-6 py-5 text-slate-600 font-mono-label text-xs whitespace-nowrap">{t.date}</td>
                         <td className="px-6 py-5">
                           <div className="flex items-center gap-3">
                             <div className={`w-2 h-2 rounded-full ${t.type === 'in' ? 'bg-[#6FBF8E]' : 'bg-[#E0846A]'}`} />
-                            <span className="text-sm font-bold text-gray-700 uppercase">{t.note}</span>
+                            <span className="text-sm font-bold text-gray-700 ">{t.note}</span>
                             {classifyTransaction(t) && (
-                              <span className="text-[8px] px-2 py-0.5 rounded-full bg-[#080D1E]/5 text-[#080D1E] font-black uppercase">{classifyTransaction(t)}</span>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-[#080D1E]/5 text-[#080D1E] font-bold ">{classifyTransaction(t)}</span>
                             )}
                             {t.ref_type && t.ref_type !== 'MANUAL' && (
-                              <span className="text-[8px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 font-black uppercase">{t.ref_type}</span>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-slate-600 font-bold ">{t.ref_type}</span>
                             )}
                             {t.payment_method && (
-                              <span className="text-[8px] px-2 py-0.5 rounded-full bg-[#CBA85C]/10 text-[#8A6D2F] font-black uppercase">
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-[#CBA85C]/10 text-[#7A5F2A] font-bold ">
                                 {t.payment_method === 'CHEQUE' ? `CHEQUE · ${t.cheque_status}` : t.payment_method}
                               </span>
                             )}
                           </div>
                         </td>
-                        <td className={`px-6 py-5 text-right font-black font-mono text-sm tracking-tighter ${t.type === 'in' ? 'text-[#3F7D58]' : 'text-[#E0846A]'}`}>
+                        <td className={`px-6 py-5 text-right font-bold font-mono-label text-sm tracking-tighter ${t.type === 'in' ? 'text-[#3F7D58]' : 'text-[#c53030]'}`}>
                           {t.type === 'in' ? '+' : '-'}{t.amount.toFixed(2)}
                         </td>
                         <td className="px-4 py-5 text-right">
                           <button
                             onClick={() => handleDelete(t.id)}
-                            className="text-gray-200 hover:text-[#E0846A] p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                            className="text-gray-200 hover:text-[#E0846A] p-2 rounded-md opacity-0 group-hover:opacity-100 transition-all"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -898,7 +902,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                       </tr>
                     ))}
                     {currentTransactions.length === 0 && (
-                      <tr><td colSpan={4} className="px-6 py-16 text-center text-gray-300 text-xs font-black uppercase tracking-widest">No entries yet</td></tr>
+                      <tr><td colSpan={4} className="px-6 py-16 text-center text-slate-600 text-xs font-bold ">No entries yet</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -920,15 +924,15 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
         // open. Mounting straight onto document.body via a portal sidesteps
         // the whole ancestor chain — there is no longer any ancestor between
         // this overlay and <body> that could reinterpret `fixed`.
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xl z-[6000] flex items-center justify-center p-4 sm:p-8">
+        <ModalPortal><div className="fixed inset-0 bg-[rgba(8,13,30,0.5)] z-[1100] flex items-center justify-center p-4 max-sm:p-0 max-sm:items-start max-sm:overflow-y-auto">
           <div
-            className="bg-white rounded-[40px] shadow-2xl max-w-md w-full flex flex-col overflow-hidden"
+            className="bg-white rounded-[14px] shadow-2xl max-w-md w-full flex flex-col overflow-hidden max-sm:w-full max-sm:min-h-full max-sm:my-0 max-sm:max-w-none max-sm:max-h-none max-sm:rounded-none"
             style={{ maxHeight: 'calc(100dvh - 32px)' }}
           >
             {/* Header — fixed, never scrolls */}
             <div className="shrink-0 flex items-center justify-between px-10 pt-10 pb-6">
-              <h3 className="text-sm font-black text-[#080D1E] uppercase tracking-[0.2em]">新增银行账户</h3>
-              <button onClick={() => { setShowAddAccount(false); setNewAcc(emptyNewAccount); }} className="text-gray-300 hover:text-gray-600 shrink-0">
+              <h3 className="text-sm font-bold text-[#080D1E] ">新增银行账户</h3>
+              <button onClick={() => { setShowAddAccount(false); setNewAcc(emptyNewAccount); }} className="text-slate-600 hover:text-gray-600 shrink-0">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -943,10 +947,10 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
             <div className="flex-1 min-h-0 overflow-y-auto px-10">
             <div className="space-y-5 pb-8">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">账户名称</label>
+                <label className="text-xs font-bold text-slate-600 ">账户名称</label>
                 <input
                   type="text"
-                  className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                  className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
                   placeholder="e.g. Emirates NBD - GCI Trading"
                   value={newAcc.account_name}
                   onChange={e => setNewAccField('account_name', e.target.value)}
@@ -955,10 +959,10 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
 
               {newAcc.account_type !== 'Cash' && (
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">账户持有人</label>
+                  <label className="text-xs font-bold text-slate-600 ">账户持有人</label>
                   <input
                     type="text"
-                    className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                    className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
                     placeholder="e.g. Globalcare Info General Trading FZCO"
                     value={newAcc.account_holder_name}
                     onChange={e => setNewAccField('account_holder_name', e.target.value)}
@@ -967,9 +971,9 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
               )}
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">账户类型</label>
+                <label className="text-xs font-bold text-slate-600 ">账户类型</label>
                 <select
-                  className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                  className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
                   value={newAcc.account_type}
                   onChange={e => setNewAccField('account_type', e.target.value)}
                 >
@@ -983,38 +987,38 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
               {newAcc.account_type !== 'Cash' && (
                 <>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">银行名称</label>
+                    <label className="text-xs font-bold text-slate-600 ">银行名称</label>
                     <input
                       type="text"
-                      className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                      className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
                       placeholder="e.g. WIO Bank PJSC"
                       value={newAcc.bank_name}
                       onChange={e => setNewAccField('bank_name', e.target.value)}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Account Number / 账号</label>
+                    <label className="text-xs font-bold text-slate-600 ">Account Number / 账号</label>
                     <input
                       type="text"
-                      className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono"
+                      className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono-label"
                       value={newAcc.account_number}
                       onChange={e => setNewAccField('account_number', e.target.value)}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">IBAN</label>
+                    <label className="text-xs font-bold text-slate-600 ">IBAN</label>
                     <input
                       type="text"
-                      className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono"
+                      className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono-label"
                       value={newAcc.iban}
                       onChange={e => setNewAccField('iban', e.target.value)}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">SWIFT / BIC</label>
+                    <label className="text-xs font-bold text-slate-600 ">SWIFT / BIC</label>
                     <input
                       type="text"
-                      className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono"
+                      className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono-label"
                       value={newAcc.swift_bic}
                       onChange={e => setNewAccField('swift_bic', e.target.value)}
                     />
@@ -1023,10 +1027,10 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
               )}
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Currency</label>
+                <label className="text-xs font-bold text-slate-600 ">Currency</label>
                 <input
                   type="text"
-                  className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                  className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
                   placeholder="AED"
                   value={newAcc.currency}
                   onChange={e => setNewAccField('currency', e.target.value.toUpperCase())}
@@ -1036,19 +1040,19 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
               {newAcc.account_type !== 'Cash' && (
                 <>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Bank Address</label>
+                    <label className="text-xs font-bold text-slate-600 ">Bank Address</label>
                     <input
                       type="text"
-                      className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                      className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
                       value={newAcc.bank_address}
                       onChange={e => setNewAccField('bank_address', e.target.value)}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Branch</label>
+                    <label className="text-xs font-bold text-slate-600 ">Branch</label>
                     <input
                       type="text"
-                      className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700"
+                      className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
                       value={newAcc.branch_name}
                       onChange={e => setNewAccField('branch_name', e.target.value)}
                     />
@@ -1057,11 +1061,11 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
               )}
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Opening Balance（可选，默认 0）</label>
+                <label className="text-xs font-bold text-slate-600 ">Opening Balance（可选，默认 0）</label>
                 <input
                   type="number"
                   step="0.01"
-                  className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono"
+                  className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono-label"
                   placeholder="0.00"
                   value={newAcc.opening_balance}
                   onChange={e => setNewAccField('opening_balance', e.target.value)}
@@ -1075,13 +1079,13 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
               <button
                 onClick={handleCreateAccount}
                 disabled={!newAcc.account_name.trim() || savingAccount}
-                className="w-full py-4 rounded-[20px] bg-[#080D1E] text-white font-black text-[10px] uppercase disabled:opacity-40"
+                className="w-full py-4 rounded-md bg-[#080D1E] text-white font-bold text-xs disabled:opacity-40"
               >
                 {savingAccount ? '创建中...' : '创建账户'}
               </button>
             </div>
           </div>
-        </div>,
+        </div></ModalPortal>,
         document.body
       )}
 

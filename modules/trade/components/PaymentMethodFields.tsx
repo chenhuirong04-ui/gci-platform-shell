@@ -172,7 +172,7 @@ export function PaymentMethodFields({ value, onChange, accounts, compact, type }
       </div>
 
       {value.payment_method === 'CASH' && (
-        <p className="text-[11px] text-gray-400 px-1">
+        <p className="text-xs text-slate-600 px-1">
           将自动记到系统里唯一启用中的 Cash 账户——如果没有 Cash 账户，或者有不止一个，提交时会提示，不会自动乱选。
         </p>
       )}
@@ -181,7 +181,7 @@ export function PaymentMethodFields({ value, onChange, accounts, compact, type }
         <div className="space-y-1.5">
           <label className={labelCls}>Bank Account / 银行账户</label>
           {bankAccounts.length === 0 ? (
-            <p className="text-[11px] text-[#E0846A] font-bold px-1">
+            <p className="text-xs text-[#c53030] font-bold px-1">
               没有可选的银行账户，请先去"银行账户"新建一个 Corporate/Personal/Other 账户。
             </p>
           ) : (
@@ -200,11 +200,11 @@ export function PaymentMethodFields({ value, onChange, accounts, compact, type }
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className={labelCls}>Cheque Number</label>
-              <input className={inputCls + ' font-mono'} value={value.cheque_number} onChange={e => set('cheque_number', e.target.value)} />
+              <input className={inputCls + ' font-mono-label'} value={value.cheque_number} onChange={e => set('cheque_number', e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <label className={labelCls}>Cheque Date</label>
-              <input type="date" className={inputCls + ' font-mono'} value={value.cheque_date} onChange={e => set('cheque_date', e.target.value)} />
+              <input type="date" className={inputCls + ' font-mono-label'} value={value.cheque_date} onChange={e => set('cheque_date', e.target.value)} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -214,7 +214,7 @@ export function PaymentMethodFields({ value, onChange, accounts, compact, type }
             </div>
             <div className="space-y-1.5">
               <label className={labelCls}>Cheque Amount</label>
-              <input type="number" step="0.01" className={inputCls + ' font-mono'} value={value.cheque_amount} onChange={e => set('cheque_amount', e.target.value)} />
+              <input type="number" step="0.01" className={inputCls + ' font-mono-label'} value={value.cheque_amount} onChange={e => set('cheque_amount', e.target.value)} />
             </div>
           </div>
           <div className="space-y-1.5">
@@ -232,7 +232,7 @@ export function PaymentMethodFields({ value, onChange, accounts, compact, type }
             <div className="space-y-1.5">
               <label className={labelCls}>Issued From / 开票账户</label>
               {bankAccounts.length === 0 ? (
-                <p className="text-[11px] text-[#E0846A] font-bold px-1">没有可选的银行账户，请先去"银行账户"新建一个。</p>
+                <p className="text-xs text-[#c53030] font-bold px-1">没有可选的银行账户，请先去"银行账户"新建一个。</p>
               ) : (
                 <select className={inputCls} value={value.issued_from_bank_account_id} onChange={e => set('issued_from_bank_account_id', e.target.value)}>
                   <option value="">请选择账户…</option>
@@ -247,7 +247,7 @@ export function PaymentMethodFields({ value, onChange, accounts, compact, type }
               <div className="space-y-1.5">
                 <label className={labelCls}>Deposited To / 存入账户</label>
                 {bankAccounts.length === 0 ? (
-                  <p className="text-[11px] text-[#E0846A] font-bold px-1">没有可选的银行账户，请先去"银行账户"新建一个。</p>
+                  <p className="text-xs text-[#c53030] font-bold px-1">没有可选的银行账户，请先去"银行账户"新建一个。</p>
                 ) : (
                   <select className={inputCls} value={value.deposited_to_bank_account_id} onChange={e => set('deposited_to_bank_account_id', e.target.value)}>
                     <option value="">请选择账户…</option>
@@ -260,7 +260,7 @@ export function PaymentMethodFields({ value, onChange, accounts, compact, type }
             )
           )}
           {value.cheque_status !== 'CLEARED' && (
-            <p className="text-[11px] text-gray-400 px-1">
+            <p className="text-xs text-slate-600 px-1">
               {value.cheque_status === 'PENDING'
                 ? (type === 'out'
                     ? '支票 Cleared 之前不减少开票账户余额；后续可以在"待清算支票"列表里把它标记为已清算。'

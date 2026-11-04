@@ -9,7 +9,7 @@ import HomeDashboard from './components/HomeDashboard';
 import InventoryManager from './components/InventoryManager';
 import ConsignmentManager from './components/ConsignmentManager';
 import { Zap, ArrowLeft } from 'lucide-react';
-import { Button } from '@gci/design-system';
+import { Button, workspaceFontFamily } from '@gci/design-system';
 
 console.log('[TRADE OPS BUILD]',    'ops-dashboard-inventory-consignment-v1');
 console.log('[TRADE FORMAL BUILD]', 'trade-formal-v1');
@@ -78,17 +78,17 @@ export default function TradeModule({ initialTab }: TradeModuleProps = {}) {
   ] as const;
 
   return (
-    <div className="min-h-screen bg-[#F5F6FA]">
+    <div className="min-h-screen bg-[#F5F6FA]" style={{ fontFamily: workspaceFontFamily }}>
       {/* In-module sub-nav: was "mobile-only", now the only nav for Trade's
           7 sub-tabs since the global Sidebar only has one "Trade" entry. */}
-      <nav className="no-print bg-white border-b border-gray-100 sticky top-0 z-40 px-3 shadow-sm">
-        <div className="flex overflow-x-auto custom-scrollbar gap-1.5 py-2">
+      <nav className="no-print bg-white border-b border-[rgba(12,27,58,0.1)] sticky top-[var(--header-h)] z-20 px-3">
+        <div className="flex overflow-x-auto custom-scrollbar">
           {navTabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                activeTab === tab.id ? 'bg-[#080D1E] text-white' : 'text-slate-500 bg-slate-100'
+              className={`shrink-0 px-[18px] py-3 -mb-px border-b-2 text-[13px] whitespace-nowrap transition-colors ${
+                activeTab === tab.id ? 'border-[#A07F3C] text-[#0C1B3A] font-bold' : 'border-transparent text-slate-600 font-medium'
               }`}
             >
               {tab.label}
@@ -105,11 +105,11 @@ export default function TradeModule({ initialTab }: TradeModuleProps = {}) {
         {activeTab === 'convert' && (
           ENABLE_ORDER_CONVERSION_AI ? <OrderConverter /> : (
             <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)] animate-in fade-in">
-              <div className="bg-white p-12 rounded-[40px] shadow-xl border border-gray-100 text-center space-y-6">
-                <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto text-gray-300">
+              <div className="bg-white p-12 rounded-[10px] shadow-xl border border-gray-100 text-center space-y-6">
+                <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto text-slate-600">
                   <Zap className="w-10 h-10" />
                 </div>
-                <p className="text-sm font-black text-gray-400 uppercase tracking-widest">This feature is currently disabled.</p>
+                <p className="text-sm font-bold text-slate-600 ">This feature is currently disabled.</p>
                 <Button
                   variant="primary"
                   onClick={() => setActiveTab('history')}

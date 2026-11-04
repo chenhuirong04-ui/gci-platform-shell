@@ -13,3 +13,4 @@ export * from './components/LangToggle';
 export * from './components/AlertRow';
 export * from './components/QuickActionCard';
 export * from './components/Toast';
+export * from './components/ModalPortal';

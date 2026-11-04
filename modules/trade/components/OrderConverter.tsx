@@ -161,21 +161,21 @@ const OrderConverter: React.FC = () => {
       
       {/* 输入侧：Chat Logs */}
       <section className="flex-1 flex flex-col gap-5">
-        <div className="bg-white p-8 rounded-[40px] shadow-sm border border-orange-50 flex flex-col h-full overflow-hidden">
+        <div className="bg-white p-8 rounded-[10px] shadow-sm border border-orange-50 flex flex-col h-full overflow-hidden">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-sm font-black text-orange-600 uppercase tracking-[0.2em] flex items-center gap-3">
+            <h2 className="text-sm font-bold text-orange-700 flex items-center gap-3">
               <MessageSquare className="w-5 h-5" /> 原始谈单记录 / Chat Logs
             </h2>
             <button 
               onClick={() => setInputChat('')}
-              className="text-[10px] font-black text-gray-400 hover:text-red-500 uppercase tracking-widest transition-colors"
+              className="text-xs font-bold text-slate-600 hover:text-red-500 transition-colors"
             >
               清空
             </button>
           </div>
           
           <textarea 
-            className="flex-1 w-full p-6 text-sm font-mono text-gray-700 bg-orange-50/20 border-2 border-orange-50 rounded-[32px] outline-none focus:border-orange-500 transition-all resize-none placeholder:text-gray-300"
+            className="flex-1 w-full p-6 text-sm font-mono-label text-gray-700 bg-orange-50/20 border-2 border-orange-50 rounded-md outline-none focus:border-orange-500 transition-all resize-none placeholder:text-gray-300"
             placeholder="在此粘贴包含产品、数量、价格的聊天记录...&#10;AI 将自动提取结构化订单。"
             value={inputChat}
             onChange={(e) => setInputChat(e.target.value)}
@@ -184,7 +184,7 @@ const OrderConverter: React.FC = () => {
           <button 
             disabled={isExtracting || !inputChat.trim()}
             onClick={handleExtract}
-            className="w-full mt-6 py-5 bg-orange-500 text-white rounded-[24px] font-black uppercase text-xs tracking-[0.3em] shadow-xl shadow-orange-100 hover:bg-orange-600 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30"
+            className="w-full mt-6 py-5 bg-orange-500 text-white rounded-md font-bold text-xs shadow-xl shadow-orange-100 hover:bg-orange-600 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30"
           >
             {isExtracting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Zap className="w-5 h-5 fill-white" /> 物理解析订单 / Extract</>}
           </button>
@@ -193,57 +193,57 @@ const OrderConverter: React.FC = () => {
 
       {/* 结果侧：Parsed Orders */}
       <section className="flex-1 flex flex-col gap-6 h-full overflow-hidden">
-        <div className="bg-white rounded-[40px] border border-indigo-50 shadow-2xl flex flex-col h-full overflow-hidden relative">
+        <div className="bg-white rounded-[10px] border border-indigo-50 shadow-2xl flex flex-col h-full overflow-hidden relative">
           
           <div className="p-8 border-b border-indigo-50 flex items-center justify-between bg-indigo-50/30">
              <div className="flex items-center gap-4">
-                <div className="p-3 bg-indigo-600 rounded-2xl text-white">
+                <div className="p-3 bg-indigo-600 rounded-[10px] text-white">
                     <Layers className="w-5 h-5" />
                 </div>
                 <div>
-                    <h3 className="font-black text-indigo-900 uppercase text-xs tracking-widest">提取结果 / Extracted Orders</h3>
-                    <p className="text-[9px] text-indigo-400 font-bold uppercase mt-1">Pending Sync to Notion</p>
+                    <h3 className="font-bold text-indigo-900 text-xs ">提取结果 / Extracted Orders</h3>
+                    <p className="text-xs text-indigo-400 font-bold mt-1">Pending Sync to Notion</p>
                 </div>
              </div>
              <div className="flex items-center gap-3">
-                <span className="px-3 py-1 bg-white border border-indigo-100 rounded-full text-[10px] font-black text-indigo-600">{items.length} SKUs</span>
+                <span className="px-3 py-1 bg-white border border-indigo-100 rounded-full text-xs font-bold text-indigo-600">{items.length} SKUs</span>
              </div>
           </div>
 
           <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-4">
             {error && (
-              <div className="bg-red-50 border-2 border-red-100 p-6 rounded-[24px] text-red-600 text-xs font-bold flex items-center gap-3 animate-pulse">
+              <div className="bg-red-50 border-2 border-red-100 p-6 rounded-[10px] text-red-600 text-xs font-bold flex items-center gap-3 animate-pulse">
                 <AlertTriangle className="w-5 h-5" /> {error}
               </div>
             )}
 
             {items.length === 0 && !isExtracting && (
-              <div className="h-full flex flex-col items-center justify-center text-gray-300 opacity-50">
+              <div className="h-full flex flex-col items-center justify-center text-slate-600 opacity-50">
                  <Package className="w-16 h-16 mb-4" />
-                 <p className="text-xs font-black uppercase tracking-widest">Waiting for extraction...</p>
+                 <p className="text-xs font-bold ">Waiting for extraction...</p>
               </div>
             )}
 
             {items.length > 0 && (
               <>
-                <div className="flex items-center gap-3 mb-6 px-4 py-3 bg-indigo-50 rounded-2xl border border-indigo-100">
+                <div className="flex items-center gap-3 mb-6 px-4 py-3 bg-indigo-50 rounded-[10px] border border-indigo-100">
                     <User className="w-4 h-4 text-indigo-400" />
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Customer:</span>
+                    <span className="text-xs font-bold text-slate-600 ">Customer:</span>
                     <input 
                       value={customer} 
                       onChange={e => setCustomer(e.target.value)} 
-                      className="bg-transparent font-black text-indigo-900 outline-none flex-1 text-sm uppercase"
+                      className="bg-transparent font-bold text-indigo-900 outline-none flex-1 text-sm "
                     />
                 </div>
                 
                 <div className="space-y-4">
                   {items.map((it) => (
-                    <div key={it.id} className="group bg-white border border-gray-100 rounded-[28px] p-6 shadow-sm hover:shadow-md transition-all flex items-center justify-between">
+                    <div key={it.id} className="group bg-white border border-gray-100 rounded-[10px] p-6 shadow-sm hover:shadow-md transition-all flex items-center justify-between">
                        <div className="flex flex-col gap-1 flex-1 pr-4">
-                          <span className="text-sm font-black text-gray-800 uppercase leading-tight">{it.desc}</span>
+                          <span className="text-sm font-bold text-gray-800 leading-tight">{it.desc}</span>
                           <div className="flex items-center gap-4 mt-1">
-                             <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1"><DollarSign className="w-3 h-3"/> {it.price.toFixed(2)}</span>
-                             <span className="text-[10px] font-bold text-gray-400 flex items-center gap-1">QTY: {it.qty}</span>
+                             <span className="text-xs font-bold text-emerald-700 flex items-center gap-1"><DollarSign className="w-3 h-3"/> {it.price.toFixed(2)}</span>
+                             <span className="text-xs font-bold text-slate-600 flex items-center gap-1">QTY: {it.qty}</span>
                           </div>
                        </div>
                        <button 
@@ -260,11 +260,11 @@ const OrderConverter: React.FC = () => {
 
             {syncLogs.length > 0 && (
               <div className="mt-8 pt-8 border-t-2 border-dashed border-gray-100 space-y-2">
-                 <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-4">Sync Operation Logs</p>
+                 <p className="text-xs font-bold text-slate-600 mb-4">Sync Operation Logs</p>
                  {syncLogs.map((log, idx) => (
-                    <div key={idx} className={`text-[10px] font-mono font-bold flex items-center gap-2 ${
-                        log.type === 'success' ? 'text-emerald-500' : 
-                        log.type === 'error' ? 'text-red-500' : 'text-indigo-400'
+                    <div key={idx} className={`text-xs font-mono-label font-bold flex items-center gap-2 ${
+                        log.type === 'success' ? 'text-emerald-700' : 
+                        log.type === 'error' ? 'text-red-600' : 'text-indigo-400'
                     }`}>
                         <div className={`w-1.5 h-1.5 rounded-full ${
                             log.type === 'success' ? 'bg-emerald-500' : 
@@ -281,7 +281,7 @@ const OrderConverter: React.FC = () => {
              <button 
                disabled={items.length === 0 || isSyncing}
                onClick={handleSyncToNotion}
-               className="w-full py-6 bg-indigo-900 text-white rounded-[24px] font-black uppercase text-xs tracking-[0.5em] shadow-2xl flex items-center justify-center gap-4 active:scale-95 transition-all hover:bg-black disabled:opacity-30"
+               className="w-full py-6 bg-indigo-900 text-white rounded-md font-bold text-xs shadow-2xl flex items-center justify-center gap-4 active:scale-95 transition-all hover:bg-black disabled:opacity-30"
              >
                 {isSyncing ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Send className="w-5 h-5" /> 生成订单并扣库存 / SYNC ORDER</>}
              </button>

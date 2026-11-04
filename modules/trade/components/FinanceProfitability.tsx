@@ -288,7 +288,7 @@ export default function FinanceProfitability() {
   }, [periodTxns, supplierNameById, payables, supplierIdByPaymentId]);
 
   if (loading) {
-    return <div className="h-[calc(100vh-250px)] flex items-center justify-center text-gray-300 text-xs font-black uppercase tracking-widest">Loading...</div>;
+    return <div className="h-[calc(100vh-250px)] flex items-center justify-center text-slate-600 text-xs font-bold ">Loading...</div>;
   }
 
   const periodLabel = period === 'this_month' ? '本月' : period === 'last_month' ? '上月' : period === 'custom' ? customMonth : '全部历史';
@@ -302,7 +302,7 @@ export default function FinanceProfitability() {
             <button
               key={p}
               onClick={() => setPeriod(p)}
-              className={`px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${period === p ? 'bg-[#080D1E] text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+              className={`px-4 py-2.5 rounded-md text-xs font-bold transition-all ${period === p ? 'bg-[#080D1E] text-white' : 'bg-gray-100 text-slate-600 hover:bg-gray-200'}`}
             >
               {p === 'this_month' ? '本月' : p === 'last_month' ? '上月' : p === 'custom' ? '自定义月份' : '全部历史'}
             </button>
@@ -311,7 +311,7 @@ export default function FinanceProfitability() {
             <select
               value={customMonth}
               onChange={e => setCustomMonth(e.target.value)}
-              className="p-2.5 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] bg-white font-black text-gray-700 text-sm font-mono"
+              className="p-2.5 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700 text-sm font-mono-label"
             >
               {monthOptions.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
@@ -320,9 +320,9 @@ export default function FinanceProfitability() {
       </div>
 
       {projectDirectCostIncomplete && (
-        <div className="bg-[#CBA85C]/10 border border-[#CBA85C]/30 rounded-2xl p-4 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-[#8A6D2F] shrink-0 mt-0.5" />
-          <p className="text-xs font-bold text-[#8A6D2F]">
+        <div className="bg-[#CBA85C]/10 border border-[#CBA85C]/30 rounded-[10px] p-4 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-[#7A5F2A] shrink-0 mt-0.5" />
+          <p className="text-xs font-bold text-[#7A5F2A]">
             项目直接成本数据尚未完整归集 / Direct cost data incomplete — 供应商付款（Supplier Payment）目前不携带 project_id，只有手工记账时主动关联项目的支出才会计入下面的"项目直接支出"。以下毛利率可能被高估，仅供参考，不代表真实项目盈亏。
           </p>
         </div>
@@ -330,30 +330,30 @@ export default function FinanceProfitability() {
 
       {/* Top KPI — sums of the Project Profitability table below (real projects only, excludes Legacy) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{periodLabel}项目经营收入</p>
-          <p className="text-xl font-black font-mono text-[#3F7D58]">+{periodProjectRevenue.toFixed(2)}</p>
+        <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
+          <p className="text-xs font-bold text-slate-600 mb-1">{periodLabel}项目经营收入</p>
+          <p className="text-xl font-bold font-mono-label text-[#3F7D58]">+{periodProjectRevenue.toFixed(2)}</p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{periodLabel}项目直接支出</p>
-          <p className="text-xl font-black font-mono text-[#E0846A]">-{periodProjectCost.toFixed(2)}</p>
+        <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
+          <p className="text-xs font-bold text-slate-600 mb-1">{periodLabel}项目直接支出</p>
+          <p className="text-xl font-bold font-mono-label text-[#c53030]">-{periodProjectCost.toFixed(2)}</p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">毛利 / Gross Profit</p>
-          <p className={`text-xl font-black font-mono ${periodProjectGrossProfit >= 0 ? 'text-gray-800' : 'text-[#E0846A]'}`}>{periodProjectGrossProfit.toFixed(2)}</p>
+        <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
+          <p className="text-xs font-bold text-slate-600 mb-1">毛利 / Gross Profit</p>
+          <p className={`text-xl font-bold font-mono-label ${periodProjectGrossProfit >= 0 ? 'text-gray-800' : 'text-[#c53030]'}`}>{periodProjectGrossProfit.toFixed(2)}</p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">毛利率 / Gross Margin</p>
-          <p className="text-xl font-black font-mono text-gray-800">{periodProjectMargin === null ? '—' : `${periodProjectMargin.toFixed(1)}%`}</p>
+        <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
+          <p className="text-xs font-bold text-slate-600 mb-1">毛利率 / Gross Margin</p>
+          <p className="text-xl font-bold font-mono-label text-gray-800">{periodProjectMargin === null ? '—' : `${periodProjectMargin.toFixed(1)}%`}</p>
         </div>
       </div>
 
       {/* Project profitability */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Layers className="w-4 h-4 text-[#CBA85C]" /> 项目利润排行 / Project Profitability</h3>
+      <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6">
+        <h3 className="font-bold text-gray-800 flex items-center gap-2 text-xs mb-4"><Layers className="w-4 h-4 text-[#7A5F2A]" /> 项目利润排行 / Project Profitability</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
+            <thead className="text-xs font-bold text-slate-600 border-b border-gray-100">
               <tr>
                 <th className="py-2 pr-4">Project</th>
                 <th className="py-2 pr-4">Customer</th>
@@ -367,19 +367,19 @@ export default function FinanceProfitability() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {projectRows.map(r => (
-                <tr key={r.key} className={r.isLegacy ? 'text-gray-400 italic' : ''}>
+                <tr key={r.key} className={r.isLegacy ? 'text-slate-600 italic' : ''}>
                   <td className="py-3 pr-4 font-bold text-gray-700">{r.projectName}</td>
-                  <td className="py-3 pr-4 text-gray-500">{r.customerName}</td>
-                  <td className="py-3 pr-4 text-right font-mono font-black text-[#3F7D58]">{r.revenue.toFixed(2)}</td>
-                  <td className="py-3 pr-4 text-right font-mono font-black text-[#E0846A]">{r.directCost.toFixed(2)}</td>
-                  <td className={`py-3 pr-4 text-right font-mono font-black ${r.grossProfit >= 0 ? 'text-gray-800' : 'text-[#E0846A]'}`}>{r.grossProfit.toFixed(2)}</td>
-                  <td className="py-3 pr-4 text-right font-mono text-gray-600">{r.grossMargin === null ? '—' : `${r.grossMargin.toFixed(1)}%`}</td>
-                  <td className="py-3 pr-4 text-right font-mono text-gray-600">{r.collected.toFixed(2)}</td>
-                  <td className="py-3 text-right font-mono text-gray-600">{r.outstanding.toFixed(2)}</td>
+                  <td className="py-3 pr-4 text-slate-600">{r.customerName}</td>
+                  <td className="py-3 pr-4 text-right font-mono-label font-bold text-[#3F7D58]">{r.revenue.toFixed(2)}</td>
+                  <td className="py-3 pr-4 text-right font-mono-label font-bold text-[#c53030]">{r.directCost.toFixed(2)}</td>
+                  <td className={`py-3 pr-4 text-right font-mono-label font-bold ${r.grossProfit >= 0 ? 'text-gray-800' : 'text-[#c53030]'}`}>{r.grossProfit.toFixed(2)}</td>
+                  <td className="py-3 pr-4 text-right font-mono-label text-gray-600">{r.grossMargin === null ? '—' : `${r.grossMargin.toFixed(1)}%`}</td>
+                  <td className="py-3 pr-4 text-right font-mono-label text-gray-600">{r.collected.toFixed(2)}</td>
+                  <td className="py-3 text-right font-mono-label text-gray-600">{r.outstanding.toFixed(2)}</td>
                 </tr>
               ))}
               {projectRows.length === 0 && (
-                <tr><td colSpan={8} className="py-10 text-center text-gray-300 text-xs font-black uppercase">No project-linked data in this period</td></tr>
+                <tr><td colSpan={8} className="py-10 text-center text-slate-600 text-xs font-bold ">No project-linked data in this period</td></tr>
               )}
             </tbody>
           </table>
@@ -387,45 +387,45 @@ export default function FinanceProfitability() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Trophy className="w-4 h-4 text-[#CBA85C]" /> 客户收入排行 / Top Customers</h3>
+        <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6">
+          <h3 className="font-bold text-gray-800 flex items-center gap-2 text-xs mb-4"><Trophy className="w-4 h-4 text-[#7A5F2A]" /> 客户收入排行 / Top Customers</h3>
           <div className="space-y-2">
             {customerRows.map((r, i) => (
               <div key={r.key} className="flex items-center justify-between text-sm gap-2">
-                <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-[9px] text-gray-300 ml-1">Legacy / 未关联ID</span>}</span>
-                <span className="font-mono font-black text-gray-800 shrink-0">{r.revenue.toFixed(2)}</span>
+                <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-xs text-slate-600 ml-1">Legacy / 未关联ID</span>}</span>
+                <span className="font-mono-label font-bold text-gray-800 shrink-0">{r.revenue.toFixed(2)}</span>
               </div>
             ))}
-            {customerRows.length === 0 && <p className="text-xs text-gray-300 font-black uppercase text-center py-4">No data</p>}
+            {customerRows.length === 0 && <p className="text-xs text-slate-600 font-bold text-center py-4">No data</p>}
           </div>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Users className="w-4 h-4 text-[#CBA85C]" /> 客户未收款 / AR by Customer（当前，不受时间筛选影响）</h3>
+        <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6">
+          <h3 className="font-bold text-gray-800 flex items-center gap-2 text-xs mb-4"><Users className="w-4 h-4 text-[#7A5F2A]" /> 客户未收款 / AR by Customer（当前，不受时间筛选影响）</h3>
           <div className="space-y-2">
             {customerArRows.map((r, i) => (
               <div key={r.key} className="flex items-center justify-between text-sm gap-2">
                 <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}</span>
-                <span className="font-mono font-black text-[#E0846A] shrink-0">{r.ar.toFixed(2)}</span>
+                <span className="font-mono-label font-bold text-[#c53030] shrink-0">{r.ar.toFixed(2)}</span>
               </div>
             ))}
-            {customerArRows.length === 0 && <p className="text-xs text-gray-300 font-black uppercase text-center py-4">No outstanding AR</p>}
+            {customerArRows.length === 0 && <p className="text-xs text-slate-600 font-bold text-center py-4">No outstanding AR</p>}
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <h3 className="font-black text-gray-800 flex items-center gap-2 uppercase text-xs tracking-widest mb-4"><Wallet className="w-4 h-4 text-[#CBA85C]" /> 供应商付款排行 / Top Suppliers</h3>
+      <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6">
+        <h3 className="font-bold text-gray-800 flex items-center gap-2 text-xs mb-4"><Wallet className="w-4 h-4 text-[#7A5F2A]" /> 供应商付款排行 / Top Suppliers</h3>
         <div className="space-y-2">
           {supplierRows.map((r, i) => (
             <div key={r.key} className="flex items-center justify-between text-sm gap-2">
-              <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-[9px] text-gray-300 ml-1">Legacy / 未关联ID</span>}</span>
+              <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-xs text-slate-600 ml-1">Legacy / 未关联ID</span>}</span>
               <span className="flex items-center gap-4 shrink-0">
-                <span className="font-mono font-black text-gray-800">已付 {r.paid.toFixed(2)}</span>
-                {r.ap > 0 && <span className="font-mono font-black text-[#E0846A]">AP {r.ap.toFixed(2)}</span>}
+                <span className="font-mono-label font-bold text-gray-800">已付 {r.paid.toFixed(2)}</span>
+                {r.ap > 0 && <span className="font-mono-label font-bold text-[#c53030]">AP {r.ap.toFixed(2)}</span>}
               </span>
             </div>
           ))}
-          {supplierRows.length === 0 && <p className="text-xs text-gray-300 font-black uppercase text-center py-4">No data</p>}
+          {supplierRows.length === 0 && <p className="text-xs text-slate-600 font-bold text-center py-4">No data</p>}
         </div>
       </div>
     </div>

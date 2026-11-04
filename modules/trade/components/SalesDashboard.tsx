@@ -7,7 +7,7 @@ import {
 import { OrderRecord, OrderItemRecord } from '../types';
 import { roundTo2 } from '../services/currencyUtils';
 import { persistence } from '../services/persistenceService';
-import { colors } from '@gci/design-system';
+import { colors, workspace } from '@gci/design-system';
 
 const GOLD = colors.goldBase;
 const NAVY = colors.bgBase;
@@ -201,8 +201,8 @@ const SalesDashboard: React.FC = () => {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="text-center space-y-4">
-          <RefreshCw className="w-8 h-8 animate-spin mx-auto" style={{ color: GOLD }} />
-          <p className="text-xs font-black uppercase tracking-widest text-gray-400">Loading Dashboard...</p>
+          <RefreshCw className="w-8 h-8 animate-spin mx-auto" style={{ color: workspace.accentText }} />
+          <p className="text-xs font-bold text-slate-600">Loading Dashboard...</p>
         </div>
       </div>
     );
@@ -214,14 +214,14 @@ const SalesDashboard: React.FC = () => {
       {/* ── Page Header ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-2xl font-black uppercase tracking-widest" style={{ color: NAVY }}>经营看板</h2>
-          <p className="text-xs text-gray-400 font-bold mt-0.5 uppercase tracking-widest">
+          <h2 className="text-2xl font-bold " style={{ color: NAVY }}>经营看板</h2>
+          <p className="text-xs text-slate-600 font-bold mt-0.5 ">
             Business Analytics · v2 · {lastRefresh.toLocaleTimeString()}
           </p>
         </div>
         <button
           onClick={load}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-black uppercase tracking-widest text-gray-500 hover:text-slate-700 hover:border-slate-300 transition-all shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-md text-xs font-bold text-slate-600 hover:text-slate-700 hover:border-slate-300 transition-all shadow-sm"
         >
           <RefreshCw className="w-3.5 h-3.5" />刷新数据
         </button>
@@ -237,7 +237,7 @@ const SalesDashboard: React.FC = () => {
       </div>
 
       {/* ══ Row 2 — 本月经营拆解 ════════════════════════════════════════ */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-[10px] border border-gray-100 shadow-sm overflow-hidden">
         <SecHead icon={<Layers className="w-4 h-4" />} title="本月经营拆解" sub="MONTHLY BUSINESS BREAKDOWN" />
         <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <BreakCard label="Direct Sale"  sub="本月直销"   value={`AED ${fmt(breakdown.directAmt)}`}
@@ -255,7 +255,7 @@ const SalesDashboard: React.FC = () => {
       </div>
 
       {/* ══ Row 3 — 销售渠道占比 ════════════════════════════════════════ */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-[10px] border border-gray-100 shadow-sm overflow-hidden">
         <SecHead icon={<PieChart className="w-4 h-4" />} title="销售渠道占比" sub="SALES CHANNEL MIX · BY SALES AMOUNT" />
         <div className="p-6 space-y-5">
           <ChannelBar
@@ -269,10 +269,10 @@ const SalesDashboard: React.FC = () => {
             barClass="bg-[#080D1E]" dotClass="bg-[#080D1E]"
           />
           <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
-            <span className="text-xs font-black uppercase tracking-widest text-gray-400">合计 · All Orders</span>
-            <span className="text-xl font-black font-mono text-[#080D1E]">AED {fmt(channelMix.grand)}</span>
+            <span className="text-xs font-bold text-slate-600">合计 · All Orders</span>
+            <span className="text-xl font-bold font-mono-label text-[#080D1E]">AED {fmt(channelMix.grand)}</span>
           </div>
-          <p className="text-xs text-gray-400 font-semibold leading-relaxed">
+          <p className="text-xs text-slate-600 font-semibold leading-relaxed">
             ℹ 当前订单未设 salesChannel 字段。Consignment 按 transactionMode 识别，其余统一归为 Other。
             录入渠道字段后（超市 / 批发商 / 电商 / 项目客户等）将自动细分。
           </p>
@@ -282,7 +282,7 @@ const SalesDashboard: React.FC = () => {
       {/* ══ Row 4 — 客户 + 产品排行 ══════════════════════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 overflow-hidden">
           <SecHead icon={<Users className="w-4 h-4" />} title="客户销售排行 Top 10" sub="CUSTOMER SALES RANKING · ALL TIME" />
           <div className="p-5 space-y-3">
             {topCustomers.length === 0
@@ -296,7 +296,7 @@ const SalesDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 overflow-hidden">
           <SecHead icon={<Package className="w-4 h-4" />} title="产品销售排行 Top 10" sub="PRODUCT SALES RANKING · ALL TIME" />
           <div className="p-5 space-y-3">
             {topProducts.length === 0
@@ -316,7 +316,7 @@ const SalesDashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
         {/* 逾期应收 */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 overflow-hidden">
           <SecHead icon={<Clock className="w-4 h-4" />}
             title={`逾期应收 (${overdueList.length})`}
             sub="OVERDUE RECEIVABLES · DUE DATE PASSED"
@@ -326,13 +326,13 @@ const SalesDashboard: React.FC = () => {
               <EmptyState text="暂无逾期应收 · All Clear" icon="✅" green />
             ) : (
               overdueList.map(o => (
-                <div key={o.id} className="flex items-center justify-between p-3.5 rounded-xl bg-[#FBF1EE] border border-[#E0846A]/20">
+                <div key={o.id} className="flex items-center justify-between p-3.5 rounded-[10px] bg-[#FBF1EE] border border-[#E0846A]/20">
                   <div className="min-w-0">
-                    <div className="text-sm font-black text-gray-800 truncate">{o.customerName || '—'}</div>
-                    <div className="text-xs font-bold text-gray-400 mt-0.5 font-mono">{o.id}</div>
+                    <div className="text-sm font-bold text-gray-800 truncate">{o.customerName || '—'}</div>
+                    <div className="text-xs font-bold text-slate-600 mt-0.5 font-mono-label">{o.id}</div>
                   </div>
                   <div className="text-right shrink-0 ml-3">
-                    <div className="text-sm font-black font-mono text-[#A85D45]">AED {fmt(Number(o.outstandingAmount) || 0)}</div>
+                    <div className="text-sm font-bold font-mono-label text-[#A85D45]">AED {fmt(Number(o.outstandingAmount) || 0)}</div>
                     <div className="text-xs font-bold text-[#C17F66] mt-0.5">+{o.diffDays}d 逾期</div>
                   </div>
                 </div>
@@ -342,7 +342,7 @@ const SalesDashboard: React.FC = () => {
         </div>
 
         {/* 客户应收排行 */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 overflow-hidden">
           <SecHead icon={<DollarSign className="w-4 h-4" />}
             title="客户应收排行"
             sub="CUSTOMER OUTSTANDING RANKING"
@@ -362,20 +362,20 @@ const SalesDashboard: React.FC = () => {
       </div>
 
       {/* ══ Row 6 — 销售模式表现 ═════════════════════════════════════════ */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-[10px] border border-gray-100 shadow-sm overflow-hidden">
         <SecHead icon={<BarChart3 className="w-4 h-4" />} title="销售模式表现" sub="SALES MODE PERFORMANCE · ALL ORDERS" />
         <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-5">
 
           {/* Direct Sale */}
-          <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 space-y-3">
+          <div className="bg-gray-50 rounded-[10px] p-5 border border-gray-100 space-y-3">
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full bg-[#080D1E]" />
-              <span className="text-sm font-black uppercase tracking-widest text-gray-700">Direct Sale</span>
+              <span className="text-sm font-bold text-gray-700">Direct Sale</span>
             </div>
-            <div className="text-[28px] font-black font-mono text-[#080D1E] leading-tight">
+            <div className="text-[28px] font-bold font-mono-label text-[#080D1E] leading-tight">
               AED {fmt(modePerf.direct.total)}
             </div>
-            <div className="flex gap-4 text-xs font-bold text-gray-500">
+            <div className="flex gap-4 text-xs font-bold text-slate-600">
               <span>{modePerf.direct.count} 单</span>
               <span>占比 {modePerf.direct.pct}%</span>
             </div>
@@ -386,16 +386,16 @@ const SalesDashboard: React.FC = () => {
           </div>
 
           {/* Consignment (Orders) */}
-          <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200 space-y-3">
+          <div className="bg-slate-50 rounded-[10px] p-5 border border-slate-200 space-y-3">
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full bg-slate-400" />
-              <span className="text-sm font-black uppercase tracking-widest text-slate-700">Consignment</span>
-              <span className="text-xs font-bold text-slate-400">SO 记录</span>
+              <span className="text-sm font-bold text-slate-700">Consignment</span>
+              <span className="text-xs font-bold text-slate-600">SO 记录</span>
             </div>
-            <div className="text-[28px] font-black font-mono text-slate-700 leading-tight">
+            <div className="text-[28px] font-bold font-mono-label text-slate-700 leading-tight">
               AED {fmt(modePerf.consign.total)}
             </div>
-            <div className="flex gap-4 text-xs font-bold text-slate-400">
+            <div className="flex gap-4 text-xs font-bold text-slate-600">
               <span>{modePerf.consign.count} 单</span>
               <span>占比 {modePerf.consign.pct}%</span>
             </div>
@@ -406,28 +406,28 @@ const SalesDashboard: React.FC = () => {
           </div>
 
           {/* Consignment Ledger */}
-          <div className="bg-[#D4A843]/10 rounded-2xl p-5 border border-[#D4A843]/20 space-y-3">
+          <div className="bg-[#D4A843]/10 rounded-[10px] p-5 border border-[#D4A843]/20 space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
               <div className="w-2.5 h-2.5 rounded-full bg-[#D4A843]" />
-              <span className="text-sm font-black uppercase tracking-widest text-[#8A6B2A]">寄售台账</span>
-              <span className="text-xs font-bold text-[#D4A843]/70 uppercase">Consignment Ledger</span>
+              <span className="text-sm font-bold text-[#8A6B2A]">寄售台账</span>
+              <span className="text-xs font-bold text-[#7A5F2A] ">Consignment Ledger</span>
             </div>
             <div className="space-y-2.5">
               <div className="flex justify-between items-center">
-                <span className="text-xs font-black uppercase tracking-wide text-[#D4A843]">寄售总额</span>
-                <span className="text-sm font-black font-mono text-[#8A6B2A]">AED {fmt(modePerf.ledger.total)}</span>
+                <span className="text-xs font-bold text-[#7A5F2A]">寄售总额</span>
+                <span className="text-sm font-bold font-mono-label text-[#8A6B2A]">AED {fmt(modePerf.ledger.total)}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs font-black uppercase tracking-wide text-[#3F7D58]">已结算</span>
-                <span className="text-sm font-black font-mono text-[#2d5c40]">AED {fmt(modePerf.ledger.settled)}</span>
+                <span className="text-xs font-bold text-[#3F7D58]">已结算</span>
+                <span className="text-sm font-bold font-mono-label text-[#2d5c40]">AED {fmt(modePerf.ledger.settled)}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs font-black uppercase tracking-wide text-[#E0846A]">未结算</span>
-                <span className="text-sm font-black font-mono text-[#A85D45]">AED {fmt(modePerf.ledger.unsettled)}</span>
+                <span className="text-xs font-bold text-[#c53030]">未结算</span>
+                <span className="text-sm font-bold font-mono-label text-[#A85D45]">AED {fmt(modePerf.ledger.unsettled)}</span>
               </div>
               <div className="flex justify-between items-center pt-2 border-t border-[#D4A843]/20">
-                <span className="text-xs font-black uppercase tracking-wide text-gray-400">台账记录</span>
-                <span className="text-sm font-black text-gray-600">{modePerf.ledger.count} 条</span>
+                <span className="text-xs font-bold text-slate-600">台账记录</span>
+                <span className="text-sm font-bold text-gray-600">{modePerf.ledger.count} 条</span>
               </div>
             </div>
           </div>
@@ -436,7 +436,7 @@ const SalesDashboard: React.FC = () => {
       </div>
 
       {/* ── Footer ──────────────────────────────────────────────────────── */}
-      <div className="text-center text-xs font-bold text-gray-300 uppercase tracking-widest pb-2">
+      <div className="text-center text-xs font-bold text-slate-600 pb-2">
         Refreshed: {lastRefresh.toLocaleTimeString()} &nbsp;·&nbsp; sales-dashboard-v2
       </div>
 
@@ -453,9 +453,9 @@ const SalesDashboard: React.FC = () => {
 // is now neutral gray per the V2 baseline (no purple as a regular status
 // color).
 const KPI_C = {
-  indigo:  { border: 'border-[#E5D5A0]',   iconBg: 'bg-[#FFF5D0]',  icon: 'text-[#8A6D2F]', val: 'text-[#4A3A14]',   bg: 'bg-[#FFFBEF]' },
+  indigo:  { border: 'border-[#E5D5A0]',   iconBg: 'bg-[#FFF5D0]',  icon: 'text-[#7A5F2A]', val: 'text-[#4A3A14]',   bg: 'bg-[#FFFBEF]' },
   emerald: { border: 'border-[#6FBF8E]/20', iconBg: 'bg-[#6FBF8E]/10', icon: 'text-[#3F7D58]', val: 'text-[#2d5c40]', bg: 'bg-[#F1F8F4]' },
-  amber:   { border: 'border-[#E0846A]/20', iconBg: 'bg-[#E0846A]/10', icon: 'text-[#E0846A]', val: 'text-[#A85D45]', bg: 'bg-[#FFF1EE]' },
+  amber:   { border: 'border-[#E0846A]/20', iconBg: 'bg-[#E0846A]/10', icon: 'text-[#c53030]', val: 'text-[#A85D45]', bg: 'bg-[#FFF1EE]' },
   violet:  { border: 'border-slate-200',    iconBg: 'bg-slate-100', icon: 'text-slate-500',   val: 'text-slate-700',   bg: 'bg-slate-50' },
 } as const;
 
@@ -464,12 +464,12 @@ const KpiCard: React.FC<{
 }> = ({ label, sub, value, icon, c }) => {
   const s = KPI_C[c];
   return (
-    <div className={`${s.bg} rounded-2xl p-5 shadow-sm border ${s.border}`}>
-      <div className={`inline-flex p-2.5 rounded-xl ${s.iconBg} ${s.icon}`}>{icon}</div>
+    <div className={`${s.bg} rounded-[10px] p-5 shadow-sm border ${s.border}`}>
+      <div className={`inline-flex p-2.5 rounded-[10px] ${s.iconBg} ${s.icon}`}>{icon}</div>
       <div className="mt-4">
-        <div className="text-xs font-black uppercase tracking-widest text-gray-400">{sub}</div>
-        <div className="text-sm font-black uppercase tracking-wide text-gray-600 mt-0.5">{label}</div>
-        <div className={`text-[28px] font-black font-mono mt-2 leading-tight ${s.val}`}>{value}</div>
+        <div className="text-xs font-bold text-slate-600">{sub}</div>
+        <div className="text-sm font-bold text-gray-600 mt-0.5">{label}</div>
+        <div className={`text-[28px] font-bold font-mono-label mt-2 leading-tight ${s.val}`}>{value}</div>
       </div>
     </div>
   );
@@ -482,8 +482,8 @@ const SecHead: React.FC<{
   <div className="bg-gray-50 border-b border-gray-100 px-5 py-4 flex items-center gap-2.5">
     <div style={{ color: accentRed ? colors.statusDanger : GOLD }}>{icon}</div>
     <div>
-      <div className="text-base font-black uppercase tracking-widest" style={{ color: accentRed ? colors.statusDanger : '#374151' }}>{title}</div>
-      <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-0.5">{sub}</div>
+      <div className="text-base font-bold " style={{ color: accentRed ? colors.statusDanger : '#374151' }}>{title}</div>
+      <div className="text-xs font-bold text-slate-600 mt-0.5">{sub}</div>
     </div>
   </div>
 );
@@ -492,15 +492,15 @@ const SecHead: React.FC<{
 const BreakCard: React.FC<{
   label: string; sub: string; value: string; pct: number; barClass: string; alert?: boolean;
 }> = ({ label, sub, value, pct, barClass, alert }) => (
-  <div className={`rounded-xl p-4 border ${alert ? 'bg-[#FBF1EE] border-[#E0846A]/20' : 'bg-gray-50 border-gray-100'}`}>
-    <div className="text-xs font-black uppercase tracking-wide text-gray-400 mb-0.5">{sub}</div>
-    <div className={`text-sm font-black uppercase ${alert ? 'text-[#A85D45]' : 'text-gray-700'} mb-2`}>{label}</div>
-    <div className={`text-lg font-black font-mono ${alert ? 'text-[#A85D45]' : 'text-[#080D1E]'} leading-tight mb-3`}>{value}</div>
+  <div className={`rounded-[10px] p-4 border ${alert ? 'bg-[#FBF1EE] border-[#E0846A]/20' : 'bg-gray-50 border-gray-100'}`}>
+    <div className="text-xs font-bold text-slate-600 mb-0.5">{sub}</div>
+    <div className={`text-sm font-bold ${alert ? 'text-[#A85D45]' : 'text-gray-700'} mb-2`}>{label}</div>
+    <div className={`text-lg font-bold font-mono-label ${alert ? 'text-[#A85D45]' : 'text-[#080D1E]'} leading-tight mb-3`}>{value}</div>
     <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
       <div className={`h-full ${barClass} rounded-full`}
         style={{ width: `${Math.max(pct * 100, pct > 0 ? 2 : 0)}%` }} />
     </div>
-    <div className="text-xs text-gray-400 font-bold mt-1">{Math.round(pct * 100)}%</div>
+    <div className="text-xs text-slate-600 font-bold mt-1">{Math.round(pct * 100)}%</div>
   </div>
 );
 
@@ -512,19 +512,19 @@ const ChannelBar: React.FC<{
     <div className="flex justify-between items-center flex-wrap gap-2">
       <div className="flex items-center gap-2 flex-wrap">
         <div className={`w-2.5 h-2.5 rounded-full ${dotClass} shrink-0`} />
-        <span className="text-sm font-black text-gray-700">{label}</span>
+        <span className="text-sm font-bold text-gray-700">{label}</span>
         {subTag && (
-          <span className="text-xs font-bold text-[#D4A843] bg-[#D4A843]/10 border border-[#D4A843]/25 px-1.5 py-0.5 rounded-full">
+          <span className="text-xs font-bold text-[#7A5F2A] bg-[#D4A843]/10 border border-[#D4A843]/25 px-1.5 py-0.5 rounded-full">
             {subTag}
           </span>
         )}
-        <span className="text-xs font-bold text-gray-400">{count} 单</span>
+        <span className="text-xs font-bold text-slate-600">{count} 单</span>
       </div>
       <div className="flex items-center gap-2">
-        <span className="text-sm font-black font-mono text-gray-700">
+        <span className="text-sm font-bold font-mono-label text-gray-700">
           AED {total.toLocaleString('en-US', { maximumFractionDigits: 0 })}
         </span>
-        <span className="text-xs font-bold text-gray-400 w-10 text-right">{pct}%</span>
+        <span className="text-xs font-bold text-slate-600 w-10 text-right">{pct}%</span>
       </div>
     </div>
     <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
@@ -541,13 +541,13 @@ const RankRow: React.FC<{
   <div className="space-y-1">
     <div className="flex items-center justify-between gap-2">
       <div className="flex items-center gap-2.5 min-w-0">
-        <span className="text-xs font-black text-gray-300 w-6 shrink-0">#{rank}</span>
+        <span className="text-xs font-bold text-slate-600 w-6 shrink-0">#{rank}</span>
         <div className="min-w-0">
-          <div className="text-sm font-black text-gray-700 truncate">{label}</div>
-          <div className="text-xs font-bold text-gray-400">{sub}</div>
+          <div className="text-sm font-bold text-gray-700 truncate">{label}</div>
+          <div className="text-xs font-bold text-slate-600">{sub}</div>
         </div>
       </div>
-      <div className="text-sm font-black font-mono text-[#080D1E] shrink-0">{value}</div>
+      <div className="text-sm font-bold font-mono-label text-[#080D1E] shrink-0">{value}</div>
     </div>
     <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden ml-8">
       <div className={`h-full ${barClass} rounded-full`}
@@ -558,9 +558,9 @@ const RankRow: React.FC<{
 
 // Empty State
 const EmptyState: React.FC<{ text: string; icon?: string; green?: boolean }> = ({ text, icon, green }) => (
-  <div className={`py-10 text-center rounded-xl ${green ? 'bg-[#6FBF8E]/10 border border-[#6FBF8E]/20' : 'bg-gray-50 border border-gray-100'}`}>
+  <div className={`py-10 text-center rounded-[10px] ${green ? 'bg-[#6FBF8E]/10 border border-[#6FBF8E]/20' : 'bg-gray-50 border border-gray-100'}`}>
     {icon && <div className="text-2xl mb-2">{icon}</div>}
-    <p className={`text-sm font-black uppercase tracking-widest ${green ? 'text-[#6FBF8E]' : 'text-gray-300'}`}>{text}</p>
+    <p className={`text-sm font-bold ${green ? 'text-[#15803d]' : 'text-slate-600'}`}>{text}</p>
   </div>
 );
 
