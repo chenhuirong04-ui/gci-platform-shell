@@ -357,7 +357,8 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
       <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
         {/* ── 区域1：核心数据卡 ─────────────────────────────────────────── */}
-        <div style={{ display: 'flex', gap: 12 }}>
+        {/* Wraps on narrow screens (each card keeps its 120px min width) instead of widening the page. */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
           <StatCard label={t.statTotal} value={stats.total} />
           <StatCard label={t.statPreferred} value={stats.preferred} sub="is_preferred = true" onClick={() => { setActiveTab('pending'); setPreferredFirst(true); }} active={preferredFirst && activeTab === 'pending'} />
           <StatCard label={t.statMissingCountry} value={stats.missingCountry} accent onClick={() => jumpToFlag('missingCountry')} active={activeTab === 'pending' && activeFlags.has('missingCountry')} />
@@ -366,7 +367,7 @@ export default function SupplierCleanupPage({ onBack, onOpenDetail, onGoToFilter
         </div>
 
         {/* ── 区域2+3：两栏图表 ─────────────────────────────────────────── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: 16 }}>
           <CountryDistributionChart
             data={countryDistribution}
             selectedCountry={selectedCountry}
