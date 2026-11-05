@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
 import { useAuth } from '../contexts/AuthContext';
-import { runGiaTopRouter, type GiaRouterState, type PendingDriveFolderCreate } from '../lib/giaRouter';
+import { runGiaExplicitCommandRouter, type GiaRouterState, type PendingDriveFolderCreate } from '../lib/giaRouter';
 import { confirmCaptureItem, completeOrCancelTask, rescheduleTask, type ResolvedCaptureItem } from '../lib/businessCapture';
 import { BUSINESS_AREA_LABEL, BUSINESS_AREA_LABEL_ZH, ALL_BUSINESS_AREAS, type ExecutiveTask, type TaskBusinessArea } from '../lib/executiveTasks';
 import { uploadAndRegisterLocalFile, searchDriveFolders, listChildFolders, extractCompanyName, createFolderIfMissing, getDriveFolderName, DEFAULT_TARGET_FOLDER_ID, DEFAULT_TARGET_FOLDER_NAME, type DriveFolderOption } from '../lib/giaFiles';
@@ -68,10 +68,6 @@ const SHORTCUT_ROUTES: { zh: string; en: string; path: string; module?: string }
 ];
 
 const UPLOAD_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png';
-// Requests the AI Business Agent handles (stock, product matching / recommendation,
-// quotation drafts). Plain customer lookups such as “ABC 的报价” keep going to the
-// Business Assistant customer view.
-const AGENT_COMMAND_RE = /库存|存货|可销售|在库|报价草稿|(做|生成|出|写)(一份|个)?报价|推荐(商品|产品)|(商品|产品)推荐|匹配(商品|产品)|\b(stock|inventory|recommend(ation)?s?|quotation draft|draft (a )?quot(e|ation))\b/i;
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -325,11 +321,12 @@ export function BusinessAssistantEntry() {
       setValue('');
       return;
     }
-    // Stock / product / quotation requests go to the AI Business Agent (multi-step
-    // tools) instead of falling through to the customer-name lookup below.
-    if (AGENT_COMMAND_RE.test(v)) {
+    // Explicit page-navigation command: the text is exactly a shortcut label
+    // (e.g. 查客户 / Search clients) — open that page like the chip does.
+    const shortcut = visibleShortcuts.find((sc) => [sc.zh, sc.en].some((l) => l.toLowerCase() === v.toLowerCase()));
+    if (shortcut) {
       setValue('');
-      navigate(`/ai?tab=agent&agent_q=${encodeURIComponent(v)}`);
+      navigate(shortcut.path);
       return;
     }
     setBusy(true);
@@ -339,13 +336,14 @@ export function BusinessAssistantEntry() {
       setCaptureDone, setPendingTaskLifecycle, setPendingTaskReschedule,
       setPendingDriveFolderCreate, lang,
     };
-    const consumed = await runGiaTopRouter(v, state);
+    // Only explicit action commands with their own confirm card stay local.
+    const consumed = await runGiaExplicitCommandRouter(v, state);
     setBusy(false);
     if (!consumed) {
-      // Plain name/company lookup — Home has no Customer-360 view, hand off
-      // to the full page exactly like this used to always do.
-      navigate(`/business-assistant?customer=${encodeURIComponent(v)}`);
-      return;
+      // Unified GIA routing: every other free-text business question goes to the
+      // AI Business Agent with the original wording, sent automatically. The agent
+      // decides the intent (customer, stock, products, quotation draft, …).
+      navigate(`/ai?tab=agent&agent_q=${encodeURIComponent(v)}`);
     }
     setValue('');
   }
