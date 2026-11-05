@@ -12,7 +12,7 @@ type Step = { tool: string; input: string; ok: boolean };
 type ProposalItem = { item_name: string; description?: string; qty: number; unit: string; supplier_cost: number; selling_price: number };
 type Proposal = {
   token: string; customer_name?: string; customer_id: string; project_name?: string; currency: string; vat_rate: number;
-  items: ProposalItem[]; subtotal: number; vat: number; total: number;
+  items: ProposalItem[]; subtotal: number; vat: number; total: number; stock_verification_required?: boolean;
 };
 type Entry = Turn & { steps?: Step[]; proposal?: Proposal | null; status?: 'confirmed' | 'cancelled' | 'error'; note?: string };
 
@@ -25,7 +25,7 @@ const BORDER = 'rgba(240,234,210,0.12)';
 
 const TOOL_LABEL: Record<string, [string, string]> = {
   search_customers: ['查找客户', 'Find customer'],
-  check_inventory: ['查库存', 'Check stock'],
+  check_inventory: ['查客户寄售剩余', 'Consignment remaining'],
   search_products: ['匹配商品', 'Match products'],
   get_product_prices: ['查价格', 'Look up prices'],
   propose_quotation_draft: ['生成报价草稿', 'Draft quotation'],
@@ -148,6 +148,13 @@ export function AgentChat({ initialQuestion = '' }: { initialQuestion?: string }
                   {(en ? 'Customer: ' : '客户：') + (m.proposal.customer_name || m.proposal.customer_id)}
                   {m.proposal.project_name ? ` · ${m.proposal.project_name}` : ''} · {m.proposal.currency} · VAT {m.proposal.vat_rate}%
                 </div>
+                {m.proposal.stock_verification_required && (
+                  <div style={{ fontSize: 12.5, color: '#E8C46A', background: 'rgba(217,180,90,0.12)', border: '1px solid rgba(217,180,90,0.35)', borderRadius: 8, padding: '6px 10px', marginBottom: 8 }}>
+                    {en
+                      ? 'Stock to be verified manually — quantities are not confirmed against sellable stock (customer consignment remaining is not sellable stock).'
+                      : '库存待人工核实——报价数量未经可销售库存确认（客户寄售剩余不等于可销售库存）。'}
+                  </div>
+                )}
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, color: TEXT, minWidth: 420 }}>
                     <thead>
