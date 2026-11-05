@@ -192,7 +192,7 @@ export function Home({ onFlash: _onFlash }: { onFlash: (msg: string) => void }) 
 
   return (
     <div style={{ maxWidth: 'var(--content-max-w)', margin: '0 auto', padding: '48px 48px 60px' }}>
-      <div style={{ marginBottom: 50 }}>
+      <div style={{ marginBottom: 28 }}>
         <h1
           style={{
             fontFamily: "'Space Grotesk',sans-serif", fontSize: 34, fontWeight: 600,
@@ -205,6 +205,14 @@ export function Home({ onFlash: _onFlash }: { onFlash: (msg: string) => void }) 
           {summaryLine}
         </p>
       </div>
+
+      {/* Ask GCI (GIA) — the one search/assistant entry point, placed first so it
+          is usable on open without scrolling, ahead of the KPI / statistics /
+          alert sections below (order only; those sections are unchanged).
+          Its shortcut chips are the real, working actions — see
+          BusinessAssistantEntry.tsx. */}
+      <SectionHeader label="ASK GCI" />
+      <BusinessAssistantEntry />
 
       {/* Each section is dropped entirely (header included) when permission
           filtering leaves zero tiles — never an empty header over nothing,
@@ -260,13 +268,6 @@ export function Home({ onFlash: _onFlash }: { onFlash: (msg: string) => void }) 
           )}
         </div>
       )}
-
-      {/* Ask GCI — the one search/assistant entry point, listed last per the
-          final structure. Its own shortcut chips were trimmed to only
-          real, working actions (查客户/查报价/查文件/查财务/记录跟进) — see
-          BusinessAssistantEntry.tsx. */}
-      <SectionHeader label="ASK GCI" />
-      <BusinessAssistantEntry />
 
       {inventoryDrawerOpen && (
         <InventoryAlertDrawer onClose={() => setInventoryDrawerOpen(false)} />
