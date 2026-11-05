@@ -38,7 +38,6 @@ export const en = {
     supplierLibrary: 'Supplier Library',
     accessVault: 'Access Vault',
     aiAssistant: 'Legacy AI Tools',
-    aiAgent: 'AI Business Agent',
     settings: 'Settings',
   },
   header: {
