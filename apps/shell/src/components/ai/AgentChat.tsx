@@ -86,7 +86,10 @@ export function AgentChat({ initialQuestion = '' }: { initialQuestion?: string }
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.error || data.result?.error || `HTTP ${res.status}`);
       const r = data.result || {};
-      const ref = r.quote_number || r.quotation_number || r.data?.quote_number || r.target_id || r.id || '';
+      if (r.ok === false) throw new Error(r.error || 'save_failed');
+      // Only a real quotation number is shown — never an internal id.
+      const no = r.result?.quote_no || r.quote_no || r.result?.quote_number || r.quote_number || '';
+      const ref = typeof no === 'string' ? no : '';
       setEntries((e) => e.map((x, i) => (i === index ? { ...x, status: 'confirmed', note: ref ? String(ref) : '' } : x)));
     } catch (err: any) {
       setEntries((e) => e.map((x, i) => (i === index ? { ...x, status: 'error', note: String(err?.message || err) } : x)));
@@ -142,7 +145,7 @@ export function AgentChat({ initialQuestion = '' }: { initialQuestion?: string }
             {m.proposal && (
               <div style={{ marginTop: 10, border: `1px solid rgba(203,168,92,0.4)`, borderRadius: 12, padding: 12, background: 'rgba(203,168,92,0.06)' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: GOLD, marginBottom: 6 }}>
-                  {en ? 'Quotation draft — awaiting your confirmation' : '报价草稿 — 等待你确认'}
+                  {en ? 'Quotation draft preview — not saved yet' : '报价草稿预览，尚未保存'}
                 </div>
                 <div style={{ fontSize: 13, color: MUTED, marginBottom: 8 }}>
                   {(en ? 'Customer: ' : '客户：') + (m.proposal.customer_name || m.proposal.customer_id)}
@@ -196,7 +199,7 @@ export function AgentChat({ initialQuestion = '' }: { initialQuestion?: string }
                 )}
                 {m.status === 'confirmed' && (
                   <div style={{ marginTop: 10, fontSize: 13, color: '#7FD19C' }}>
-                    {(en ? 'Draft saved' : '草稿已保存') + (m.note ? ` · ${m.note}` : '')}{' '}
+                    {(en ? 'Quotation draft saved' : '报价草稿已保存') + (m.note ? (en ? ` · No. ${m.note}` : ` · 单号 ${m.note}`) : '')}{' '}
                     <button type="button" onClick={() => navigate('/quotation')} style={{ background: 'none', border: 'none', color: GOLD, cursor: 'pointer', fontSize: 13, textDecoration: 'underline' }}>
                       {en ? 'Open Quotation Center' : '打开报价中心'}
                     </button>
