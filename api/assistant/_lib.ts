@@ -66,7 +66,7 @@ export async function authenticateMcpSecret(request: Request): Promise<boolean> 
   return assistantSecretMatches || claudeSecretMatches;
 }
 
-function serverContext(actor: string): AssistantContext | null {
+export function serverContext(actor: string): AssistantContext | null {
   const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
   return supabaseUrl === EXPECTED_SUPABASE_ORIGIN && serviceKey

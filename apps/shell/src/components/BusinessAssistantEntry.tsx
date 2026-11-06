@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { colors } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
 import { useAuth } from '../contexts/AuthContext';
-import { runGiaTopRouter, type GiaRouterState, type PendingDriveFolderCreate } from '../lib/giaRouter';
+import { runGiaExplicitCommandRouter, type GiaRouterState, type PendingDriveFolderCreate } from '../lib/giaRouter';
 import { confirmCaptureItem, completeOrCancelTask, rescheduleTask, type ResolvedCaptureItem } from '../lib/businessCapture';
 import { BUSINESS_AREA_LABEL, BUSINESS_AREA_LABEL_ZH, ALL_BUSINESS_AREAS, type ExecutiveTask, type TaskBusinessArea } from '../lib/executiveTasks';
 import { uploadAndRegisterLocalFile, searchDriveFolders, listChildFolders, extractCompanyName, createFolderIfMissing, getDriveFolderName, DEFAULT_TARGET_FOLDER_ID, DEFAULT_TARGET_FOLDER_NAME, type DriveFolderOption } from '../lib/giaFiles';
@@ -321,6 +321,14 @@ export function BusinessAssistantEntry() {
       setValue('');
       return;
     }
+    // Explicit page-navigation command: the text is exactly a shortcut label
+    // (e.g. 查客户 / Search clients) — open that page like the chip does.
+    const shortcut = visibleShortcuts.find((sc) => [sc.zh, sc.en].some((l) => l.toLowerCase() === v.toLowerCase()));
+    if (shortcut) {
+      setValue('');
+      navigate(shortcut.path);
+      return;
+    }
     setBusy(true);
     const state: GiaRouterState = {
       currentCustomer: null, // Home has no loaded customer context
@@ -328,13 +336,14 @@ export function BusinessAssistantEntry() {
       setCaptureDone, setPendingTaskLifecycle, setPendingTaskReschedule,
       setPendingDriveFolderCreate, lang,
     };
-    const consumed = await runGiaTopRouter(v, state);
+    // Only explicit action commands with their own confirm card stay local.
+    const consumed = await runGiaExplicitCommandRouter(v, state);
     setBusy(false);
     if (!consumed) {
-      // Plain name/company lookup — Home has no Customer-360 view, hand off
-      // to the full page exactly like this used to always do.
-      navigate(`/business-assistant?customer=${encodeURIComponent(v)}`);
-      return;
+      // Unified GIA routing: every other free-text business question goes to the
+      // AI Business Agent with the original wording, sent automatically. The agent
+      // decides the intent (customer, stock, products, quotation draft, …).
+      navigate(`/ai?tab=agent&agent_q=${encodeURIComponent(v)}`);
     }
     setValue('');
   }
