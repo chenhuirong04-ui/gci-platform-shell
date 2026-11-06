@@ -14,8 +14,8 @@
 // when the same user explicitly confirms it from the UI, using a short-lived
 // HMAC-signed token that binds the exact payload to that user.
 //
-// Model: Anthropic Claude when ANTHROPIC_API_KEY is configured, otherwise the
-// already-configured OpenAI key. GCI_AGENT_MODEL overrides the model id.
+// Model: Anthropic Claude when ANTHROPIC_API_KEY is configured, otherwise
+// Gemini (GEMINI_API_KEY, already used across GCI), then OpenAI as a fallback. GCI_AGENT_MODEL overrides the model id.
 export const config = { runtime: 'edge' };
 
 import { requireUser, requireModule, legacyTradeAnonHeaders, type AuthContext } from '../_lib/auth';
@@ -367,6 +367,53 @@ async function runOpenAI(apiKey: string, model: string, turns: Turn[], run: Tool
   return '';
 }
 
+// Gemini (the provider GCI already uses for document parsing). Function
+// declarations take an OpenAPI subset, so JSON-schema-only keys are stripped.
+// The model's content (incl. thought signatures) is echoed back unchanged.
+function geminiSchema(v: any): any {
+  if (Array.isArray(v)) return v.map(geminiSchema);
+  if (!v || typeof v !== 'object') return v;
+  const out: Record<string, unknown> = {};
+  for (const [k, val] of Object.entries(v)) if (k !== 'additionalProperties') out[k] = geminiSchema(val);
+  return out;
+}
+
+async function runGemini(apiKey: string, model: string, turns: Turn[], run: ToolRunner, defs: ToolDef[]): Promise<string> {
+  const contents: any[] = turns.map((t) => ({ role: t.role === 'assistant' ? 'model' : 'user', parts: [{ text: t.content }] }));
+  const tools = defs.length ? [{ functionDeclarations: defs.map((t) => ({ name: t.name, description: t.description, parameters: geminiSchema(t.parameters) })) }] : undefined;
+  for (let step = 0; step <= MAX_STEPS; step++) {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents,
+        generationConfig: { temperature: 0.2 },
+        ...(tools ? { tools, toolConfig: { functionCallingConfig: { mode: step === MAX_STEPS ? 'NONE' : 'AUTO' } } } : {}),
+      }),
+    });
+    const data: any = await res.json().catch(() => null);
+    if (!res.ok || !data) {
+      console.error('[agent] gemini error', res.status, data?.error?.status || '');
+      throw new Error(`model_error_${res.status}`);
+    }
+    const content = data.candidates?.[0]?.content;
+    const parts: any[] = content?.parts || [];
+    const calls = parts.filter((p) => p?.functionCall);
+    if (!calls.length) return parts.map((p) => (typeof p?.text === 'string' && !p?.thought ? p.text : '')).join('').trim();
+    contents.push({ role: 'model', parts });
+    const responses = [];
+    for (const c of calls) {
+      const out = await run(c.functionCall.name, c.functionCall.args || {});
+      let parsed: unknown = out;
+      try { parsed = JSON.parse(out); } catch { /* keep text */ }
+      responses.push({ functionResponse: { name: c.functionCall.name, response: { result: parsed } } });
+    }
+    contents.push({ role: 'user', parts: responses });
+  }
+  return '';
+}
+
 // ── handler ─────────────────────────────────────────────────────────────────
 export default async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405);
@@ -396,8 +443,10 @@ export default async function handler(request: Request): Promise<Response> {
   while (turns.length && turns[0].role !== 'user') turns.shift();
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY || '';
+  const geminiKey = process.env.GEMINI_API_KEY || '';
   const openaiKey = process.env.OPENAI_API_KEY || '';
-  if (!anthropicKey && !openaiKey) return json({ ok: false, error: 'model_not_configured' }, 503);
+  const provider = anthropicKey ? 'anthropic' : geminiKey ? 'gemini' : 'openai';
+  if (!anthropicKey && !geminiKey && !openaiKey) return json({ ok: false, error: 'model_not_configured' }, 503);
 
   const steps: Step[] = [];
   const proposals: Proposal[] = [];
@@ -409,15 +458,17 @@ export default async function handler(request: Request): Promise<Response> {
   };
 
   try {
-    const reply = anthropicKey
+    const reply = provider === 'anthropic'
       ? await runAnthropic(anthropicKey, process.env.GCI_AGENT_MODEL || 'claude-sonnet-5-5', turns, run, toolsFor(user))
+      : provider === 'gemini'
+      ? await runGemini(geminiKey, process.env.GCI_AGENT_MODEL || 'gemini-2.5-flash', turns, run, toolsFor(user))
       : await runOpenAI(openaiKey, process.env.GCI_AGENT_MODEL || 'gpt-4o', turns, run, toolsFor(user));
     const proposal = proposals[proposals.length - 1] || null;
     return json({
       ok: true,
       reply,
       steps,
-      provider: anthropicKey ? 'anthropic' : 'openai',
+      provider,
       proposal: proposal && { token: proposal.token, customer_name: proposal.customer_name, ...proposal.payload, subtotal: proposal.subtotal, vat: proposal.vat, total: proposal.total, stock_verification_required: proposal.stock_verification_required },
     });
   } catch (e: any) {
