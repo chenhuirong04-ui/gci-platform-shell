@@ -5,6 +5,8 @@ import { LangContext, dictionaries, type Lang } from '@gci/i18n';
 import { sections as sectionDefs } from './config/navigation';
 import { Home } from './pages/Home';
 import { Login } from './pages/Login';
+import { ResetPassword } from './pages/ResetPassword';
+import { isPasswordRecovery } from './lib/supabase';
 import { AccessDenied } from './pages/AccessDenied';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -97,6 +99,19 @@ function Shell() {
   async function handleSignOut() {
     await signOut();
     navigate('/login', { replace: true });
+  }
+
+  // Password recovery — a verified recovery link (even one that lands on the
+  // site root) goes straight to the set-new-password step.
+  if (location.pathname === '/reset-password' || isPasswordRecovery()) {
+    return (
+      <LangContext.Provider value={{ lang, dict, setLang }}>
+        <Routes>
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="*" element={<Navigate to="/reset-password" replace />} />
+        </Routes>
+      </LangContext.Provider>
+    );
   }
 
   // Public routes — rendered without the shell layout
