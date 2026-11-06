@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AIPage } from './AIPage';
+import { ChangePasswordCard } from '../components/ChangePasswordCard';
 import { workspaceFontFamily } from '@gci/design-system';
 
 const GOLD = '#7A5F2A';
@@ -63,8 +64,11 @@ export function Settings() {
       </div>
 
       {tab === 'general' && (
-        <div style={{ padding: '18px 20px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, fontSize: 13, color: MUTED }}>
-          {isZh ? '更多设置即将上线。' : 'More settings coming soon.'}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <ChangePasswordCard isZh={isZh} />
+          <div style={{ padding: '18px 20px', background: CARD, border: `1px solid ${BORD}`, borderRadius: 12, fontSize: 13, color: MUTED }}>
+            {isZh ? '更多设置即将上线。' : 'More settings coming soon.'}
+          </div>
         </div>
       )}
 
