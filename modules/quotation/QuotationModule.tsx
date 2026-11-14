@@ -99,6 +99,7 @@ import {
   uploadSupplierQuoteImage, loadSupplierQuoteImage, isValidImageRef, mapWithLimit, type SupplierQuoteImageRef,
 } from './lib/supplierQuoteImages';
 import { extractXlsxImages as extractXlsxImagesFromBuffer, isImageHeader } from './lib/xlsxImages';
+import { DEFAULT_RATES, defaultRate, convertAmount, detectHeaderCurrency } from './lib/currencyRates';
 import {
   listServiceCategories, listServiceCatalogItems, addServiceCategory, addServiceCatalogItem,
   deleteServiceCatalogItem, seedDefaultCatalogIfEmpty, saveServiceQuote, listServiceQuotes,
@@ -412,7 +413,21 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   const [rateConfig, setRateConfig] = useState<{ quoteCurrency: string; rate: number }>({ quoteCurrency: 'AED', rate: 1 });
   // Module 2 V2: live currency/margin preview shown directly in Supplier Cost Items table
   const [sqCustomerCurrency, setSqCustomerCurrency] = useState<'AED' | 'USD'>('AED');
-  const [sqExchangeRate, setSqExchangeRate] = useState<number>(0.505); // Supplier currency → Customer currency
+  const [sqExchangeRate, setSqExchangeRate] = useState<number>(() => defaultRate('AED', 'AED')); // Supplier currency → Customer currency
+  // Excel price-header currency check: 'detected' = one explicit currency; 'unclear' / 'multi' must be confirmed before save/convert.
+  const [sqCurrencyCheck, setSqCurrencyCheck] = useState<{ status: 'detected' | 'unclear' | 'multi'; found: string[] } | null>(null);
+  const sqCurrencyNeedsConfirm = !!sqCurrencyCheck && sqCurrencyCheck.status !== 'detected';
+  // Rate follows the currency pair: reset to the table default only when a currency changes;
+  // a manually typed rate is kept until then.
+  useEffect(() => {
+    setSqExchangeRate(defaultRate(supplierMeta.currency || 'AED', sqCustomerCurrency));
+  }, [supplierMeta.currency, sqCustomerCurrency]);
+  // A user pick of the supplier currency is the confirmation; parsed rows follow it.
+  const changeSupplierCurrency = (currency: string) => {
+    setSupplierMeta(prev => ({ ...prev, currency }));
+    setDraftItems(prev => prev.map(it => ({ ...it, originalCurrency: currency })));
+    setSqCurrencyCheck(null);
+  };
   const [sqGlobalMargin, setSqGlobalMargin] = useState<number>(30);    // default margin %, per-item overridable
   // Module 2 V3: field-level visibility for the customer-facing GCI Quote (internal vs customer view separation)
   const [sqIncludeFields, setSqIncludeFields] = useState({
@@ -2856,7 +2871,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             <label className="text-xs font-bold text-slate-600 block mb-1.5">{t('Currency')}</label>
             <select
               value={supplierMeta.currency}
-              onChange={e => setSupplierMeta(prev => ({ ...prev, currency: e.target.value }))}
+              onChange={e => changeSupplierCurrency(e.target.value)}
               className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-4 py-2.5 text-[14px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C] transition-colors"
             >
               {['AED','USD','CNY','EUR','GBP'].map(c => <option key={c} value={c}>{c}</option>)}
@@ -3005,6 +3020,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                   onClick={() => {
                     if (!sqSelectedFile || isProcessingAI) return;
                     setSqParseStatus('parsing');
+                    setSqCurrencyCheck(null);
                     setSqParseError('');
                     const isPDF = sqSelectedFile.type === 'application/pdf' || sqSelectedFile.name.toLowerCase().endsWith('.pdf');
                     const isImage = sqSelectedFile.type.startsWith('image/');
@@ -3076,7 +3092,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           <div className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[10px] px-6 py-4 flex flex-wrap items-end gap-5">
             <div>
               <label className="text-xs font-bold text-slate-600 block mb-1.5">{t('Supplier Currency')}</label>
-              <select value={supplierMeta.currency} onChange={e => setSupplierMeta(prev => ({ ...prev, currency: e.target.value }))}
+              <select value={supplierMeta.currency} onChange={e => changeSupplierCurrency(e.target.value)}
                 className="bg-white border border-[#0C1B3A]/10 rounded-md px-3 py-2 text-[13px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]">
                 {['CNY','USD','AED'].map(c => <option key={c} value={c}>{c === 'CNY' ? t('RMB (CNY)') : c}</option>)}
               </select>
@@ -3101,7 +3117,24 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                 className="w-24 bg-white border border-[#0C1B3A]/10 rounded-md px-3 py-2 text-[13px] font-mono-label font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]" />
             </div>
             <p className="text-xs text-slate-600 leading-snug max-w-[220px]">Converted = Supplier Cost × Rate. Customer Price = Converted × (1 + Margin%). Margin can be overridden per item below.</p>
+            <p className="basis-full text-xs font-mono-label font-bold text-[#0C1B3A]" data-testid="sq-rate-preview">
+              {t('Conversion preview')}: 1 {supplierMeta.currency} = {sqExchangeRate} {sqCustomerCurrency} · {supplierMeta.currency} 100 = {sqCustomerCurrency} {convertAmount(100, sqExchangeRate)}
+              {sqCurrencyCheck?.status === 'detected' && <span className="ml-2 font-normal text-slate-600">({t('Currency detected from Excel header')})</span>}
+            </p>
           </div>
+          {sqCurrencyNeedsConfirm && (
+            <div className="flex flex-wrap items-center gap-3 rounded-[10px] border border-amber-300 bg-amber-50 px-5 py-3 text-[13px] font-bold text-amber-800" data-testid="sq-currency-confirm">
+              <span>
+                {sqCurrencyCheck!.status === 'multi'
+                  ? t('Excel price headers name several currencies ({list}). Confirm the supplier currency before saving or converting.').replace('{list}', sqCurrencyCheck!.found.join(' / '))
+                  : t('Excel price header names no currency. Confirm the supplier currency before saving or converting.')}
+              </span>
+              <button onClick={() => changeSupplierCurrency(supplierMeta.currency || 'AED')}
+                className="rounded-md bg-[#0C1B3A] px-4 py-1.5 text-xs font-bold text-white">
+                {t('Confirm {c}').replace('{c}', supplierMeta.currency || 'AED')}
+              </button>
+            </div>
+          )}
 
           {/* Editable table — rich detail + EN translation + currency conversion */}
           <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 overflow-hidden shadow-sm">
@@ -3329,6 +3362,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                 onClick={() => {
                   const included = draftItems.filter(it => it.includeInGCI !== false);
                   if (included.length === 0) { alert(t('Please select at least one item to create GCI Quote.')); return; }
+                  if (sqCurrencyNeedsConfirm) { alert(t('Please confirm the supplier currency first.')); return; }
                   // Gate: show currency & exchange rate confirmation before entering Pricing Review
                   // Pre-fill from the live preview controls set above (Supplier Currency / Exchange Rate / Customer Currency)
                   setPendingConversionItems(included);
@@ -3370,6 +3404,12 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   /** Save current draftItems as a Supplier Quote (no GCI pricing required). */
   const handleSaveSupplierQuote = async () => {
     if (draftItems.length === 0) return;
+    if (sqCurrencyNeedsConfirm) { alert(t('Please confirm the supplier currency first.')); return; }
+    // Show currency, rate and a conversion preview before saving.
+    const supCur = supplierMeta.currency || 'AED';
+    if (!window.confirm(t('Save supplier quote?\nSupplier currency: {sup}\nRate: 1 {sup} = {rate} {cust}\nPreview: {sup} 100 = {cust} {x}')
+      .replace(/\{sup\}/g, supCur).replace(/\{cust\}/g, sqCustomerCurrency)
+      .replace('{rate}', String(sqExchangeRate)).replace('{x}', convertAmount(100, sqExchangeRate)))) return;
     setSqSaveStatus('saving');
     try {
       const totalCost = draftItems.reduce((s, it) => s + it.targetUnitPrice * it.quantity, 0);
@@ -5152,14 +5192,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
     }
   };
 
-  // Default conservative exchange rates: supplierCurrency → quoteCurrency
-  const DEFAULT_RATES: Record<string, Record<string, number>> = {
-    AED: { AED: 1.0,    USD: 0.2723 },
-    USD: { AED: 3.6725, USD: 1.0    },
-    CNY: { AED: 0.505,  USD: 0.1375 },
-    EUR: { AED: 4.00,   USD: 1.09   },
-    GBP: { AED: 4.67,   USD: 1.27   },
-  };
+  // Default exchange rates (DEFAULT_RATES / defaultRate) live in ./lib/currencyRates.
 
   // Called when user confirms Currency & Exchange Rate modal
   const handleConfirmRate = () => {
@@ -5451,6 +5484,12 @@ Set "productDetected":false if the photo is a logo, blank, or has no identifiabl
           if (mappings.price === -1) {
             console.warn('[parseExcel] No named price column found, using fallback column', autoMappings.price);
           }
+          // Supplier currency from the price/total headers: one explicit currency → use it;
+          // none or several → keep the current pick and ask the user to confirm (no guessing).
+          const headerCurrency = detectHeaderCurrency([headers[autoMappings.price], mappings.total !== -1 ? headers[mappings.total] : '']);
+          const parseCurrency = headerCurrency.currency ?? (supplierMeta.currency || 'AED');
+          if (headerCurrency.currency) setSupplierMeta(prev => ({ ...prev, currency: headerCurrency.currency! }));
+          setSqCurrencyCheck({ status: headerCurrency.currency ? 'detected' : headerCurrency.found.length > 1 ? 'multi' : 'unclear', found: headerCurrency.found });
           const dataRows = jsonData.slice(bestHeaderRowIndex !== -1 ? bestHeaderRowIndex + 1 : 1);
           console.log('[parseExcel] mappings:', mappings, '| autoMappings:', autoMappings, '| bestHeaderRowIndex:', bestHeaderRowIndex);
 
@@ -5537,7 +5576,7 @@ Set "productDetected":false if the photo is a logo, blank, or has no identifiabl
             }
             const unitPrice = parseFloat(String(row[autoMappings.price] || '0').replace(/[^0-9.-]/g, '')) || 0;
             const qty = parseFloat(String(row[autoMappings.qty] || '1').replace(/[^0-9.-]/g, '')) || 1;
-            const supplierCurrencyAtParse = supplierMeta.currency || 'AED';
+            const supplierCurrencyAtParse = parseCurrency;
             const rawSpec = String(row[autoMappings.spec] || '').trim();
             const rawMaterial = colMaterial !== -1 ? String(row[colMaterial] || '').trim() : '';
             // Best-effort EN description: translate name + material via Package Quote's CN→EN helpers as a starting point (user can edit)
@@ -5594,7 +5633,7 @@ Set "productDetected":false if the photo is a logo, blank, or has no identifiabl
               headerRowOffset,
               rows,
               rowIdxToItemIndex,
-              supplierCurrency: supplierMeta.currency || 'AED',
+              supplierCurrency: parseCurrency,
             });
           } catch (ocrErr) {
             console.warn('[parseExcel] Embedded image OCR failed (non-fatal, rows kept as-is):', ocrErr);
