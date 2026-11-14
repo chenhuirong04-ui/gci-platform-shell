@@ -98,6 +98,7 @@ import {
 import {
   uploadSupplierQuoteImage, loadSupplierQuoteImage, isValidImageRef, mapWithLimit, type SupplierQuoteImageRef,
 } from './lib/supplierQuoteImages';
+import { extractXlsxImages as extractXlsxImagesFromBuffer, isImageHeader } from './lib/xlsxImages';
 import {
   listServiceCategories, listServiceCatalogItems, addServiceCategory, addServiceCatalogItem,
   deleteServiceCatalogItem, seedDefaultCatalogIfEmpty, saveServiceQuote, listServiceQuotes,
@@ -1140,117 +1141,9 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
   // ── Package Quote: parse multi-sheet Excel ──────────────────────────────
   // ── Shared XLSX image extraction (DISPIMG cell images + floating/anchored drawings) ──
-  // Used by both Package Quote (Module 3) and Supplier Quote (Module 2) — single source of truth.
-  // Returns: { dispimgId → dataUrl, sheetName → { 0-based row index → dataUrl } }
-  const extractXlsxImages = async (arrayBuffer: ArrayBuffer): Promise<{
-    imgDataUrls: Record<string, string>;
-    floatingBySheet: Record<string, Record<number, string>>;
-  }> => {
-    const imgDataUrls: Record<string, string> = {};
-    const floatingBySheet: Record<string, Record<number, string>> = {};
-    try {
-      const zip = await JSZip.loadAsync(arrayBuffer);
-
-      // Parse cellimages.xml.rels → rId → media filename
-      const relsFile = zip.files['xl/_rels/cellimages.xml.rels'];
-      const cellImgFile = zip.files['xl/cellimages.xml'];
-
-      if (relsFile && cellImgFile) {
-        const relsText = await relsFile.async('text');
-        const cellText = await cellImgFile.async('text');
-
-        const ridToMedia: Record<string, string> = {};
-        for (const m of relsText.matchAll(/Id="([^"]+)"[^>]+Target="([^"]+)"/g)) {
-          if (!m[2].toLowerCase().includes('null')) ridToMedia[m[1]] = m[2];
-        }
-
-        const idToRid: Record<string, string> = {};
-        for (const m of cellText.matchAll(/name="(ID_[A-F0-9]+)"[\s\S]*?r:embed="([^"]+)"/gi)) {
-          idToRid[m[1]] = m[2];
-        }
-
-        for (const [dispId, rid] of Object.entries(idToRid)) {
-          const mediaPath = ridToMedia[rid];
-          if (!mediaPath) continue;
-          const fullPath = `xl/${mediaPath}`;
-          const mediaFile = zip.files[fullPath];
-          if (!mediaFile) continue;
-          const b64 = await mediaFile.async('base64');
-          const ext = fullPath.split('.').pop()?.toLowerCase() || 'png';
-          const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
-          imgDataUrls[dispId] = `data:${mime};base64,${b64}`;
-        }
-        console.log(`[extractXlsxImages] Extracted ${Object.keys(imgDataUrls).length} DISPIMG images`);
-      } else {
-        console.log('[extractXlsxImages] No cellimages.xml found — skipping DISPIMG extraction');
-      }
-
-      // ── Floating/anchored drawing images ─────────────────────────────
-      try {
-        const wbXml = zip.files['xl/workbook.xml'] ? await zip.files['xl/workbook.xml'].async('text') : '';
-        const wbRels = zip.files['xl/_rels/workbook.xml.rels'] ? await zip.files['xl/_rels/workbook.xml.rels'].async('text') : '';
-        const sheetNameToRid: Record<string, string> = {};
-        for (const m of wbXml.matchAll(/sheet name="([^"]+)"[^r]*r:id="([^"]+)"/g)) {
-          sheetNameToRid[m[1]] = m[2];
-        }
-        const ridToSheetPath: Record<string, string> = {};
-        for (const m of wbRels.matchAll(/Id="([^"]+)"[^>]+Target="([^"]+)"/g)) {
-          ridToSheetPath[m[1]] = m[2];
-        }
-        for (const [sheetName, sheetRid] of Object.entries(sheetNameToRid)) {
-          const sheetPath = ridToSheetPath[sheetRid];
-          if (!sheetPath) continue;
-          const sheetFileName = sheetPath.split('/').pop()!;
-          const sheetRelsPath = `xl/worksheets/_rels/${sheetFileName}.rels`;
-          const sheetRelsFile = zip.files[sheetRelsPath];
-          if (!sheetRelsFile) continue;
-          const sheetRelsXml = await sheetRelsFile.async('text');
-          const drawingMatch = sheetRelsXml.match(/Id="([^"]+)"[^>]+Type="[^"]*drawing[^"]*"[^>]+Target="([^"]+)"/);
-          if (!drawingMatch) continue;
-          const drawingRelPath = drawingMatch[2];
-          const drawingPath = `xl/drawings/${drawingRelPath.replace('../drawings/', '')}`;
-          const drawingFile = zip.files[drawingPath];
-          if (!drawingFile) continue;
-          const drawingXml = await drawingFile.async('text');
-          const drawingFileName = drawingPath.split('/').pop()!;
-          const drawingRelsPath = `xl/drawings/_rels/${drawingFileName}.rels`;
-          const drawingRelsFile = zip.files[drawingRelsPath];
-          if (!drawingRelsFile) continue;
-          const drawingRelsXml = await drawingRelsFile.async('text');
-          const dRidToMedia: Record<string, string> = {};
-          for (const m of drawingRelsXml.matchAll(/Id="([^"]+)"[^>]+Target="([^"]+)"/g)) {
-            if (!m[2].toLowerCase().includes('null')) dRidToMedia[m[1]] = m[2];
-          }
-          const rowMap: Record<number, string> = {};
-          for (const anchor of drawingXml.matchAll(/<xdr:twoCellAnchor[\s\S]*?<\/xdr:twoCellAnchor>/g)) {
-            const a = anchor[0];
-            const fromRowStr = a.match(/<xdr:from>[\s\S]*?<xdr:row>(\d+)<\/xdr:row>/)?.[1];
-            const embed = a.match(/r:embed="([^"]+)"/)?.[1];
-            if (fromRowStr == null || !embed) continue;
-            const fromRow = parseInt(fromRowStr);
-            const mediaRel = dRidToMedia[embed];
-            if (!mediaRel) continue;
-            const mediaPath = `xl/media/${mediaRel.replace('../media/', '')}`;
-            const mediaFile = zip.files[mediaPath];
-            if (!mediaFile) continue;
-            const b64 = await mediaFile.async('base64');
-            const ext = mediaPath.split('.').pop()?.toLowerCase() || 'png';
-            const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
-            rowMap[fromRow] = `data:${mime};base64,${b64}`;
-          }
-          if (Object.keys(rowMap).length > 0) {
-            floatingBySheet[sheetName] = rowMap;
-            console.log(`[extractXlsxImages] Floating images for "${sheetName}":`, Object.keys(rowMap));
-          }
-        }
-      } catch (fErr) {
-        console.warn('[extractXlsxImages] Floating image extraction failed (non-fatal):', fErr);
-      }
-    } catch (imgErr) {
-      console.warn('[extractXlsxImages] Image extraction failed (non-fatal):', imgErr);
-    }
-    return { imgDataUrls, floatingBySheet };
-  };
+  // Used by both Package Quote (Module 3) and Supplier Quote (Module 2) — single source of truth,
+  // now in ./lib/xlsxImages (attribute-order / absolute-path / oneCellAnchor tolerant).
+  const extractXlsxImages = extractXlsxImagesFromBuffer;
 
   const parsePackageExcel = async (file: File) => {
     setPqParseStatus('parsing');
@@ -5510,8 +5403,10 @@ Set "productDetected":false if the photo is a logo, blank, or has no identifiabl
 
         const findCol = (kList: string[]) => headers.findIndex((h: string) => kList.some(k => h === k || (h.length > 1 && h.includes(k))));
 
+        // Item column must never be an image column ("PRODUCT IMAGE" contains "product").
+        const itemCol = headers.findIndex((h: string) => !isImageHeader(h) && keywords.item.some(k => h === k || (h.length > 1 && h.includes(k))));
         const mappings = {
-          item: findCol(keywords.item),
+          item: itemCol,
           spec: findCol(keywords.spec),
           qty: findCol(keywords.qty),
           price: findCol(keywords.price),
@@ -5521,7 +5416,7 @@ Set "productDetected":false if the photo is a logo, blank, or has no identifiabl
 
         // If Item Column detection is ambiguous (e.g. found No. as item), try to refine
         if (mappings.item === mappings.no && mappings.item !== -1) {
-           mappings.item = headers.findIndex((h, idx) => idx !== mappings.no && keywords.item.some(k => h.includes(k)));
+           mappings.item = headers.findIndex((h, idx) => idx !== mappings.no && !isImageHeader(h) && keywords.item.some(k => h.includes(k)));
         }
 
         // AED-priority price column selection: prefer AED column, reject RMB/CNY/SAR columns
