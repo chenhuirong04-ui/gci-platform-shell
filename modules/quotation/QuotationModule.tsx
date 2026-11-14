@@ -246,6 +246,7 @@ interface DraftItem {
   marginPercent?: number;      // per-item margin override (defaults to global margin)
   imageDataUrl?: string;       // photo extracted from Excel (DISPIMG/floating) or supplied PDF/image
   imageRef?: SupplierQuoteImageRef; // persisted copy of imageDataUrl (Supplier Library storage)
+  fromSupplierArchive?: boolean;    // created from a Supplier Quote archive → customer description format
   // ── Module 2 V3: read-everything + image OCR provenance ──────────────
   sourceType?: 'excel' | 'excel-image-ocr' | 'pdf' | 'image' | 'docx' | 'text' | 'manual';
   dataConfidence?: 'high' | 'low'; // AI-OCR confidence in the extracted fields (separate from category confidence)
@@ -902,7 +903,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   const buildCloudPayload = (confirmed: typeof draftItems, totals: {
     totalSupplierCost: number; totalSelling: number; totalProfit: number;
     overallMargin: number; totalVAT: number; grandTotal: number;
-  }) => {
+  }, imageRefs: (SupplierQuoteImageRef | null)[] = []) => {
     const quoteNo = quoteInfo.quoteNumber || `GCI-${Date.now()}`;
     const record = {
       quote_no: quoteNo,
@@ -951,6 +952,16 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
         currency: tradeItemCurrencies[item.id] || 'AED',
         item_notes: tradeItemNotes[item.id] || '',
         sort_order: i,
+        // Customer-facing snapshot only — deliberately no cost/margin/markup fields.
+        item_meta: {
+          img: imageRefs[i] ?? item.imageRef ?? null,
+          en: item.englishDescription || '', model: item.model || '', material: item.material || '',
+          color: item.color || '', size: item.sizeDimension || '', moq: item.moq || '',
+          packaging: item.packaging || '', delivery: item.deliveryTime || '',
+          payment: item.paymentTerms || '', remarks: item.remarks || '',
+          sa: quoteSource === 'supplier-archive' || !!item.fromSupplierArchive,
+          show: { ...sqIncludeFields },
+        },
       };
     });
     return { record, items };
@@ -963,7 +974,23 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   }) => {
     setCloudSaveStatus('saving');
     try {
-      const payload = buildCloudPayload(confirmed, totals);
+      // Reuse the Supplier Quote image storage: rows that already carry a
+      // stored ref (e.g. from the supplier archive) are never uploaded again.
+      const imgBase = quoteInfo.quoteNumber || `GCI-${Date.now()}`;
+      const uploaded = await mapWithLimit(confirmed, 4, async (it, i) => {
+        if (it.imageRef) return it.imageRef;
+        if (!it.imageDataUrl) return null;
+        try { return await uploadSupplierQuoteImage(it.imageDataUrl, undefined, imgBase, i); }
+        catch (err) { console.error('[Cloud Save] image upload failed, row', i + 1, err); return 'failed' as const; }
+      });
+      const failedRows = uploaded.map((r, i) => (r === 'failed' ? i + 1 : 0)).filter(Boolean);
+      if (failedRows.length > 0
+        && !window.confirm(`${failedRows.length} product image(s) failed to upload (rows ${failedRows.join(', ')}).\n\nSave anyway without these images? Click Cancel to retry later.`)) {
+        setCloudSaveStatus('error');
+        return;
+      }
+      const imageRefs = uploaded.map(r => (isValidImageRef(r) ? r : null));
+      const payload = buildCloudPayload(confirmed, totals, imageRefs);
       let id: string | null = null;
       if (cloudId) {
         const ok = await updateQuotation(cloudId, payload);
@@ -972,6 +999,12 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
         id = await saveQuotation(payload);
       }
       if (id) {
+        // Remember stored refs so the next save doesn't upload the same image again.
+        const refById = new Map(confirmed.map((it, i) => [it.id, imageRefs[i]] as const));
+        setDraftItems(prev => prev.map(it => {
+          const ref = refById.get(it.id);
+          return ref && !it.imageRef ? { ...it, imageRef: ref } : it;
+        }));
         setCloudId(id);
         setCloudSaveStatus('saved');
         // Update quoteNumber in quoteInfo if not set
@@ -1023,18 +1056,39 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       } : emptyCustomerProjectSelection());
 
       // Restore draftItems from saved items
-      const restoredDraftItems = items.map(it => ({
-        id: `cloud-${it.id || Date.now()}-${Math.random().toString(36).slice(2)}`,
-        originalName: it.item_name,
-        originalSpec: it.description || '',
-        quantity: it.qty,
-        unit: it.unit,
-        targetUnitPrice: it.supplier_cost,
-        targetTotal: it.supplier_cost * it.qty,
-        confidence: 1,
-        status: 'Confirmed' as const,
-        suggestedCategory: FurnitureCategory.OTHER,
-      }));
+      const restoredDraftItems = items.map(it => {
+        const meta = it.item_meta && typeof it.item_meta === 'object' ? it.item_meta : null;
+        return {
+          id: `cloud-${it.id || Date.now()}-${Math.random().toString(36).slice(2)}`,
+          originalName: it.item_name,
+          originalSpec: it.description || '',
+          quantity: it.qty,
+          unit: it.unit,
+          targetUnitPrice: it.supplier_cost,
+          targetTotal: it.supplier_cost * it.qty,
+          confidence: 1,
+          status: 'Confirmed' as const,
+          suggestedCategory: FurnitureCategory.OTHER,
+          // Rows saved before item_meta existed restore exactly as before.
+          ...(meta ? {
+            englishDescription: meta.en || '', model: meta.model || '', material: meta.material || '',
+            color: meta.color || '', sizeDimension: meta.size || '', moq: meta.moq || '',
+            packaging: meta.packaging || '', deliveryTime: meta.delivery || '',
+            paymentTerms: meta.payment || '', remarks: meta.remarks || '',
+            fromSupplierArchive: !!meta.sa,
+            imageRef: isValidImageRef(meta.img) ? meta.img : undefined,
+          } : {}),
+        } as DraftItem;
+      });
+
+      // Restore persisted product images (same storage as Supplier Quotes).
+      const restoredImages = await mapWithLimit(restoredDraftItems, 6, (d) =>
+        d.imageRef ? loadSupplierQuoteImage(d.imageRef) : Promise.resolve(null));
+      restoredDraftItems.forEach((d, i) => { if (restoredImages[i]) d.imageDataUrl = restoredImages[i]!; });
+      const missingImages = restoredDraftItems.filter((d, i) => d.imageRef && !restoredImages[i]).length;
+      if (missingImages > 0) console.warn(`[Cloud Load] ${missingImages} stored image(s) could not be restored`);
+      const savedShow = items.find(it => it.item_meta?.show)?.item_meta?.show;
+      if (savedShow) setSqIncludeFields({ ...savedShow });
 
       // Restore selling prices & extras keyed by NEW draft ids
       const newSelling: Record<string, number> = {};
@@ -3540,6 +3594,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
         // Old saves (pre-V3) have no `inc` key — default to included so nothing pre-existing disappears
         includeInGCI: v2.inc !== undefined ? v2.inc !== false : true,
         imageRef: isValidImageRef(v2.img) ? v2.img : undefined,
+        fromSupplierArchive: true,
       } as DraftItem;
     });
 
@@ -3950,12 +4005,14 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       const lineTot = sp;                        // already line total
       const unitSellPrice = item.quantity > 0 ? sp / item.quantity : 0;
       doc.setFontSize(8.5);
-      const descText = isModule2Quote
+      // Items reopened from GCI history keep their supplier-archive description format.
+      const descText = (isModule2Quote || item.fromSupplierArchive)
         ? buildModule2CustomerDescription(item)
         : item.originalName + (item.originalSpec ? `\n${item.originalSpec}` : '');
-      // Product photo (supplier-archive quotes): 14mm thumbnail left of the description.
+      // Product photo: 14mm thumbnail left of the description, for every item that has one
+      // (supplier-archive quotes and quotes reopened from GCI history).
       const IMG = 14;
-      const hasImg = isModule2Quote && !!item.imageDataUrl;
+      const hasImg = !!item.imageDataUrl;
       if (hasImg && y + IMG + 2 > 280) { doc.addPage(); y = 20; }
       const textX = colX[0] + 1 + (hasImg ? IMG + 2 : 0);
       const nameLines = doc.splitTextToSize(descText, colWidths[0] - 2 - (hasImg ? IMG + 2 : 0));

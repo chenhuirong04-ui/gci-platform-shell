@@ -60,6 +60,18 @@ export interface QuotationItem {
   currency: string;
   item_notes?: string;
   sort_order: number;
+  /** Customer-facing product snapshot + persisted image ref (migration
+   * 20261114090000). Never carries cost / margin / markup. Absent on rows
+   * saved before that migration — callers must treat it as optional. */
+  item_meta?: QuotationItemMeta | null;
+}
+
+export interface QuotationItemMeta {
+  img?: { b: string; p: string } | null; // Supplier Library storage ref (same as supplier quotes)
+  en?: string; model?: string; material?: string; color?: string; size?: string;
+  moq?: string; packaging?: string; delivery?: string; payment?: string; remarks?: string;
+  sa?: boolean; // item came from the Supplier Quote archive (customer description format)
+  show?: { deliveryTime: boolean; packaging: boolean; remarks: boolean; moq: boolean; paymentTerms: boolean };
 }
 
 export interface SaveQuotationPayload {
