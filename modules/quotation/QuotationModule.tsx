@@ -96,6 +96,9 @@ import {
   deleteSupplierQuote, generateSupplierQuoteNo, SupplierQuote, SupplierQuoteItem,
 } from './lib/supplierQuoteCloud';
 import {
+  uploadSupplierQuoteImage, loadSupplierQuoteImage, isValidImageRef, mapWithLimit, type SupplierQuoteImageRef,
+} from './lib/supplierQuoteImages';
+import {
   listServiceCategories, listServiceCatalogItems, addServiceCategory, addServiceCatalogItem,
   deleteServiceCatalogItem, seedDefaultCatalogIfEmpty, saveServiceQuote, listServiceQuotes,
   loadServiceQuote, deleteServiceQuote, generateServiceQuoteNo, BILLING_TYPE_LABELS, PAYMENT_TERM_OPTIONS,
@@ -242,6 +245,7 @@ interface DraftItem {
   englishDescription?: string; // editable EN translation, shown in customer quote
   marginPercent?: number;      // per-item margin override (defaults to global margin)
   imageDataUrl?: string;       // photo extracted from Excel (DISPIMG/floating) or supplied PDF/image
+  imageRef?: SupplierQuoteImageRef; // persisted copy of imageDataUrl (Supplier Library storage)
   // ── Module 2 V3: read-everything + image OCR provenance ──────────────
   sourceType?: 'excel' | 'excel-image-ocr' | 'pdf' | 'image' | 'docx' | 'text' | 'manual';
   dataConfidence?: 'high' | 'low'; // AI-OCR confidence in the extracted fields (separate from category confidence)
@@ -3422,8 +3426,27 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     setSqSaveStatus('saving');
     try {
       const totalCost = draftItems.reduce((s, it) => s + it.targetUnitPrice * it.quantity, 0);
+      const supplierQuoteNo = generateSupplierQuoteNo();
+      // Persist each line-item image via the existing Supplier Library storage.
+      // Rows already carrying a stored ref (re-save) are not uploaded twice.
+      const imageRefs = await mapWithLimit(draftItems, 4, async (it, i) => {
+        if (it.imageRef) return it.imageRef;
+        if (!it.imageDataUrl) return null;
+        try {
+          return await uploadSupplierQuoteImage(it.imageDataUrl, sqSupplierSelection.supplierId || undefined, supplierQuoteNo, i);
+        } catch (err) {
+          console.error('[Supplier Quote Save] image upload failed, row', i + 1, err);
+          return 'failed' as const;
+        }
+      });
+      const failedRows = imageRefs.map((r, i) => (r === 'failed' ? i + 1 : 0)).filter(Boolean);
+      if (failedRows.length > 0
+        && !window.confirm(`${failedRows.length} product image(s) failed to upload (rows ${failedRows.join(', ')}).\n\nSave anyway without these images? Click Cancel to retry later.`)) {
+        setSqSaveStatus('error');
+        return;
+      }
       const header: SupplierQuote = {
-        supplier_quote_no: generateSupplierQuoteNo(),
+        supplier_quote_no: supplierQuoteNo,
         // Quotation Center master-data unification (2026-09-15) — real FKs
         // are the primary relation now; supplier_name/supplier_contact stay
         // as the display snapshot (never re-derived by guessing a name).
@@ -3457,11 +3480,17 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           remarks: it.remarks || '', margin: it.marginPercent ?? null,
           size: it.sizeDimension || '', inc: it.includeInGCI !== false,
           note: tradeItemNotes[it.id] || '',
+          img: isValidImageRef(imageRefs[i]) ? imageRefs[i] : null,
         }),
         sort_order: i,
       }));
       const id = await saveSupplierQuote(header, items);
       if (id) {
+        // Remember stored refs on the in-memory rows so a re-save doesn't re-upload.
+        setDraftItems(prev => prev.map((it, i) => {
+          const ref = imageRefs[i];
+          return isValidImageRef(ref) && !it.imageRef ? { ...it, imageRef: ref } : it;
+        }));
         setSavedSQId(id);
         setSqSaveStatus('saved');
         // Refresh supplier quotes list if history is open
@@ -3510,8 +3539,16 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
         sizeDimension: v2.size || '',
         // Old saves (pre-V3) have no `inc` key — default to included so nothing pre-existing disappears
         includeInGCI: v2.inc !== undefined ? v2.inc !== false : true,
-      };
+        imageRef: isValidImageRef(v2.img) ? v2.img : undefined,
+      } as DraftItem;
     });
+
+    // Restore persisted product images (rows saved before image persistence have none).
+    const restoredImages = await mapWithLimit(restoredDraft, 6, (d) =>
+      d.imageRef ? loadSupplierQuoteImage(d.imageRef) : Promise.resolve(null));
+    restoredDraft.forEach((d, i) => { if (restoredImages[i]) d.imageDataUrl = restoredImages[i]!; });
+    const missingImages = restoredDraft.filter((d, i) => d.imageRef && !restoredImages[i]).length;
+    if (missingImages > 0) console.warn(`[Supplier Quote Load] ${missingImages} stored image(s) could not be restored`);
 
     const newCurrencies: Record<string, string> = {};
     const newNotes: Record<string, string> = {};
@@ -3916,13 +3953,24 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       const descText = isModule2Quote
         ? buildModule2CustomerDescription(item)
         : item.originalName + (item.originalSpec ? `\n${item.originalSpec}` : '');
-      const nameLines = doc.splitTextToSize(descText, colWidths[0] - 2);
-      doc.text(nameLines, colX[0] + 1, y + 4);
+      // Product photo (supplier-archive quotes): 14mm thumbnail left of the description.
+      const IMG = 14;
+      const hasImg = isModule2Quote && !!item.imageDataUrl;
+      if (hasImg && y + IMG + 2 > 280) { doc.addPage(); y = 20; }
+      const textX = colX[0] + 1 + (hasImg ? IMG + 2 : 0);
+      const nameLines = doc.splitTextToSize(descText, colWidths[0] - 2 - (hasImg ? IMG + 2 : 0));
+      if (hasImg) {
+        try {
+          const fmt = /^data:image\/jpe?g/i.test(item.imageDataUrl!) ? 'JPEG' : 'PNG';
+          doc.addImage(item.imageDataUrl!, fmt, colX[0] + 1, y + 1, IMG, IMG);
+        } catch { /* unsupported image — keep the row text-only */ }
+      }
+      doc.text(nameLines, textX, y + 4);
       doc.text(String(item.quantity), colX[1] + colWidths[1] - 2, y + 4, { align: 'right' });
       doc.text(item.unit, colX[2] + 1, y + 4);
       doc.text(unitSellPrice.toFixed(2), colX[3] + colWidths[3] - 2, y + 4, { align: 'right' });
       doc.text(lineTot.toFixed(2), colX[4] + colWidths[4] - 2, y + 4, { align: 'right' });
-      const rowH = Math.max(7, nameLines.length * 4.5 + 3);
+      const rowH = Math.max(hasImg ? IMG + 2 : 7, nameLines.length * 4.5 + 3);
       doc.setDrawColor(220, 220, 220);
       doc.line(margin, y + rowH, w - margin, y + rowH);
       y += rowH;
@@ -6492,10 +6540,13 @@ Leave a field as empty string if not present. Never fabricate values.`;
               };
               return (
                 <div key={item.id} className="grid grid-cols-12 gap-2 px-6 py-4 items-center hover:bg-[#0C1B3A]/2 transition-colors">
-                  <div className="col-span-3">
+                  <div className="col-span-3 flex items-start gap-2 min-w-0">
+                    {item.imageDataUrl && <img src={item.imageDataUrl} alt="" className="w-9 h-9 shrink-0 object-cover rounded-md border border-[#0C1B3A]/10" />}
+                    <div className="min-w-0">
                     <p className="text-xs font-bold text-[#0C1B3A] truncate">{item.originalName}</p>
                     {item.originalSpec && <p className="text-xs text-slate-600 truncate">{item.originalSpec}</p>}
                     <span className="text-xs font-bold text-slate-600 ">{tradeItemCurrencies[item.id] || 'AED'} · {item.unit}</span>
+                    </div>
                   </div>
                   <div className="col-span-1 text-right text-xs font-bold text-[#0C1B3A]">{item.quantity}</div>
                   <div className="col-span-2 text-right">
@@ -6705,9 +6756,12 @@ Leave a field as empty string if not present. Never fabricate values.`;
                   const vat = sub * 0.05;
                   return (
                     <div key={item.id} className="grid grid-cols-12 gap-2 px-5 py-3 items-center">
-                      <div className="col-span-5">
+                      <div className="col-span-5 flex items-start gap-2 min-w-0">
+                        {item.imageDataUrl && <img src={item.imageDataUrl} alt="" className="w-9 h-9 shrink-0 object-cover rounded-md border border-[#0C1B3A]/10" />}
+                        <div className="min-w-0">
                         <p className="text-xs font-bold text-[#0C1B3A]">{item.originalName}</p>
                         {item.originalSpec && <p className="text-xs text-slate-600">{item.originalSpec}</p>}
+                        </div>
                       </div>
                       <div className="col-span-1 text-center text-xs font-mono-label text-[#0C1B3A]">{item.quantity}</div>
                       <div className="col-span-2 text-right text-xs font-mono-label text-[#0C1B3A]">{unitSell.toFixed(2)}</div>
