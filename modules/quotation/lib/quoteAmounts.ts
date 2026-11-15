@@ -1,19 +1,21 @@
 /**
  * Customer-quote amount reconciliation (cloud save).
  *
- * Rules (unchanged business rules, unified precision):
- * - Customer line selling amount = the line price shown to the customer, rounded to 0.01.
- * - Subtotal = sum of those lines. VAT = round(subtotal × 5%) on the whole quote.
- * - Supplier cost total = round(sum of exact line costs).
- * - The VAT and cost totals are split back onto the lines with the largest-remainder
- *   method, so every line column adds up exactly to the header (no 0.01 drift).
- * All arithmetic is done in integer fils (1/100 AED).
+ * Header amounts reuse the verified Trade / PI rules (modules/trade/services/currencyUtils):
+ * - roundTo2 (round half up) for every money value
+ * - calculateTradeTotals: subtotal = sum of rounded lines, VAT = roundTo2(subtotal × 5%),
+ *   total = subtotal + VAT  — identical to what the PI computes.
+ * Quotation Center additionally stores per-line VAT / cost / profit (PI does not), so the
+ * only logic added here splits the header VAT and cost back onto the lines
+ * (largest-remainder method) so every line column adds up exactly to the header.
  */
+import { roundTo2, calculateTradeTotals } from '../../trade/services/currencyUtils';
 
-export const VAT_RATE = 0.05;
+/** Only used to weight the per-line VAT split; the VAT total itself comes from calculateTradeTotals. */
+const VAT_SHARE = 0.05;
 
-/** Number → integer cents, tolerant of float noise (e.g. 1.005 → 101). */
-export const toCents = (x: number): number => Math.round(Number(((Number(x) || 0) * 100).toPrecision(12)));
+/** Money → integer fils using the same roundTo2 rule as Trade / PI. */
+export const toCents = (x: number): number => Math.round(roundTo2(Number(x) || 0) * 100);
 const fromCents = (c: number): number => c / 100;
 
 /**
@@ -50,16 +52,15 @@ export interface AmountTotals {
   overallMargin: number; totalVAT: number; grandTotal: number;
 }
 
-const pct = (profitC: number, costC: number) => (costC > 0 ? Math.round((profitC / costC) * 10000) / 100 : 0);
+const pct = (profitC: number, costC: number) => (costC > 0 ? roundTo2((profitC / costC) * 100) : 0);
 
 export function reconcileQuoteAmounts(lines: AmountLineInput[]): { lines: AmountLine[]; totals: AmountTotals } {
-  if (lines.length === 0) {
-    return { lines: [], totals: { totalSupplierCost: 0, totalSelling: 0, totalProfit: 0, overallMargin: 0, totalVAT: 0, grandTotal: 0 } };
-  }
+  // Quotation Center keeps LINE totals, so each line goes in as price = line amount, qty = 1.
+  const { subtotal, vat, total } = calculateTradeTotals(lines.map(l => ({ price: roundTo2(Number(l.selling) || 0), qty: 1 })));
   const sellC = lines.map(l => toCents(l.selling));
-  const subtotalC = sellC.reduce((s, v) => s + v, 0);
-  const vatTotalC = Math.round(subtotalC * VAT_RATE);
-  const vatC = allocateCents(sellC.map(c => c * VAT_RATE), vatTotalC);
+  const subtotalC = toCents(subtotal);
+  const vatTotalC = toCents(vat);
+  const vatC = allocateCents(sellC.map(c => c * VAT_SHARE), vatTotalC);
 
   const exactCostC = lines.map(l => (Number(l.cost) || 0) * 100);
   const costTotalC = toCents(exactCostC.reduce((s, v) => s + v, 0) / 100);
@@ -81,11 +82,11 @@ export function reconcileQuoteAmounts(lines: AmountLineInput[]): { lines: Amount
     lines: out,
     totals: {
       totalSupplierCost: fromCents(costTotalC),
-      totalSelling: fromCents(subtotalC),
+      totalSelling: subtotal,
       totalProfit: fromCents(profitTotalC),
       overallMargin: pct(profitTotalC, costTotalC),
-      totalVAT: fromCents(vatTotalC),
-      grandTotal: fromCents(subtotalC + vatTotalC),
+      totalVAT: vat,
+      grandTotal: total,
     },
   };
 }

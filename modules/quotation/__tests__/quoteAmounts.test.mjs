@@ -87,6 +87,25 @@ test('allocateCents: exact total, each value within 1, deterministic ties', () =
   assert.equal(lib.toCents(1.005), 101);
 });
 
+test('header comes from the Trade / PI calculateTradeTotals (one rule for quote and PI)', async () => {
+  const lib2 = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'gci-cu-')), 'cu.mjs');
+  const b = await rolldown({ input: path.join(ROOT, 'modules/trade/services/currencyUtils.ts'), platform: 'node' });
+  await b.write({ file: lib2, format: 'esm' });
+  const cu = await import(pathToFileURL(lib2).href);
+  let seed = 7; const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  for (let run = 0; run < 50; run++) {
+    // PI-style lines: whole qty, 2-dp unit price (as PI normalises them); the quote stores the same line amounts.
+    const pi = Array.from({ length: 1 + Math.floor(rnd() * 100) }, () => ({ qty: 1 + Math.floor(rnd() * 50), price: Math.round(rnd() * 99999) / 100 }));
+    const quote = pi.map(it => ({ cost: it.price * it.qty * 0.77, selling: cu.roundTo2(it.price * it.qty) }));
+    const piT = cu.calculateTradeTotals(pi);
+    const q = lib.reconcileQuoteAmounts(quote).totals;
+    assert.equal(q.totalSelling, piT.subtotal); assert.equal(q.totalVAT, piT.vat); assert.equal(q.grandTotal, piT.total);
+  }
+  const src = fs.readFileSync(path.join(ROOT, 'modules/quotation/lib/quoteAmounts.ts'), 'utf8');
+  assert.match(src, /import \{ roundTo2, calculateTradeTotals \} from '\.\.\/\.\.\/trade\/services\/currencyUtils';/);
+  assert.match(src, /calculateTradeTotals\(/);
+});
+
 test('cloud save uses the reconciled amounts for header and lines', () => {
   const fn = SRC.slice(SRC.indexOf('const buildCloudPayload = '), SRC.indexOf('const handleSaveToCloud = async'));
   assert.match(fn, /const amounts = reconcileQuoteAmounts\(/);
