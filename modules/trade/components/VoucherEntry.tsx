@@ -43,6 +43,7 @@ export default function VoucherEntry() {
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   const [fields, setFields] = useState<ParsedVoucherFields>({});
   const [purposeNote, setPurposeNote] = useState('');
@@ -248,10 +249,33 @@ export default function VoucherEntry() {
           </div>
         )}
 
+        {/* Upload zone (UI only) — the whole zone is a <label> for the same
+            file input below, and drag & drop calls the same handleFile(). */}
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-slate-600 ">{t.upload}</label>
-          <input ref={fileRef} type="file" accept="application/pdf,image/*" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} disabled={parsing} className="text-sm" />
-          {parsing && <p className="text-xs font-bold text-[#7A5F2A] flex items-center gap-1.5 pt-1"><FileClock className="w-3.5 h-3.5" /> {t.parsing}</p>}
+          <label
+            onDragOver={e => { e.preventDefault(); if (!parsing) setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={e => {
+              e.preventDefault();
+              setDragOver(false);
+              if (parsing) return;
+              const f = e.dataTransfer.files?.[0];
+              if (f && (f.type === 'application/pdf' || f.type.startsWith('image/') || f.name.toLowerCase().endsWith('.pdf'))) handleFile(f);
+            }}
+            className={`block rounded-[10px] border-2 border-dashed p-6 text-center transition-all ${parsing ? 'cursor-wait opacity-90' : 'cursor-pointer hover:border-[#CBA85C]'} ${dragOver ? 'border-[#CBA85C] bg-[#CBA85C]/10' : 'border-[#CBA85C]/50 bg-[#080D1E]'}`}
+          >
+            <input ref={fileRef} type="file" accept="application/pdf,image/*" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} disabled={parsing} className="hidden" />
+            <div className="w-12 h-12 rounded-full bg-[#CBA85C]/15 flex items-center justify-center mx-auto mb-3">
+              {parsing ? <FileClock className="w-6 h-6 text-[#CBA85C] animate-pulse" /> : <Upload className="w-6 h-6 text-[#CBA85C]" />}
+            </div>
+            <p className={`text-sm font-bold ${dragOver ? 'text-[#7A5F2A]' : 'text-white'}`}>{t.upload}</p>
+            <p className={`text-xs mt-1 ${dragOver ? 'text-[#7A5F2A]' : 'text-slate-300'}`}>{t.uploadHint}</p>
+            {!file && <p className="text-xs font-bold text-[#CBA85C] mt-3">{t.uploadCta}</p>}
+            {file && (
+              <p className="text-xs font-bold text-[#CBA85C] mt-3 truncate" title={file.name}>{t.selectedFile}{file.name}</p>
+            )}
+            {parsing && <p className="text-xs font-bold text-white mt-2 flex items-center justify-center gap-1.5"><FileClock className="w-3.5 h-3.5 text-[#CBA85C]" /> {t.parsing}</p>}
+          </label>
           {parseError && <p className="text-xs font-bold text-red-600 pt-1">{parseError}</p>}
         </div>
       </div>
