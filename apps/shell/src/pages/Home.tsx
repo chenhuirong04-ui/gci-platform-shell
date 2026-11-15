@@ -206,6 +206,13 @@ export function Home({ onFlash: _onFlash }: { onFlash: (msg: string) => void }) 
         </p>
       </div>
 
+      {/* Ask GCI — the one search/assistant entry point, placed directly
+          under the greeting (AI first). Its own shortcut chips were trimmed
+          to only real, working actions (查客户/查报价/查文件/查财务/记录跟进)
+          — see BusinessAssistantEntry.tsx. */}
+      <SectionHeader label="ASK GCI" />
+      <BusinessAssistantEntry />
+
       {/* Each section is dropped entirely (header included) when permission
           filtering leaves zero tiles — never an empty header over nothing,
           and never a "no permission" placeholder in its place. */}
@@ -260,13 +267,6 @@ export function Home({ onFlash: _onFlash }: { onFlash: (msg: string) => void }) 
           )}
         </div>
       )}
-
-      {/* Ask GCI — the one search/assistant entry point, listed last per the
-          final structure. Its own shortcut chips were trimmed to only
-          real, working actions (查客户/查报价/查文件/查财务/记录跟进) — see
-          BusinessAssistantEntry.tsx. */}
-      <SectionHeader label="ASK GCI" />
-      <BusinessAssistantEntry />
 
       {inventoryDrawerOpen && (
         <InventoryAlertDrawer onClose={() => setInventoryDrawerOpen(false)} />
