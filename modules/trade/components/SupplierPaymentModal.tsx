@@ -8,6 +8,7 @@ import {
 } from './PaymentMethodFields';
 import type { SupplierPayable, BankAccount } from '../types';
 import { ModalPortal } from '@gci/design-system';
+import { useI18n } from '@gci/i18n';
 
 interface SupplierPaymentModalProps {
   payable: SupplierPayable;
@@ -24,6 +25,8 @@ interface SupplierPaymentModalProps {
  */
 export default function SupplierPaymentModal({ payable, accounts, onClose, onSuccess }: SupplierPaymentModalProps) {
   const [amount, setAmount] = useState(String(payable.outstanding_amount));
+  const { dict } = useI18n();
+  const t = dict.trade.finance.payModal;
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [referenceNo, setReferenceNo] = useState('');
   const [notes, setNotes] = useState('');
@@ -34,8 +37,8 @@ export default function SupplierPaymentModal({ payable, accounts, onClose, onSuc
   const overOutstanding = amtNum > payable.outstanding_amount + 0.005;
 
   const submit = async () => {
-    if (amtNum <= 0) { alert('⚠️ 付款金额必须大于 0。'); return; }
-    if (overOutstanding) { alert(`⚠️ 本次付款金额不能大于未付余额 AED ${payable.outstanding_amount.toFixed(2)}。`); return; }
+    if (amtNum <= 0) { alert(t.errAmount); return; }
+    if (overOutstanding) { alert(t.errOver.replace('{amt}', payable.outstanding_amount.toFixed(2))); return; }
     setSubmitting(true);
     try {
       await supplierPaymentsService.create({
@@ -51,7 +54,7 @@ export default function SupplierPaymentModal({ payable, accounts, onClose, onSuc
       onSuccess();
       onClose();
     } catch (e: any) {
-      alert(`⚠️ ${e?.message || '付款失败，请重试。'}`);
+      alert(`⚠️ ${e?.message || t.errFail}`);
     } finally {
       setSubmitting(false);
     }
@@ -62,7 +65,7 @@ export default function SupplierPaymentModal({ payable, accounts, onClose, onSuc
       <div className="bg-white w-full max-w-xl rounded-[14px] overflow-hidden flex flex-col shadow-2xl max-h-[90dvh] max-sm:w-full max-sm:min-h-full max-sm:my-0 max-sm:max-w-none max-sm:max-h-none max-sm:rounded-none">
         <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
           <div>
-            <h3 className="text-sm font-bold text-gray-800 ">供应商付款 / Supplier Payment</h3>
+            <h3 className="text-sm font-bold text-gray-800 ">{t.title}</h3>
             <p className="text-xs font-bold text-slate-600 mt-1">{payable.supplier_name} — {payable.invoice_no || payable.reference_no || payable.id.slice(0, 8)}</p>
           </div>
           <button onClick={onClose} className="p-3 hover:bg-red-50 text-slate-600 hover:text-red-500 rounded-full transition-all">
@@ -73,17 +76,17 @@ export default function SupplierPaymentModal({ payable, accounts, onClose, onSuc
         <div className="flex-1 min-h-0 overflow-y-auto p-8 space-y-5">
           <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-[10px]">
             <div>
-              <p className="text-xs font-bold text-slate-600 ">应付金额</p>
+              <p className="text-xs font-bold text-slate-600 ">{t.payable}</p>
               <p className="text-lg font-bold font-mono-label text-gray-700">AED {payable.amount.toFixed(2)}</p>
             </div>
             <div>
-              <p className="text-xs font-bold text-slate-600 ">未付余额</p>
+              <p className="text-xs font-bold text-slate-600 ">{t.outstanding}</p>
               <p className="text-lg font-bold font-mono-label text-[#c53030]">AED {payable.outstanding_amount.toFixed(2)}</p>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-600 ">本次付款金额 (AED)</label>
+            <label className="text-xs font-bold text-slate-600 ">{t.amountThis}</label>
             <input
               type="number"
               step="0.01"
@@ -92,12 +95,12 @@ export default function SupplierPaymentModal({ payable, accounts, onClose, onSuc
               className={`w-full p-4 border rounded-md outline-none font-bold font-mono-label text-lg ${overOutstanding ? 'border-red-400 text-red-600' : 'border-gray-300 focus:border-[#CBA85C] text-gray-700'}`}
             />
             {overOutstanding && (
-              <p className="text-xs text-red-600 font-bold px-1">⚠️ 不能大于未付余额 AED {payable.outstanding_amount.toFixed(2)}</p>
+              <p className="text-xs text-red-600 font-bold px-1">{t.overWarn.replace('{amt}', payable.outstanding_amount.toFixed(2))}</p>
             )}
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-600 ">Payment Date</label>
+            <label className="text-xs font-bold text-slate-600 ">{t.paymentDate}</label>
             <input
               type="date"
               value={paymentDate}
@@ -109,7 +112,7 @@ export default function SupplierPaymentModal({ payable, accounts, onClose, onSuc
           <PaymentMethodFields value={pmValue} onChange={setPmValue} accounts={accounts} type="out" />
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-600 ">Reference No / 单据参考号（可选）</label>
+            <label className="text-xs font-bold text-slate-600 ">{t.refNoOpt}</label>
             <input
               type="text"
               value={referenceNo}
@@ -119,7 +122,7 @@ export default function SupplierPaymentModal({ payable, accounts, onClose, onSuc
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-600 ">备注（可选）</label>
+            <label className="text-xs font-bold text-slate-600 ">{t.notesOpt}</label>
             <input
               type="text"
               value={notes}
@@ -135,7 +138,7 @@ export default function SupplierPaymentModal({ payable, accounts, onClose, onSuc
             disabled={submitting || overOutstanding || amtNum <= 0}
             className="w-full py-5 bg-[#080D1E] text-white rounded-md font-bold text-xs shadow-lg hover:bg-[#CBA85C] transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-40"
           >
-            <Save className="w-4 h-4" /> {submitting ? '提交中…' : '确认付款'}
+            <Save className="w-4 h-4" /> {submitting ? t.submitting : t.confirmPay}
           </button>
         </div>
       </div>

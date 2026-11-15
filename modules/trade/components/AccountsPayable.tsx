@@ -9,6 +9,7 @@ import { useAuth } from '../../../apps/shell/src/contexts/AuthContext';
 import SupplierPaymentModal from './SupplierPaymentModal';
 import type { SupplierPayable, SupplierPayment, BankAccount } from '../types';
 import type { Supplier } from '../../suppliers/types';
+import { useI18n } from '@gci/i18n';
 
 const STATUS_STYLE: Record<SupplierPayable['status'], string> = {
   UNPAID: 'bg-[#E0846A]/10 text-[#c53030] border-[#E0846A]/20',
@@ -26,6 +27,12 @@ function daysUntil(dateStr?: string): number | null {
 
 const AccountsPayable: React.FC = () => {
   const { can } = useAuth();
+  const { dict } = useI18n();
+  const tf = dict.trade.finance;
+  const t = tf.ap;
+  const statusLabel: Record<SupplierPayable['status'], string> = { UNPAID: t.statusUnpaid, PARTIAL: t.statusPartial, PAID: t.statusPaid, CANCELLED: t.statusCancelled };
+  const pmName = (m?: string) => (m === 'CASH' ? tf.payFields.cash : m === 'BANK_TRANSFER' ? tf.payFields.bankTransfer : m === 'CHEQUE' ? tf.payFields.cheque : m || '');
+  const chequeStatusName = (s?: string) => (s === 'PENDING' ? tf.payFields.statusPending : s === 'CLEARED' ? tf.payFields.statusCleared : s === 'BOUNCED' ? tf.payFields.statusBounced : s === 'CANCELLED' ? tf.payFields.statusCancelled : s || '');
 
   const [payables, setPayables] = useState<SupplierPayable[]>([]);
   const [payments, setPayments] = useState<SupplierPayment[]>([]);
@@ -107,9 +114,9 @@ const AccountsPayable: React.FC = () => {
   };
 
   const submitNewPayable = async () => {
-    if (!selectedSupplier?.id) { alert('⚠️ 请选择供应商。'); return; }
+    if (!selectedSupplier?.id) { alert(t.errSupplier); return; }
     const amt = Number(npAmount);
-    if (!amt || amt <= 0) { alert('⚠️ 应付金额必须大于 0。'); return; }
+    if (!amt || amt <= 0) { alert(t.errAmount); return; }
     setSavingPayable(true);
     try {
       await supplierPayablesService.create({
@@ -125,7 +132,7 @@ const AccountsPayable: React.FC = () => {
       setShowNewPayable(false);
       await loadAll();
     } catch (e: any) {
-      alert(`⚠️ ${e?.message || '新增应付失败，请重试。'}`);
+      alert(`⚠️ ${e?.message || t.errCreate}`);
     } finally {
       setSavingPayable(false);
     }
@@ -136,17 +143,17 @@ const AccountsPayable: React.FC = () => {
       await supplierPaymentsService.markChequeStatus(payment, status);
       await loadAll();
     } catch (e: any) {
-      alert(`⚠️ ${e?.message || '操作失败，请重试。'}`);
+      alert(`⚠️ ${e?.message || t.errAction}`);
     }
   };
 
   const handleCancelPayable = async (payable: SupplierPayable) => {
-    if (!confirm(`确认作废这笔应付账款吗？（${payable.supplier_name} — AED ${payable.amount.toFixed(2)}）`)) return;
+    if (!confirm(t.confirmVoid.replace('{name}', payable.supplier_name).replace('{amt}', payable.amount.toFixed(2)))) return;
     try {
       await supplierPayablesService.cancel(payable.id);
       await loadAll();
     } catch (e: any) {
-      alert(`⚠️ ${e?.message || '作废失败，请重试。'}`);
+      alert(`⚠️ ${e?.message || t.errVoid}`);
     }
   };
 
@@ -157,8 +164,8 @@ const AccountsPayable: React.FC = () => {
           <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto text-slate-600">
             <Lock className="w-10 h-10" />
           </div>
-          <h3 className="text-lg font-bold text-gray-800">PRIVATE AREA</h3>
-          <p className="text-sm text-slate-600">你的账号没有财务权限，请联系管理员开通 "finance" 权限</p>
+          <h3 className="text-lg font-bold text-gray-800">{tf.common.privateArea}</h3>
+          <p className="text-sm text-slate-600">{tf.common.noFinancePermission}</p>
         </div>
       </div>
     );
@@ -167,44 +174,44 @@ const AccountsPayable: React.FC = () => {
   return (
     <div className="flex flex-col gap-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>应付账款 / Accounts Payable</h1>
+        <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>{t.title}</h1>
         <button
           onClick={() => setShowNewPayable(v => !v)}
           className="flex items-center gap-2 px-5 py-3 rounded-md bg-[#080D1E] text-white text-xs font-bold hover:bg-[#CBA85C] transition-all"
         >
-          <Plus className="w-4 h-4" /> 新增应付
+          <Plus className="w-4 h-4" /> {t.newPayable}
         </button>
       </div>
 
       {/* KPI row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-[10px] shadow-sm border border-gray-100">
-          <p className="text-xs font-bold text-slate-600 mb-1">总应付 / Total Outstanding</p>
+          <p className="text-xs font-bold text-slate-600 mb-1">{t.totalOutstanding}</p>
           <p className="text-2xl font-bold font-mono-label text-gray-800">AED {kpi.totalOutstanding.toFixed(2)}</p>
         </div>
         <div className="bg-white p-6 rounded-[10px] shadow-sm border border-gray-100">
-          <p className="text-xs font-bold text-slate-600 mb-1 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5 text-[#c53030]" /> 已逾期 / Overdue</p>
+          <p className="text-xs font-bold text-slate-600 mb-1 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5 text-[#c53030]" /> {t.overdue}</p>
           <p className="text-2xl font-bold font-mono-label text-[#c53030]">AED {kpi.overdueAmount.toFixed(2)}</p>
-          <p className="text-xs text-slate-600 font-bold mt-1">{kpi.overdueCount} 笔</p>
+          <p className="text-xs text-slate-600 font-bold mt-1">{tf.common.countItems.replace('{n}', String(kpi.overdueCount))}</p>
         </div>
         <div className="bg-white p-6 rounded-[10px] shadow-sm border border-gray-100">
-          <p className="text-xs font-bold text-slate-600 mb-1 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-[#7A5F2A]" /> 7天内到期 / Due Soon</p>
+          <p className="text-xs font-bold text-slate-600 mb-1 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-[#7A5F2A]" /> {t.dueSoon}</p>
           <p className="text-2xl font-bold font-mono-label text-[#7A5F2A]">AED {kpi.dueSoonAmount.toFixed(2)}</p>
-          <p className="text-xs text-slate-600 font-bold mt-1">{kpi.dueSoonCount} 笔</p>
+          <p className="text-xs text-slate-600 font-bold mt-1">{tf.common.countItems.replace('{n}', String(kpi.dueSoonCount))}</p>
         </div>
       </div>
 
       {/* New payable form */}
       {showNewPayable && (
         <div className="bg-white p-8 rounded-[10px] border border-gray-100 shadow-sm space-y-5">
-          <h3 className="text-sm font-bold text-gray-800 ">新增应付 / New Payable</h3>
+          <h3 className="text-sm font-bold text-gray-800 ">{t.newPayable}</h3>
           <div className="space-y-1.5 relative">
-            <label className="text-xs font-bold text-slate-600 ">供应商 / Supplier</label>
+            <label className="text-xs font-bold text-slate-600 ">{tf.common.supplier}</label>
             <input
               type="text"
               value={selectedSupplier ? selectedSupplier.supplier_name_display : supplierQuery}
               onChange={e => { setSelectedSupplier(null); setSupplierQuery(e.target.value); }}
-              placeholder="搜索供应商名称…"
+              placeholder={tf.common.searchSupplier}
               className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
             />
             {!selectedSupplier && supplierQuery.trim() && filteredSuppliers.length > 0 && (
@@ -224,26 +231,26 @@ const AccountsPayable: React.FC = () => {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-600 ">Invoice No（可选）</label>
+              <label className="text-xs font-bold text-slate-600 ">{t.invoiceNoOpt}</label>
               <input value={npInvoiceNo} onChange={e => setNpInvoiceNo(e.target.value)} className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-600 ">Reference No（可选）</label>
+              <label className="text-xs font-bold text-slate-600 ">{t.referenceNoOpt}</label>
               <input value={npReferenceNo} onChange={e => setNpReferenceNo(e.target.value)} className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-600 ">应付金额 (AED)</label>
+              <label className="text-xs font-bold text-slate-600 ">{t.payableAmount}</label>
               <input type="number" step="0.01" value={npAmount} onChange={e => setNpAmount(e.target.value)} className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold font-mono-label text-gray-700" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-600 ">到期日（可选）</label>
+              <label className="text-xs font-bold text-slate-600 ">{t.dueDateOpt}</label>
               <input type="date" value={npDueDate} onChange={e => setNpDueDate(e.target.value)} className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono-label" />
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-600 ">备注（可选）</label>
+            <label className="text-xs font-bold text-slate-600 ">{t.notesOpt}</label>
             <input value={npNotes} onChange={e => setNpNotes(e.target.value)} className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700" />
           </div>
           <div className="flex gap-3">
@@ -252,13 +259,13 @@ const AccountsPayable: React.FC = () => {
               disabled={savingPayable}
               className="flex items-center gap-2 px-6 py-3 rounded-md bg-[#080D1E] text-white text-xs font-bold hover:bg-[#CBA85C] transition-all disabled:opacity-40"
             >
-              <Save className="w-4 h-4" /> {savingPayable ? '保存中…' : '保存'}
+              <Save className="w-4 h-4" /> {savingPayable ? t.saving : t.save}
             </button>
             <button
               onClick={() => { resetNewPayableForm(); setShowNewPayable(false); }}
               className="px-6 py-3 rounded-md bg-gray-100 text-slate-600 text-xs font-bold hover:bg-gray-200 transition-all"
             >
-              取消
+              {t.cancel}
             </button>
           </div>
         </div>
@@ -268,7 +275,7 @@ const AccountsPayable: React.FC = () => {
       {pendingCheques.length > 0 && (
         <div className="bg-white rounded-[10px] shadow-xl border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-            <span className="font-bold text-gray-800 text-xs ">待清算支票 / Pending Cheques</span>
+            <span className="font-bold text-gray-800 text-xs ">{tf.common.pendingCheques}</span>
             <span className="text-xs px-3 py-1 bg-white border border-gray-200 rounded-full text-gray-600 font-bold ">{pendingCheques.length}</span>
           </div>
           <div className="divide-y divide-gray-50">
@@ -278,18 +285,18 @@ const AccountsPayable: React.FC = () => {
                 <div key={p.id} className="p-6 flex items-center justify-between flex-wrap gap-3">
                   <div>
                     <p className="text-sm font-bold text-gray-700">
-                      <span className="inline-block px-2 py-0.5 mr-2 rounded-md text-xs font-bold align-middle bg-[#A85D45]/10 text-[#A85D45]">付款 OUT</span>
+                      <span className="inline-block px-2 py-0.5 mr-2 rounded-md text-xs font-bold align-middle bg-[#A85D45]/10 text-[#A85D45]">{tf.common.badgeOut}</span>
                       {p.supplier_name} — <span className="font-mono-label">{p.cheque_bank}</span> #{p.cheque_number}
                     </p>
                     <p className="text-xs text-slate-600 mt-1">
                       {p.payment_date} · {p.cheque_date} · AED {(p.cheque_amount ?? p.amount).toFixed(2)}
-                      {issuedFrom ? ` · Issued From ${issuedFrom.account_name}` : ' · ⚠️ 缺少 Issued From 账户'}
+                      {issuedFrom ? `${tf.common.issuedFromPrefix}${issuedFrom.account_name}` : tf.common.missingIssuedFrom}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => handleChequeAction(p, 'CLEARED')} className="px-4 py-2 rounded-md bg-[#3F7D58] text-white text-xs font-bold hover:bg-[#2d5c40]">标记已清算</button>
-                    <button onClick={() => handleChequeAction(p, 'BOUNCED')} className="px-4 py-2 rounded-md bg-gray-100 text-slate-600 text-xs font-bold hover:bg-gray-200">退票</button>
-                    <button onClick={() => handleChequeAction(p, 'CANCELLED')} className="px-4 py-2 rounded-md bg-gray-100 text-slate-600 text-xs font-bold hover:bg-gray-200">作废</button>
+                    <button onClick={() => handleChequeAction(p, 'CLEARED')} className="px-4 py-2 rounded-md bg-[#3F7D58] text-white text-xs font-bold hover:bg-[#2d5c40]">{tf.common.markCleared}</button>
+                    <button onClick={() => handleChequeAction(p, 'BOUNCED')} className="px-4 py-2 rounded-md bg-gray-100 text-slate-600 text-xs font-bold hover:bg-gray-200">{tf.common.bounced}</button>
+                    <button onClick={() => handleChequeAction(p, 'CANCELLED')} className="px-4 py-2 rounded-md bg-gray-100 text-slate-600 text-xs font-bold hover:bg-gray-200">{tf.common.void}</button>
                   </div>
                 </div>
               );
@@ -304,13 +311,13 @@ const AccountsPayable: React.FC = () => {
           onClick={() => setHistoryView('payables')}
           className={`px-5 py-2.5 rounded-md text-xs font-bold transition-all ${historyView === 'payables' ? 'bg-[#080D1E] text-white shadow-lg' : 'text-slate-600 hover:bg-gray-50'}`}
         >
-          应付列表
+          {t.tabPayables}
         </button>
         <button
           onClick={() => setHistoryView('history')}
           className={`px-5 py-2.5 rounded-md text-xs font-bold transition-all ${historyView === 'history' ? 'bg-[#080D1E] text-white shadow-lg' : 'text-slate-600 hover:bg-gray-50'}`}
         >
-          付款记录 / Payment History
+          {t.tabHistory}
         </button>
       </div>
 
@@ -319,22 +326,22 @@ const AccountsPayable: React.FC = () => {
           <table className="w-full text-left">
             <thead className="bg-gray-50 text-xs font-bold text-slate-600 border-b">
               <tr>
-                <th className="px-6 py-4">供应商</th>
-                <th className="px-6 py-4">单据号</th>
-                <th className="px-6 py-4 text-right">应付金额</th>
-                <th className="px-6 py-4 text-right">已付</th>
-                <th className="px-6 py-4 text-right">未付</th>
-                <th className="px-6 py-4">到期日</th>
-                <th className="px-6 py-4">状态</th>
-                <th className="px-6 py-4 text-right">操作</th>
+                <th className="px-6 py-4">{tf.common.supplier}</th>
+                <th className="px-6 py-4">{t.colDocNo}</th>
+                <th className="px-6 py-4 text-right">{t.colAmount}</th>
+                <th className="px-6 py-4 text-right">{t.colPaid}</th>
+                <th className="px-6 py-4 text-right">{t.colOutstanding}</th>
+                <th className="px-6 py-4">{t.colDue}</th>
+                <th className="px-6 py-4">{t.colStatus}</th>
+                <th className="px-6 py-4 text-right">{t.colActions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {loading && (
-                <tr><td colSpan={8} className="px-6 py-10 text-center text-slate-600 text-sm">加载中…</td></tr>
+                <tr><td colSpan={8} className="px-6 py-10 text-center text-slate-600 text-sm">{tf.common.loading}</td></tr>
               )}
               {!loading && payables.length === 0 && (
-                <tr><td colSpan={8} className="px-6 py-10 text-center text-slate-600 text-sm">暂无应付账款</td></tr>
+                <tr><td colSpan={8} className="px-6 py-10 text-center text-slate-600 text-sm">{t.empty}</td></tr>
               )}
               {!loading && payables.map(p => {
                 const d = daysUntil(p.due_date);
@@ -350,7 +357,7 @@ const AccountsPayable: React.FC = () => {
                     <td className="px-6 py-5 text-right font-mono-label font-bold text-[#c53030]">{p.outstanding_amount.toFixed(2)}</td>
                     <td className={`px-6 py-5 text-xs font-bold font-mono-label ${overdue ? 'text-red-600' : 'text-slate-600'}`}>{p.due_date || '—'}{overdue ? ' ⚠️' : ''}</td>
                     <td className="px-6 py-5">
-                      <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${STATUS_STYLE[p.status]}`}>{p.status}</span>
+                      <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${STATUS_STYLE[p.status]}`}>{statusLabel[p.status] || p.status}</span>
                     </td>
                     <td className="px-6 py-5 text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -359,14 +366,14 @@ const AccountsPayable: React.FC = () => {
                           onClick={() => setPayingPayable(p)}
                           className="px-4 py-2 rounded-md bg-[#080D1E] text-white text-xs font-bold hover:bg-[#CBA85C] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                         >
-                          付款
+                          {t.pay}
                         </button>
                         {canCancel && (
                           <button
                             onClick={() => handleCancelPayable(p)}
                             className="px-4 py-2 rounded-md bg-gray-100 text-slate-600 text-xs font-bold hover:bg-gray-200 transition-all"
                           >
-                            作废
+                            {tf.common.void}
                           </button>
                         )}
                       </div>
@@ -382,16 +389,16 @@ const AccountsPayable: React.FC = () => {
           <table className="w-full text-left">
             <thead className="bg-gray-50 text-xs font-bold text-slate-600 border-b">
               <tr>
-                <th className="px-6 py-4">日期</th>
-                <th className="px-6 py-4">供应商</th>
-                <th className="px-6 py-4">方式</th>
-                <th className="px-6 py-4 text-right">金额</th>
-                <th className="px-6 py-4">备注</th>
+                <th className="px-6 py-4">{t.histDate}</th>
+                <th className="px-6 py-4">{tf.common.supplier}</th>
+                <th className="px-6 py-4">{t.histMethod}</th>
+                <th className="px-6 py-4 text-right">{t.histAmount}</th>
+                <th className="px-6 py-4">{t.histNotes}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {payments.length === 0 && (
-                <tr><td colSpan={5} className="px-6 py-10 text-center text-slate-600 text-sm">暂无付款记录</td></tr>
+                <tr><td colSpan={5} className="px-6 py-10 text-center text-slate-600 text-sm">{t.emptyHistory}</td></tr>
               )}
               {payments.map(p => (
                 <tr key={p.id} className="hover:bg-gray-50/50">
@@ -399,7 +406,7 @@ const AccountsPayable: React.FC = () => {
                   <td className="px-6 py-5 font-bold text-gray-700 text-sm">{p.supplier_name}</td>
                   <td className="px-6 py-5">
                     <span className="px-3 py-1 rounded-lg text-xs font-bold bg-gray-100 text-gray-600">
-                      {p.payment_method}{p.payment_method === 'CHEQUE' && p.cheque_status ? ` · ${p.cheque_status}` : ''}
+                      {pmName(p.payment_method)}{p.payment_method === 'CHEQUE' && p.cheque_status ? ` · ${chequeStatusName(p.cheque_status)}` : ''}
                     </span>
                   </td>
                   <td className="px-6 py-5 text-right font-mono-label font-bold text-[#c53030]">{p.amount.toFixed(2)}</td>

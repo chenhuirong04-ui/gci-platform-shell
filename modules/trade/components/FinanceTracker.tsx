@@ -24,6 +24,7 @@ import {
 } from '../services/transactionCategories';
 import type { TransactionRecord, BankAccount } from '../types';
 import { ModalPortal } from '@gci/design-system';
+import { useI18n } from '@gci/i18n';
 
 // Printable / exported documents keep the body font they have always used.
 const DOC_FONT = "var(--font-body), var(--font-display), 'Segoe UI', system-ui, sans-serif";
@@ -47,6 +48,12 @@ const ACCOUNT_ICON: Record<BankAccount['account_type'], React.ElementType> = {
 
 const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
   const { can } = useAuth();
+  const { dict } = useI18n();
+  const tf = dict.trade.finance;
+  const tt = tf.tracker;
+  const catName = (v: string, fallback?: string) => (tf.categories as Record<string, string>)[v] || fallback || v;
+  const pmName = (m?: string) => (m === 'CASH' ? tf.payFields.cash : m === 'BANK_TRANSFER' ? tf.payFields.bankTransfer : m === 'CHEQUE' ? tf.payFields.cheque : m || '');
+  const chequeStatusName = (s?: string) => (s === 'PENDING' ? tf.payFields.statusPending : s === 'CLEARED' ? tf.payFields.statusCleared : s === 'BOUNCED' ? tf.payFields.statusBounced : s === 'CANCELLED' ? tf.payFields.statusCancelled : s || '');
 
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
@@ -187,16 +194,16 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
             <Lock className="w-10 h-10" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-xl font-bold text-[#080D1E] tracking-tighter">Private Area</h2>
+            <h2 className="text-xl font-bold text-[#080D1E] tracking-tighter">{tf.common.privateArea}</h2>
             <p className="text-xs font-bold text-slate-600 ">
-              你的账号没有财务权限，请联系管理员开通 “finance” 权限
+              {tf.common.noFinancePermission}
             </p>
           </div>
           <button
             onClick={onCancel}
             className="w-full py-4 rounded-md bg-[#080D1E] text-white font-bold text-xs "
           >
-            Back
+            {tf.common.back}
           </button>
         </div>
       </div>
@@ -255,14 +262,14 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
     // match the button actually clicked (an Income category can't be
     // submitted via the Expense button and vice versa) — same
     // cross-check pattern as the CHEQUE direction guard right below.
-    if (!category) { alert('⚠️ 请选择分类 Category。'); return; }
+    if (!category) { alert(tt.errCategory); return; }
     // INTERNAL_TRANSFER is the one bidirectional category (2026-09-15) —
     // a transfer between the company's own accounts is recorded as two
     // ordinary manual entries, one 'out' on the source account and one
     // 'in' on the destination account, both tagged INTERNAL_TRANSFER — so
     // it skips the normal income/expense direction cross-check entirely.
     if (!isTransferCategory(category) && isIncomeCategory(category) !== (type === 'in')) {
-      alert(`⚠️ 「${category}」是${isIncomeCategory(category) ? '收入' : '支出'}分类，请点击对应的 ${isIncomeCategory(category) ? 'Income' : 'Expense'} 按钮提交。`);
+      alert(tt.errCategoryDirection.replace('{cat}', catName(category)).replace('{kind}', isIncomeCategory(category) ? tt.kindIncome : tt.kindExpense).replace('{btn}', isIncomeCategory(category) ? tt.income : tt.expense));
       return;
     }
 
@@ -270,7 +277,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
     // (it decides Deposited To vs Issued From) — the clicked button must
     // agree, or the record would end up with the wrong cheque fields.
     if (paymentMethodValue.payment_method === 'CHEQUE' && chequeDirection !== type) {
-      alert(`⚠️ 这张支票是「${chequeDirection === 'in' ? '收款支票 In' : '付款支票 Out'}」，请点击对应的 ${chequeDirection === 'in' ? 'Income' : 'Expense'} 按钮提交。`);
+      alert(tt.errChequeDirection.replace('{dir}', chequeDirection === 'in' ? tt.chequeIn : tt.chequeOut).replace('{btn}', chequeDirection === 'in' ? tt.income : tt.expense));
       return;
     }
 
@@ -339,11 +346,11 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
     if (status === 'CLEARED') {
       if (isOut) {
         if (!t.issued_from_bank_account_id) {
-          alert('⚠️ 该支票缺少开票账户 (Issued From)，无法标记为已清算。');
+          alert(tt.errChequeNoIssuedFrom);
           return;
         }
       } else if (!depositAccountId) {
-        alert('⚠️ 标记为 Cleared 时必须选择存入哪个银行账户。');
+        alert(tt.errChequeNeedDeposit);
         return;
       }
     }
@@ -397,7 +404,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
       setShowAddAccount(false);
       setNewAcc(emptyNewAccount);
     } catch (e: any) {
-      alert(`创建账户失败：${e?.message || '未知错误'}`);
+      alert(`${tt.errCreateAccount}${e?.message || tf.common.unknownError}`);
     } finally {
       setSavingAccount(false);
     }
@@ -413,7 +420,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
 
   const handleExportAllCorporate = async () => {
     if (activeCorporateAccounts.length === 0) {
-      alert('没有可导出的 Corporate 账户（需要 account_type=Corporate 且 is_active）。');
+      alert(tt.errNoCorporate);
       return;
     }
     setExportingAll(true);
@@ -423,37 +430,37 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
         .filter((el): el is HTMLDivElement => !!el);
       await exportElementsToPdf(els, `GCI_Corporate_Bank_Details_${new Date().toISOString().slice(0, 10)}.pdf`, { scale: 2 });
     } catch (e: any) {
-      alert(`导出失败：${e?.message || '未知错误'}`);
+      alert(`${tt.errExport}${e?.message || tf.common.unknownError}`);
     } finally {
       setExportingAll(false);
     }
   };
 
   if (loading) {
-    return <div className="h-[calc(100vh-250px)] flex items-center justify-center text-slate-600 text-xs font-bold ">Loading...</div>;
+    return <div className="h-[calc(100vh-250px)] flex items-center justify-center text-slate-600 text-xs font-bold ">{tf.common.loading}</div>;
   }
 
   return (
     <div className="h-full flex flex-col gap-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>财务账</h1>
+        <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>{tt.title}</h1>
         <div className="flex items-center gap-2">
           {activeCorporateAccounts.length > 0 && (
             <button
               onClick={handleExportAllCorporate}
               disabled={exportingAll}
               className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-md text-xs font-bold hover:border-[#CBA85C] transition-all disabled:opacity-40"
-              title="导出全部 Corporate 账户的银行信息（Cash/Personal/Other 不包含）"
+              title={tt.exportAllTitle}
             >
               <FileDown className="w-4 h-4" />
-              {exportingAll ? '导出中...' : 'Export All Corporate Accounts'}
+              {exportingAll ? tf.common.exporting : tt.exportAll}
             </button>
           )}
           <button
             onClick={() => setShowAddAccount(true)}
             className="flex items-center gap-2 px-4 py-2 bg-[#080D1E] text-white rounded-md text-xs font-bold hover:bg-[#CBA85C] transition-all"
           >
-            <Plus className="w-4 h-4" /> 新增账户
+            <Plus className="w-4 h-4" /> {tt.addAccount}
           </button>
         </div>
       </div>
@@ -471,19 +478,19 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
       {/* Top summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
-          <p className="text-xs font-bold text-slate-600 mb-1">总银行余额</p>
+          <p className="text-xs font-bold text-slate-600 mb-1">{tt.totalBank}</p>
           <p className="text-xl font-bold font-mono-label text-gray-800">AED {stats.bankTotal.toFixed(2)}</p>
         </div>
         <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
-          <p className="text-xs font-bold text-slate-600 mb-1">Cash 余额</p>
+          <p className="text-xs font-bold text-slate-600 mb-1">{tt.cashBalance}</p>
           <p className="text-xl font-bold font-mono-label text-gray-800">AED {stats.cashTotal.toFixed(2)}</p>
         </div>
         <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
-          <p className="text-xs font-bold text-slate-600 mb-1">本月收款</p>
+          <p className="text-xs font-bold text-slate-600 mb-1">{tt.monthIncome}</p>
           <p className="text-xl font-bold font-mono-label text-[#3F7D58]">+{stats.monthIncome.toFixed(2)}</p>
         </div>
         <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
-          <p className="text-xs font-bold text-slate-600 mb-1">本月付款</p>
+          <p className="text-xs font-bold text-slate-600 mb-1">{tt.monthExpense}</p>
           <p className="text-xl font-bold font-mono-label text-[#c53030]">-{stats.monthExpense.toFixed(2)}</p>
         </div>
       </div>
@@ -491,8 +498,8 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
       {accounts.length === 0 ? (
         <div className="bg-white p-12 rounded-[10px] border border-gray-100 shadow-sm text-center space-y-4">
           <Landmark className="w-10 h-10 text-slate-600 mx-auto" />
-          <p className="text-sm font-bold text-slate-600">还没有任何银行账户</p>
-          <p className="text-xs text-slate-600">点右上角「新增账户」先建一个对公/对私/现金账户，才能开始记流水</p>
+          <p className="text-sm font-bold text-slate-600">{tt.noAccountsTitle}</p>
+          <p className="text-xs text-slate-600">{tt.noAccountsHint}</p>
         </div>
       ) : (
         <>
@@ -524,7 +531,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
           {pendingCheques.length > 0 && (
             <div className="bg-white rounded-[10px] shadow-xl border border-gray-100 overflow-hidden">
               <div className="p-6 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-                <span className="font-bold text-gray-800 text-xs ">待清算支票 / Pending Cheques</span>
+                <span className="font-bold text-gray-800 text-xs ">{tf.common.pendingCheques}</span>
                 <span className="text-xs px-3 py-1 bg-white border border-gray-200 rounded-full text-gray-600 font-bold ">{pendingCheques.length}</span>
               </div>
               <div className="divide-y divide-gray-50">
@@ -537,13 +544,13 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                         <div>
                           <p className="text-sm font-bold text-gray-700">
                             <span className={`inline-block px-2 py-0.5 mr-2 rounded-md text-xs font-bold align-middle ${isOut ? 'bg-[#A85D45]/10 text-[#A85D45]' : 'bg-[#3F7D58]/10 text-[#3F7D58]'}`}>
-                              {isOut ? '付款 OUT' : '收款 IN'}
+                              {isOut ? tf.common.badgeOut : tf.common.badgeIn}
                             </span>
                             {t.note} — <span className="font-mono-label">{t.cheque_bank}</span> #{t.cheque_number}
                           </p>
                           <p className="text-xs text-slate-600 mt-1">
                             {t.date} · {t.cheque_date} · AED {(t.cheque_amount ?? t.amount).toFixed(2)}
-                            {isOut && (issuedFromAccount ? ` · Issued From ${issuedFromAccount.account_name}` : ' · ⚠️ 缺少 Issued From 账户')}
+                            {isOut && (issuedFromAccount ? `${tf.common.issuedFromPrefix}${issuedFromAccount.account_name}` : tf.common.missingIssuedFrom)}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -558,19 +565,19 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                             }}
                             className="px-4 py-2 rounded-md bg-[#3F7D58] text-white text-xs font-bold hover:bg-[#2d5c40]"
                           >
-                            标记已清算
+                            {tf.common.markCleared}
                           </button>
                           <button
                             onClick={() => markChequeStatus(t, 'BOUNCED')}
                             className="px-4 py-2 rounded-md bg-gray-100 text-slate-600 text-xs font-bold hover:bg-gray-200"
                           >
-                            退票
+                            {tf.common.bounced}
                           </button>
                           <button
                             onClick={() => markChequeStatus(t, 'CANCELLED')}
                             className="px-4 py-2 rounded-md bg-gray-100 text-slate-600 text-xs font-bold hover:bg-gray-200"
                           >
-                            作废
+                            {tf.common.void}
                           </button>
                         </div>
                       </div>
@@ -581,7 +588,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                             value={clearingDepositAccount}
                             onChange={e => setClearingDepositAccount(e.target.value)}
                           >
-                            <option value="">选择存入账户 Deposited To…</option>
+                            <option value="">{tt.selectDepositAccount}</option>
                             {bankTransferEligible(accounts).map(a => (
                               <option key={a.id} value={a.id}>{a.account_name}{a.bank_name ? ' · ' + a.bank_name : ''} · {a.currency}</option>
                             ))}
@@ -594,7 +601,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                             disabled={!clearingDepositAccount}
                             className="px-5 py-3 rounded-md bg-[#080D1E] text-white text-xs font-bold disabled:opacity-40"
                           >
-                            确认
+                            {tf.common.confirm}
                           </button>
                         </div>
                       )}
@@ -612,7 +619,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-xs font-bold text-slate-600 mb-1">
-                      Current Balance ({activeAccount?.account_name || '-'})
+                      {tt.currentBalance} ({activeAccount?.account_name || '-'})
                     </p>
                     <p className={`text-4xl font-bold font-mono-label tracking-tighter ${activeBalance >= 0 ? 'text-gray-800' : 'text-[#c53030]'}`}>
                       {activeAccount?.currency || 'AED'} {activeBalance.toFixed(2)}
@@ -625,14 +632,14 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
 
                 <div className="mt-8 grid grid-cols-2 gap-6 border-t border-gray-50 pt-6">
                   <div>
-                    <p className="text-xs font-bold text-slate-600 mb-1">Income</p>
+                    <p className="text-xs font-bold text-slate-600 mb-1">{tt.income}</p>
                     <p className="text-lg font-bold text-[#3F7D58] flex items-center gap-1.5 font-mono-label">
                       <TrendingUp className="w-4 h-4" />
                       {activeIncome.toFixed(2)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-slate-600 mb-1">Expense</p>
+                    <p className="text-xs font-bold text-slate-600 mb-1">{tt.expense}</p>
                     <p className="text-lg font-bold text-[#c53030] flex items-center gap-1.5 font-mono-label">
                       <TrendingDown className="w-4 h-4" />
                       {activeExpense.toFixed(2)}
@@ -645,7 +652,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                     onClick={() => setShowBankDetailsFor(activeAccount)}
                     className="mt-6 w-full flex items-center justify-center gap-2 py-3.5 rounded-md border border-gray-200 text-gray-700 font-bold text-xs hover:border-[#CBA85C] hover:text-[#CBA85C] transition-all"
                   >
-                    <CreditCard className="w-4 h-4" /> 银行信息 / Bank Details
+                    <CreditCard className="w-4 h-4" /> {tt.bankDetails}
                   </button>
                 )}
               </div>
@@ -654,7 +661,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                 <div className="flex justify-between items-center mb-8 pb-4 border-b border-gray-50">
                   <h3 className="font-bold text-gray-800 flex items-center gap-3 text-sm ">
                     <PlusCircle className="w-5 h-5 text-[#7A5F2A]" />
-                    Quick Entry
+                    {tt.quickEntry}
                   </h3>
                 </div>
 
@@ -668,30 +675,30 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                       one of the two submit buttons below — addTransaction()
                       cross-checks the pick against whichever was clicked. */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 ">Category / 分类 *</label>
+                    <label className="text-xs font-bold text-slate-600 ">{tt.categoryRequired}</label>
                     <select
                       className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700"
                       value={category}
                       onChange={e => setCategory(e.target.value)}
                     >
-                      <option value="">选择分类…</option>
-                      <optgroup label="收入 Income">
-                        {INCOME_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      <option value="">{tf.common.selectCategory}</option>
+                      <optgroup label={tt.groupIncome}>
+                        {INCOME_CATEGORIES.map(c => <option key={c.value} value={c.value}>{catName(c.value, c.label)}</option>)}
                       </optgroup>
-                      <optgroup label="非经营流入 Non-Operating（仅 Income 按钮）">
-                        {NON_OPERATING_INFLOW_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      <optgroup label={tt.groupNonOp}>
+                        {NON_OPERATING_INFLOW_CATEGORIES.map(c => <option key={c.value} value={c.value}>{catName(c.value, c.label)}</option>)}
                       </optgroup>
-                      <optgroup label="转账 Transfer（Income/Expense 均可）">
-                        {TRANSFER_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      <optgroup label={tt.groupTransfer}>
+                        {TRANSFER_CATEGORIES.map(c => <option key={c.value} value={c.value}>{catName(c.value, c.label)}</option>)}
                       </optgroup>
-                      <optgroup label="支出 Expense">
-                        {MANUAL_EXPENSE_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      <optgroup label={tt.groupExpense}>
+                        {MANUAL_EXPENSE_CATEGORIES.map(c => <option key={c.value} value={c.value}>{catName(c.value, c.label)}</option>)}
                       </optgroup>
                     </select>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 ">Subcategory / 子分类（可选）</label>
+                    <label className="text-xs font-bold text-slate-600 ">{tt.subcategoryOptional}</label>
                     <input
                       type="text"
                       className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
@@ -704,7 +711,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                       real supplier, never both (a manual entry is either
                       sales-adjacent or supplier-adjacent). */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 ">关联 Link（可选）</label>
+                    <label className="text-xs font-bold text-slate-600 ">{tf.common.linkOptional}</label>
                     <div className="grid grid-cols-3 gap-2">
                       {(['none', 'customer', 'supplier'] as const).map(m => (
                         <button
@@ -713,7 +720,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                           onClick={() => setLinkMode(m)}
                           className={`p-2.5 rounded-md text-xs font-bold transition-all ${linkMode === m ? 'bg-[#080D1E] text-white' : 'bg-gray-100 text-slate-600'}`}
                         >
-                          {m === 'none' ? '不关联' : m === 'customer' ? '客户/项目' : '供应商'}
+                          {m === 'none' ? tf.common.linkNone : m === 'customer' ? tf.common.linkCustomer : tf.common.linkSupplier}
                         </button>
                       ))}
                     </div>
@@ -725,11 +732,11 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
 
                   {linkMode === 'supplier' && (
                     <div className="space-y-1.5 relative">
-                      <label className="text-xs font-bold text-slate-600 ">Supplier / 供应商</label>
+                      <label className="text-xs font-bold text-slate-600 ">{tf.common.supplier}</label>
                       <input
                         type="text"
                         className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
-                        placeholder="搜索供应商名称…"
+                        placeholder={tf.common.searchSupplier}
                         value={selectedSupplier ? selectedSupplier.supplier_name_display : supplierQuery}
                         onChange={e => { setSupplierQuery(e.target.value); setSelectedSupplier(null); }}
                       />
@@ -758,21 +765,21 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                       actually moved. */}
                   {paymentMethodValue.payment_method === 'CHEQUE' && (
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600 ">Cheque Direction / 支票方向</label>
+                      <label className="text-xs font-bold text-slate-600 ">{tt.chequeDirection}</label>
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"
                           onClick={() => setChequeDirection('in')}
                           className={`p-3 rounded-md text-xs font-bold transition-all ${chequeDirection === 'in' ? 'bg-[#3F7D58] text-white' : 'bg-gray-100 text-slate-600'}`}
                         >
-                          收款支票 / In
+                          {tt.chequeIn}
                         </button>
                         <button
                           type="button"
                           onClick={() => setChequeDirection('out')}
                           className={`p-3 rounded-md text-xs font-bold transition-all ${chequeDirection === 'out' ? 'bg-[#A85D45] text-white' : 'bg-gray-100 text-slate-600'}`}
                         >
-                          付款支票 / Out
+                          {tt.chequeOut}
                         </button>
                       </div>
                     </div>
@@ -785,7 +792,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                   />
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 ">Transaction Date</label>
+                    <label className="text-xs font-bold text-slate-600 ">{tt.txnDate}</label>
                     <div className="relative">
                       <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
                       <input
@@ -798,13 +805,13 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 ">Memo / Note</label>
+                    <label className="text-xs font-bold text-slate-600 ">{tt.memo}</label>
                     <div className="relative">
                       <FileText className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
                       <input
                         type="text"
                         className="w-full pl-10 p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] focus:ring-4 focus:ring-[#CBA85C]/20 bg-white font-bold text-gray-700"
-                        placeholder="e.g. Sales Deposit"
+                        placeholder={tt.memoPlaceholder}
                         value={note}
                         onChange={e => setNote(e.target.value)}
                       />
@@ -812,7 +819,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 ">Amount</label>
+                    <label className="text-xs font-bold text-slate-600 ">{tt.amount}</label>
                     <div className="relative">
                       <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
                       <input
@@ -832,14 +839,14 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                       disabled={!note || !amount || !category}
                       className="flex items-center justify-center gap-2 p-4 rounded-md bg-[#3F7D58] text-white hover:bg-[#2d5c40] shadow-lg font-bold text-xs disabled:opacity-40"
                     >
-                      <TrendingUp className="w-4 h-4" /> Income
+                      <TrendingUp className="w-4 h-4" /> {tt.income}
                     </button>
                     <button
                       onClick={() => addTransaction('out')}
                       disabled={!note || !amount || !category}
                       className="flex items-center justify-center gap-2 p-4 rounded-md bg-[#A85D45] text-white hover:bg-[#8b4c37] shadow-lg font-bold text-xs disabled:opacity-40"
                     >
-                      <TrendingDown className="w-4 h-4" /> Expense
+                      <TrendingDown className="w-4 h-4" /> {tt.expense}
                     </button>
                   </div>
                 </div>
@@ -850,10 +857,10 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
               <div className="p-6 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
                 <span className="font-bold text-gray-800 text-xs flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-[#7A5F2A]" />
-                  {activeAccount?.account_name || '-'} Ledger
+                  {tt.ledgerTitle.replace('{name}', activeAccount?.account_name || '-')}
                 </span>
                 <span className="text-xs px-3 py-1 bg-white border border-gray-200 rounded-full text-gray-600 font-bold ">
-                  {currentTransactions.length} ENTRIES
+                  {tt.entries.replace('{n}', String(currentTransactions.length))}
                 </span>
               </div>
 
@@ -861,9 +868,9 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                 <table className="w-full text-left">
                   <thead className="bg-gray-50/50 text-xs font-bold text-slate-600 sticky top-0 shadow-sm z-10">
                     <tr>
-                      <th className="px-6 py-4">Date</th>
-                      <th className="px-6 py-4">Memo</th>
-                      <th className="px-6 py-4 text-right">Value</th>
+                      <th className="px-6 py-4">{tt.colDate}</th>
+                      <th className="px-6 py-4">{tt.colMemo}</th>
+                      <th className="px-6 py-4 text-right">{tt.colValue}</th>
                       <th className="px-4 py-4 w-10"></th>
                     </tr>
                   </thead>
@@ -876,14 +883,14 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                             <div className={`w-2 h-2 rounded-full ${t.type === 'in' ? 'bg-[#6FBF8E]' : 'bg-[#E0846A]'}`} />
                             <span className="text-sm font-bold text-gray-700 ">{t.note}</span>
                             {classifyTransaction(t) && (
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-[#080D1E]/5 text-[#080D1E] font-bold ">{classifyTransaction(t)}</span>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-[#080D1E]/5 text-[#080D1E] font-bold ">{catName(classifyTransaction(t) as string)}</span>
                             )}
                             {t.ref_type && t.ref_type !== 'MANUAL' && (
                               <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-slate-600 font-bold ">{t.ref_type}</span>
                             )}
                             {t.payment_method && (
                               <span className="text-xs px-2 py-0.5 rounded-full bg-[#CBA85C]/10 text-[#7A5F2A] font-bold ">
-                                {t.payment_method === 'CHEQUE' ? `CHEQUE · ${t.cheque_status}` : t.payment_method}
+                                {t.payment_method === 'CHEQUE' ? `${pmName('CHEQUE')} · ${chequeStatusName(t.cheque_status)}` : pmName(t.payment_method)}
                               </span>
                             )}
                           </div>
@@ -902,7 +909,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                       </tr>
                     ))}
                     {currentTransactions.length === 0 && (
-                      <tr><td colSpan={4} className="px-6 py-16 text-center text-slate-600 text-xs font-bold ">No entries yet</td></tr>
+                      <tr><td colSpan={4} className="px-6 py-16 text-center text-slate-600 text-xs font-bold ">{tt.noEntries}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -931,7 +938,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
           >
             {/* Header — fixed, never scrolls */}
             <div className="shrink-0 flex items-center justify-between px-10 pt-10 pb-6">
-              <h3 className="text-sm font-bold text-[#080D1E] ">新增银行账户</h3>
+              <h3 className="text-sm font-bold text-[#080D1E] ">{tt.newAccountTitle}</h3>
               <button onClick={() => { setShowAddAccount(false); setNewAcc(emptyNewAccount); }} className="text-slate-600 hover:text-gray-600 shrink-0">
                 <X className="w-5 h-5" />
               </button>
@@ -947,7 +954,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
             <div className="flex-1 min-h-0 overflow-y-auto px-10">
             <div className="space-y-5 pb-8">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-600 ">账户名称</label>
+                <label className="text-xs font-bold text-slate-600 ">{tt.accountName}</label>
                 <input
                   type="text"
                   className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
@@ -959,7 +966,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
 
               {newAcc.account_type !== 'Cash' && (
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-600 ">账户持有人</label>
+                  <label className="text-xs font-bold text-slate-600 ">{tt.accountHolder}</label>
                   <input
                     type="text"
                     className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
@@ -971,23 +978,23 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
               )}
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-600 ">账户类型</label>
+                <label className="text-xs font-bold text-slate-600 ">{tt.accountType}</label>
                 <select
                   className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
                   value={newAcc.account_type}
                   onChange={e => setNewAccField('account_type', e.target.value)}
                 >
-                  <option value="Corporate">Corporate (对公)</option>
-                  <option value="Personal">Personal (对私)</option>
-                  <option value="Cash">Cash (现金)</option>
-                  <option value="Other">Other</option>
+                  <option value="Corporate">{tt.typeCorporate}</option>
+                  <option value="Personal">{tt.typePersonal}</option>
+                  <option value="Cash">{tt.typeCash}</option>
+                  <option value="Other">{tt.typeOther}</option>
                 </select>
               </div>
 
               {newAcc.account_type !== 'Cash' && (
                 <>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 ">银行名称</label>
+                    <label className="text-xs font-bold text-slate-600 ">{tt.bankName}</label>
                     <input
                       type="text"
                       className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
@@ -997,7 +1004,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 ">Account Number / 账号</label>
+                    <label className="text-xs font-bold text-slate-600 ">{tt.accountNumber}</label>
                     <input
                       type="text"
                       className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono-label"
@@ -1027,7 +1034,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
               )}
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-600 ">Currency</label>
+                <label className="text-xs font-bold text-slate-600 ">{tt.currency}</label>
                 <input
                   type="text"
                   className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
@@ -1040,7 +1047,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
               {newAcc.account_type !== 'Cash' && (
                 <>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 ">Bank Address</label>
+                    <label className="text-xs font-bold text-slate-600 ">{tt.bankAddress}</label>
                     <input
                       type="text"
                       className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
@@ -1049,7 +1056,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 ">Branch</label>
+                    <label className="text-xs font-bold text-slate-600 ">{tt.branch}</label>
                     <input
                       type="text"
                       className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
@@ -1061,7 +1068,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
               )}
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-600 ">Opening Balance（可选，默认 0）</label>
+                <label className="text-xs font-bold text-slate-600 ">{tt.openingBalance}</label>
                 <input
                   type="number"
                   step="0.01"
@@ -1081,7 +1088,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                 disabled={!newAcc.account_name.trim() || savingAccount}
                 className="w-full py-4 rounded-md bg-[#080D1E] text-white font-bold text-xs disabled:opacity-40"
               >
-                {savingAccount ? '创建中...' : '创建账户'}
+                {savingAccount ? tt.creating : tt.createAccount}
               </button>
             </div>
           </div>

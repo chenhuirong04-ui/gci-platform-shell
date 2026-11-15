@@ -10,6 +10,7 @@ import { getAllCustomerNames } from '../../../apps/shell/src/lib/crmSupabase';
 import { listAllProjects } from '../../../apps/shell/src/lib/crmProjects';
 import { classifyTransaction, isOperatingIncomeCategory, isOperatingExpenseCategory } from '../services/transactionCategories';
 import type { TransactionRecord, OrderRecord, SupplierPayable, SupplierPayment } from '../types';
+import { useI18n } from '@gci/i18n';
 
 /**
  * Finance Profitability V1 (2026-09-15) — "项目与客户利润". Management
@@ -88,6 +89,9 @@ interface SupplierRow {
 
 export default function FinanceProfitability() {
   const [loading, setLoading] = useState(true);
+  const { dict } = useI18n();
+  const tf = dict.trade.finance;
+  const tp = tf.profit;
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [payables, setPayables] = useState<SupplierPayable[]>([]);
@@ -185,7 +189,7 @@ export default function FinanceProfitability() {
       const grossProfit = roundTo2(v.revenue - v.directCost);
       return {
         key: pid,
-        projectName: proj?.name || `(项目 ${pid.slice(0, 8)})`,
+        projectName: proj?.name || tp.projectFallback.replace('{id}', pid.slice(0, 8)),
         customerName: (proj && customerNameById.get(proj.customerId)) || '—',
         revenue: v.revenue,
         directCost: v.directCost,
@@ -201,7 +205,7 @@ export default function FinanceProfitability() {
       const gp = roundTo2(legacyRevenue - legacyCost);
       rows.push({
         key: '__legacy__',
-        projectName: 'Legacy / 未关联项目',
+        projectName: tp.legacyProject,
         customerName: '—',
         revenue: legacyRevenue,
         directCost: legacyCost,
@@ -214,7 +218,7 @@ export default function FinanceProfitability() {
     }
 
     return rows.sort((a, b) => b.revenue - a.revenue);
-  }, [periodTxns, projectById, customerNameById, orders]);
+  }, [periodTxns, projectById, customerNameById, orders, tp]);
 
   const realProjectRows = projectRows.filter(r => !r.isLegacy);
   const projectDirectCostIncomplete = realProjectRows.some(r => r.revenue > 0 && r.directCost === 0);
@@ -230,7 +234,7 @@ export default function FinanceProfitability() {
     for (const t of periodTxns) {
       if (t.type !== 'in' || !isOperatingIncomeCategory(classifyTransaction(t))) continue;
       const id = t.customer_id;
-      const name = (id && customerNameById.get(id)) || t.customer || '(未命名)';
+      const name = (id && customerNameById.get(id)) || t.customer || tf.common.unnamed;
       const key = id || `name:${name}`;
       const existing = map.get(key);
       if (existing) existing.revenue = roundTo2(existing.revenue + t.amount);
@@ -247,7 +251,7 @@ export default function FinanceProfitability() {
         : 0;
       return { key, name: v.name, hasId: v.hasId, revenue: v.revenue, collected: v.revenue, ar, projectCount };
     }).sort((a, b) => b.revenue - a.revenue);
-  }, [periodTxns, customerNameById, orders]);
+  }, [periodTxns, customerNameById, orders, tf]);
 
   // AR-by-customer is a current snapshot, not period-scoped — every real
   // customer with any outstanding order balance, regardless of whether they
@@ -259,10 +263,10 @@ export default function FinanceProfitability() {
       map.set(o.crmCustomerId, roundTo2((map.get(o.crmCustomerId) || 0) + (o.outstandingAmount || 0)));
     }
     return Array.from(map.entries())
-      .map(([id, ar]) => ({ key: id, name: customerNameById.get(id) || `(客户 ${id.slice(0, 8)})`, hasId: true, revenue: 0, collected: 0, ar, projectCount: 0 }))
+      .map(([id, ar]) => ({ key: id, name: customerNameById.get(id) || tp.customerFallback.replace('{id}', id.slice(0, 8)), hasId: true, revenue: 0, collected: 0, ar, projectCount: 0 }))
       .filter(r => r.ar > 0)
       .sort((a, b) => b.ar - a.ar);
-  }, [orders, customerNameById]);
+  }, [orders, customerNameById, tp]);
 
   // ── Supplier dimension ─────────────────────────────────────────────────
   const supplierRows = useMemo<SupplierRow[]>(() => {
@@ -270,7 +274,7 @@ export default function FinanceProfitability() {
     for (const t of periodTxns) {
       if (t.type !== 'out' || !isOperatingExpenseCategory(classifyTransaction(t))) continue;
       const id = resolveSupplierId(t);
-      const name = (id && supplierNameById.get(id)) || t.supplier || '(未命名)';
+      const name = (id && supplierNameById.get(id)) || t.supplier || tf.common.unnamed;
       const key = id || `name:${name}`;
       const existing = map.get(key);
       if (existing) existing.paid = roundTo2(existing.paid + t.amount);
@@ -285,18 +289,18 @@ export default function FinanceProfitability() {
       return { key, name: v.name, hasId: v.hasId, paid: v.paid, ap };
     }).sort((a, b) => b.paid - a.paid);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodTxns, supplierNameById, payables, supplierIdByPaymentId]);
+  }, [periodTxns, supplierNameById, payables, supplierIdByPaymentId, tf]);
 
   if (loading) {
-    return <div className="h-[calc(100vh-250px)] flex items-center justify-center text-slate-600 text-xs font-bold ">Loading...</div>;
+    return <div className="h-[calc(100vh-250px)] flex items-center justify-center text-slate-600 text-xs font-bold ">{tf.common.loading}</div>;
   }
 
-  const periodLabel = period === 'this_month' ? '本月' : period === 'last_month' ? '上月' : period === 'custom' ? customMonth : '全部历史';
+  const periodLabel = period === 'this_month' ? tp.thisMonth : period === 'last_month' ? tp.lastMonth : period === 'custom' ? customMonth : tp.allTime;
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>项目与客户利润 / Profitability</h1>
+        <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>{tp.title}</h1>
         <div className="flex items-center gap-2">
           {(['this_month', 'last_month', 'custom', 'all_time'] as Period[]).map(p => (
             <button
@@ -304,7 +308,7 @@ export default function FinanceProfitability() {
               onClick={() => setPeriod(p)}
               className={`px-4 py-2.5 rounded-md text-xs font-bold transition-all ${period === p ? 'bg-[#080D1E] text-white' : 'bg-gray-100 text-slate-600 hover:bg-gray-200'}`}
             >
-              {p === 'this_month' ? '本月' : p === 'last_month' ? '上月' : p === 'custom' ? '自定义月份' : '全部历史'}
+              {p === 'this_month' ? tp.thisMonth : p === 'last_month' ? tp.lastMonth : p === 'custom' ? tp.custom : tp.allTime}
             </button>
           ))}
           {period === 'custom' && (
@@ -323,7 +327,7 @@ export default function FinanceProfitability() {
         <div className="bg-[#CBA85C]/10 border border-[#CBA85C]/30 rounded-[10px] p-4 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-[#7A5F2A] shrink-0 mt-0.5" />
           <p className="text-xs font-bold text-[#7A5F2A]">
-            项目直接成本数据尚未完整归集 / Direct cost data incomplete — 供应商付款（Supplier Payment）目前不携带 project_id，只有手工记账时主动关联项目的支出才会计入下面的"项目直接支出"。以下毛利率可能被高估，仅供参考，不代表真实项目盈亏。
+            {tp.warnIncomplete}
           </p>
         </div>
       )}
@@ -331,38 +335,38 @@ export default function FinanceProfitability() {
       {/* Top KPI — sums of the Project Profitability table below (real projects only, excludes Legacy) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
-          <p className="text-xs font-bold text-slate-600 mb-1">{periodLabel}项目经营收入</p>
+          <p className="text-xs font-bold text-slate-600 mb-1">{tp.kpiRevenue.replace('{period}', periodLabel)}</p>
           <p className="text-xl font-bold font-mono-label text-[#3F7D58]">+{periodProjectRevenue.toFixed(2)}</p>
         </div>
         <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
-          <p className="text-xs font-bold text-slate-600 mb-1">{periodLabel}项目直接支出</p>
+          <p className="text-xs font-bold text-slate-600 mb-1">{tp.kpiCost.replace('{period}', periodLabel)}</p>
           <p className="text-xl font-bold font-mono-label text-[#c53030]">-{periodProjectCost.toFixed(2)}</p>
         </div>
         <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
-          <p className="text-xs font-bold text-slate-600 mb-1">毛利 / Gross Profit</p>
+          <p className="text-xs font-bold text-slate-600 mb-1">{tp.grossProfit}</p>
           <p className={`text-xl font-bold font-mono-label ${periodProjectGrossProfit >= 0 ? 'text-gray-800' : 'text-[#c53030]'}`}>{periodProjectGrossProfit.toFixed(2)}</p>
         </div>
         <div className="bg-white p-5 rounded-[10px] border border-gray-100 shadow-sm">
-          <p className="text-xs font-bold text-slate-600 mb-1">毛利率 / Gross Margin</p>
+          <p className="text-xs font-bold text-slate-600 mb-1">{tp.grossMargin}</p>
           <p className="text-xl font-bold font-mono-label text-gray-800">{periodProjectMargin === null ? '—' : `${periodProjectMargin.toFixed(1)}%`}</p>
         </div>
       </div>
 
       {/* Project profitability */}
       <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6">
-        <h3 className="font-bold text-gray-800 flex items-center gap-2 text-xs mb-4"><Layers className="w-4 h-4 text-[#7A5F2A]" /> 项目利润排行 / Project Profitability</h3>
+        <h3 className="font-bold text-gray-800 flex items-center gap-2 text-xs mb-4"><Layers className="w-4 h-4 text-[#7A5F2A]" /> {tp.projectTable}</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="text-xs font-bold text-slate-600 border-b border-gray-100">
               <tr>
-                <th className="py-2 pr-4">Project</th>
-                <th className="py-2 pr-4">Customer</th>
-                <th className="py-2 pr-4 text-right">Revenue</th>
-                <th className="py-2 pr-4 text-right">Direct Cost</th>
-                <th className="py-2 pr-4 text-right">Gross Profit</th>
-                <th className="py-2 pr-4 text-right">Margin</th>
-                <th className="py-2 pr-4 text-right">收款</th>
-                <th className="py-2 text-right">未收款</th>
+                <th className="py-2 pr-4">{tp.colProject}</th>
+                <th className="py-2 pr-4">{tp.colCustomer}</th>
+                <th className="py-2 pr-4 text-right">{tp.colRevenue}</th>
+                <th className="py-2 pr-4 text-right">{tp.colCost}</th>
+                <th className="py-2 pr-4 text-right">{tp.colGp}</th>
+                <th className="py-2 pr-4 text-right">{tp.colMargin}</th>
+                <th className="py-2 pr-4 text-right">{tp.colCollected}</th>
+                <th className="py-2 text-right">{tp.colOutstanding}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -379,7 +383,7 @@ export default function FinanceProfitability() {
                 </tr>
               ))}
               {projectRows.length === 0 && (
-                <tr><td colSpan={8} className="py-10 text-center text-slate-600 text-xs font-bold ">No project-linked data in this period</td></tr>
+                <tr><td colSpan={8} className="py-10 text-center text-slate-600 text-xs font-bold ">{tp.noProject}</td></tr>
               )}
             </tbody>
           </table>
@@ -388,19 +392,19 @@ export default function FinanceProfitability() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6">
-          <h3 className="font-bold text-gray-800 flex items-center gap-2 text-xs mb-4"><Trophy className="w-4 h-4 text-[#7A5F2A]" /> 客户收入排行 / Top Customers</h3>
+          <h3 className="font-bold text-gray-800 flex items-center gap-2 text-xs mb-4"><Trophy className="w-4 h-4 text-[#7A5F2A]" /> {tp.topCustomers}</h3>
           <div className="space-y-2">
             {customerRows.map((r, i) => (
               <div key={r.key} className="flex items-center justify-between text-sm gap-2">
-                <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-xs text-slate-600 ml-1">Legacy / 未关联ID</span>}</span>
+                <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-xs text-slate-600 ml-1">{tf.common.legacyNoId}</span>}</span>
                 <span className="font-mono-label font-bold text-gray-800 shrink-0">{r.revenue.toFixed(2)}</span>
               </div>
             ))}
-            {customerRows.length === 0 && <p className="text-xs text-slate-600 font-bold text-center py-4">No data</p>}
+            {customerRows.length === 0 && <p className="text-xs text-slate-600 font-bold text-center py-4">{tf.common.noData}</p>}
           </div>
         </div>
         <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6">
-          <h3 className="font-bold text-gray-800 flex items-center gap-2 text-xs mb-4"><Users className="w-4 h-4 text-[#7A5F2A]" /> 客户未收款 / AR by Customer（当前，不受时间筛选影响）</h3>
+          <h3 className="font-bold text-gray-800 flex items-center gap-2 text-xs mb-4"><Users className="w-4 h-4 text-[#7A5F2A]" /> {tp.arByCustomer}</h3>
           <div className="space-y-2">
             {customerArRows.map((r, i) => (
               <div key={r.key} className="flex items-center justify-between text-sm gap-2">
@@ -408,24 +412,24 @@ export default function FinanceProfitability() {
                 <span className="font-mono-label font-bold text-[#c53030] shrink-0">{r.ar.toFixed(2)}</span>
               </div>
             ))}
-            {customerArRows.length === 0 && <p className="text-xs text-slate-600 font-bold text-center py-4">No outstanding AR</p>}
+            {customerArRows.length === 0 && <p className="text-xs text-slate-600 font-bold text-center py-4">{tp.noAr}</p>}
           </div>
         </div>
       </div>
 
       <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6">
-        <h3 className="font-bold text-gray-800 flex items-center gap-2 text-xs mb-4"><Wallet className="w-4 h-4 text-[#7A5F2A]" /> 供应商付款排行 / Top Suppliers</h3>
+        <h3 className="font-bold text-gray-800 flex items-center gap-2 text-xs mb-4"><Wallet className="w-4 h-4 text-[#7A5F2A]" /> {tp.topSuppliers}</h3>
         <div className="space-y-2">
           {supplierRows.map((r, i) => (
             <div key={r.key} className="flex items-center justify-between text-sm gap-2">
-              <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-xs text-slate-600 ml-1">Legacy / 未关联ID</span>}</span>
+              <span className="font-bold text-gray-600 truncate">{i + 1}. {r.name}{!r.hasId && <span className="text-xs text-slate-600 ml-1">{tf.common.legacyNoId}</span>}</span>
               <span className="flex items-center gap-4 shrink-0">
-                <span className="font-mono-label font-bold text-gray-800">已付 {r.paid.toFixed(2)}</span>
-                {r.ap > 0 && <span className="font-mono-label font-bold text-[#c53030]">AP {r.ap.toFixed(2)}</span>}
+                <span className="font-mono-label font-bold text-gray-800">{tp.paidPrefix} {r.paid.toFixed(2)}</span>
+                {r.ap > 0 && <span className="font-mono-label font-bold text-[#c53030]">{tp.apPrefix} {r.ap.toFixed(2)}</span>}
               </span>
             </div>
           ))}
-          {supplierRows.length === 0 && <p className="text-xs text-slate-600 font-bold text-center py-4">No data</p>}
+          {supplierRows.length === 0 && <p className="text-xs text-slate-600 font-bold text-center py-4">{tf.common.noData}</p>}
         </div>
       </div>
     </div>
