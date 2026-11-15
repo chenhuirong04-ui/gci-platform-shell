@@ -262,19 +262,19 @@ export default function VoucherEntry() {
               const f = e.dataTransfer.files?.[0];
               if (f && (f.type === 'application/pdf' || f.type.startsWith('image/') || f.name.toLowerCase().endsWith('.pdf'))) handleFile(f);
             }}
-            className={`block rounded-[10px] border-2 border-dashed p-6 text-center transition-all ${parsing ? 'cursor-wait opacity-90' : 'cursor-pointer hover:border-[#CBA85C]'} ${dragOver ? 'border-[#CBA85C] bg-[#CBA85C]/10' : 'border-[#CBA85C]/50 bg-[#080D1E]'}`}
+            className={`block rounded-[10px] border-2 border-dashed p-6 text-center transition-all ${parsing ? 'cursor-wait opacity-90' : 'cursor-pointer hover:border-[#CBA85C]'} ${dragOver ? 'border-[#CBA85C] bg-[#CBA85C]/10' : 'border-[#CBA85C]/50 bg-[#F5F6FA]'}`}
           >
             <input ref={fileRef} type="file" accept="application/pdf,image/*" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} disabled={parsing} className="hidden" />
             <div className="w-12 h-12 rounded-full bg-[#CBA85C]/15 flex items-center justify-center mx-auto mb-3">
-              {parsing ? <FileClock className="w-6 h-6 text-[#CBA85C] animate-pulse" /> : <Upload className="w-6 h-6 text-[#CBA85C]" />}
+              {parsing ? <FileClock className="w-6 h-6 text-[#7A5F2A] animate-pulse" /> : <Upload className="w-6 h-6 text-[#7A5F2A]" />}
             </div>
-            <p className={`text-sm font-bold ${dragOver ? 'text-[#7A5F2A]' : 'text-white'}`}>{t.upload}</p>
-            <p className={`text-xs mt-1 ${dragOver ? 'text-[#7A5F2A]' : 'text-slate-300'}`}>{t.uploadHint}</p>
-            {!file && <p className="text-xs font-bold text-[#CBA85C] mt-3">{t.uploadCta}</p>}
+            <p className="text-sm font-bold text-[#0C1B3A]">{t.upload}</p>
+            <p className="text-xs mt-1 text-slate-600">{t.uploadHint}</p>
+            {!file && <p className="text-xs font-bold text-[#7A5F2A] mt-3">{t.uploadCta}</p>}
             {file && (
-              <p className="text-xs font-bold text-[#CBA85C] mt-3 truncate" title={file.name}>{t.selectedFile}{file.name}</p>
+              <p className="text-xs font-bold text-[#7A5F2A] mt-3 truncate" title={file.name}>{t.selectedFile}{file.name}</p>
             )}
-            {parsing && <p className="text-xs font-bold text-white mt-2 flex items-center justify-center gap-1.5"><FileClock className="w-3.5 h-3.5 text-[#CBA85C]" /> {t.parsing}</p>}
+            {parsing && <p className="text-xs font-bold text-[#0C1B3A] mt-2 flex items-center justify-center gap-1.5"><FileClock className="w-3.5 h-3.5 text-[#7A5F2A]" /> {t.parsing}</p>}
           </label>
           {parseError && <p className="text-xs font-bold text-red-600 pt-1">{parseError}</p>}
         </div>
