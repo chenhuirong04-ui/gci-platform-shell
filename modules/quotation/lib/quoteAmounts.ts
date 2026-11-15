@@ -47,6 +47,20 @@ export function lockLineToUnit(line: number, qty: number): number {
   return roundTo2(roundTo2(amount / qty) * qty);
 }
 
+/**
+ * Read-only check: does the entered line differ from what the PI will compute
+ * (2-dp unit × qty)? Returns null when they match. Never changes the amount —
+ * the user must confirm any adjustment.
+ */
+export function lineUnitMismatch(line: number, qty: number):
+  { entered: number; unit: number; adjusted: number; diff: number } | null {
+  const entered = roundTo2(Number(line) || 0);
+  if (!(qty > 0) || entered <= 0) return null;
+  const adjusted = lockLineToUnit(entered, qty);
+  if (adjusted === entered) return null;
+  return { entered, unit: roundTo2(entered / qty), adjusted, diff: roundTo2(adjusted - entered) };
+}
+
 export interface AmountLineInput {
   /** Exact supplier cost for the whole line (unit cost × qty, AED). */
   cost: number;

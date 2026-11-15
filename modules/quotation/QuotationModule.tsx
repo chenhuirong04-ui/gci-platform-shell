@@ -100,7 +100,7 @@ import {
 } from './lib/supplierQuoteImages';
 import { extractXlsxImages as extractXlsxImagesFromBuffer, isImageHeader } from './lib/xlsxImages';
 import { DEFAULT_RATES, defaultRate, convertAmount, detectHeaderCurrency } from './lib/currencyRates';
-import { reconcileQuoteAmounts, lockLineToUnit } from './lib/quoteAmounts';
+import { reconcileQuoteAmounts, lockLineToUnit, lineUnitMismatch } from './lib/quoteAmounts';
 import {
   listServiceCategories, listServiceCatalogItems, addServiceCategory, addServiceCatalogItem,
   deleteServiceCatalogItem, seedDefaultCatalogIfEmpty, saveServiceQuote, listServiceQuotes,
@@ -991,6 +991,10 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     totalSupplierCost: number; totalSelling: number; totalProfit: number;
     overallMargin: number; totalVAT: number; grandTotal: number;
   }) => {
+    if (confirmed.some(it => lineUnitMismatch(sellingPrices[it.id] || 0, it.quantity))) {
+      alert(t('Some line totals differ from the PI unit price calculation. Please confirm each adjustment first.'));
+      return;
+    }
     setCloudSaveStatus('saving');
     try {
       // Reuse the Supplier Quote image storage: rows that already carry a
@@ -6345,8 +6349,11 @@ Leave a field as empty string if not present. Never fabricate values.`;
     const overallMargin = totalSupplierCost > 0 ? (totalProfit / totalSupplierCost) * 100 : 0;
     const totalVAT = totalSelling * 0.05;
     const grandTotal = totalSelling + totalVAT;
+    // Lines whose entered total the PI cannot reproduce (2-dp unit × qty) — the user must confirm first.
+    const unitMismatchCount = confirmed.filter(it => lineUnitMismatch(sellingPrices[it.id] || 0, it.quantity)).length;
 
     const handleSendTradeToTrade = () => {
+      if (unitMismatchCount > 0) { alert(t('Some line totals differ from the PI unit price calculation. Please confirm each adjustment first.')); return; }
       if (!quoteInfo.customerProjectName) { alert(t('Please enter Customer / Project Name')); return; }
       if (totalSelling <= 0) { alert(t('Please enter selling price')); return; }
       const payload = {
@@ -6532,11 +6539,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 if (supplierTotal > 0)
                   setSellingPrices(prev => ({ ...prev, [item.id]: lockLineToUnit(supplierTotal * (1 + pct / 100), item.quantity) }));
               };
-              // Typed line totals settle to 2-dp unit × qty (same line the PI recomputes).
-              const handleSellCommit = () => {
-                const locked = lockLineToUnit(sellPrice, item.quantity);
-                if (locked !== sellPrice) handleSellChange(locked);
-              };
+              // Typed line totals are never changed silently: show the PI difference, the user confirms.
+              const unitMismatch = lineUnitMismatch(sellPrice, item.quantity);
               return (
                 <div key={item.id} className="grid grid-cols-12 gap-2 px-6 py-4 items-center hover:bg-[#0C1B3A]/2 transition-colors">
                   <div className="col-span-3 flex items-start gap-2 min-w-0">
@@ -6559,7 +6563,6 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       value={sellPrice || ''}
                       placeholder="0.00"
                       onChange={e => handleSellChange(Number(e.target.value) || 0)}
-                      onBlur={handleSellCommit}
                       className="w-full text-right bg-[#C9A84C]/8 border border-[#C9A84C]/30 rounded-md px-2 py-1.5 text-xs font-bold font-mono-label text-[#0C1B3A] outline-none focus:border-[#C9A84C] focus:bg-[#C9A84C]/12 transition-all"
                     />
                   </div>
@@ -6588,6 +6591,23 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     </p>
                     {sellPrice > 0 && <p className="text-xs text-slate-600">+{lineVAT.toFixed(1)} VAT</p>}
                   </div>
+                  {unitMismatch && (
+                    <div data-testid="sq-unit-mismatch" className="col-span-12 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      <span>
+                        {t('Entered {e}, but the PI uses a 2-decimal unit price: {u} × {q} = {a} (difference {d}). Saving and sending to TRADE are blocked until you confirm.')
+                          .replace('{e}', unitMismatch.entered.toFixed(2)).replace('{u}', unitMismatch.unit.toFixed(2))
+                          .replace('{q}', String(item.quantity)).replace('{a}', unitMismatch.adjusted.toFixed(2))
+                          .replace('{d}', (unitMismatch.diff > 0 ? '+' : '') + unitMismatch.diff.toFixed(2))}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleSellChange(unitMismatch.adjusted)}
+                        className="shrink-0 rounded-md bg-amber-600 px-3 py-1 font-bold text-white hover:bg-amber-700"
+                      >
+                        {t('Adjust to {a}').replace('{a}', unitMismatch.adjusted.toFixed(2))}
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -6632,6 +6652,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
           <button
             onClick={() => {
               if (totalSelling <= 0) { alert(t('Please enter selling prices first')); return; }
+              if (unitMismatchCount > 0) { alert(t('Some line totals differ from the PI unit price calculation. Please confirm each adjustment first.')); return; }
               setQuoteGenerated(true);
               // Auto-save to cloud on generate
               handleSaveToCloud(confirmed, { totalSupplierCost, totalSelling, totalProfit, overallMargin, totalVAT, grandTotal });
