@@ -33,12 +33,12 @@ interface FinanceCenterProps {
 // Labels come from dict.trade.finance.center (keyed by tab id).
 const SUB_TABS: { id: FinanceSubTab; icon: React.ElementType }[] = [
   { id: 'overview', icon: LayoutGrid },
+  { id: 'bookkeeping', icon: BookOpenCheck },
+  { id: 'ap', icon: FileStack },
   { id: 'accounts', icon: Landmark },
   { id: 'cashflow', icon: ArrowLeftRight },
-  { id: 'ap', icon: FileStack },
   { id: 'invoice', icon: Receipt },
   { id: 'profitability', icon: Layers },
-  { id: 'bookkeeping', icon: BookOpenCheck },
 ];
 
 export default function FinanceCenter({ initialSubTab }: FinanceCenterProps) {
