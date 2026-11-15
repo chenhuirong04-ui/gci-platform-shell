@@ -106,6 +106,47 @@ test('header comes from the Trade / PI calculateTradeTotals (one rule for quote 
   assert.match(src, /calculateTradeTotals\(/);
 });
 
+test('quote → PI: qty / rate / rounding never change line or total amounts', async () => {
+  const lib2 = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'gci-cu2-')), 'cu.mjs');
+  const b = await rolldown({ input: path.join(ROOT, 'modules/trade/services/currencyUtils.ts'), platform: 'node' });
+  await b.write({ file: lib2, format: 'esm' });
+  const cu = await import(pathToFileURL(lib2).href);
+  // Reported case: line 64.45, qty 3 → locked to 21.48 × 3 = 64.44 before it ever reaches the PI.
+  assert.equal(lib.lockLineToUnit(64.45, 3), 64.44);
+  assert.equal(lib.lockLineToUnit(18.62, 1), 18.62);   // qty 1 unchanged
+  assert.equal(lib.lockLineToUnit(43450, 50), 43450);
+  assert.equal(lib.lockLineToUnit(10, 0), 10);
+  let seed = 42; const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const rates = [1, 3.6725, 0.505, 0.2723];
+  for (let run = 0; run < 200; run++) {
+    const rows = Array.from({ length: 1 + Math.floor(rnd() * 100) }, () => {
+      const qty = 1 + Math.floor(rnd() * 999);
+      const unitCost = Number((Math.round(rnd() * 100000) / 1000 * rates[Math.floor(rnd() * 4)]).toFixed(4)); // handleConfirmRate keeps 4 dp
+      const supplierTotal = unitCost * qty;
+      const pct = Math.floor(rnd() * 1000) / 10;
+      const line = lib.lockLineToUnit(supplierTotal * (1 + pct / 100), qty);           // markup path
+      const typed = lib.lockLineToUnit(Math.round(rnd() * 1e7) / 100, qty);            // typed + blur path
+      return { qty, cost: supplierTotal, line: rnd() < 0.5 ? line : typed };
+    });
+    // Quotation Center push payload (unchanged code) → PI recompute (unchanged code).
+    const pushed = rows.map(r => ({ unitPrice: Number((r.line / r.qty).toFixed(2)), lineTotal: Number(r.line.toFixed(2)), qty: r.qty }));
+    const piItems = pushed.map(p => ({ price: cu.roundTo2(p.unitPrice), qty: p.qty }));
+    pushed.forEach((p, i) => assert.equal(cu.roundTo2(p.unitPrice * p.qty), p.lineTotal, `row ${i + 1} PI line = quote line`));
+    const pi = cu.calculateTradeTotals(piItems);
+    const q = lib.reconcileQuoteAmounts(rows.map(r => ({ cost: r.cost, selling: r.line }))).totals;
+    assert.deepEqual([q.totalSelling, q.totalVAT, q.grandTotal], [pi.subtotal, pi.vat, pi.total]);
+  }
+});
+
+test('selling-line entry points lock to unit × qty; history restore and PI push code untouched', () => {
+  assert.match(SRC, /setSellingPrices\(prev => \(\{ \.\.\.prev, \[item\.id\]: lockLineToUnit\(supplierTotal \* \(1 \+ pct \/ 100\), item\.quantity\) \}\)\);/);
+  assert.match(SRC, /onChange=\{e => handleSellChange\(Number\(e\.target\.value\) \|\| 0\)\}\n\s+onBlur=\{handleSellCommit\}/);
+  assert.match(SRC, /const locked = lockLineToUnit\(sellPrice, item\.quantity\);/);
+  assert.match(SRC, /newSelling\[draft\.id\] = src\.selling_price;/); // saved history amounts are restored as-is
+  assert.match(SRC, /unitPrice: it\.quantity > 0 \? Number\(\(\(sellingPrices\[it\.id\] \|\| 0\) \/ it\.quantity\)\.toFixed\(2\)\) : 0,/);
+  assert.equal((SRC.match(/setSellingPrices\(prev =>/g) || []).length, 2, 'new selling-line writer added without lock');
+});
+
 test('cloud save uses the reconciled amounts for header and lines', () => {
   const fn = SRC.slice(SRC.indexOf('const buildCloudPayload = '), SRC.indexOf('const handleSaveToCloud = async'));
   assert.match(fn, /const amounts = reconcileQuoteAmounts\(/);

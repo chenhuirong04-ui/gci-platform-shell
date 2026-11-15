@@ -36,6 +36,17 @@ export function allocateCents(exact: number[], total: number): number[] {
   return base;
 }
 
+/**
+ * Line selling amount the PI will reproduce: the PI keeps a 2-dp unit price and
+ * recomputes line = roundTo2(unit × qty). Locking the quote line to that value means
+ * quote, PDF and PI show the same line for any qty (qty 1 lines are unchanged).
+ */
+export function lockLineToUnit(line: number, qty: number): number {
+  const amount = roundTo2(Number(line) || 0);
+  if (!(qty > 0)) return amount;
+  return roundTo2(roundTo2(amount / qty) * qty);
+}
+
 export interface AmountLineInput {
   /** Exact supplier cost for the whole line (unit cost × qty, AED). */
   cost: number;

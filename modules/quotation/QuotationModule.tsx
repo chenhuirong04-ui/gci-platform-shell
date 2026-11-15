@@ -100,7 +100,7 @@ import {
 } from './lib/supplierQuoteImages';
 import { extractXlsxImages as extractXlsxImagesFromBuffer, isImageHeader } from './lib/xlsxImages';
 import { DEFAULT_RATES, defaultRate, convertAmount, detectHeaderCurrency } from './lib/currencyRates';
-import { reconcileQuoteAmounts } from './lib/quoteAmounts';
+import { reconcileQuoteAmounts, lockLineToUnit } from './lib/quoteAmounts';
 import {
   listServiceCategories, listServiceCatalogItems, addServiceCategory, addServiceCatalogItem,
   deleteServiceCatalogItem, seedDefaultCatalogIfEmpty, saveServiceQuote, listServiceQuotes,
@@ -6530,7 +6530,12 @@ Leave a field as empty string if not present. Never fabricate values.`;
               const handleMarkupChange = (pct: number) => {
                 setMarkupPercents(prev => ({ ...prev, [item.id]: pct }));
                 if (supplierTotal > 0)
-                  setSellingPrices(prev => ({ ...prev, [item.id]: Number((supplierTotal * (1 + pct / 100)).toFixed(2)) }));
+                  setSellingPrices(prev => ({ ...prev, [item.id]: lockLineToUnit(supplierTotal * (1 + pct / 100), item.quantity) }));
+              };
+              // Typed line totals settle to 2-dp unit × qty (same line the PI recomputes).
+              const handleSellCommit = () => {
+                const locked = lockLineToUnit(sellPrice, item.quantity);
+                if (locked !== sellPrice) handleSellChange(locked);
               };
               return (
                 <div key={item.id} className="grid grid-cols-12 gap-2 px-6 py-4 items-center hover:bg-[#0C1B3A]/2 transition-colors">
@@ -6554,6 +6559,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       value={sellPrice || ''}
                       placeholder="0.00"
                       onChange={e => handleSellChange(Number(e.target.value) || 0)}
+                      onBlur={handleSellCommit}
                       className="w-full text-right bg-[#C9A84C]/8 border border-[#C9A84C]/30 rounded-md px-2 py-1.5 text-xs font-bold font-mono-label text-[#0C1B3A] outline-none focus:border-[#C9A84C] focus:bg-[#C9A84C]/12 transition-all"
                     />
                   </div>
