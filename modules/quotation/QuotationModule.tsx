@@ -96,6 +96,13 @@ import {
   deleteSupplierQuote, generateSupplierQuoteNo, SupplierQuote, SupplierQuoteItem,
 } from './lib/supplierQuoteCloud';
 import {
+  uploadSupplierQuoteImage, loadSupplierQuoteImage, isValidImageRef, mapWithLimit, type SupplierQuoteImageRef,
+} from './lib/supplierQuoteImages';
+import { extractXlsxImages as extractXlsxImagesFromBuffer, isImageHeader } from './lib/xlsxImages';
+import { DEFAULT_RATES, defaultRate, convertAmount, detectHeaderCurrency } from './lib/currencyRates';
+import { reconcileQuoteAmounts, lineFromUnit, supplierCostTotal, costFingerprint, type SavedCostBaseline } from './lib/quoteAmounts';
+import { roundTo2, calculateTradeTotals } from '../trade/services/currencyUtils';
+import {
   listServiceCategories, listServiceCatalogItems, addServiceCategory, addServiceCatalogItem,
   deleteServiceCatalogItem, seedDefaultCatalogIfEmpty, saveServiceQuote, listServiceQuotes,
   loadServiceQuote, deleteServiceQuote, generateServiceQuoteNo, BILLING_TYPE_LABELS, PAYMENT_TERM_OPTIONS,
@@ -242,6 +249,8 @@ interface DraftItem {
   englishDescription?: string; // editable EN translation, shown in customer quote
   marginPercent?: number;      // per-item margin override (defaults to global margin)
   imageDataUrl?: string;       // photo extracted from Excel (DISPIMG/floating) or supplied PDF/image
+  imageRef?: SupplierQuoteImageRef; // persisted copy of imageDataUrl (Supplier Library storage)
+  fromSupplierArchive?: boolean;    // created from a Supplier Quote archive → customer description format
   // ── Module 2 V3: read-everything + image OCR provenance ──────────────
   sourceType?: 'excel' | 'excel-image-ocr' | 'pdf' | 'image' | 'docx' | 'text' | 'manual';
   dataConfidence?: 'high' | 'low'; // AI-OCR confidence in the extracted fields (separate from category confidence)
@@ -389,6 +398,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   const isProjectInfoScreen = appMode === 'customer-quote' && view !== 'history' && (!projectInfoSubmitted || !quoteType);
   const [tradePhase, setTradePhase] = useState<'upload' | 'pricing' | null>(_autoTrade ? 'upload' : null);
   const [sellingPrices, setSellingPrices] = useState<Record<string, number>>({});
+  // Saved supplier_cost_total of a reopened quote (used while its cost lines are unchanged).
+  const [savedCostBaseline, setSavedCostBaseline] = useState<SavedCostBaseline | null>(null);
   const [markupPercents, setMarkupPercents] = useState<Record<string, number>>({});
   const [tradeItemNotes, setTradeItemNotes] = useState<Record<string, string>>({});
   const [tradeItemCurrencies, setTradeItemCurrencies] = useState<Record<string, string>>({});
@@ -406,7 +417,21 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   const [rateConfig, setRateConfig] = useState<{ quoteCurrency: string; rate: number }>({ quoteCurrency: 'AED', rate: 1 });
   // Module 2 V2: live currency/margin preview shown directly in Supplier Cost Items table
   const [sqCustomerCurrency, setSqCustomerCurrency] = useState<'AED' | 'USD'>('AED');
-  const [sqExchangeRate, setSqExchangeRate] = useState<number>(0.505); // Supplier currency → Customer currency
+  const [sqExchangeRate, setSqExchangeRate] = useState<number>(() => defaultRate('AED', 'AED')); // Supplier currency → Customer currency
+  // Excel price-header currency check: 'detected' = one explicit currency; 'unclear' / 'multi' must be confirmed before save/convert.
+  const [sqCurrencyCheck, setSqCurrencyCheck] = useState<{ status: 'detected' | 'unclear' | 'multi'; found: string[] } | null>(null);
+  const sqCurrencyNeedsConfirm = !!sqCurrencyCheck && sqCurrencyCheck.status !== 'detected';
+  // Rate follows the currency pair: reset to the table default only when a currency changes;
+  // a manually typed rate is kept until then.
+  useEffect(() => {
+    setSqExchangeRate(defaultRate(supplierMeta.currency || 'AED', sqCustomerCurrency));
+  }, [supplierMeta.currency, sqCustomerCurrency]);
+  // A user pick of the supplier currency is the confirmation; parsed rows follow it.
+  const changeSupplierCurrency = (currency: string) => {
+    setSupplierMeta(prev => ({ ...prev, currency }));
+    setDraftItems(prev => prev.map(it => ({ ...it, originalCurrency: currency })));
+    setSqCurrencyCheck(null);
+  };
   const [sqGlobalMargin, setSqGlobalMargin] = useState<number>(30);    // default margin %, per-item overridable
   // Module 2 V3: field-level visibility for the customer-facing GCI Quote (internal vs customer view separation)
   const [sqIncludeFields, setSqIncludeFields] = useState({
@@ -762,6 +787,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     setQuoteType(null);
     setTradePhase(null);
     setSellingPrices({});
+    setSavedCostBaseline(null);
     setMarkupPercents({});
     setTradeItemNotes({});
     setTradeItemCurrencies({});
@@ -895,11 +921,19 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   // ── Cloud Save / Load ────────────────────────────────────────────────────
 
   /** Build the Supabase payload from current quote state (trade/BOQ path). */
-  const buildCloudPayload = (confirmed: typeof draftItems, totals: {
+  const buildCloudPayload = (confirmed: typeof draftItems, _totals: {
     totalSupplierCost: number; totalSelling: number; totalProfit: number;
     overallMargin: number; totalVAT: number; grandTotal: number;
-  }) => {
+  }, imageRefs: (SupplierQuoteImageRef | null)[] = [], markGenerated = false) => {
     const quoteNo = quoteInfo.quoteNumber || `GCI-${Date.now()}`;
+    // Unified 0.01 precision: header = exact sum of the saved lines (VAT / cost
+    // rounding differences allocated to lines). sellingPrices[id] = UNIT price;
+    // line = roundTo2(unit × qty) as in Trade / PI.
+    const amounts = reconcileQuoteAmounts(confirmed.map(item => ({
+      cost: item.targetUnitPrice * item.quantity,
+      selling: lineFromUnit(sellingPrices[item.id] || 0, item.quantity),
+    })), supplierCostTotal(confirmed, savedCostBaseline));
+    const sums = amounts.totals;
     const record = {
       quote_no: quoteNo,
       customer_name: quoteInfo.customerProjectName || '',
@@ -914,39 +948,44 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       salesperson: quoteInfo.salesperson || '',
       phone_wa: quoteInfo.phoneWhatsApp || '',
       quote_type: (quoteType === 'boq' ? 'BOQ' : 'TRADE') as 'TRADE' | 'BOQ',
-      status: quoteGenerated ? 'GENERATED' : 'DRAFT' as 'DRAFT' | 'GENERATED',
+      status: (quoteGenerated || markGenerated ? 'GENERATED' : 'DRAFT') as 'DRAFT' | 'GENERATED',
       source: _businessIdParam ? 'DEAL' : 'Manual',
-      supplier_cost_total: Number(totals.totalSupplierCost.toFixed(2)),
-      selling_total: Number(totals.totalSelling.toFixed(2)),
-      profit_total: Number(totals.totalProfit.toFixed(2)),
-      margin_percent: Number(totals.overallMargin.toFixed(2)),
-      vat_amount: Number(totals.totalVAT.toFixed(2)),
-      grand_total: Number(totals.grandTotal.toFixed(2)),
+      supplier_cost_total: sums.totalSupplierCost,
+      selling_total: sums.totalSelling,
+      profit_total: sums.totalProfit,
+      margin_percent: sums.overallMargin,
+      vat_amount: sums.totalVAT,
+      grand_total: sums.grandTotal,
       terms_notes: tradeTerms || undefined,
       created_by: 'Admin',
       quote_date: quoteInfo.date || new Date().toISOString().split('T')[0],
     };
     const items: QuotationItem[] = confirmed.map((item, i) => {
-      const sp = sellingPrices[item.id] || 0;  // line total
-      const sub = sp;                            // already line total, no * qty
-      const supp = item.targetUnitPrice * item.quantity;
-      const profit = sub - supp;
-      const margin = supp > 0 ? (profit / supp) * 100 : 0;
-      const vat = sub * 0.05;
+      const a = amounts.lines[i];
       return {
         item_name: item.originalName,
         description: item.originalSpec || '',
         qty: item.quantity,
         unit: item.unit,
         supplier_cost: Number(item.targetUnitPrice.toFixed(2)),
-        selling_price: Number(sp.toFixed(2)),
-        profit_amount: Number(profit.toFixed(2)),
-        margin_percent: Number(margin.toFixed(2)),
-        vat_amount: Number(vat.toFixed(2)),
-        line_total: Number((sub + vat).toFixed(2)),
+        selling_price: roundTo2(sellingPrices[item.id] || 0), // unit price, same meaning as AI / CRM / PI
+        profit_amount: a.profit,
+        margin_percent: a.margin,
+        vat_amount: a.vat,
+        line_total: a.lineTotal,
         currency: tradeItemCurrencies[item.id] || 'AED',
         item_notes: tradeItemNotes[item.id] || '',
         sort_order: i,
+        // Customer-facing snapshot only — deliberately no cost/margin/markup fields.
+        item_meta: {
+          img: imageRefs[i] ?? item.imageRef ?? null,
+          en: item.englishDescription || '', model: item.model || '', material: item.material || '',
+          color: item.color || '', size: item.sizeDimension || '', moq: item.moq || '',
+          packaging: item.packaging || '', delivery: item.deliveryTime || '',
+          payment: item.paymentTerms || '', remarks: item.remarks || '',
+          sa: quoteSource === 'supplier-archive' || !!item.fromSupplierArchive,
+          show: { ...sqIncludeFields },
+        },
       };
     });
     return { record, items };
@@ -956,10 +995,26 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   const handleSaveToCloud = async (confirmed: typeof draftItems, totals: {
     totalSupplierCost: number; totalSelling: number; totalProfit: number;
     overallMargin: number; totalVAT: number; grandTotal: number;
-  }) => {
+  }, markGenerated = false) => {
     setCloudSaveStatus('saving');
     try {
-      const payload = buildCloudPayload(confirmed, totals);
+      // Reuse the Supplier Quote image storage: rows that already carry a
+      // stored ref (e.g. from the supplier archive) are never uploaded again.
+      const imgBase = quoteInfo.quoteNumber || `GCI-${Date.now()}`;
+      const uploaded = await mapWithLimit(confirmed, 4, async (it, i) => {
+        if (it.imageRef) return it.imageRef;
+        if (!it.imageDataUrl) return null;
+        try { return await uploadSupplierQuoteImage(it.imageDataUrl, undefined, imgBase, i); }
+        catch (err) { console.error('[Cloud Save] image upload failed, row', i + 1, err); return 'failed' as const; }
+      });
+      const failedRows = uploaded.map((r, i) => (r === 'failed' ? i + 1 : 0)).filter(Boolean);
+      if (failedRows.length > 0
+        && !window.confirm(`${failedRows.length} product image(s) failed to upload (rows ${failedRows.join(', ')}).\n\nSave anyway without these images? Click Cancel to retry later.`)) {
+        setCloudSaveStatus('error');
+        return;
+      }
+      const imageRefs = uploaded.map(r => (isValidImageRef(r) ? r : null));
+      const payload = buildCloudPayload(confirmed, totals, imageRefs, markGenerated);
       let id: string | null = null;
       if (cloudId) {
         const ok = await updateQuotation(cloudId, payload);
@@ -968,6 +1023,12 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
         id = await saveQuotation(payload);
       }
       if (id) {
+        // Remember stored refs so the next save doesn't upload the same image again.
+        const refById = new Map(confirmed.map((it, i) => [it.id, imageRefs[i]] as const));
+        setDraftItems(prev => prev.map(it => {
+          const ref = refById.get(it.id);
+          return ref && !it.imageRef ? { ...it, imageRef: ref } : it;
+        }));
         setCloudId(id);
         setCloudSaveStatus('saved');
         // Update quoteNumber in quoteInfo if not set
@@ -1019,18 +1080,39 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       } : emptyCustomerProjectSelection());
 
       // Restore draftItems from saved items
-      const restoredDraftItems = items.map(it => ({
-        id: `cloud-${it.id || Date.now()}-${Math.random().toString(36).slice(2)}`,
-        originalName: it.item_name,
-        originalSpec: it.description || '',
-        quantity: it.qty,
-        unit: it.unit,
-        targetUnitPrice: it.supplier_cost,
-        targetTotal: it.supplier_cost * it.qty,
-        confidence: 1,
-        status: 'Confirmed' as const,
-        suggestedCategory: FurnitureCategory.OTHER,
-      }));
+      const restoredDraftItems = items.map(it => {
+        const meta = it.item_meta && typeof it.item_meta === 'object' ? it.item_meta : null;
+        return {
+          id: `cloud-${it.id || Date.now()}-${Math.random().toString(36).slice(2)}`,
+          originalName: it.item_name,
+          originalSpec: it.description || '',
+          quantity: it.qty,
+          unit: it.unit,
+          targetUnitPrice: it.supplier_cost,
+          targetTotal: it.supplier_cost * it.qty,
+          confidence: 1,
+          status: 'Confirmed' as const,
+          suggestedCategory: FurnitureCategory.OTHER,
+          // Rows saved before item_meta existed restore exactly as before.
+          ...(meta ? {
+            englishDescription: meta.en || '', model: meta.model || '', material: meta.material || '',
+            color: meta.color || '', sizeDimension: meta.size || '', moq: meta.moq || '',
+            packaging: meta.packaging || '', deliveryTime: meta.delivery || '',
+            paymentTerms: meta.payment || '', remarks: meta.remarks || '',
+            fromSupplierArchive: !!meta.sa,
+            imageRef: isValidImageRef(meta.img) ? meta.img : undefined,
+          } : {}),
+        } as DraftItem;
+      });
+
+      // Restore persisted product images (same storage as Supplier Quotes).
+      const restoredImages = await mapWithLimit(restoredDraftItems, 6, (d) =>
+        d.imageRef ? loadSupplierQuoteImage(d.imageRef) : Promise.resolve(null));
+      restoredDraftItems.forEach((d, i) => { if (restoredImages[i]) d.imageDataUrl = restoredImages[i]!; });
+      const missingImages = restoredDraftItems.filter((d, i) => d.imageRef && !restoredImages[i]).length;
+      if (missingImages > 0) console.warn(`[Cloud Load] ${missingImages} stored image(s) could not be restored`);
+      const savedShow = items.find(it => it.item_meta?.show)?.item_meta?.show;
+      if (savedShow) setSqIncludeFields({ ...savedShow });
 
       // Restore selling prices & extras keyed by NEW draft ids
       const newSelling: Record<string, number> = {};
@@ -1049,6 +1131,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
       setDraftItems(restoredDraftItems);
       setSellingPrices(newSelling);
+      setSavedCostBaseline(typeof record.supplier_cost_total === 'number'
+        ? { total: Number(record.supplier_cost_total), fingerprint: costFingerprint(restoredDraftItems) } : null);
       setMarkupPercents(newMarkup);
       setTradeItemCurrencies(newCurrency);
       setTradeItemNotes(newNotes);
@@ -1082,117 +1166,9 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
   // ── Package Quote: parse multi-sheet Excel ──────────────────────────────
   // ── Shared XLSX image extraction (DISPIMG cell images + floating/anchored drawings) ──
-  // Used by both Package Quote (Module 3) and Supplier Quote (Module 2) — single source of truth.
-  // Returns: { dispimgId → dataUrl, sheetName → { 0-based row index → dataUrl } }
-  const extractXlsxImages = async (arrayBuffer: ArrayBuffer): Promise<{
-    imgDataUrls: Record<string, string>;
-    floatingBySheet: Record<string, Record<number, string>>;
-  }> => {
-    const imgDataUrls: Record<string, string> = {};
-    const floatingBySheet: Record<string, Record<number, string>> = {};
-    try {
-      const zip = await JSZip.loadAsync(arrayBuffer);
-
-      // Parse cellimages.xml.rels → rId → media filename
-      const relsFile = zip.files['xl/_rels/cellimages.xml.rels'];
-      const cellImgFile = zip.files['xl/cellimages.xml'];
-
-      if (relsFile && cellImgFile) {
-        const relsText = await relsFile.async('text');
-        const cellText = await cellImgFile.async('text');
-
-        const ridToMedia: Record<string, string> = {};
-        for (const m of relsText.matchAll(/Id="([^"]+)"[^>]+Target="([^"]+)"/g)) {
-          if (!m[2].toLowerCase().includes('null')) ridToMedia[m[1]] = m[2];
-        }
-
-        const idToRid: Record<string, string> = {};
-        for (const m of cellText.matchAll(/name="(ID_[A-F0-9]+)"[\s\S]*?r:embed="([^"]+)"/gi)) {
-          idToRid[m[1]] = m[2];
-        }
-
-        for (const [dispId, rid] of Object.entries(idToRid)) {
-          const mediaPath = ridToMedia[rid];
-          if (!mediaPath) continue;
-          const fullPath = `xl/${mediaPath}`;
-          const mediaFile = zip.files[fullPath];
-          if (!mediaFile) continue;
-          const b64 = await mediaFile.async('base64');
-          const ext = fullPath.split('.').pop()?.toLowerCase() || 'png';
-          const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
-          imgDataUrls[dispId] = `data:${mime};base64,${b64}`;
-        }
-        console.log(`[extractXlsxImages] Extracted ${Object.keys(imgDataUrls).length} DISPIMG images`);
-      } else {
-        console.log('[extractXlsxImages] No cellimages.xml found — skipping DISPIMG extraction');
-      }
-
-      // ── Floating/anchored drawing images ─────────────────────────────
-      try {
-        const wbXml = zip.files['xl/workbook.xml'] ? await zip.files['xl/workbook.xml'].async('text') : '';
-        const wbRels = zip.files['xl/_rels/workbook.xml.rels'] ? await zip.files['xl/_rels/workbook.xml.rels'].async('text') : '';
-        const sheetNameToRid: Record<string, string> = {};
-        for (const m of wbXml.matchAll(/sheet name="([^"]+)"[^r]*r:id="([^"]+)"/g)) {
-          sheetNameToRid[m[1]] = m[2];
-        }
-        const ridToSheetPath: Record<string, string> = {};
-        for (const m of wbRels.matchAll(/Id="([^"]+)"[^>]+Target="([^"]+)"/g)) {
-          ridToSheetPath[m[1]] = m[2];
-        }
-        for (const [sheetName, sheetRid] of Object.entries(sheetNameToRid)) {
-          const sheetPath = ridToSheetPath[sheetRid];
-          if (!sheetPath) continue;
-          const sheetFileName = sheetPath.split('/').pop()!;
-          const sheetRelsPath = `xl/worksheets/_rels/${sheetFileName}.rels`;
-          const sheetRelsFile = zip.files[sheetRelsPath];
-          if (!sheetRelsFile) continue;
-          const sheetRelsXml = await sheetRelsFile.async('text');
-          const drawingMatch = sheetRelsXml.match(/Id="([^"]+)"[^>]+Type="[^"]*drawing[^"]*"[^>]+Target="([^"]+)"/);
-          if (!drawingMatch) continue;
-          const drawingRelPath = drawingMatch[2];
-          const drawingPath = `xl/drawings/${drawingRelPath.replace('../drawings/', '')}`;
-          const drawingFile = zip.files[drawingPath];
-          if (!drawingFile) continue;
-          const drawingXml = await drawingFile.async('text');
-          const drawingFileName = drawingPath.split('/').pop()!;
-          const drawingRelsPath = `xl/drawings/_rels/${drawingFileName}.rels`;
-          const drawingRelsFile = zip.files[drawingRelsPath];
-          if (!drawingRelsFile) continue;
-          const drawingRelsXml = await drawingRelsFile.async('text');
-          const dRidToMedia: Record<string, string> = {};
-          for (const m of drawingRelsXml.matchAll(/Id="([^"]+)"[^>]+Target="([^"]+)"/g)) {
-            if (!m[2].toLowerCase().includes('null')) dRidToMedia[m[1]] = m[2];
-          }
-          const rowMap: Record<number, string> = {};
-          for (const anchor of drawingXml.matchAll(/<xdr:twoCellAnchor[\s\S]*?<\/xdr:twoCellAnchor>/g)) {
-            const a = anchor[0];
-            const fromRowStr = a.match(/<xdr:from>[\s\S]*?<xdr:row>(\d+)<\/xdr:row>/)?.[1];
-            const embed = a.match(/r:embed="([^"]+)"/)?.[1];
-            if (fromRowStr == null || !embed) continue;
-            const fromRow = parseInt(fromRowStr);
-            const mediaRel = dRidToMedia[embed];
-            if (!mediaRel) continue;
-            const mediaPath = `xl/media/${mediaRel.replace('../media/', '')}`;
-            const mediaFile = zip.files[mediaPath];
-            if (!mediaFile) continue;
-            const b64 = await mediaFile.async('base64');
-            const ext = mediaPath.split('.').pop()?.toLowerCase() || 'png';
-            const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
-            rowMap[fromRow] = `data:${mime};base64,${b64}`;
-          }
-          if (Object.keys(rowMap).length > 0) {
-            floatingBySheet[sheetName] = rowMap;
-            console.log(`[extractXlsxImages] Floating images for "${sheetName}":`, Object.keys(rowMap));
-          }
-        }
-      } catch (fErr) {
-        console.warn('[extractXlsxImages] Floating image extraction failed (non-fatal):', fErr);
-      }
-    } catch (imgErr) {
-      console.warn('[extractXlsxImages] Image extraction failed (non-fatal):', imgErr);
-    }
-    return { imgDataUrls, floatingBySheet };
-  };
+  // Used by both Package Quote (Module 3) and Supplier Quote (Module 2) — single source of truth,
+  // now in ./lib/xlsxImages (attribute-order / absolute-path / oneCellAnchor tolerant).
+  const extractXlsxImages = extractXlsxImagesFromBuffer;
 
   const parsePackageExcel = async (file: File) => {
     setPqParseStatus('parsing');
@@ -2905,7 +2881,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             <label className="text-xs font-bold text-slate-600 block mb-1.5">{t('Currency')}</label>
             <select
               value={supplierMeta.currency}
-              onChange={e => setSupplierMeta(prev => ({ ...prev, currency: e.target.value }))}
+              onChange={e => changeSupplierCurrency(e.target.value)}
               className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-4 py-2.5 text-[14px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C] transition-colors"
             >
               {['AED','USD','CNY','EUR','GBP'].map(c => <option key={c} value={c}>{c}</option>)}
@@ -3054,6 +3030,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                   onClick={() => {
                     if (!sqSelectedFile || isProcessingAI) return;
                     setSqParseStatus('parsing');
+                    setSqCurrencyCheck(null);
                     setSqParseError('');
                     const isPDF = sqSelectedFile.type === 'application/pdf' || sqSelectedFile.name.toLowerCase().endsWith('.pdf');
                     const isImage = sqSelectedFile.type.startsWith('image/');
@@ -3125,7 +3102,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           <div className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[10px] px-6 py-4 flex flex-wrap items-end gap-5">
             <div>
               <label className="text-xs font-bold text-slate-600 block mb-1.5">{t('Supplier Currency')}</label>
-              <select value={supplierMeta.currency} onChange={e => setSupplierMeta(prev => ({ ...prev, currency: e.target.value }))}
+              <select value={supplierMeta.currency} onChange={e => changeSupplierCurrency(e.target.value)}
                 className="bg-white border border-[#0C1B3A]/10 rounded-md px-3 py-2 text-[13px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]">
                 {['CNY','USD','AED'].map(c => <option key={c} value={c}>{c === 'CNY' ? t('RMB (CNY)') : c}</option>)}
               </select>
@@ -3150,7 +3127,24 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                 className="w-24 bg-white border border-[#0C1B3A]/10 rounded-md px-3 py-2 text-[13px] font-mono-label font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]" />
             </div>
             <p className="text-xs text-slate-600 leading-snug max-w-[220px]">Converted = Supplier Cost × Rate. Customer Price = Converted × (1 + Margin%). Margin can be overridden per item below.</p>
+            <p className="basis-full text-xs font-mono-label font-bold text-[#0C1B3A]" data-testid="sq-rate-preview">
+              {t('Conversion preview')}: 1 {supplierMeta.currency} = {sqExchangeRate} {sqCustomerCurrency} · {supplierMeta.currency} 100 = {sqCustomerCurrency} {convertAmount(100, sqExchangeRate)}
+              {sqCurrencyCheck?.status === 'detected' && <span className="ml-2 font-normal text-slate-600">({t('Currency detected from Excel header')})</span>}
+            </p>
           </div>
+          {sqCurrencyNeedsConfirm && (
+            <div className="flex flex-wrap items-center gap-3 rounded-[10px] border border-amber-300 bg-amber-50 px-5 py-3 text-[13px] font-bold text-amber-800" data-testid="sq-currency-confirm">
+              <span>
+                {sqCurrencyCheck!.status === 'multi'
+                  ? t('Excel price headers name several currencies ({list}). Confirm the supplier currency before saving or converting.').replace('{list}', sqCurrencyCheck!.found.join(' / '))
+                  : t('Excel price header names no currency. Confirm the supplier currency before saving or converting.')}
+              </span>
+              <button onClick={() => changeSupplierCurrency(supplierMeta.currency || 'AED')}
+                className="rounded-md bg-[#0C1B3A] px-4 py-1.5 text-xs font-bold text-white">
+                {t('Confirm {c}').replace('{c}', supplierMeta.currency || 'AED')}
+              </button>
+            </div>
+          )}
 
           {/* Editable table — rich detail + EN translation + currency conversion */}
           <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 overflow-hidden shadow-sm">
@@ -3167,9 +3161,10 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
               {draftItems.map((item, idx) => {
                 const included = item.includeInGCI !== false;
                 const marginPct = item.marginPercent ?? sqGlobalMargin;
-                const convertedUnitCost = item.targetUnitPrice * sqExchangeRate;
-                const customerUnitPrice = convertedUnitCost * (1 + marginPct / 100);
-                const customerLineTotal = customerUnitPrice * item.quantity;
+                // Same as Convert → Pricing: unit cost converted at 4 dp, 2-dp selling unit price, line = unit × qty.
+                const convertedUnitCost = Number((item.targetUnitPrice * sqExchangeRate).toFixed(4));
+                const customerUnitPrice = roundTo2(convertedUnitCost * (1 + marginPct / 100));
+                const customerLineTotal = lineFromUnit(customerUnitPrice, item.quantity);
                 const update = (patch: Partial<DraftItem>) =>
                   setDraftItems(prev => prev.map((it, i) => i === idx ? { ...it, ...patch } : it));
                 return (
@@ -3291,7 +3286,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                 <p className="text-2xl font-bold font-mono-label text-[#0C1B3A]">
                   {sqCustomerCurrency} {draftItems.reduce((s, it) => {
                     const margin = it.marginPercent ?? sqGlobalMargin;
-                    return s + it.targetUnitPrice * sqExchangeRate * (1 + margin / 100) * it.quantity;
+                    return s + lineFromUnit(roundTo2(Number((it.targetUnitPrice * sqExchangeRate).toFixed(4)) * (1 + margin / 100)), it.quantity);
                   }, 0).toFixed(2)}
                 </p>
               </div>
@@ -3378,6 +3373,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                 onClick={() => {
                   const included = draftItems.filter(it => it.includeInGCI !== false);
                   if (included.length === 0) { alert(t('Please select at least one item to create GCI Quote.')); return; }
+                  if (sqCurrencyNeedsConfirm) { alert(t('Please confirm the supplier currency first.')); return; }
                   // Gate: show currency & exchange rate confirmation before entering Pricing Review
                   // Pre-fill from the live preview controls set above (Supplier Currency / Exchange Rate / Customer Currency)
                   setPendingConversionItems(included);
@@ -3419,11 +3415,36 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   /** Save current draftItems as a Supplier Quote (no GCI pricing required). */
   const handleSaveSupplierQuote = async () => {
     if (draftItems.length === 0) return;
+    if (sqCurrencyNeedsConfirm) { alert(t('Please confirm the supplier currency first.')); return; }
+    // Show currency, rate and a conversion preview before saving.
+    const supCur = supplierMeta.currency || 'AED';
+    if (!window.confirm(t('Save supplier quote?\nSupplier currency: {sup}\nRate: 1 {sup} = {rate} {cust}\nPreview: {sup} 100 = {cust} {x}')
+      .replace(/\{sup\}/g, supCur).replace(/\{cust\}/g, sqCustomerCurrency)
+      .replace('{rate}', String(sqExchangeRate)).replace('{x}', convertAmount(100, sqExchangeRate)))) return;
     setSqSaveStatus('saving');
     try {
       const totalCost = draftItems.reduce((s, it) => s + it.targetUnitPrice * it.quantity, 0);
+      const supplierQuoteNo = generateSupplierQuoteNo();
+      // Persist each line-item image via the existing Supplier Library storage.
+      // Rows already carrying a stored ref (re-save) are not uploaded twice.
+      const imageRefs = await mapWithLimit(draftItems, 4, async (it, i) => {
+        if (it.imageRef) return it.imageRef;
+        if (!it.imageDataUrl) return null;
+        try {
+          return await uploadSupplierQuoteImage(it.imageDataUrl, sqSupplierSelection.supplierId || undefined, supplierQuoteNo, i);
+        } catch (err) {
+          console.error('[Supplier Quote Save] image upload failed, row', i + 1, err);
+          return 'failed' as const;
+        }
+      });
+      const failedRows = imageRefs.map((r, i) => (r === 'failed' ? i + 1 : 0)).filter(Boolean);
+      if (failedRows.length > 0
+        && !window.confirm(`${failedRows.length} product image(s) failed to upload (rows ${failedRows.join(', ')}).\n\nSave anyway without these images? Click Cancel to retry later.`)) {
+        setSqSaveStatus('error');
+        return;
+      }
       const header: SupplierQuote = {
-        supplier_quote_no: generateSupplierQuoteNo(),
+        supplier_quote_no: supplierQuoteNo,
         // Quotation Center master-data unification (2026-09-15) — real FKs
         // are the primary relation now; supplier_name/supplier_contact stay
         // as the display snapshot (never re-derived by guessing a name).
@@ -3457,11 +3478,17 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           remarks: it.remarks || '', margin: it.marginPercent ?? null,
           size: it.sizeDimension || '', inc: it.includeInGCI !== false,
           note: tradeItemNotes[it.id] || '',
+          img: isValidImageRef(imageRefs[i]) ? imageRefs[i] : null,
         }),
         sort_order: i,
       }));
       const id = await saveSupplierQuote(header, items);
       if (id) {
+        // Remember stored refs on the in-memory rows so a re-save doesn't re-upload.
+        setDraftItems(prev => prev.map((it, i) => {
+          const ref = imageRefs[i];
+          return isValidImageRef(ref) && !it.imageRef ? { ...it, imageRef: ref } : it;
+        }));
         setSavedSQId(id);
         setSqSaveStatus('saved');
         // Refresh supplier quotes list if history is open
@@ -3510,8 +3537,17 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
         sizeDimension: v2.size || '',
         // Old saves (pre-V3) have no `inc` key — default to included so nothing pre-existing disappears
         includeInGCI: v2.inc !== undefined ? v2.inc !== false : true,
-      };
+        imageRef: isValidImageRef(v2.img) ? v2.img : undefined,
+        fromSupplierArchive: true,
+      } as DraftItem;
     });
+
+    // Restore persisted product images (rows saved before image persistence have none).
+    const restoredImages = await mapWithLimit(restoredDraft, 6, (d) =>
+      d.imageRef ? loadSupplierQuoteImage(d.imageRef) : Promise.resolve(null));
+    restoredDraft.forEach((d, i) => { if (restoredImages[i]) d.imageDataUrl = restoredImages[i]!; });
+    const missingImages = restoredDraft.filter((d, i) => d.imageRef && !restoredImages[i]).length;
+    if (missingImages > 0) console.warn(`[Supplier Quote Load] ${missingImages} stored image(s) could not be restored`);
 
     const newCurrencies: Record<string, string> = {};
     const newNotes: Record<string, string> = {};
@@ -3530,6 +3566,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     setTradeItemNotes(newNotes);
     setTradeTerms(result.quote.terms_notes || '');
     setSellingPrices({});
+    setSavedCostBaseline(null);
     setMarkupPercents({});
     setQuoteGenerated(false);
     setSentToTrade(false);
@@ -3909,20 +3946,32 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     const isModule2Quote = quoteSource === 'supplier-archive';
     items.forEach((item) => {
       if (y > 260) { doc.addPage(); y = 20; }
-      const sp = sellingPrices[item.id] || 0;  // line total
-      const lineTot = sp;                        // already line total
-      const unitSellPrice = item.quantity > 0 ? sp / item.quantity : 0;
+      const unitSellPrice = roundTo2(sellingPrices[item.id] || 0);   // unit price
+      const lineTot = lineFromUnit(unitSellPrice, item.quantity);     // unit × qty (Trade / PI rule)
       doc.setFontSize(8.5);
-      const descText = isModule2Quote
+      // Items reopened from GCI history keep their supplier-archive description format.
+      const descText = (isModule2Quote || item.fromSupplierArchive)
         ? buildModule2CustomerDescription(item)
         : item.originalName + (item.originalSpec ? `\n${item.originalSpec}` : '');
-      const nameLines = doc.splitTextToSize(descText, colWidths[0] - 2);
-      doc.text(nameLines, colX[0] + 1, y + 4);
+      // Product photo: 14mm thumbnail left of the description, for every item that has one
+      // (supplier-archive quotes and quotes reopened from GCI history).
+      const IMG = 14;
+      const hasImg = !!item.imageDataUrl;
+      if (hasImg && y + IMG + 2 > 280) { doc.addPage(); y = 20; }
+      const textX = colX[0] + 1 + (hasImg ? IMG + 2 : 0);
+      const nameLines = doc.splitTextToSize(descText, colWidths[0] - 2 - (hasImg ? IMG + 2 : 0));
+      if (hasImg) {
+        try {
+          const fmt = /^data:image\/jpe?g/i.test(item.imageDataUrl!) ? 'JPEG' : 'PNG';
+          doc.addImage(item.imageDataUrl!, fmt, colX[0] + 1, y + 1, IMG, IMG);
+        } catch { /* unsupported image — keep the row text-only */ }
+      }
+      doc.text(nameLines, textX, y + 4);
       doc.text(String(item.quantity), colX[1] + colWidths[1] - 2, y + 4, { align: 'right' });
       doc.text(item.unit, colX[2] + 1, y + 4);
       doc.text(unitSellPrice.toFixed(2), colX[3] + colWidths[3] - 2, y + 4, { align: 'right' });
       doc.text(lineTot.toFixed(2), colX[4] + colWidths[4] - 2, y + 4, { align: 'right' });
-      const rowH = Math.max(7, nameLines.length * 4.5 + 3);
+      const rowH = Math.max(hasImg ? IMG + 2 : 7, nameLines.length * 4.5 + 3);
       doc.setDrawColor(220, 220, 220);
       doc.line(margin, y + rowH, w - margin, y + rowH);
       y += rowH;
@@ -5154,14 +5203,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
     }
   };
 
-  // Default conservative exchange rates: supplierCurrency → quoteCurrency
-  const DEFAULT_RATES: Record<string, Record<string, number>> = {
-    AED: { AED: 1.0,    USD: 0.2723 },
-    USD: { AED: 3.6725, USD: 1.0    },
-    CNY: { AED: 0.505,  USD: 0.1375 },
-    EUR: { AED: 4.00,   USD: 1.09   },
-    GBP: { AED: 4.67,   USD: 1.27   },
-  };
+  // Default exchange rates (DEFAULT_RATES / defaultRate) live in ./lib/currencyRates.
 
   // Called when user confirms Currency & Exchange Rate modal
   const handleConfirmRate = () => {
@@ -5188,6 +5230,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
     setTradeItemCurrencies(newCurrencies);
     setTradeItemNotes(newNotes);
     setSellingPrices({});
+    setSavedCostBaseline(null);
     setMarkupPercents(newMarkups);
     setQuoteGenerated(false);
     setSentToTrade(false);
@@ -5405,8 +5448,10 @@ Set "productDetected":false if the photo is a logo, blank, or has no identifiabl
 
         const findCol = (kList: string[]) => headers.findIndex((h: string) => kList.some(k => h === k || (h.length > 1 && h.includes(k))));
 
+        // Item column must never be an image column ("PRODUCT IMAGE" contains "product").
+        const itemCol = headers.findIndex((h: string) => !isImageHeader(h) && keywords.item.some(k => h === k || (h.length > 1 && h.includes(k))));
         const mappings = {
-          item: findCol(keywords.item),
+          item: itemCol,
           spec: findCol(keywords.spec),
           qty: findCol(keywords.qty),
           price: findCol(keywords.price),
@@ -5416,7 +5461,7 @@ Set "productDetected":false if the photo is a logo, blank, or has no identifiabl
 
         // If Item Column detection is ambiguous (e.g. found No. as item), try to refine
         if (mappings.item === mappings.no && mappings.item !== -1) {
-           mappings.item = headers.findIndex((h, idx) => idx !== mappings.no && keywords.item.some(k => h.includes(k)));
+           mappings.item = headers.findIndex((h, idx) => idx !== mappings.no && !isImageHeader(h) && keywords.item.some(k => h.includes(k)));
         }
 
         // AED-priority price column selection: prefer AED column, reject RMB/CNY/SAR columns
@@ -5451,6 +5496,12 @@ Set "productDetected":false if the photo is a logo, blank, or has no identifiabl
           if (mappings.price === -1) {
             console.warn('[parseExcel] No named price column found, using fallback column', autoMappings.price);
           }
+          // Supplier currency from the price/total headers: one explicit currency → use it;
+          // none or several → keep the current pick and ask the user to confirm (no guessing).
+          const headerCurrency = detectHeaderCurrency([headers[autoMappings.price], mappings.total !== -1 ? headers[mappings.total] : '']);
+          const parseCurrency = headerCurrency.currency ?? (supplierMeta.currency || 'AED');
+          if (headerCurrency.currency) setSupplierMeta(prev => ({ ...prev, currency: headerCurrency.currency! }));
+          setSqCurrencyCheck({ status: headerCurrency.currency ? 'detected' : headerCurrency.found.length > 1 ? 'multi' : 'unclear', found: headerCurrency.found });
           const dataRows = jsonData.slice(bestHeaderRowIndex !== -1 ? bestHeaderRowIndex + 1 : 1);
           console.log('[parseExcel] mappings:', mappings, '| autoMappings:', autoMappings, '| bestHeaderRowIndex:', bestHeaderRowIndex);
 
@@ -5537,7 +5588,7 @@ Set "productDetected":false if the photo is a logo, blank, or has no identifiabl
             }
             const unitPrice = parseFloat(String(row[autoMappings.price] || '0').replace(/[^0-9.-]/g, '')) || 0;
             const qty = parseFloat(String(row[autoMappings.qty] || '1').replace(/[^0-9.-]/g, '')) || 1;
-            const supplierCurrencyAtParse = supplierMeta.currency || 'AED';
+            const supplierCurrencyAtParse = parseCurrency;
             const rawSpec = String(row[autoMappings.spec] || '').trim();
             const rawMaterial = colMaterial !== -1 ? String(row[colMaterial] || '').trim() : '';
             // Best-effort EN description: translate name + material via Package Quote's CN→EN helpers as a starting point (user can edit)
@@ -5594,7 +5645,7 @@ Set "productDetected":false if the photo is a logo, blank, or has no identifiabl
               headerRowOffset,
               rows,
               rowIdxToItemIndex,
-              supplierCurrency: supplierMeta.currency || 'AED',
+              supplierCurrency: parseCurrency,
             });
           } catch (ocrErr) {
             console.warn('[parseExcel] Embedded image OCR failed (non-fatal, rows kept as-is):', ocrErr);
@@ -6139,8 +6190,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
   const renderQuotationSummary = () => {
     // Quotation Summary values come only from real state; anything not known yet shows "—".
     const confirmedSummary = draftItems.filter(it => it.status === 'Confirmed' && it.includeInGCI !== false);
-    const sumCost = confirmedSummary.reduce((s, it) => s + it.targetUnitPrice * it.quantity, 0);
-    const sumSelling = confirmedSummary.reduce((s, it) => s + (sellingPrices[it.id] || 0), 0);
+    const sumCost = supplierCostTotal(confirmedSummary, savedCostBaseline);
+    const sumSelling = confirmedSummary.reduce((s, it) => s + lineFromUnit(sellingPrices[it.id] || 0, it.quantity), 0);
     const hasPricing = confirmedSummary.length > 0 && sumSelling > 0;
     const fmt = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 2 });
     const statusText = sentToTrade ? 'SENT_TO_TRADE' : quoteGenerated ? 'GENERATED' : wb.statusDraft;
@@ -6295,14 +6346,18 @@ Leave a field as empty string if not present. Never fabricate values.`;
     // For Module 2-sourced quotes it enforces row-level exclusion all the way through this screen,
     // the "Send to TRADE" payload, and the generated PDF (all three read from this same `confirmed`).
     const confirmed = draftItems.filter(it => it.status === 'Confirmed' && it.includeInGCI !== false);
-    const totalSupplierCost = confirmed.reduce((s, it) => s + it.targetUnitPrice * it.quantity, 0);
+    const totalSupplierCost = supplierCostTotal(confirmed, savedCostBaseline);
+    // Row cost amounts = header cost split with the quoteAmounts tail allocation, so rows add up to the header.
+    const rowCosts = reconcileQuoteAmounts(confirmed.map(it => ({ cost: it.targetUnitPrice * it.quantity, selling: lineFromUnit(sellingPrices[it.id] || 0, it.quantity) })), totalSupplierCost).lines;
     console.log('[Pricing View] Confirmed items:', confirmed.length, '| Supplier Total:', totalSupplierCost.toFixed(2));
-    // sellingPrices[id] = LINE TOTAL (not unit price). No * quantity needed.
-    const totalSelling = confirmed.reduce((s, it) => s + (sellingPrices[it.id] || 0), 0);
+    // sellingPrices[id] = UNIT selling price. Subtotal / VAT / total = the Trade / PI rule
+    // (calculateTradeTotals: sum of roundTo2(unit × qty), VAT on the subtotal).
+    const piTotals = calculateTradeTotals(confirmed.map(it => ({ price: roundTo2(sellingPrices[it.id] || 0), qty: it.quantity })));
+    const totalSelling = piTotals.subtotal;
     const totalProfit = totalSelling - totalSupplierCost;
     const overallMargin = totalSupplierCost > 0 ? (totalProfit / totalSupplierCost) * 100 : 0;
-    const totalVAT = totalSelling * 0.05;
-    const grandTotal = totalSelling + totalVAT;
+    const totalVAT = piTotals.vat;
+    const grandTotal = piTotals.total;
 
     const handleSendTradeToTrade = () => {
       if (!quoteInfo.customerProjectName) { alert(t('Please enter Customer / Project Name')); return; }
@@ -6322,9 +6377,9 @@ Leave a field as empty string if not present. Never fabricate values.`;
         items: confirmed.map(it => ({
           desc: `${it.originalName}${it.originalSpec ? ` (${it.originalSpec})` : ''}`,
           qty: it.quantity,
-          // sellingPrices[id] is line total; TRADE expects unit price
-          unitPrice: it.quantity > 0 ? Number(((sellingPrices[it.id] || 0) / it.quantity).toFixed(2)) : 0,
-          lineTotal: Number((sellingPrices[it.id] || 0).toFixed(2)),
+          // sellingPrices[id] is the unit price — sent as-is, never derived from a line total
+          unitPrice: roundTo2(sellingPrices[it.id] || 0),
+          lineTotal: lineFromUnit(sellingPrices[it.id] || 0, it.quantity),
         })),
         sourceApp: 'gci-living-engineering-studio',
         piType: 'PROJECT',
@@ -6455,7 +6510,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
             <div className="col-span-3">{t('Item')}</div>
             <div className="col-span-1 text-right">{t('Qty')}</div>
             <div className="col-span-2 text-right">{t('Supplier Cost')}</div>
-            <div className="col-span-2 text-right">{t('Selling Total ✎')}</div>
+            <div className="col-span-2 text-right">{t('Selling Unit Price ✎')}</div>
             <div className="col-span-1 text-right">{t('Markup%')}</div>
             <div className="col-span-1 text-right">{t('Profit')}</div>
             <div className="col-span-1 text-right">{t('Margin%')}</div>
@@ -6464,38 +6519,41 @@ Leave a field as empty string if not present. Never fabricate values.`;
 
           {/* Items */}
           <div className="divide-y divide-[#0C1B3A]/5">
-            {confirmed.map(item => {
-              const supplierUnit = item.targetUnitPrice;
-              const supplierTotal = supplierUnit * item.quantity;
-              // sellingPrices[id] = LINE TOTAL selling price (e.g. 43450 for 50×790 bed)
-              const sellPrice = sellingPrices[item.id] || 0;          // line total
+            {confirmed.map((item, idx) => {
+              const supplierUnit = item.targetUnitPrice;              // original unit cost (unchanged)
+              const supplierTotal = rowCosts[idx].cost;               // allocated row cost, sums to the header
+              // sellingPrices[id] = UNIT selling price; line = roundTo2(unit × qty) (Trade / PI rule)
+              const sellPrice = sellingPrices[item.id] || 0;          // unit price
               const markupPct = markupPercents[item.id] || 0;
-              const lineSellingTotal = sellPrice;                       // already line total
+              const lineSellingTotal = lineFromUnit(sellPrice, item.quantity);
               const lineProfit = lineSellingTotal - supplierTotal;
               const lineMargin = supplierTotal > 0 ? (lineProfit / supplierTotal) * 100 : 0;
-              const lineVAT = lineSellingTotal * 0.05;
-              const lineTotal = lineSellingTotal + lineVAT;
+              const lineVAT = rowCosts[idx].vat;              // whole-quote VAT split to rows (quoteAmounts)
+              const lineTotal = rowCosts[idx].lineTotal;      // rows add up to the header total
               const isProfit = lineProfit > 0;
-              // Rule A: user enters Selling Total → calc Markup%
+              // Rule A: user enters Selling Unit Price → calc Markup%
               const handleSellChange = (val: number) => {
                 setSellingPrices(prev => ({ ...prev, [item.id]: val }));
-                if (supplierTotal > 0 && val > 0)
-                  setMarkupPercents(prev => ({ ...prev, [item.id]: Number(((val / supplierTotal - 1) * 100).toFixed(1)) }));
+                if (supplierUnit > 0 && val > 0)
+                  setMarkupPercents(prev => ({ ...prev, [item.id]: Number(((val / supplierUnit - 1) * 100).toFixed(1)) }));
                 else
                   setMarkupPercents(prev => ({ ...prev, [item.id]: 0 }));
               };
-              // Rule B: user enters Markup% → calc Selling Total
+              // Rule B: user enters Markup% → calc Selling Unit Price (2 dp)
               const handleMarkupChange = (pct: number) => {
                 setMarkupPercents(prev => ({ ...prev, [item.id]: pct }));
-                if (supplierTotal > 0)
-                  setSellingPrices(prev => ({ ...prev, [item.id]: Number((supplierTotal * (1 + pct / 100)).toFixed(2)) }));
+                if (supplierUnit > 0)
+                  setSellingPrices(prev => ({ ...prev, [item.id]: roundTo2(supplierUnit * (1 + pct / 100)) }));
               };
               return (
                 <div key={item.id} className="grid grid-cols-12 gap-2 px-6 py-4 items-center hover:bg-[#0C1B3A]/2 transition-colors">
-                  <div className="col-span-3">
+                  <div className="col-span-3 flex items-start gap-2 min-w-0">
+                    {item.imageDataUrl && <img src={item.imageDataUrl} alt="" className="w-9 h-9 shrink-0 object-cover rounded-md border border-[#0C1B3A]/10" />}
+                    <div className="min-w-0">
                     <p className="text-xs font-bold text-[#0C1B3A] truncate">{item.originalName}</p>
                     {item.originalSpec && <p className="text-xs text-slate-600 truncate">{item.originalSpec}</p>}
                     <span className="text-xs font-bold text-slate-600 ">{tradeItemCurrencies[item.id] || 'AED'} · {item.unit}</span>
+                    </div>
                   </div>
                   <div className="col-span-1 text-right text-xs font-bold text-[#0C1B3A]">{item.quantity}</div>
                   <div className="col-span-2 text-right">
@@ -6511,6 +6569,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       onChange={e => handleSellChange(Number(e.target.value) || 0)}
                       className="w-full text-right bg-[#C9A84C]/8 border border-[#C9A84C]/30 rounded-md px-2 py-1.5 text-xs font-bold font-mono-label text-[#0C1B3A] outline-none focus:border-[#C9A84C] focus:bg-[#C9A84C]/12 transition-all"
                     />
+                    {sellPrice > 0 && <p className="mt-1 text-right text-xs font-mono-label text-slate-600" data-testid="sq-line-selling">= {lineSellingTotal.toFixed(2)}</p>}
                   </div>
                   {/* Markup% */}
                   <div className="col-span-1">
@@ -6583,7 +6642,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
               if (totalSelling <= 0) { alert(t('Please enter selling prices first')); return; }
               setQuoteGenerated(true);
               // Auto-save to cloud on generate
-              handleSaveToCloud(confirmed, { totalSupplierCost, totalSelling, totalProfit, overallMargin, totalVAT, grandTotal });
+              handleSaveToCloud(confirmed, { totalSupplierCost, totalSelling, totalProfit, overallMargin, totalVAT, grandTotal }, true); // state update is async: save as GENERATED now
             }}
             disabled={totalSelling <= 0}
             className="px-12 py-5 rounded-md bg-[#C9A84C] text-[#0C1B3A] font-bold text-xs shadow-xl hover:bg-[#E8C96A] transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-3"
@@ -6698,25 +6757,31 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 <div className="col-span-1 text-right">{t('Total')}</div>
               </div>
               <div className="divide-y divide-[#0C1B3A]/5">
-                {confirmed.map(item => {
-                  const sp = sellingPrices[item.id] || 0;  // line total
-                  const sub = sp;                            // already line total
-                  const unitSell = item.quantity > 0 ? sp / item.quantity : 0;
-                  const vat = sub * 0.05;
+                {(() => {
+                  // Same per-line VAT split as the saved quote (VAT on the whole quote, allocated to lines).
+                  const rec = reconcileQuoteAmounts(confirmed.map(it => ({ cost: it.targetUnitPrice * it.quantity, selling: lineFromUnit(sellingPrices[it.id] || 0, it.quantity) })), supplierCostTotal(confirmed, savedCostBaseline));
+                  return confirmed.map((item, idx) => {
+                  const unitSell = roundTo2(sellingPrices[item.id] || 0);  // unit price
+                  const sub = rec.lines[idx].selling;                        // unit × qty
+                  const vat = rec.lines[idx].vat;
                   return (
                     <div key={item.id} className="grid grid-cols-12 gap-2 px-5 py-3 items-center">
-                      <div className="col-span-5">
+                      <div className="col-span-5 flex items-start gap-2 min-w-0">
+                        {item.imageDataUrl && <img src={item.imageDataUrl} alt="" className="w-9 h-9 shrink-0 object-cover rounded-md border border-[#0C1B3A]/10" />}
+                        <div className="min-w-0">
                         <p className="text-xs font-bold text-[#0C1B3A]">{item.originalName}</p>
                         {item.originalSpec && <p className="text-xs text-slate-600">{item.originalSpec}</p>}
+                        </div>
                       </div>
                       <div className="col-span-1 text-center text-xs font-mono-label text-[#0C1B3A]">{item.quantity}</div>
                       <div className="col-span-2 text-right text-xs font-mono-label text-[#0C1B3A]">{unitSell.toFixed(2)}</div>
                       <div className="col-span-2 text-right text-xs font-mono-label text-[#0C1B3A]">{sub.toFixed(2)}</div>
                       <div className="col-span-1 text-right text-xs font-mono-label text-slate-600">{vat.toFixed(2)}</div>
-                      <div className="col-span-1 text-right text-xs font-bold font-mono-label text-[#0C1B3A]">{(sub + vat).toFixed(2)}</div>
+                      <div className="col-span-1 text-right text-xs font-bold font-mono-label text-[#0C1B3A]">{rec.lines[idx].lineTotal.toFixed(2)}</div>
                     </div>
                   );
-                })}
+                  });
+                })()}
               </div>
               <div className="px-5 py-3 bg-[#0C1B3A] flex justify-end items-center gap-4">
                 <p className="text-xs font-bold text-white/40">{t('Grand Total (incl 5% VAT)')}</p>
