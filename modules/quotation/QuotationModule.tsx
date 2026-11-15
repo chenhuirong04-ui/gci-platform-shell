@@ -6592,7 +6592,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     {sellPrice > 0 && <p className="text-xs text-slate-600">+{lineVAT.toFixed(1)} VAT</p>}
                   </div>
                   {unitMismatch && (
-                    <div data-testid="sq-unit-mismatch" className="col-span-12 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    <div data-testid="sq-unit-mismatch" className="col-span-12 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-600">
                       <span>
                         {t('Entered {e}, but the PI uses a 2-decimal unit price: {u} × {q} = {a} (difference {d}). Saving and sending to TRADE are blocked until you confirm.')
                           .replace('{e}', unitMismatch.entered.toFixed(2)).replace('{u}', unitMismatch.unit.toFixed(2))
