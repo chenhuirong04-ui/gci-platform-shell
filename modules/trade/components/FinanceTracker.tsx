@@ -958,7 +958,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                 <input
                   type="text"
                   className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
-                  placeholder="e.g. Emirates NBD - GCI Trading"
+                  placeholder={tt.phAccountName}
                   value={newAcc.account_name}
                   onChange={e => setNewAccField('account_name', e.target.value)}
                 />
@@ -970,7 +970,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                   <input
                     type="text"
                     className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
-                    placeholder="e.g. Globalcare Info General Trading FZCO"
+                    placeholder={tt.phAccountHolder}
                     value={newAcc.account_holder_name}
                     onChange={e => setNewAccField('account_holder_name', e.target.value)}
                   />
@@ -998,7 +998,7 @@ const FinanceTracker: React.FC<FinanceTrackerProps> = ({ onCancel }) => {
                     <input
                       type="text"
                       className="w-full p-4 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
-                      placeholder="e.g. WIO Bank PJSC"
+                      placeholder={tt.phBankName}
                       value={newAcc.bank_name}
                       onChange={e => setNewAccField('bank_name', e.target.value)}
                     />
