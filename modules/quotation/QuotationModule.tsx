@@ -100,6 +100,7 @@ import {
 } from './lib/supplierQuoteImages';
 import { extractXlsxImages as extractXlsxImagesFromBuffer, isImageHeader } from './lib/xlsxImages';
 import { DEFAULT_RATES, defaultRate, convertAmount, detectHeaderCurrency } from './lib/currencyRates';
+import { reconcileQuoteAmounts } from './lib/quoteAmounts';
 import {
   listServiceCategories, listServiceCatalogItems, addServiceCategory, addServiceCatalogItem,
   deleteServiceCatalogItem, seedDefaultCatalogIfEmpty, saveServiceQuote, listServiceQuotes,
@@ -916,11 +917,18 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   // ── Cloud Save / Load ────────────────────────────────────────────────────
 
   /** Build the Supabase payload from current quote state (trade/BOQ path). */
-  const buildCloudPayload = (confirmed: typeof draftItems, totals: {
+  const buildCloudPayload = (confirmed: typeof draftItems, _totals: {
     totalSupplierCost: number; totalSelling: number; totalProfit: number;
     overallMargin: number; totalVAT: number; grandTotal: number;
   }, imageRefs: (SupplierQuoteImageRef | null)[] = []) => {
     const quoteNo = quoteInfo.quoteNumber || `GCI-${Date.now()}`;
+    // Unified 0.01 precision: header = exact sum of the saved lines (VAT / cost
+    // rounding differences allocated to lines). sellingPrices[id] = line total.
+    const amounts = reconcileQuoteAmounts(confirmed.map(item => ({
+      cost: item.targetUnitPrice * item.quantity,
+      selling: sellingPrices[item.id] || 0,
+    })));
+    const sums = amounts.totals;
     const record = {
       quote_no: quoteNo,
       customer_name: quoteInfo.customerProjectName || '',
@@ -937,34 +945,29 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       quote_type: (quoteType === 'boq' ? 'BOQ' : 'TRADE') as 'TRADE' | 'BOQ',
       status: quoteGenerated ? 'GENERATED' : 'DRAFT' as 'DRAFT' | 'GENERATED',
       source: _businessIdParam ? 'DEAL' : 'Manual',
-      supplier_cost_total: Number(totals.totalSupplierCost.toFixed(2)),
-      selling_total: Number(totals.totalSelling.toFixed(2)),
-      profit_total: Number(totals.totalProfit.toFixed(2)),
-      margin_percent: Number(totals.overallMargin.toFixed(2)),
-      vat_amount: Number(totals.totalVAT.toFixed(2)),
-      grand_total: Number(totals.grandTotal.toFixed(2)),
+      supplier_cost_total: sums.totalSupplierCost,
+      selling_total: sums.totalSelling,
+      profit_total: sums.totalProfit,
+      margin_percent: sums.overallMargin,
+      vat_amount: sums.totalVAT,
+      grand_total: sums.grandTotal,
       terms_notes: tradeTerms || undefined,
       created_by: 'Admin',
       quote_date: quoteInfo.date || new Date().toISOString().split('T')[0],
     };
     const items: QuotationItem[] = confirmed.map((item, i) => {
-      const sp = sellingPrices[item.id] || 0;  // line total
-      const sub = sp;                            // already line total, no * qty
-      const supp = item.targetUnitPrice * item.quantity;
-      const profit = sub - supp;
-      const margin = supp > 0 ? (profit / supp) * 100 : 0;
-      const vat = sub * 0.05;
+      const a = amounts.lines[i];
       return {
         item_name: item.originalName,
         description: item.originalSpec || '',
         qty: item.quantity,
         unit: item.unit,
         supplier_cost: Number(item.targetUnitPrice.toFixed(2)),
-        selling_price: Number(sp.toFixed(2)),
-        profit_amount: Number(profit.toFixed(2)),
-        margin_percent: Number(margin.toFixed(2)),
-        vat_amount: Number(vat.toFixed(2)),
-        line_total: Number((sub + vat).toFixed(2)),
+        selling_price: a.selling,
+        profit_amount: a.profit,
+        margin_percent: a.margin,
+        vat_amount: a.vat,
+        line_total: a.lineTotal,
         currency: tradeItemCurrencies[item.id] || 'AED',
         item_notes: tradeItemNotes[item.id] || '',
         sort_order: i,
