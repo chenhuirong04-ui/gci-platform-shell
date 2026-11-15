@@ -460,6 +460,34 @@ export async function runGiaCaptureChain(text: string, state: GiaRouterState): P
 // for it" (the /business-assistant page calls its own resolve(); the Home
 // dashboard entry navigates to /business-assistant?customer= instead,
 // since it has no Customer-360 view of its own).
+// Unified GIA routing (Home): only EXPLICIT action commands that already have
+// their own confirm card stay local — "记到…" explicit-destination captures,
+// completing / rescheduling an existing task, and creating a Drive folder.
+// Everything else (questions, lookups, unrecognised text) is NOT handled here;
+// the caller hands it to the AI Business Agent, which decides the intent and
+// calls the tools the user is allowed to use. Follow-up notes and attached
+// files are handled by the caller before this runs.
+export async function runGiaExplicitCommandRouter(text: string, state: GiaRouterState): Promise<boolean> {
+  const t = text.trim();
+  if (!t) return false;
+  state.setFileSearchReply(null);
+  state.setPendingCapture(null);
+  state.setCaptureDone(new Set());
+  state.setCaptureError(null);
+  const explicitResult = await checkExplicitDestination(t, state);
+  if (explicitResult === true) return true;
+  if (typeof explicitResult === 'string') { state.setFileSearchReply(explicitResult); return true; }
+  if (await tryTaskLifecycleCommand(t, state)) return true;
+  if (await tryTaskRescheduleCommand(t, state)) return true;
+  if (await tryDriveCreateFolderCommand(t, state)) return true;
+  return false;
+}
+
+/** A short, punctuation-free string that can be looked up as a customer / company name. */
+export function looksLikeBareName(text: string): boolean {
+  return BARE_NAME_RE.test(text.trim());
+}
+
 export async function runGiaTopRouter(text: string, state: GiaRouterState): Promise<boolean> {
   const t = text.trim();
   if (!t) return false;

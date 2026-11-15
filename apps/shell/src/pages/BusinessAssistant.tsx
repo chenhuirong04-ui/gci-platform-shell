@@ -28,7 +28,7 @@ import {
   type FileClassification, type GiaFileRegistryRow,
 } from '../lib/giaFiles';
 import {
-  runGiaTopRouter, checkExplicitDestination, tryFileSearch, tryChanyaStatusQuery,
+  runGiaTopRouter, checkExplicitDestination, looksLikeBareName, tryFileSearch, tryChanyaStatusQuery,
   tryBusinessMemoryQuery, tryWhatsAppQuery, tryQuotePrepCommand,
   tryBusinessCaptureV3, tryBusinessCapture, type GiaRouterState,
 } from '../lib/giaRouter';
@@ -304,7 +304,13 @@ export function BusinessAssistant() {
     setPendingCapture(next);
   }
 
-  async function resolve(name: string, autoQuestion?: string) {
+  // Natural language is never treated as a customer name: it goes to the AI
+  // Business Agent (unified GIA routing) with the original wording, auto-sent.
+  function handOffToAgent(text: string) {
+    navigate(`/ai?tab=agent&agent_q=${encodeURIComponent(text)}`, { replace: true });
+  }
+
+  async function resolve(name: string, autoQuestion?: string, originalText?: string) {
     if (!name.trim()) return;
     setLoading(true);
     setError(null);
@@ -312,6 +318,13 @@ export function BusinessAssistant() {
     resetChat();
 
     const result = await resolveBusinessContext(name.trim());
+    if (!result.found && !result.potentialCustomer) {
+      // No customer / company matches — hand the request to the agent instead of
+      // answering "no CRM record found" for what is usually a business question.
+      setLoading(false);
+      handOffToAgent(originalText || (autoQuestion ? `${name.trim()} ${autoQuestion}` : name.trim()));
+      return;
+    }
     setCtx(result);
     setLoading(false);
 
@@ -346,7 +359,9 @@ export function BusinessAssistant() {
     });
     if (consumed) return;
     const stripped = t.replace(LOOKUP_PREFIX_RE, '').trim() || t;
-    resolve(stripped);
+    // Only a bare customer / company name is looked up here; a sentence goes to the agent.
+    if (!looksLikeBareName(stripped)) { handOffToAgent(t); return; }
+    resolve(stripped, undefined, t);
   }
 
   useEffect(() => {
