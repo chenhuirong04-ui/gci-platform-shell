@@ -6346,6 +6346,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
     // the "Send to TRADE" payload, and the generated PDF (all three read from this same `confirmed`).
     const confirmed = draftItems.filter(it => it.status === 'Confirmed' && it.includeInGCI !== false);
     const totalSupplierCost = supplierCostTotal(confirmed, savedCostBaseline);
+    // Row cost amounts = header cost split with the quoteAmounts tail allocation, so rows add up to the header.
+    const rowCosts = reconcileQuoteAmounts(confirmed.map(it => ({ cost: it.targetUnitPrice * it.quantity, selling: lineFromUnit(sellingPrices[it.id] || 0, it.quantity) })), totalSupplierCost).lines;
     console.log('[Pricing View] Confirmed items:', confirmed.length, '| Supplier Total:', totalSupplierCost.toFixed(2));
     // sellingPrices[id] = UNIT selling price. Subtotal / VAT / total = the Trade / PI rule
     // (calculateTradeTotals: sum of roundTo2(unit × qty), VAT on the subtotal).
@@ -6516,9 +6518,9 @@ Leave a field as empty string if not present. Never fabricate values.`;
 
           {/* Items */}
           <div className="divide-y divide-[#0C1B3A]/5">
-            {confirmed.map(item => {
-              const supplierUnit = item.targetUnitPrice;
-              const supplierTotal = supplierUnit * item.quantity;
+            {confirmed.map((item, idx) => {
+              const supplierUnit = item.targetUnitPrice;              // original unit cost (unchanged)
+              const supplierTotal = rowCosts[idx].cost;               // allocated row cost, sums to the header
               // sellingPrices[id] = UNIT selling price; line = roundTo2(unit × qty) (Trade / PI rule)
               const sellPrice = sellingPrices[item.id] || 0;          // unit price
               const markupPct = markupPercents[item.id] || 0;

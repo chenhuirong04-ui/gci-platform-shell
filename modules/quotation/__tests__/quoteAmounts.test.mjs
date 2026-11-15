@@ -227,3 +227,23 @@ test('baseline wiring: set on history restore, cleared on new quote, used by pag
   const fn = SRC.slice(SRC.indexOf('const buildCloudPayload = '), SRC.indexOf('const handleSaveToCloud = async'));
   assert.match(fn, /\}\)\), supplierCostTotal\(confirmed, savedCostBaseline\)\);/);
 });
+
+test('pricing rows: allocated row costs add up to the header cost (GCI-20261114-001 acceptance)', () => {
+  const restored = [14.32, 14.32, 16.53, 16.53, 16.53, ...Array(9).fill(1.32)].map(u => ({ targetUnitPrice: u, quantity: 1 }));
+  const unitSell = [18.62, 18.62, 21.48, 21.48, 21.48, ...Array(9).fill(1.72)];
+  const baseline = { total: 90.12, fingerprint: lib.costFingerprint(restored) };
+  const header = lib.supplierCostTotal(restored, baseline);
+  const rows = lib.reconcileQuoteAmounts(restored.map((it, i) => ({ cost: it.targetUnitPrice * it.quantity, selling: lib.lineFromUnit(unitSell[i], it.quantity) })), header);
+  assert.equal(sumC(rows.lines, 'cost'), 9012);                 // 90.12
+  assert.equal(sumC(rows.lines, 'selling'), 11716);             // 117.16
+  assert.equal(sumC(rows.lines, 'profit'), 2704);               // 27.04
+  assert.equal(rows.totals.totalVAT, 5.86);
+  assert.equal(rows.totals.grandTotal, 123.02);
+  rows.lines.forEach((l, i) => assert.ok(Math.abs(l.cost - restored[i].targetUnitPrice) <= 0.01, `row ${i + 1} within 0.01`));
+  // unit costs and unit selling prices are inputs only — never rewritten
+  assert.deepEqual(restored.map(r => r.targetUnitPrice), [14.32, 14.32, 16.53, 16.53, 16.53, ...Array(9).fill(1.32)]);
+  // wiring: row display uses the allocated cost; the unit cost shown (@) stays the original
+  assert.match(SRC, /const rowCosts = reconcileQuoteAmounts\(confirmed\.map\(it => \(\{ cost: it\.targetUnitPrice \* it\.quantity, selling: lineFromUnit\(sellingPrices\[it\.id\] \|\| 0, it\.quantity\) \}\)\), totalSupplierCost\)\.lines;/);
+  assert.match(SRC, /const supplierUnit = item\.targetUnitPrice;\s+\/\/ original unit cost \(unchanged\)\n\s+const supplierTotal = rowCosts\[idx\]\.cost;/);
+  assert.match(SRC, /const lineProfit = lineSellingTotal - supplierTotal;/);
+});
