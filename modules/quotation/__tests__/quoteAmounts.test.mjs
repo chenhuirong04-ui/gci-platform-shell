@@ -247,3 +247,41 @@ test('pricing rows: allocated row costs add up to the header cost (GCI-20261114-
   assert.match(SRC, /const supplierUnit = item\.targetUnitPrice;\s+\/\/ original unit cost \(unchanged\)\n\s+const supplierTotal = rowCosts\[idx\]\.cost;/);
   assert.match(SRC, /const lineProfit = lineSellingTotal - supplierTotal;/);
 });
+
+test('PR #17 UAT fix 1: supplier quote page line = 2-dp unit × qty (qty 13 → 242.06, not 242.05)', () => {
+  const R = 3.6725, usd = 3.9, m = 30;
+  const unitCost = Number((usd * R).toFixed(4));             // handleConfirmRate precision
+  const unit = Math.round(unitCost * (1 + m / 100) * 100) / 100;
+  assert.equal(unit, 18.62);
+  assert.equal(lib.lineFromUnit(unit, 13), 242.06);
+  assert.equal(lib.lineFromUnit(unit, 3), 55.86);
+  const sq = SRC.slice(SRC.indexOf("{t('Customer Total')}"), SRC.indexOf("{t('Terms & Notes (from AI)')}"));
+  assert.match(sq, /const convertedUnitCost = Number\(\(item\.targetUnitPrice \* sqExchangeRate\)\.toFixed\(4\)\);/);
+  assert.match(sq, /const customerUnitPrice = roundTo2\(convertedUnitCost \* \(1 \+ marginPct \/ 100\)\);/);
+  assert.match(sq, /const customerLineTotal = lineFromUnit\(customerUnitPrice, item\.quantity\);/);
+  assert.match(sq, /return s \+ lineFromUnit\(roundTo2\(Number\(\(it\.targetUnitPrice \* sqExchangeRate\)\.toFixed\(4\)\) \* \(1 \+ margin \/ 100\)\), it\.quantity\);/);
+  assert.ok(!/customerUnitPrice \* item\.quantity|\* \(1 \+ margin \/ 100\) \* it\.quantity/.test(sq), 'exact cost × qty is back');
+  // Same precision as Convert → Pricing (handleConfirmRate keeps 4 dp)
+  assert.match(SRC, /const convertedUnit = Number\(\(origCost \* rate\)\.toFixed\(4\)\);/);
+});
+
+test('PR #17 UAT fix 2: pricing-page row VAT / incl-VAT add up to the header (GCI-20261115-001 data)', () => {
+  const R = 3.6725;
+  const rows = [[3.9, 3], [3.9, 1], [4.5, 1], [4.5, 1], [4.5, 1], ...Array(9).fill([0.36, 1])]
+    .map(([u, q]) => { const c = Number((u * R).toFixed(4)); return { cost: c * q, selling: lib.lineFromUnit(Math.round(c * 1.3 * 100) / 100, q) }; });
+  const rec = lib.reconcileQuoteAmounts(rows);
+  assert.deepEqual([rec.totals.totalSupplierCost, rec.totals.totalSelling, rec.totals.totalProfit, rec.totals.totalVAT, rec.totals.grandTotal], [118.77, 154.4, 35.63, 7.72, 162.12]);
+  assert.equal(sumC(rec.lines, 'vat'), 772);
+  assert.equal(sumC(rec.lines, 'lineTotal'), 16212);   // was 162.14 with per-row 5% rounding
+  assert.match(SRC, /const lineVAT = rowCosts\[idx\]\.vat;/);
+  assert.match(SRC, /const lineTotal = rowCosts\[idx\]\.lineTotal;/);
+});
+
+test('PR #17 UAT fix 3: first "Generate GCI Quote" saves status GENERATED', () => {
+  const gen = SRC.slice(SRC.indexOf('// Auto-save to cloud on generate') - 400, SRC.indexOf('// Auto-save to cloud on generate') + 300);
+  assert.match(gen, /setQuoteGenerated\(true\);[\s\S]*handleSaveToCloud\(confirmed, \{ totalSupplierCost, totalSelling, totalProfit, overallMargin, totalVAT, grandTotal \}, true\);/);
+  assert.match(SRC, /status: \(quoteGenerated \|\| markGenerated \? 'GENERATED' : 'DRAFT'\) as 'DRAFT' \| 'GENERATED',/);
+  assert.match(SRC, /const payload = buildCloudPayload\(confirmed, totals, imageRefs, markGenerated\);/);
+  // "Update Draft" keeps using the current state (no forced status)
+  assert.match(SRC, /onClick=\{\(\) => handleSaveToCloud\(confirmed, \{ totalSupplierCost, totalSelling, totalProfit, overallMargin, totalVAT, grandTotal \}\)\}/);
+});

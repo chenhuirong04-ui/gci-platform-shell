@@ -90,7 +90,7 @@ test('save reuses stored refs and uploads only images without one', () => {
   const save = between(MODULE_SRC, 'const handleSaveToCloud = async', 'const handleLoadDraft = async');
   assert.match(save, /if \(it\.imageRef\) return it\.imageRef;/);
   assert.match(save, /uploadSupplierQuoteImage\(/);
-  assert.match(save, /buildCloudPayload\(confirmed, totals, imageRefs\)/);
+  assert.match(save, /buildCloudPayload\(confirmed, totals, imageRefs(, markGenerated)?\)/);
 });
 
 test('history load restores product fields + image from item_meta and keeps legacy rows unchanged', () => {

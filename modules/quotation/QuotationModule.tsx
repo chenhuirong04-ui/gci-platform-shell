@@ -924,7 +924,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   const buildCloudPayload = (confirmed: typeof draftItems, _totals: {
     totalSupplierCost: number; totalSelling: number; totalProfit: number;
     overallMargin: number; totalVAT: number; grandTotal: number;
-  }, imageRefs: (SupplierQuoteImageRef | null)[] = []) => {
+  }, imageRefs: (SupplierQuoteImageRef | null)[] = [], markGenerated = false) => {
     const quoteNo = quoteInfo.quoteNumber || `GCI-${Date.now()}`;
     // Unified 0.01 precision: header = exact sum of the saved lines (VAT / cost
     // rounding differences allocated to lines). sellingPrices[id] = UNIT price;
@@ -948,7 +948,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       salesperson: quoteInfo.salesperson || '',
       phone_wa: quoteInfo.phoneWhatsApp || '',
       quote_type: (quoteType === 'boq' ? 'BOQ' : 'TRADE') as 'TRADE' | 'BOQ',
-      status: quoteGenerated ? 'GENERATED' : 'DRAFT' as 'DRAFT' | 'GENERATED',
+      status: (quoteGenerated || markGenerated ? 'GENERATED' : 'DRAFT') as 'DRAFT' | 'GENERATED',
       source: _businessIdParam ? 'DEAL' : 'Manual',
       supplier_cost_total: sums.totalSupplierCost,
       selling_total: sums.totalSelling,
@@ -995,7 +995,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   const handleSaveToCloud = async (confirmed: typeof draftItems, totals: {
     totalSupplierCost: number; totalSelling: number; totalProfit: number;
     overallMargin: number; totalVAT: number; grandTotal: number;
-  }) => {
+  }, markGenerated = false) => {
     setCloudSaveStatus('saving');
     try {
       // Reuse the Supplier Quote image storage: rows that already carry a
@@ -1014,7 +1014,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
         return;
       }
       const imageRefs = uploaded.map(r => (isValidImageRef(r) ? r : null));
-      const payload = buildCloudPayload(confirmed, totals, imageRefs);
+      const payload = buildCloudPayload(confirmed, totals, imageRefs, markGenerated);
       let id: string | null = null;
       if (cloudId) {
         const ok = await updateQuotation(cloudId, payload);
@@ -3161,9 +3161,10 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
               {draftItems.map((item, idx) => {
                 const included = item.includeInGCI !== false;
                 const marginPct = item.marginPercent ?? sqGlobalMargin;
-                const convertedUnitCost = item.targetUnitPrice * sqExchangeRate;
-                const customerUnitPrice = convertedUnitCost * (1 + marginPct / 100);
-                const customerLineTotal = customerUnitPrice * item.quantity;
+                // Same as Convert → Pricing: unit cost converted at 4 dp, 2-dp selling unit price, line = unit × qty.
+                const convertedUnitCost = Number((item.targetUnitPrice * sqExchangeRate).toFixed(4));
+                const customerUnitPrice = roundTo2(convertedUnitCost * (1 + marginPct / 100));
+                const customerLineTotal = lineFromUnit(customerUnitPrice, item.quantity);
                 const update = (patch: Partial<DraftItem>) =>
                   setDraftItems(prev => prev.map((it, i) => i === idx ? { ...it, ...patch } : it));
                 return (
@@ -3285,7 +3286,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
                 <p className="text-2xl font-bold font-mono-label text-[#0C1B3A]">
                   {sqCustomerCurrency} {draftItems.reduce((s, it) => {
                     const margin = it.marginPercent ?? sqGlobalMargin;
-                    return s + it.targetUnitPrice * sqExchangeRate * (1 + margin / 100) * it.quantity;
+                    return s + lineFromUnit(roundTo2(Number((it.targetUnitPrice * sqExchangeRate).toFixed(4)) * (1 + margin / 100)), it.quantity);
                   }, 0).toFixed(2)}
                 </p>
               </div>
@@ -6527,8 +6528,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
               const lineSellingTotal = lineFromUnit(sellPrice, item.quantity);
               const lineProfit = lineSellingTotal - supplierTotal;
               const lineMargin = supplierTotal > 0 ? (lineProfit / supplierTotal) * 100 : 0;
-              const lineVAT = lineSellingTotal * 0.05;
-              const lineTotal = lineSellingTotal + lineVAT;
+              const lineVAT = rowCosts[idx].vat;              // whole-quote VAT split to rows (quoteAmounts)
+              const lineTotal = rowCosts[idx].lineTotal;      // rows add up to the header total
               const isProfit = lineProfit > 0;
               // Rule A: user enters Selling Unit Price → calc Markup%
               const handleSellChange = (val: number) => {
@@ -6641,7 +6642,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
               if (totalSelling <= 0) { alert(t('Please enter selling prices first')); return; }
               setQuoteGenerated(true);
               // Auto-save to cloud on generate
-              handleSaveToCloud(confirmed, { totalSupplierCost, totalSelling, totalProfit, overallMargin, totalVAT, grandTotal });
+              handleSaveToCloud(confirmed, { totalSupplierCost, totalSelling, totalProfit, overallMargin, totalVAT, grandTotal }, true); // state update is async: save as GENERATED now
             }}
             disabled={totalSelling <= 0}
             className="px-12 py-5 rounded-md bg-[#C9A84C] text-[#0C1B3A] font-bold text-xs shadow-xl hover:bg-[#E8C96A] transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-3"
