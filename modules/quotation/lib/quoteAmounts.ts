@@ -37,28 +37,12 @@ export function allocateCents(exact: number[], total: number): number[] {
 }
 
 /**
- * Line selling amount the PI will reproduce: the PI keeps a 2-dp unit price and
- * recomputes line = roundTo2(unit × qty). Locking the quote line to that value means
- * quote, PDF and PI show the same line for any qty (qty 1 lines are unchanged).
+ * Unit-price-first line amount, the Trade / PI rule (QuoteManager saves
+ * lineTotal = roundTo2(unit_price × qty) with a 2-dp unit price).
+ * The quote never derives a unit price from a line total.
  */
-export function lockLineToUnit(line: number, qty: number): number {
-  const amount = roundTo2(Number(line) || 0);
-  if (!(qty > 0)) return amount;
-  return roundTo2(roundTo2(amount / qty) * qty);
-}
-
-/**
- * Read-only check: does the entered line differ from what the PI will compute
- * (2-dp unit × qty)? Returns null when they match. Never changes the amount —
- * the user must confirm any adjustment.
- */
-export function lineUnitMismatch(line: number, qty: number):
-  { entered: number; unit: number; adjusted: number; diff: number } | null {
-  const entered = roundTo2(Number(line) || 0);
-  if (!(qty > 0) || entered <= 0) return null;
-  const adjusted = lockLineToUnit(entered, qty);
-  if (adjusted === entered) return null;
-  return { entered, unit: roundTo2(entered / qty), adjusted, diff: roundTo2(adjusted - entered) };
+export function lineFromUnit(unitPrice: number, qty: number): number {
+  return roundTo2(roundTo2(Number(unitPrice) || 0) * (Number(qty) || 0));
 }
 
 export interface AmountLineInput {

@@ -106,76 +106,87 @@ test('header comes from the Trade / PI calculateTradeTotals (one rule for quote 
   assert.match(src, /calculateTradeTotals\(/);
 });
 
-test('quote → PI: qty / rate / rounding never change line or total amounts', async () => {
-  const lib2 = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'gci-cu2-')), 'cu.mjs');
+async function loadCu() {
+  const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'gci-cu2-')), 'cu.mjs');
   const b = await rolldown({ input: path.join(ROOT, 'modules/trade/services/currencyUtils.ts'), platform: 'node' });
-  await b.write({ file: lib2, format: 'esm' });
-  const cu = await import(pathToFileURL(lib2).href);
-  // Reported case: line 64.45, qty 3 → locked to 21.48 × 3 = 64.44 before it ever reaches the PI.
-  assert.equal(lib.lockLineToUnit(64.45, 3), 64.44);
-  assert.equal(lib.lockLineToUnit(18.62, 1), 18.62);   // qty 1 unchanged
-  assert.equal(lib.lockLineToUnit(43450, 50), 43450);
-  assert.equal(lib.lockLineToUnit(10, 0), 10);
+  await b.write({ file: out, format: 'esm' });
+  return import(pathToFileURL(out).href);
+}
+
+test('unit price first: line = roundTo2(unit × qty), identical to Trade / PI', async () => {
+  const cu = await loadCu();
+  assert.equal(lib.lineFromUnit(21.48, 3), 64.44);   // qty 3 × 21.48 — no line ÷ qty anywhere
+  assert.equal(lib.lineFromUnit(21.485, 3), 64.47);  // unit is taken at 2 dp first (21.49), like the PI
+  assert.equal(lib.lineFromUnit(18.62, 1), 18.62);
+  assert.equal(lib.lineFromUnit(790, 50), 39500);
+  assert.equal(lib.lineFromUnit(0, 3), 0);
+  for (const [u, q] of [[21.48, 3], [6.21, 3], [1.72, 999], [3.33, 7], [0.01, 1]])
+    assert.equal(lib.lineFromUnit(u, q), cu.roundTo2(cu.roundTo2(u) * q)); // QuoteManager.tsx lineTotal rule
+});
+
+test('quote → PI: qty / rate / rounding never change unit, line or total amounts', async () => {
+  const cu = await loadCu();
   let seed = 42; const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
   const rates = [1, 3.6725, 0.505, 0.2723];
   for (let run = 0; run < 200; run++) {
     const rows = Array.from({ length: 1 + Math.floor(rnd() * 100) }, () => {
       const qty = 1 + Math.floor(rnd() * 999);
       const unitCost = Number((Math.round(rnd() * 100000) / 1000 * rates[Math.floor(rnd() * 4)]).toFixed(4)); // handleConfirmRate keeps 4 dp
-      const supplierTotal = unitCost * qty;
       const pct = Math.floor(rnd() * 1000) / 10;
-      const line = lib.lockLineToUnit(supplierTotal * (1 + pct / 100), qty);           // markup path
-      const typed = lib.lockLineToUnit(Math.round(rnd() * 1e7) / 100, qty);            // typed + blur path
-      return { qty, cost: supplierTotal, line: rnd() < 0.5 ? line : typed };
+      const unit = rnd() < 0.5 ? cu.roundTo2(unitCost * (1 + pct / 100))   // markup path
+                               : Math.round(rnd() * 1e6) / 100;            // typed unit price
+      return { qty, unitCost, unit };
     });
-    // Quotation Center push payload (unchanged code) → PI recompute (unchanged code).
-    const pushed = rows.map(r => ({ unitPrice: Number((r.line / r.qty).toFixed(2)), lineTotal: Number(r.line.toFixed(2)), qty: r.qty }));
-    const piItems = pushed.map(p => ({ price: cu.roundTo2(p.unitPrice), qty: p.qty }));
-    pushed.forEach((p, i) => assert.equal(cu.roundTo2(p.unitPrice * p.qty), p.lineTotal, `row ${i + 1} PI line = quote line`));
-    const pi = cu.calculateTradeTotals(piItems);
-    const q = lib.reconcileQuoteAmounts(rows.map(r => ({ cost: r.cost, selling: r.line }))).totals;
-    assert.deepEqual([q.totalSelling, q.totalVAT, q.grandTotal], [pi.subtotal, pi.vat, pi.total]);
+    // Quote side (screen / PDF / push): calculateTradeTotals over unit × qty; save side: reconcileQuoteAmounts.
+    const quoteTotals = cu.calculateTradeTotals(rows.map(r => ({ price: cu.roundTo2(r.unit), qty: r.qty })));
+    const saved = lib.reconcileQuoteAmounts(rows.map(r => ({ cost: r.unitCost * r.qty, selling: lib.lineFromUnit(r.unit, r.qty) })));
+    // Push payload (unchanged shape) → PI inbound parse → PI recompute (QuoteManager, unchanged).
+    const pushed = rows.map(r => ({ unitPrice: cu.roundTo2(r.unit), lineTotal: lib.lineFromUnit(r.unit, r.qty), qty: r.qty }));
+    const piItems = pushed.map(p => ({ unit_price: cu.roundTo2(Number(p.unitPrice) || 0), qty: p.qty }));
+    piItems.forEach((it, i) => assert.equal(cu.roundTo2(it.unit_price * it.qty), pushed[i].lineTotal, `row ${i + 1}`));
+    const pi = cu.calculateTradeTotals(piItems.map(i => ({ price: i.unit_price, qty: i.qty })));
+    assert.deepEqual([quoteTotals.subtotal, quoteTotals.vat, quoteTotals.total], [pi.subtotal, pi.vat, pi.total]);
+    assert.deepEqual([saved.totals.totalSelling, saved.totals.totalVAT, saved.totals.grandTotal], [pi.subtotal, pi.vat, pi.total]);
   }
 });
 
-test('regression: qty 3, typed 64.45 → difference shown, never changed silently', () => {
-  assert.deepEqual(lib.lineUnitMismatch(64.45, 3), { entered: 64.45, unit: 21.48, adjusted: 64.44, diff: -0.01 });
-  assert.equal(lib.lineUnitMismatch(64.44, 3), null);   // after the user confirms
-  assert.equal(lib.lineUnitMismatch(18.62, 1), null);   // qty 1 never flagged
-  assert.equal(lib.lineUnitMismatch(43450, 50), null);
-  assert.equal(lib.lineUnitMismatch(0, 3), null);
-  assert.deepEqual(lib.lineUnitMismatch(10, 3), { entered: 10, unit: 3.33, adjusted: 9.99, diff: -0.01 });
-  // typed input: onChange stores exactly what was typed; no blur/auto adjust anywhere.
-  assert.match(SRC, /onChange=\{e => handleSellChange\(Number\(e\.target\.value\) \|\| 0\)\}\n\s+className="w-full text-right bg-\[#C9A84C\]\/8/);
-  assert.ok(!/handleSellCommit|onBlur=\{handleSell/.test(SRC), 'silent blur adjustment is back');
-  // difference + reason shown with an explicit confirm button
-  assert.match(SRC, /data-testid="sq-unit-mismatch"/);
-  assert.match(SRC, /onClick=\{\(\) => handleSellChange\(unitMismatch\.adjusted\)\}/);
-  // nothing inconsistent can be generated (auto-save), saved or pushed before confirmation
-  const MSG = "Some line totals differ from the PI unit price calculation. Please confirm each adjustment first.";
-  const gen = SRC.slice(SRC.indexOf("if (totalSelling <= 0) { alert(t('Please enter selling prices first')); return; }"), SRC.indexOf('// Auto-save to cloud on generate'));
-  assert.ok(gen.includes('if (unitMismatchCount > 0)') && gen.indexOf('unitMismatchCount') < gen.indexOf('setQuoteGenerated(true)'));
-  const push = SRC.slice(SRC.indexOf('const handleSendTradeToTrade = () => {'), SRC.indexOf('const payload = {', SRC.indexOf('const handleSendTradeToTrade = () => {')));
-  assert.ok(push.includes('if (unitMismatchCount > 0)') && push.includes(MSG));
-  const save = SRC.slice(SRC.indexOf('const handleSaveToCloud = async'), SRC.indexOf("setCloudSaveStatus('saving');", SRC.indexOf('const handleSaveToCloud = async')));
-  assert.ok(save.includes('lineUnitMismatch(sellingPrices[it.id] || 0, it.quantity)') && save.includes(MSG));
-  const tr = fs.readFileSync(path.join(ROOT, 'modules/quotation/translations.ts'), 'utf8');
-  assert.ok(tr.includes("'Adjust to {a}': '确认调整为 {a}',"));
+test('regression: qty 3, unit 21.48 → line 64.44 on screen, PDF, push, save and PI', async () => {
+  const cu = await loadCu();
+  const unit = 21.48, qty = 3;
+  assert.equal(lib.lineFromUnit(unit, qty), 64.44);
+  const piLine = cu.roundTo2(cu.roundTo2(unit) * qty);
+  assert.equal(piLine, 64.44);
+  const saved = lib.reconcileQuoteAmounts([{ cost: 14.32275 * qty, selling: lib.lineFromUnit(unit, qty) }]);
+  assert.equal(saved.lines[0].selling, 64.44);
+  assert.equal(saved.totals.grandTotal, cu.calculateTradeTotals([{ price: unit, qty }]).total); // 67.66
+  assert.equal(saved.totals.grandTotal, 67.66);
 });
 
-test('markup path still produces PI-reproducible lines; history restore and PI push code untouched', () => {
-  assert.match(SRC, /setSellingPrices\(prev => \(\{ \.\.\.prev, \[item\.id\]: lockLineToUnit\(supplierTotal \* \(1 \+ pct \/ 100\), item\.quantity\) \}\)\);/);
-  assert.match(SRC, /newSelling\[draft\.id\] = src\.selling_price;/); // saved history amounts are restored as-is
-  assert.match(SRC, /unitPrice: it\.quantity > 0 \? Number\(\(\(sellingPrices\[it\.id\] \|\| 0\) \/ it\.quantity\)\.toFixed\(2\)\) : 0,/);
-  assert.equal((SRC.match(/setSellingPrices\(prev =>/g) || []).length, 2, 'new selling-line writer added without lock');
+test('no unit price is derived from a line total anywhere in the customer quote', () => {
+  assert.ok(!/\/ (item|it)\.quantity/.test(SRC), 'line ÷ qty is back');
+  assert.ok(!/lockLineToUnit|lineUnitMismatch|sq-unit-mismatch/.test(SRC), 'old line-total workaround is back');
+  // pricing row: input is the unit price; markup sets a 2-dp unit price from the unit cost
+  assert.match(SRC, /\{t\('Selling Unit Price ✎'\)\}/);
+  assert.match(SRC, /setSellingPrices\(prev => \(\{ \.\.\.prev, \[item\.id\]: roundTo2\(supplierUnit \* \(1 \+ pct \/ 100\)\) \}\)\);/);
+  assert.match(SRC, /const lineSellingTotal = lineFromUnit\(sellPrice, item\.quantity\);/);
+  // totals = Trade / PI rule
+  assert.match(SRC, /const piTotals = calculateTradeTotals\(confirmed\.map\(it => \(\{ price: roundTo2\(sellingPrices\[it\.id\] \|\| 0\), qty: it\.quantity \}\)\)\);/);
+  // PDF + push use the unit price directly
+  assert.match(SRC, /const unitSellPrice = roundTo2\(sellingPrices\[item\.id\] \|\| 0\);/);
+  assert.match(SRC, /const lineTot = lineFromUnit\(unitSellPrice, item\.quantity\);/);
+  assert.match(SRC, /unitPrice: roundTo2\(sellingPrices\[it\.id\] \|\| 0\),\n\s+lineTotal: lineFromUnit\(sellingPrices\[it\.id\] \|\| 0, it\.quantity\),/);
+  // history: selling_price is a unit price, restored as-is; markup = unit / unit cost
+  assert.match(SRC, /newSelling\[draft\.id\] = src\.selling_price;/);
+  assert.match(SRC, /src\.selling_price \/ src\.supplier_cost - 1/);
+  assert.equal((SRC.match(/setSellingPrices\(prev =>/g) || []).length, 2);
 });
 
-test('cloud save uses the reconciled amounts for header and lines', () => {
+test('cloud save: selling_price = unit price, reconciled line / header amounts', () => {
   const fn = SRC.slice(SRC.indexOf('const buildCloudPayload = '), SRC.indexOf('const handleSaveToCloud = async'));
-  assert.match(fn, /const amounts = reconcileQuoteAmounts\(/);
+  assert.match(fn, /selling: lineFromUnit\(sellingPrices\[item\.id\] \|\| 0, item\.quantity\),/);
   for (const k of ['supplier_cost_total: sums.totalSupplierCost', 'selling_total: sums.totalSelling', 'profit_total: sums.totalProfit',
     'margin_percent: sums.overallMargin', 'vat_amount: sums.totalVAT', 'grand_total: sums.grandTotal',
-    'selling_price: a.selling', 'profit_amount: a.profit', 'margin_percent: a.margin', 'vat_amount: a.vat', 'line_total: a.lineTotal'])
+    'selling_price: roundTo2(sellingPrices[item.id] || 0)', 'profit_amount: a.profit', 'margin_percent: a.margin', 'vat_amount: a.vat', 'line_total: a.lineTotal'])
     assert.ok(fn.includes(k), k);
   assert.ok(!/sub \* 0\.05/.test(fn), 'per-line VAT rounding is back');
   assert.match(fn, /supplier_cost: Number\(item\.targetUnitPrice\.toFixed\(2\)\)/); // unit cost column unchanged

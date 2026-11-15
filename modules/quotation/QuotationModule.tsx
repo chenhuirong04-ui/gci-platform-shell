@@ -100,7 +100,8 @@ import {
 } from './lib/supplierQuoteImages';
 import { extractXlsxImages as extractXlsxImagesFromBuffer, isImageHeader } from './lib/xlsxImages';
 import { DEFAULT_RATES, defaultRate, convertAmount, detectHeaderCurrency } from './lib/currencyRates';
-import { reconcileQuoteAmounts, lockLineToUnit, lineUnitMismatch } from './lib/quoteAmounts';
+import { reconcileQuoteAmounts, lineFromUnit } from './lib/quoteAmounts';
+import { roundTo2, calculateTradeTotals } from '../trade/services/currencyUtils';
 import {
   listServiceCategories, listServiceCatalogItems, addServiceCategory, addServiceCatalogItem,
   deleteServiceCatalogItem, seedDefaultCatalogIfEmpty, saveServiceQuote, listServiceQuotes,
@@ -923,10 +924,11 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   }, imageRefs: (SupplierQuoteImageRef | null)[] = []) => {
     const quoteNo = quoteInfo.quoteNumber || `GCI-${Date.now()}`;
     // Unified 0.01 precision: header = exact sum of the saved lines (VAT / cost
-    // rounding differences allocated to lines). sellingPrices[id] = line total.
+    // rounding differences allocated to lines). sellingPrices[id] = UNIT price;
+    // line = roundTo2(unit × qty) as in Trade / PI.
     const amounts = reconcileQuoteAmounts(confirmed.map(item => ({
       cost: item.targetUnitPrice * item.quantity,
-      selling: sellingPrices[item.id] || 0,
+      selling: lineFromUnit(sellingPrices[item.id] || 0, item.quantity),
     })));
     const sums = amounts.totals;
     const record = {
@@ -963,7 +965,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
         qty: item.quantity,
         unit: item.unit,
         supplier_cost: Number(item.targetUnitPrice.toFixed(2)),
-        selling_price: a.selling,
+        selling_price: roundTo2(sellingPrices[item.id] || 0), // unit price, same meaning as AI / CRM / PI
         profit_amount: a.profit,
         margin_percent: a.margin,
         vat_amount: a.vat,
@@ -991,10 +993,6 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     totalSupplierCost: number; totalSelling: number; totalProfit: number;
     overallMargin: number; totalVAT: number; grandTotal: number;
   }) => {
-    if (confirmed.some(it => lineUnitMismatch(sellingPrices[it.id] || 0, it.quantity))) {
-      alert(t('Some line totals differ from the PI unit price calculation. Please confirm each adjustment first.'));
-      return;
-    }
     setCloudSaveStatus('saving');
     try {
       // Reuse the Supplier Quote image storage: rows that already carry a
@@ -3941,9 +3939,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     const isModule2Quote = quoteSource === 'supplier-archive';
     items.forEach((item) => {
       if (y > 260) { doc.addPage(); y = 20; }
-      const sp = sellingPrices[item.id] || 0;  // line total
-      const lineTot = sp;                        // already line total
-      const unitSellPrice = item.quantity > 0 ? sp / item.quantity : 0;
+      const unitSellPrice = roundTo2(sellingPrices[item.id] || 0);   // unit price
+      const lineTot = lineFromUnit(unitSellPrice, item.quantity);     // unit × qty (Trade / PI rule)
       doc.setFontSize(8.5);
       // Items reopened from GCI history keep their supplier-archive description format.
       const descText = (isModule2Quote || item.fromSupplierArchive)
@@ -6186,7 +6183,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
     // Quotation Summary values come only from real state; anything not known yet shows "—".
     const confirmedSummary = draftItems.filter(it => it.status === 'Confirmed' && it.includeInGCI !== false);
     const sumCost = confirmedSummary.reduce((s, it) => s + it.targetUnitPrice * it.quantity, 0);
-    const sumSelling = confirmedSummary.reduce((s, it) => s + (sellingPrices[it.id] || 0), 0);
+    const sumSelling = confirmedSummary.reduce((s, it) => s + lineFromUnit(sellingPrices[it.id] || 0, it.quantity), 0);
     const hasPricing = confirmedSummary.length > 0 && sumSelling > 0;
     const fmt = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 2 });
     const statusText = sentToTrade ? 'SENT_TO_TRADE' : quoteGenerated ? 'GENERATED' : wb.statusDraft;
@@ -6343,17 +6340,16 @@ Leave a field as empty string if not present. Never fabricate values.`;
     const confirmed = draftItems.filter(it => it.status === 'Confirmed' && it.includeInGCI !== false);
     const totalSupplierCost = confirmed.reduce((s, it) => s + it.targetUnitPrice * it.quantity, 0);
     console.log('[Pricing View] Confirmed items:', confirmed.length, '| Supplier Total:', totalSupplierCost.toFixed(2));
-    // sellingPrices[id] = LINE TOTAL (not unit price). No * quantity needed.
-    const totalSelling = confirmed.reduce((s, it) => s + (sellingPrices[it.id] || 0), 0);
+    // sellingPrices[id] = UNIT selling price. Subtotal / VAT / total = the Trade / PI rule
+    // (calculateTradeTotals: sum of roundTo2(unit × qty), VAT on the subtotal).
+    const piTotals = calculateTradeTotals(confirmed.map(it => ({ price: roundTo2(sellingPrices[it.id] || 0), qty: it.quantity })));
+    const totalSelling = piTotals.subtotal;
     const totalProfit = totalSelling - totalSupplierCost;
     const overallMargin = totalSupplierCost > 0 ? (totalProfit / totalSupplierCost) * 100 : 0;
-    const totalVAT = totalSelling * 0.05;
-    const grandTotal = totalSelling + totalVAT;
-    // Lines whose entered total the PI cannot reproduce (2-dp unit × qty) — the user must confirm first.
-    const unitMismatchCount = confirmed.filter(it => lineUnitMismatch(sellingPrices[it.id] || 0, it.quantity)).length;
+    const totalVAT = piTotals.vat;
+    const grandTotal = piTotals.total;
 
     const handleSendTradeToTrade = () => {
-      if (unitMismatchCount > 0) { alert(t('Some line totals differ from the PI unit price calculation. Please confirm each adjustment first.')); return; }
       if (!quoteInfo.customerProjectName) { alert(t('Please enter Customer / Project Name')); return; }
       if (totalSelling <= 0) { alert(t('Please enter selling price')); return; }
       const payload = {
@@ -6371,9 +6367,9 @@ Leave a field as empty string if not present. Never fabricate values.`;
         items: confirmed.map(it => ({
           desc: `${it.originalName}${it.originalSpec ? ` (${it.originalSpec})` : ''}`,
           qty: it.quantity,
-          // sellingPrices[id] is line total; TRADE expects unit price
-          unitPrice: it.quantity > 0 ? Number(((sellingPrices[it.id] || 0) / it.quantity).toFixed(2)) : 0,
-          lineTotal: Number((sellingPrices[it.id] || 0).toFixed(2)),
+          // sellingPrices[id] is the unit price — sent as-is, never derived from a line total
+          unitPrice: roundTo2(sellingPrices[it.id] || 0),
+          lineTotal: lineFromUnit(sellingPrices[it.id] || 0, it.quantity),
         })),
         sourceApp: 'gci-living-engineering-studio',
         piType: 'PROJECT',
@@ -6504,7 +6500,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
             <div className="col-span-3">{t('Item')}</div>
             <div className="col-span-1 text-right">{t('Qty')}</div>
             <div className="col-span-2 text-right">{t('Supplier Cost')}</div>
-            <div className="col-span-2 text-right">{t('Selling Total ✎')}</div>
+            <div className="col-span-2 text-right">{t('Selling Unit Price ✎')}</div>
             <div className="col-span-1 text-right">{t('Markup%')}</div>
             <div className="col-span-1 text-right">{t('Profit')}</div>
             <div className="col-span-1 text-right">{t('Margin%')}</div>
@@ -6516,31 +6512,29 @@ Leave a field as empty string if not present. Never fabricate values.`;
             {confirmed.map(item => {
               const supplierUnit = item.targetUnitPrice;
               const supplierTotal = supplierUnit * item.quantity;
-              // sellingPrices[id] = LINE TOTAL selling price (e.g. 43450 for 50×790 bed)
-              const sellPrice = sellingPrices[item.id] || 0;          // line total
+              // sellingPrices[id] = UNIT selling price; line = roundTo2(unit × qty) (Trade / PI rule)
+              const sellPrice = sellingPrices[item.id] || 0;          // unit price
               const markupPct = markupPercents[item.id] || 0;
-              const lineSellingTotal = sellPrice;                       // already line total
+              const lineSellingTotal = lineFromUnit(sellPrice, item.quantity);
               const lineProfit = lineSellingTotal - supplierTotal;
               const lineMargin = supplierTotal > 0 ? (lineProfit / supplierTotal) * 100 : 0;
               const lineVAT = lineSellingTotal * 0.05;
               const lineTotal = lineSellingTotal + lineVAT;
               const isProfit = lineProfit > 0;
-              // Rule A: user enters Selling Total → calc Markup%
+              // Rule A: user enters Selling Unit Price → calc Markup%
               const handleSellChange = (val: number) => {
                 setSellingPrices(prev => ({ ...prev, [item.id]: val }));
-                if (supplierTotal > 0 && val > 0)
-                  setMarkupPercents(prev => ({ ...prev, [item.id]: Number(((val / supplierTotal - 1) * 100).toFixed(1)) }));
+                if (supplierUnit > 0 && val > 0)
+                  setMarkupPercents(prev => ({ ...prev, [item.id]: Number(((val / supplierUnit - 1) * 100).toFixed(1)) }));
                 else
                   setMarkupPercents(prev => ({ ...prev, [item.id]: 0 }));
               };
-              // Rule B: user enters Markup% → calc Selling Total
+              // Rule B: user enters Markup% → calc Selling Unit Price (2 dp)
               const handleMarkupChange = (pct: number) => {
                 setMarkupPercents(prev => ({ ...prev, [item.id]: pct }));
-                if (supplierTotal > 0)
-                  setSellingPrices(prev => ({ ...prev, [item.id]: lockLineToUnit(supplierTotal * (1 + pct / 100), item.quantity) }));
+                if (supplierUnit > 0)
+                  setSellingPrices(prev => ({ ...prev, [item.id]: roundTo2(supplierUnit * (1 + pct / 100)) }));
               };
-              // Typed line totals are never changed silently: show the PI difference, the user confirms.
-              const unitMismatch = lineUnitMismatch(sellPrice, item.quantity);
               return (
                 <div key={item.id} className="grid grid-cols-12 gap-2 px-6 py-4 items-center hover:bg-[#0C1B3A]/2 transition-colors">
                   <div className="col-span-3 flex items-start gap-2 min-w-0">
@@ -6565,6 +6559,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       onChange={e => handleSellChange(Number(e.target.value) || 0)}
                       className="w-full text-right bg-[#C9A84C]/8 border border-[#C9A84C]/30 rounded-md px-2 py-1.5 text-xs font-bold font-mono-label text-[#0C1B3A] outline-none focus:border-[#C9A84C] focus:bg-[#C9A84C]/12 transition-all"
                     />
+                    {sellPrice > 0 && <p className="mt-1 text-right text-xs font-mono-label text-slate-600" data-testid="sq-line-selling">= {lineSellingTotal.toFixed(2)}</p>}
                   </div>
                   {/* Markup% */}
                   <div className="col-span-1">
@@ -6591,23 +6586,6 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     </p>
                     {sellPrice > 0 && <p className="text-xs text-slate-600">+{lineVAT.toFixed(1)} VAT</p>}
                   </div>
-                  {unitMismatch && (
-                    <div data-testid="sq-unit-mismatch" className="col-span-12 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-600">
-                      <span>
-                        {t('Entered {e}, but the PI uses a 2-decimal unit price: {u} × {q} = {a} (difference {d}). Saving and sending to TRADE are blocked until you confirm.')
-                          .replace('{e}', unitMismatch.entered.toFixed(2)).replace('{u}', unitMismatch.unit.toFixed(2))
-                          .replace('{q}', String(item.quantity)).replace('{a}', unitMismatch.adjusted.toFixed(2))
-                          .replace('{d}', (unitMismatch.diff > 0 ? '+' : '') + unitMismatch.diff.toFixed(2))}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleSellChange(unitMismatch.adjusted)}
-                        className="shrink-0 rounded-md bg-amber-600 px-3 py-1 font-bold text-white hover:bg-amber-700"
-                      >
-                        {t('Adjust to {a}').replace('{a}', unitMismatch.adjusted.toFixed(2))}
-                      </button>
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -6652,7 +6630,6 @@ Leave a field as empty string if not present. Never fabricate values.`;
           <button
             onClick={() => {
               if (totalSelling <= 0) { alert(t('Please enter selling prices first')); return; }
-              if (unitMismatchCount > 0) { alert(t('Some line totals differ from the PI unit price calculation. Please confirm each adjustment first.')); return; }
               setQuoteGenerated(true);
               // Auto-save to cloud on generate
               handleSaveToCloud(confirmed, { totalSupplierCost, totalSelling, totalProfit, overallMargin, totalVAT, grandTotal });
@@ -6770,11 +6747,13 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 <div className="col-span-1 text-right">{t('Total')}</div>
               </div>
               <div className="divide-y divide-[#0C1B3A]/5">
-                {confirmed.map(item => {
-                  const sp = sellingPrices[item.id] || 0;  // line total
-                  const sub = sp;                            // already line total
-                  const unitSell = item.quantity > 0 ? sp / item.quantity : 0;
-                  const vat = sub * 0.05;
+                {(() => {
+                  // Same per-line VAT split as the saved quote (VAT on the whole quote, allocated to lines).
+                  const rec = reconcileQuoteAmounts(confirmed.map(it => ({ cost: it.targetUnitPrice * it.quantity, selling: lineFromUnit(sellingPrices[it.id] || 0, it.quantity) })));
+                  return confirmed.map((item, idx) => {
+                  const unitSell = roundTo2(sellingPrices[item.id] || 0);  // unit price
+                  const sub = rec.lines[idx].selling;                        // unit × qty
+                  const vat = rec.lines[idx].vat;
                   return (
                     <div key={item.id} className="grid grid-cols-12 gap-2 px-5 py-3 items-center">
                       <div className="col-span-5 flex items-start gap-2 min-w-0">
@@ -6788,10 +6767,11 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       <div className="col-span-2 text-right text-xs font-mono-label text-[#0C1B3A]">{unitSell.toFixed(2)}</div>
                       <div className="col-span-2 text-right text-xs font-mono-label text-[#0C1B3A]">{sub.toFixed(2)}</div>
                       <div className="col-span-1 text-right text-xs font-mono-label text-slate-600">{vat.toFixed(2)}</div>
-                      <div className="col-span-1 text-right text-xs font-bold font-mono-label text-[#0C1B3A]">{(sub + vat).toFixed(2)}</div>
+                      <div className="col-span-1 text-right text-xs font-bold font-mono-label text-[#0C1B3A]">{rec.lines[idx].lineTotal.toFixed(2)}</div>
                     </div>
                   );
-                })}
+                  });
+                })()}
               </div>
               <div className="px-5 py-3 bg-[#0C1B3A] flex justify-end items-center gap-4">
                 <p className="text-xs font-bold text-white/40">{t('Grand Total (incl 5% VAT)')}</p>
