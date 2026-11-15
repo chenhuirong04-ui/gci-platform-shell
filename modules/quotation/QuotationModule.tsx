@@ -100,7 +100,7 @@ import {
 } from './lib/supplierQuoteImages';
 import { extractXlsxImages as extractXlsxImagesFromBuffer, isImageHeader } from './lib/xlsxImages';
 import { DEFAULT_RATES, defaultRate, convertAmount, detectHeaderCurrency } from './lib/currencyRates';
-import { reconcileQuoteAmounts, lineFromUnit } from './lib/quoteAmounts';
+import { reconcileQuoteAmounts, lineFromUnit, supplierCostTotal, costFingerprint, type SavedCostBaseline } from './lib/quoteAmounts';
 import { roundTo2, calculateTradeTotals } from '../trade/services/currencyUtils';
 import {
   listServiceCategories, listServiceCatalogItems, addServiceCategory, addServiceCatalogItem,
@@ -398,6 +398,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   const isProjectInfoScreen = appMode === 'customer-quote' && view !== 'history' && (!projectInfoSubmitted || !quoteType);
   const [tradePhase, setTradePhase] = useState<'upload' | 'pricing' | null>(_autoTrade ? 'upload' : null);
   const [sellingPrices, setSellingPrices] = useState<Record<string, number>>({});
+  // Saved supplier_cost_total of a reopened quote (used while its cost lines are unchanged).
+  const [savedCostBaseline, setSavedCostBaseline] = useState<SavedCostBaseline | null>(null);
   const [markupPercents, setMarkupPercents] = useState<Record<string, number>>({});
   const [tradeItemNotes, setTradeItemNotes] = useState<Record<string, string>>({});
   const [tradeItemCurrencies, setTradeItemCurrencies] = useState<Record<string, string>>({});
@@ -785,6 +787,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     setQuoteType(null);
     setTradePhase(null);
     setSellingPrices({});
+    setSavedCostBaseline(null);
     setMarkupPercents({});
     setTradeItemNotes({});
     setTradeItemCurrencies({});
@@ -929,7 +932,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     const amounts = reconcileQuoteAmounts(confirmed.map(item => ({
       cost: item.targetUnitPrice * item.quantity,
       selling: lineFromUnit(sellingPrices[item.id] || 0, item.quantity),
-    })));
+    })), supplierCostTotal(confirmed, savedCostBaseline));
     const sums = amounts.totals;
     const record = {
       quote_no: quoteNo,
@@ -1128,6 +1131,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
       setDraftItems(restoredDraftItems);
       setSellingPrices(newSelling);
+      setSavedCostBaseline(typeof record.supplier_cost_total === 'number'
+        ? { total: Number(record.supplier_cost_total), fingerprint: costFingerprint(restoredDraftItems) } : null);
       setMarkupPercents(newMarkup);
       setTradeItemCurrencies(newCurrency);
       setTradeItemNotes(newNotes);
@@ -3560,6 +3565,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     setTradeItemNotes(newNotes);
     setTradeTerms(result.quote.terms_notes || '');
     setSellingPrices({});
+    setSavedCostBaseline(null);
     setMarkupPercents({});
     setQuoteGenerated(false);
     setSentToTrade(false);
@@ -5223,6 +5229,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
     setTradeItemCurrencies(newCurrencies);
     setTradeItemNotes(newNotes);
     setSellingPrices({});
+    setSavedCostBaseline(null);
     setMarkupPercents(newMarkups);
     setQuoteGenerated(false);
     setSentToTrade(false);
@@ -6182,7 +6189,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
   const renderQuotationSummary = () => {
     // Quotation Summary values come only from real state; anything not known yet shows "—".
     const confirmedSummary = draftItems.filter(it => it.status === 'Confirmed' && it.includeInGCI !== false);
-    const sumCost = confirmedSummary.reduce((s, it) => s + it.targetUnitPrice * it.quantity, 0);
+    const sumCost = supplierCostTotal(confirmedSummary, savedCostBaseline);
     const sumSelling = confirmedSummary.reduce((s, it) => s + lineFromUnit(sellingPrices[it.id] || 0, it.quantity), 0);
     const hasPricing = confirmedSummary.length > 0 && sumSelling > 0;
     const fmt = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -6338,7 +6345,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
     // For Module 2-sourced quotes it enforces row-level exclusion all the way through this screen,
     // the "Send to TRADE" payload, and the generated PDF (all three read from this same `confirmed`).
     const confirmed = draftItems.filter(it => it.status === 'Confirmed' && it.includeInGCI !== false);
-    const totalSupplierCost = confirmed.reduce((s, it) => s + it.targetUnitPrice * it.quantity, 0);
+    const totalSupplierCost = supplierCostTotal(confirmed, savedCostBaseline);
     console.log('[Pricing View] Confirmed items:', confirmed.length, '| Supplier Total:', totalSupplierCost.toFixed(2));
     // sellingPrices[id] = UNIT selling price. Subtotal / VAT / total = the Trade / PI rule
     // (calculateTradeTotals: sum of roundTo2(unit × qty), VAT on the subtotal).
@@ -6749,7 +6756,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
               <div className="divide-y divide-[#0C1B3A]/5">
                 {(() => {
                   // Same per-line VAT split as the saved quote (VAT on the whole quote, allocated to lines).
-                  const rec = reconcileQuoteAmounts(confirmed.map(it => ({ cost: it.targetUnitPrice * it.quantity, selling: lineFromUnit(sellingPrices[it.id] || 0, it.quantity) })));
+                  const rec = reconcileQuoteAmounts(confirmed.map(it => ({ cost: it.targetUnitPrice * it.quantity, selling: lineFromUnit(sellingPrices[it.id] || 0, it.quantity) })), supplierCostTotal(confirmed, savedCostBaseline));
                   return confirmed.map((item, idx) => {
                   const unitSell = roundTo2(sellingPrices[item.id] || 0);  // unit price
                   const sub = rec.lines[idx].selling;                        // unit × qty

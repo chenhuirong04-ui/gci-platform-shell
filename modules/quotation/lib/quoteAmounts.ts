@@ -63,7 +63,29 @@ export interface AmountTotals {
 
 const pct = (profitC: number, costC: number) => (costC > 0 ? roundTo2((profitC / costC) * 100) : 0);
 
-export function reconcileQuoteAmounts(lines: AmountLineInput[]): { lines: AmountLine[]; totals: AmountTotals } {
+/**
+ * Saved supplier-cost total of a reopened quote. quotation_items.supplier_cost is
+ * numeric(14,2), so the exact converted unit cost (e.g. 14.32275) is not stored;
+ * rebuilding the total from 2-dp unit costs can differ by 0.01 from the saved
+ * supplier_cost_total. While the cost lines are unchanged, the saved total is used.
+ */
+export interface SavedCostBaseline { total: number; fingerprint: string }
+
+/** Cost lines as they were restored (unit cost × qty per row, in order). */
+export function costFingerprint(items: { targetUnitPrice: number; quantity: number }[]): string {
+  return items.map(it => `${Number(it.targetUnitPrice) || 0}*${Number(it.quantity) || 0}`).join('|');
+}
+
+/** Supplier-cost total: the saved one while cost lines are unchanged, else roundTo2(sum of exact line costs). */
+export function supplierCostTotal(
+  items: { targetUnitPrice: number; quantity: number }[],
+  baseline: SavedCostBaseline | null,
+): number {
+  if (baseline && costFingerprint(items) === baseline.fingerprint) return baseline.total;
+  return roundTo2(items.reduce((s, it) => s + (Number(it.targetUnitPrice) || 0) * (Number(it.quantity) || 0), 0));
+}
+
+export function reconcileQuoteAmounts(lines: AmountLineInput[], costTotalOverride?: number): { lines: AmountLine[]; totals: AmountTotals } {
   // Quotation Center keeps LINE totals, so each line goes in as price = line amount, qty = 1.
   const { subtotal, vat, total } = calculateTradeTotals(lines.map(l => ({ price: roundTo2(Number(l.selling) || 0), qty: 1 })));
   const sellC = lines.map(l => toCents(l.selling));
@@ -72,7 +94,9 @@ export function reconcileQuoteAmounts(lines: AmountLineInput[]): { lines: Amount
   const vatC = allocateCents(sellC.map(c => c * VAT_SHARE), vatTotalC);
 
   const exactCostC = lines.map(l => (Number(l.cost) || 0) * 100);
-  const costTotalC = toCents(exactCostC.reduce((s, v) => s + v, 0) / 100);
+  const costTotalC = costTotalOverride !== undefined
+    ? toCents(costTotalOverride)                              // saved total of an unchanged reopened quote
+    : toCents(exactCostC.reduce((s, v) => s + v, 0) / 100);
   const costC = allocateCents(exactCostC, costTotalC);
 
   const out: AmountLine[] = lines.map((_, i) => {

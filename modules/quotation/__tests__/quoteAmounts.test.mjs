@@ -191,3 +191,39 @@ test('cloud save: selling_price = unit price, reconciled line / header amounts',
   assert.ok(!/sub \* 0\.05/.test(fn), 'per-line VAT rounding is back');
   assert.match(fn, /supplier_cost: Number\(item\.targetUnitPrice\.toFixed\(2\)\)/); // unit cost column unchanged
 });
+
+test('reopened GCI-20261114-001: saved cost total 90.12 is kept until a cost line changes', () => {
+  // As restored from quotation_items (supplier_cost is numeric(14,2)) + quotation_records.supplier_cost_total.
+  const restored = [14.32, 14.32, 16.53, 16.53, 16.53, ...Array(9).fill(1.32)].map(u => ({ targetUnitPrice: u, quantity: 1 }));
+  const sell = [18.62, 18.62, 21.48, 21.48, 21.48, ...Array(9).fill(1.72)];
+  const baseline = { total: 90.12, fingerprint: lib.costFingerprint(restored) };
+  // Old behaviour: rebuilt from 2-dp unit costs.
+  assert.equal(lib.supplierCostTotal(restored, null), 90.11);
+  // Unchanged: page and re-save use the saved total; profit stays 27.04; lines still add up.
+  assert.equal(lib.supplierCostTotal(restored, baseline), 90.12);
+  const lines = restored.map((it, i) => ({ cost: it.targetUnitPrice * it.quantity, selling: lib.lineFromUnit(sell[i], it.quantity) }));
+  const resaved = lib.reconcileQuoteAmounts(lines, lib.supplierCostTotal(restored, baseline));
+  assert.deepEqual(resaved.totals, { totalSupplierCost: 90.12, totalSelling: 117.16, totalProfit: 27.04, overallMargin: 30, totalVAT: 5.86, grandTotal: 123.02 });
+  assert.equal(sumC(resaved.lines, 'cost'), 9012);
+  assert.equal(sumC(resaved.lines, 'profit'), 2704);
+  assert.equal(sumC(resaved.lines, 'lineTotal'), 12302);
+  // Selling-price edits alone keep the saved cost total.
+  assert.equal(lib.supplierCostTotal(restored, baseline), 90.12);
+  // A cost or qty change (or removed row) recalculates from the current lines.
+  const qty3 = restored.map((it, i) => (i === 0 ? { ...it, quantity: 3 } : it));
+  assert.equal(lib.supplierCostTotal(qty3, baseline), 118.75);
+  const cost = restored.map((it, i) => (i === 0 ? { ...it, targetUnitPrice: 14.5 } : it));
+  assert.equal(lib.supplierCostTotal(cost, baseline), 90.29);
+  assert.equal(lib.supplierCostTotal(restored.slice(1), baseline), 75.79);
+  // New quotes (no baseline) keep the exact-cost rule.
+  assert.equal(lib.supplierCostTotal([{ targetUnitPrice: 14.32275, quantity: 2 }], null), 28.65);
+});
+
+test('baseline wiring: set on history restore, cleared on new quote, used by page / summary / save', () => {
+  assert.match(SRC, /setSavedCostBaseline\(typeof record\.supplier_cost_total === 'number'\n\s+\? \{ total: Number\(record\.supplier_cost_total\), fingerprint: costFingerprint\(restoredDraftItems\) \} : null\);/);
+  assert.equal((SRC.match(/setSellingPrices\(\{\}\);\n\s+setSavedCostBaseline\(null\);/g) || []).length, 3);
+  assert.match(SRC, /const totalSupplierCost = supplierCostTotal\(confirmed, savedCostBaseline\);/);
+  assert.match(SRC, /const sumCost = supplierCostTotal\(confirmedSummary, savedCostBaseline\);/);
+  const fn = SRC.slice(SRC.indexOf('const buildCloudPayload = '), SRC.indexOf('const handleSaveToCloud = async'));
+  assert.match(fn, /\}\)\), supplierCostTotal\(confirmed, savedCostBaseline\)\);/);
+});
