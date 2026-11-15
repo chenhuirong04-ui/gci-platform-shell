@@ -14,6 +14,7 @@ import {
   INCOME_CATEGORIES, MANUAL_EXPENSE_CATEGORIES, NON_OPERATING_INFLOW_CATEGORIES, TRANSFER_CATEGORIES,
 } from '../services/transactionCategories';
 import type { BankAccount, BankStatementImport, BankStatementLine, TransactionRecord } from '../types';
+import { useI18n } from '@gci/i18n';
 
 interface LineDraft {
   row: BankStatementLine;
@@ -34,6 +35,10 @@ function hasId<T extends { id?: string }>(s: T): s is T & { id: string } {
 
 export default function BankReconciliation() {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
+  const { dict } = useI18n();
+  const tf = dict.trade.finance;
+  const t = tf.recon;
+  const catName = (c: { value: string; label: string }) => (tf.categories as Record<string, string>)[c.value] || c.label;
   const [accountId, setAccountId] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -74,7 +79,7 @@ export default function BankReconciliation() {
   });
 
   const handleFile = async (file: File) => {
-    if (!accountId) { setUploadError('请先选择银行账户。'); return; }
+    if (!accountId) { setUploadError(t.errSelectAccount); return; }
     setUploadError('');
     setUploading(true);
     try {
@@ -93,10 +98,10 @@ export default function BankReconciliation() {
           body: JSON.stringify({ mimeType, data: base64 }),
         });
         const data = await res.json();
-        if (!data.ok) throw new Error(data.error || 'AI 解析失败');
+        if (!data.ok) throw new Error(data.error || t.errAi);
         parsed = data.lines || [];
       }
-      if (parsed.length === 0) throw new Error('未能从文件中解析出任何流水行，请检查文件格式。');
+      if (parsed.length === 0) throw new Error(t.errNoLines);
 
       const fileHash = await computeFileHash(file);
       const { path, error: upErr } = await uploadFinanceFile('statements', file);
@@ -128,7 +133,7 @@ export default function BankReconciliation() {
       setCurrentImport(imp);
       setDrafts(created.map(buildDraft));
     } catch (e: any) {
-      setUploadError(e?.message || '解析失败，请重试。');
+      setUploadError(e?.message || t.errParse);
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -141,7 +146,7 @@ export default function BankReconciliation() {
 
   const attachToLine = async (lineId: string, file: File) => {
     const { path, error } = await uploadFinanceFile('bank-lines', file);
-    if (error) { alert(`⚠️ 附件上传失败：${error}`); return; }
+    if (error) { alert(`${t.errAttach}${error}`); return; }
     await bankStatementService.updateLine(lineId, { storage_path: path, file_name: file.name, mime_type: file.type });
     setDrafts(prev => prev.map(d => (d.row.id === lineId
       ? { ...d, row: { ...d.row, storage_path: path, file_name: file.name, mime_type: file.type } }
@@ -156,7 +161,7 @@ export default function BankReconciliation() {
   // atomic claim, not this flag.
   const confirmLine = async (draft: LineDraft) => {
     if (draft.busy || draft.row.status !== 'pending') return;
-    if (!draft.category) { alert('⚠️ 请先选择科目分类。'); return; }
+    if (!draft.category) { alert(t.errCategory); return; }
     updateDraft(draft.row.id, { busy: true });
     try {
       const txnId = await confirmBankLineAsTransaction({
@@ -178,7 +183,7 @@ export default function BankReconciliation() {
         reconciliation_status: 'matched',
       } as TransactionRecord, ...prev]);
     } catch (e: any) {
-      alert(`⚠️ 入账失败：${e?.message || '请重试'}`);
+      alert(`${t.errConfirm}${e?.message || tf.common.retry}`);
       // Re-sync this line's real status from the server — a failure here
       // most likely means someone else already confirmed/matched it.
       const fresh = await bankStatementService.listLines(draft.row.import_id);
@@ -212,7 +217,7 @@ export default function BankReconciliation() {
       .slice(0, 5);
   };
 
-  const TIER_LABEL: Record<DateMatchTier, string> = { same_day: '同日', within_1_day: '±1天', within_3_days: '±3天' };
+  const TIER_LABEL: Record<DateMatchTier, string> = { same_day: t.tierSame, within_1_day: t.tier1, within_3_days: t.tier3 };
 
   const linkToExisting = async (draft: LineDraft, txn: TransactionRecord) => {
     if (draft.row.status !== 'pending') return;
@@ -221,7 +226,7 @@ export default function BankReconciliation() {
       setDrafts(prev => prev.map(d => (d.row.id === draft.row.id ? { ...d, row: { ...d.row, status: 'matched', matched_transaction_ref: txn.id } } : d)));
       setMatchingLineId(null);
     } catch (e: any) {
-      alert(`⚠️ 关联失败：${e?.message || '请重试'}`);
+      alert(`${t.errLink}${e?.message || tf.common.retry}`);
     }
   };
 
@@ -229,13 +234,13 @@ export default function BankReconciliation() {
     <div className="flex flex-col gap-6">
       <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6 flex flex-wrap items-end gap-4">
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5"><Landmark className="w-3 h-3" /> Bank Account</label>
+          <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5"><Landmark className="w-3 h-3" /> {tf.common.bankAccount}</label>
           <select value={accountId} onChange={e => setAccountId(e.target.value)} className="p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700 text-sm min-w-[220px]">
             {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
           </select>
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-slate-600 ">上传银行对账单 (CSV / PDF / 图片)</label>
+          <label className="text-xs font-bold text-slate-600 ">{t.upload}</label>
           <input
             ref={fileRef}
             type="file"
@@ -245,14 +250,14 @@ export default function BankReconciliation() {
             className="text-sm"
           />
         </div>
-        {uploading && <span className="text-xs font-bold text-[#7A5F2A] ">AI 解析中…</span>}
+        {uploading && <span className="text-xs font-bold text-[#7A5F2A] ">{t.parsing}</span>}
         {uploadError && <span className="text-xs font-bold text-red-600">{uploadError}</span>}
       </div>
 
       {drafts.length > 0 && (
         <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-            <span className="font-bold text-gray-800 text-xs ">{currentImport?.file_name} — {drafts.length} 笔</span>
+            <span className="font-bold text-gray-800 text-xs ">{t.lineCount.replace('{file}', currentImport?.file_name || '').replace('{n}', String(drafts.length))}</span>
           </div>
           <div className="divide-y divide-gray-50">
             {drafts.map(draft => {
@@ -260,10 +265,12 @@ export default function BankReconciliation() {
               const allCategories = r.direction === 'in'
                 ? [...INCOME_CATEGORIES, ...NON_OPERATING_INFLOW_CATEGORIES, ...TRANSFER_CATEGORIES]
                 : [...MANUAL_EXPENSE_CATEGORIES, { value: 'SUPPLIER_PAYMENT', label: 'Supplier Payment / 供应商付款' }, ...TRANSFER_CATEGORIES];
+              const dirLabel = r.direction === 'in' ? t.directionIn : r.direction === 'out' ? t.directionOut : r.direction;
+              const statusLabel = r.status === 'confirmed' ? t.statusConfirmed : r.status === 'matched' ? t.statusMatched : r.status === 'ignored' ? t.statusIgnored : r.status;
               return (
                 <div key={r.id} className="p-5 flex flex-wrap items-center gap-3">
                   <span className="text-xs font-mono-label text-slate-600 w-24 shrink-0">{r.line_date || '—'}</span>
-                  <span className={`text-xs px-2 py-1 rounded-md font-bold w-12 text-center shrink-0 ${r.direction === 'in' ? 'bg-[#3F7D58]/10 text-[#3F7D58]' : 'bg-[#E0846A]/10 text-[#c53030]'}`}>{r.direction}</span>
+                  <span className={`text-xs px-2 py-1 rounded-md font-bold w-12 text-center shrink-0 ${r.direction === 'in' ? 'bg-[#3F7D58]/10 text-[#3F7D58]' : 'bg-[#E0846A]/10 text-[#c53030]'}`}>{dirLabel}</span>
                   <span className="font-mono-label font-bold text-sm w-24 text-right shrink-0">{r.amount.toFixed(2)}</span>
                   <span className="text-xs text-slate-600 flex-1 min-w-[140px] truncate" title={r.bank_description}>{r.bank_description}</span>
 
@@ -274,11 +281,11 @@ export default function BankReconciliation() {
                         onChange={e => updateDraft(r.id, { category: e.target.value })}
                         className="p-2 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] text-xs font-bold text-gray-700 max-w-[160px]"
                       >
-                        <option value="">科目…</option>
-                        {allCategories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                        <option value="">{t.categoryPh}</option>
+                        {allCategories.map(c => <option key={c.value} value={c.value}>{catName(c)}</option>)}
                       </select>
                       <input
-                        placeholder="客户/供应商"
+                        placeholder={t.counterpartyPh}
                         value={draft.customerName || draft.supplierName}
                         onChange={e => {
                           if (r.direction === 'in') updateDraft(r.id, { customerName: e.target.value, customerId: '' });
@@ -292,21 +299,21 @@ export default function BankReconciliation() {
                         className="hidden"
                         onChange={e => { const f = e.target.files?.[0]; if (f) attachToLine(r.id, f); }}
                       />
-                      <button onClick={() => attachRefs.current[r.id]?.click()} className={`p-2 rounded-md ${r.storage_path ? 'text-[#3F7D58]' : 'text-slate-600 hover:text-gray-500'}`} title="上传补充凭证">
+                      <button onClick={() => attachRefs.current[r.id]?.click()} className={`p-2 rounded-md ${r.storage_path ? 'text-[#3F7D58]' : 'text-slate-600 hover:text-gray-500'}`} title={t.attachTitle}>
                         <Paperclip className="w-4 h-4" />
                       </button>
                       <button onClick={() => confirmLine(draft)} disabled={draft.busy} className="px-3 py-2 rounded-md bg-[#080D1E] text-white text-xs font-bold flex items-center gap-1 disabled:opacity-40">
-                        <Check className="w-3.5 h-3.5" /> 确认入账
+                        <Check className="w-3.5 h-3.5" /> {t.confirm}
                       </button>
                       <button onClick={() => setMatchingLineId(matchingLineId === r.id ? null : r.id)} className="px-3 py-2 rounded-md bg-gray-100 text-slate-600 text-xs font-bold flex items-center gap-1">
-                        <Link2 className="w-3.5 h-3.5" /> 关联已有
+                        <Link2 className="w-3.5 h-3.5" /> {t.linkExisting}
                       </button>
-                      <button onClick={() => ignoreLine(draft)} className="p-2 rounded-md text-slate-600 hover:text-red-500" title="忽略">
+                      <button onClick={() => ignoreLine(draft)} className="p-2 rounded-md text-slate-600 hover:text-red-500" title={t.ignore}>
                         <XCircle className="w-4 h-4" />
                       </button>
                     </>
                   ) : (
-                    <span className={`text-xs px-3 py-1.5 rounded-full font-bold ${r.status === 'confirmed' ? 'bg-[#3F7D58]/10 text-[#3F7D58]' : r.status === 'matched' ? 'bg-[#4A6090]/10 text-[#4A6090]' : 'bg-gray-100 text-slate-600'}`}>{r.status}</span>
+                    <span className={`text-xs px-3 py-1.5 rounded-full font-bold ${r.status === 'confirmed' ? 'bg-[#3F7D58]/10 text-[#3F7D58]' : r.status === 'matched' ? 'bg-[#4A6090]/10 text-[#4A6090]' : 'bg-gray-100 text-slate-600'}`}>{statusLabel}</span>
                   )}
 
                   {matchingLineId === r.id && (
@@ -317,7 +324,7 @@ export default function BankReconciliation() {
                           <span>{txn.date} · {txn.amount.toFixed(2)} · {txn.note} · {txn.ref_type}</span>
                         </button>
                       ))}
-                      {candidateMatches(draft).length === 0 && <p className="text-xs text-slate-600">3天内没有找到金额/账户/方向匹配的现有记录。</p>}
+                      {candidateMatches(draft).length === 0 && <p className="text-xs text-slate-600">{t.noMatch}</p>}
                     </div>
                   )}
                 </div>

@@ -10,6 +10,7 @@ import {
 } from '../services/bookkeepingService';
 import { INCOME_CATEGORIES, MANUAL_EXPENSE_CATEGORIES, NON_OPERATING_INFLOW_CATEGORIES, TRANSFER_CATEGORIES } from '../services/transactionCategories';
 import type { BankAccount } from '../types';
+import { useI18n } from '@gci/i18n';
 
 type Direction = 'in' | 'out';
 type PaymentContext = 'CASH' | 'BANK_TRANSFER' | 'CHEQUE';
@@ -28,6 +29,10 @@ interface ParsedVoucherFields {
 
 export default function VoucherEntry() {
   const [direction, setDirection] = useState<Direction>('out');
+  const { dict } = useI18n();
+  const tf = dict.trade.finance;
+  const t = tf.voucher;
+  const catName = (c: { value: string; label: string }) => (tf.categories as Record<string, string>)[c.value] || c.label;
   const [context, setContext] = useState<PaymentContext>('BANK_TRANSFER');
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [bankAccountId, setBankAccountId] = useState('');
@@ -38,6 +43,7 @@ export default function VoucherEntry() {
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   const [fields, setFields] = useState<ParsedVoucherFields>({});
   const [purposeNote, setPurposeNote] = useState('');
@@ -79,7 +85,7 @@ export default function VoucherEntry() {
         body: JSON.stringify({ mimeType, data: base64 }),
       });
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error || 'AI 解析失败');
+      if (!data.ok) throw new Error(data.error || t.errAi);
       const pf: ParsedVoucherFields = data.fields || {};
       setFields(pf);
       setPurposeNote(pf.description || '');
@@ -95,7 +101,7 @@ export default function VoucherEntry() {
         if (match) { setCpSelection({ ...emptyCustomerProjectSelection(), customerId: match.id, customerName: match.customer_name }); setLinkMode('customer'); }
       }
     } catch (e: any) {
-      setParseError(e?.message || '解析失败，可手动填写。');
+      setParseError(e?.message || t.errParse);
     } finally {
       setParsing(false);
     }
@@ -111,8 +117,8 @@ export default function VoucherEntry() {
 
   const submitAsPaid = async () => {
     if (!file) return;
-    if (!category) { alert('⚠️ 请选择科目分类。'); return; }
-    if (!fields.amount || fields.amount <= 0) { alert('⚠️ 金额无效，请手动填写。'); return; }
+    if (!category) { alert(t.errCategory); return; }
+    if (!fields.amount || fields.amount <= 0) { alert(t.errAmount); return; }
     setSubmitting(true);
     try {
       const { path, error } = await uploadFinanceFile('vouchers', file);
@@ -158,7 +164,7 @@ export default function VoucherEntry() {
       if (voucher) await financeVoucherService.update(voucher.id, { status: 'confirmed', resulting_transaction_ref: txn.id });
       setDone('transaction');
     } catch (e: any) {
-      alert(`⚠️ 入账失败：${e?.message || '请重试'}`);
+      alert(`${t.errPost}${e?.message || tf.common.retry}`);
     } finally {
       setSubmitting(false);
     }
@@ -166,7 +172,7 @@ export default function VoucherEntry() {
 
   const submitAsPayable = async () => {
     if (!file || !selectedSupplier) return;
-    if (!fields.amount || fields.amount <= 0) { alert('⚠️ 金额无效，请手动填写。'); return; }
+    if (!fields.amount || fields.amount <= 0) { alert(t.errAmount); return; }
     setSubmitting(true);
     try {
       const { path, error } = await uploadFinanceFile('vouchers', file);
@@ -197,12 +203,12 @@ export default function VoucherEntry() {
         invoiceNo: fields.invoice_no,
         notes: purposeNote,
       });
-      if (!payable) throw new Error('创建应付账款失败');
+      if (!payable) throw new Error(t.errCreatePayable);
 
       if (voucher) await financeVoucherService.update(voucher.id, { status: 'confirmed', resulting_payable_id: payable.id });
       setDone('payable');
     } catch (e: any) {
-      alert(`⚠️ 生成应付失败：${e?.message || '请重试'}`);
+      alert(`${t.errPayable}${e?.message || tf.common.retry}`);
     } finally {
       setSubmitting(false);
     }
@@ -217,36 +223,59 @@ export default function VoucherEntry() {
       <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6 space-y-5">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-600 ">凭证类型 / Voucher Type</label>
+            <label className="text-xs font-bold text-slate-600 ">{t.type}</label>
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => setDirection('in')} className={`p-3 rounded-md text-xs font-bold ${direction === 'in' ? 'bg-[#3F7D58] text-white' : 'bg-gray-100 text-slate-600'}`}>收入凭证 / In</button>
-              <button onClick={() => setDirection('out')} className={`p-3 rounded-md text-xs font-bold ${direction === 'out' ? 'bg-[#A85D45] text-white' : 'bg-gray-100 text-slate-600'}`}>支出凭证 / Out</button>
+              <button onClick={() => setDirection('in')} className={`p-3 rounded-md text-xs font-bold ${direction === 'in' ? 'bg-[#3F7D58] text-white' : 'bg-gray-100 text-slate-600'}`}>{t.typeIn}</button>
+              <button onClick={() => setDirection('out')} className={`p-3 rounded-md text-xs font-bold ${direction === 'out' ? 'bg-[#A85D45] text-white' : 'bg-gray-100 text-slate-600'}`}>{t.typeOut}</button>
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-600 ">Payment Context</label>
+            <label className="text-xs font-bold text-slate-600 ">{t.context}</label>
             <select value={context} onChange={e => setContext(e.target.value as PaymentContext)} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700 text-sm">
-              <option value="CASH">Cash</option>
-              <option value="BANK_TRANSFER">Bank Account</option>
-              <option value="CHEQUE">Cheque</option>
+              <option value="CASH">{t.cash}</option>
+              <option value="BANK_TRANSFER">{t.bankAccount}</option>
+              <option value="CHEQUE">{t.cheque}</option>
             </select>
           </div>
         </div>
 
         {context === 'BANK_TRANSFER' && (
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-600 ">Bank Account</label>
+            <label className="text-xs font-bold text-slate-600 ">{t.bankAccount}</label>
             <select value={bankAccountId} onChange={e => setBankAccountId(e.target.value)} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700 text-sm">
-              <option value="">选择账户…</option>
+              <option value="">{t.selectAccount}</option>
               {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
             </select>
           </div>
         )}
 
+        {/* Upload zone (UI only) — the whole zone is a <label> for the same
+            file input below, and drag & drop calls the same handleFile(). */}
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-slate-600 ">上传发票 / 小票 / 付款截图 / 收款截图</label>
-          <input ref={fileRef} type="file" accept="application/pdf,image/*" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} disabled={parsing} className="text-sm" />
-          {parsing && <p className="text-xs font-bold text-[#7A5F2A] flex items-center gap-1.5 pt-1"><FileClock className="w-3.5 h-3.5" /> AI 解析中…</p>}
+          <label
+            onDragOver={e => { e.preventDefault(); if (!parsing) setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={e => {
+              e.preventDefault();
+              setDragOver(false);
+              if (parsing) return;
+              const f = e.dataTransfer.files?.[0];
+              if (f && (f.type === 'application/pdf' || f.type.startsWith('image/') || f.name.toLowerCase().endsWith('.pdf'))) handleFile(f);
+            }}
+            className={`block rounded-[10px] border-2 border-dashed p-6 text-center transition-all ${parsing ? 'cursor-wait opacity-90' : 'cursor-pointer hover:border-[#CBA85C]'} ${dragOver ? 'border-[#CBA85C] bg-[#CBA85C]/10' : 'border-[#CBA85C]/50 bg-[#F5F6FA]'}`}
+          >
+            <input ref={fileRef} type="file" accept="application/pdf,image/*" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} disabled={parsing} className="hidden" />
+            <div className="w-12 h-12 rounded-full bg-[#CBA85C]/15 flex items-center justify-center mx-auto mb-3">
+              {parsing ? <FileClock className="w-6 h-6 text-[#7A5F2A] animate-pulse" /> : <Upload className="w-6 h-6 text-[#7A5F2A]" />}
+            </div>
+            <p className="text-sm font-bold text-[#0C1B3A]">{t.upload}</p>
+            <p className="text-xs mt-1 text-slate-600">{t.uploadHint}</p>
+            {!file && <p className="text-xs font-bold text-[#7A5F2A] mt-3">{t.uploadCta}</p>}
+            {file && (
+              <p className="text-xs font-bold text-[#7A5F2A] mt-3 truncate" title={file.name}>{t.selectedFile}{file.name}</p>
+            )}
+            {parsing && <p className="text-xs font-bold text-[#0C1B3A] mt-2 flex items-center justify-center gap-1.5"><FileClock className="w-3.5 h-3.5 text-[#7A5F2A]" /> {t.parsing}</p>}
+          </label>
           {parseError && <p className="text-xs font-bold text-red-600 pt-1">{parseError}</p>}
         </div>
       </div>
@@ -255,48 +284,48 @@ export default function VoucherEntry() {
         <div className="bg-white rounded-[10px] shadow-sm border border-gray-100 p-6 space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-600 ">Date</label>
+              <label className="text-xs font-bold text-slate-600 ">{t.date}</label>
               <input type="date" value={fields.date || ''} onChange={e => setFields(f => ({ ...f, date: e.target.value }))} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono-label" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-600 ">Amount</label>
+              <label className="text-xs font-bold text-slate-600 ">{t.amount}</label>
               <input type="number" step="0.01" value={fields.amount ?? ''} onChange={e => setFields(f => ({ ...f, amount: Number(e.target.value) }))} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono-label" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-600 ">Invoice No</label>
+              <label className="text-xs font-bold text-slate-600 ">{t.invoiceNo}</label>
               <input value={fields.invoice_no || ''} onChange={e => setFields(f => ({ ...f, invoice_no: e.target.value }))} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-600 ">VAT Amount</label>
+              <label className="text-xs font-bold text-slate-600 ">{t.vat}</label>
               <input type="number" step="0.01" value={fields.vat_amount ?? ''} onChange={e => setFields(f => ({ ...f, vat_amount: Number(e.target.value) }))} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono-label" />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-600 ">用途 / 备注 / Purpose</label>
+            <label className="text-xs font-bold text-slate-600 ">{t.purpose}</label>
             <input value={purposeNote} onChange={e => setPurposeNote(e.target.value)} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-600 ">科目 Category *</label>
+              <label className="text-xs font-bold text-slate-600 ">{t.categoryReq}</label>
               <select value={category} onChange={e => setCategory(e.target.value)} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] bg-white font-bold text-gray-700">
-                <option value="">选择分类…</option>
-                {categoryOptions.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                <option value="">{tf.common.selectCategory}</option>
+                {categoryOptions.map(c => <option key={c.value} value={c.value}>{catName(c)}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-600 ">Subcategory（可选）</label>
+              <label className="text-xs font-bold text-slate-600 ">{t.subcatOpt}</label>
               <input value={subcategory} onChange={e => setSubcategory(e.target.value)} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700" />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-600 ">关联 Link（可选）</label>
+            <label className="text-xs font-bold text-slate-600 ">{tf.common.linkOptional}</label>
             <div className="grid grid-cols-3 gap-2">
               {(['none', 'customer', 'supplier'] as const).map(m => (
                 <button key={m} onClick={() => setLinkMode(m)} className={`p-2.5 rounded-md text-xs font-bold ${linkMode === m ? 'bg-[#080D1E] text-white' : 'bg-gray-100 text-slate-600'}`}>
-                  {m === 'none' ? '不关联' : m === 'customer' ? '客户/项目' : '供应商'}
+                  {m === 'none' ? tf.common.linkNone : m === 'customer' ? tf.common.linkCustomer : tf.common.linkSupplier}
                 </button>
               ))}
             </div>
@@ -306,11 +335,11 @@ export default function VoucherEntry() {
 
           {linkMode === 'supplier' && (
             <div className="space-y-1.5 relative">
-              <label className="text-xs font-bold text-slate-600 ">Supplier</label>
+              <label className="text-xs font-bold text-slate-600 ">{tf.common.supplier}</label>
               <input
                 value={selectedSupplier ? selectedSupplier.supplier_name_display : supplierQuery}
                 onChange={e => { setSupplierQuery(e.target.value); setSelectedSupplier(null); }}
-                placeholder="搜索供应商名称…"
+                placeholder={tf.common.searchSupplier}
                 className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700"
               />
               {!selectedSupplier && supplierQuery.trim() && filteredSuppliers.length > 0 && (
@@ -324,7 +353,7 @@ export default function VoucherEntry() {
               )}
               {direction === 'out' && selectedSupplier && (
                 <div className="pt-2">
-                  <label className="text-xs font-bold text-slate-600 ">Due Date（未付款时使用，可选）</label>
+                  <label className="text-xs font-bold text-slate-600 ">{t.dueDateOpt}</label>
                   <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full p-3 border border-gray-300 rounded-md outline-none focus:border-[#CBA85C] font-bold text-gray-700 font-mono-label mt-1" />
                 </div>
               )}
@@ -333,11 +362,11 @@ export default function VoucherEntry() {
 
           <div className="flex gap-3 pt-2">
             <button onClick={submitAsPaid} disabled={submitting} className="flex-1 flex items-center justify-center gap-2 py-4 rounded-md bg-[#080D1E] text-white font-bold text-xs disabled:opacity-40">
-              <Check className="w-4 h-4" /> {submitting ? '处理中…' : '已付款 → 生成正式账'}
+              <Check className="w-4 h-4" /> {submitting ? t.processing : t.submitPaid}
             </button>
             {direction === 'out' && linkMode === 'supplier' && selectedSupplier && (
               <button onClick={submitAsPayable} disabled={submitting} className="flex-1 flex items-center justify-center gap-2 py-4 rounded-md bg-gray-100 text-gray-700 font-bold text-xs disabled:opacity-40">
-                <Upload className="w-4 h-4" /> {submitting ? '处理中…' : '未付款 → 生成应付账款'}
+                <Upload className="w-4 h-4" /> {submitting ? t.processing : t.submitUnpaid}
               </button>
             )}
           </div>
@@ -346,8 +375,8 @@ export default function VoucherEntry() {
 
       {done && (
         <div className="bg-[#3F7D58]/5 border border-[#3F7D58]/20 rounded-[10px] p-6 flex items-center justify-between">
-          <p className="text-sm font-bold text-[#3F7D58]">{done === 'transaction' ? '已生成正式 transaction。' : '已生成供应商应付账款（Payable）。'}</p>
-          <button onClick={reset} className="px-4 py-2 rounded-md bg-white border border-gray-200 text-gray-600 text-xs font-bold ">继续录入下一笔</button>
+          <p className="text-sm font-bold text-[#3F7D58]">{done === 'transaction' ? t.doneTxn : t.donePayable}</p>
+          <button onClick={reset} className="px-4 py-2 rounded-md bg-white border border-gray-200 text-gray-600 text-xs font-bold ">{t.next}</button>
         </div>
       )}
     </div>

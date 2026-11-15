@@ -239,7 +239,7 @@ export function InvoicePage() {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
           <div>
             <h1 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 30, fontWeight: 600, color: TEXT, margin: '0 0 6px', letterSpacing: '-0.01em' }}>
-              Invoice Manager
+              {t.title}
             </h1>
             <p style={{ fontSize: 14, color: MUTED, margin: 0 }}>
               {t.subtitle}

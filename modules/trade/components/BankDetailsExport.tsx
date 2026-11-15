@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, Copy, FileDown, Check } from 'lucide-react';
 import { colors, logoGradient } from '@gci/design-system';
 import type { BankAccount } from '../types';
+import { useI18n } from '@gci/i18n';
 
 /**
  * Bank details export (Finance V1, 2026-09) — a client-facing "Company Bank
@@ -101,6 +102,8 @@ interface BankDetailsModalProps {
 export function BankDetailsModal({ account, onClose, onExportPdf }: BankDetailsModalProps) {
   const cardRef = React.useRef<HTMLDivElement>(null);
   const [copied, setCopied] = React.useState(false);
+  const { dict } = useI18n();
+  const tb = dict.trade.finance.bankDetails;
   const [exporting, setExporting] = React.useState(false);
 
   // Lock background page scroll while this modal is mounted (the parent
@@ -121,7 +124,7 @@ export function BankDetailsModal({ account, onClose, onExportPdf }: BankDetailsM
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch (e) {
-      alert('复制失败，请手动选中文本复制。');
+      alert(tb.errCopy);
     }
   };
 
@@ -131,7 +134,7 @@ export function BankDetailsModal({ account, onClose, onExportPdf }: BankDetailsM
     try {
       await onExportPdf(cardRef.current, account);
     } catch (e: any) {
-      alert(`导出失败：${e?.message || '未知错误'}`);
+      alert(`${tb.errExport}${e?.message || dict.trade.finance.common.unknownError}`);
     } finally {
       setExporting(false);
     }
@@ -149,7 +152,7 @@ export function BankDetailsModal({ account, onClose, onExportPdf }: BankDetailsM
         style={{ maxHeight: 'calc(100dvh - 32px)', maxWidth: 760 }}
       >
         <div className="shrink-0 flex items-center justify-between px-8 pt-8 pb-5">
-          <h3 className="text-sm font-black text-[#080D1E] uppercase tracking-[0.2em]">银行信息 / Bank Details</h3>
+          <h3 className="text-sm font-black text-[#080D1E] uppercase tracking-[0.2em]">{tb.title}</h3>
           <button onClick={onClose} className="text-gray-300 hover:text-gray-600 shrink-0">
             <X className="w-5 h-5" />
           </button>
@@ -172,7 +175,7 @@ export function BankDetailsModal({ account, onClose, onExportPdf }: BankDetailsM
             className="flex items-center justify-center gap-2 py-4 rounded-[20px] bg-gray-100 text-gray-700 font-black text-[10px] uppercase hover:bg-gray-200 transition-all"
           >
             {copied ? <Check className="w-4 h-4 text-[#3F7D58]" /> : <Copy className="w-4 h-4" />}
-            {copied ? '已复制' : 'Copy Bank Details'}
+            {copied ? tb.copied : tb.copy}
           </button>
           <button
             onClick={handleExport}
@@ -180,7 +183,7 @@ export function BankDetailsModal({ account, onClose, onExportPdf }: BankDetailsM
             className="flex items-center justify-center gap-2 py-4 rounded-[20px] bg-[#080D1E] text-white font-black text-[10px] uppercase hover:bg-[#CBA85C] transition-all disabled:opacity-40"
           >
             <FileDown className="w-4 h-4" />
-            {exporting ? '导出中...' : 'Export PDF'}
+            {exporting ? dict.trade.finance.common.exporting : tb.exportPdf}
           </button>
         </div>
       </div>

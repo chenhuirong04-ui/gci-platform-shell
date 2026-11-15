@@ -1,5 +1,6 @@
 import React from 'react';
 import type { BankAccount, ChequeStatus, PaymentMethod, TransactionRecord } from '../types';
+import { useI18n } from '@gci/i18n';
 
 /**
  * Shared payment-method form fragment (Finance V1, 2026-09).
@@ -151,6 +152,8 @@ export function PaymentMethodFields({ value, onChange, accounts, compact, type }
   const set = <K extends keyof PaymentMethodFormValue>(key: K, v: PaymentMethodFormValue[K]) =>
     onChange({ ...value, [key]: v });
   const gap = compact ? 'space-y-3' : 'space-y-5';
+  const { dict } = useI18n();
+  const t = dict.trade.finance.payFields;
   const labelCls = 'text-[10px] font-black text-gray-400 uppercase tracking-widest';
   const inputCls = 'w-full p-4 border border-gray-300 rounded-xl outline-none focus:border-[#CBA85C] font-bold text-gray-700';
 
@@ -159,34 +162,34 @@ export function PaymentMethodFields({ value, onChange, accounts, compact, type }
   return (
     <div className={gap}>
       <div className="space-y-1.5">
-        <label className={labelCls}>Payment Method / 收付款方式</label>
+        <label className={labelCls}>{t.method}</label>
         <select
           className={inputCls}
           value={value.payment_method}
           onChange={e => onChange({ ...value, payment_method: e.target.value as PaymentMethod })}
         >
-          <option value="CASH">CASH / 现金</option>
-          <option value="BANK_TRANSFER">BANK_TRANSFER / 银行转账</option>
-          <option value="CHEQUE">CHEQUE / 支票</option>
+          <option value="CASH">{t.cash}</option>
+          <option value="BANK_TRANSFER">{t.bankTransfer}</option>
+          <option value="CHEQUE">{t.cheque}</option>
         </select>
       </div>
 
       {value.payment_method === 'CASH' && (
         <p className="text-xs text-slate-600 px-1">
-          将自动记到系统里唯一启用中的 Cash 账户——如果没有 Cash 账户，或者有不止一个，提交时会提示，不会自动乱选。
+          {t.cashHint}
         </p>
       )}
 
       {value.payment_method === 'BANK_TRANSFER' && (
         <div className="space-y-1.5">
-          <label className={labelCls}>Bank Account / 银行账户</label>
+          <label className={labelCls}>{t.bankAccount}</label>
           {bankAccounts.length === 0 ? (
             <p className="text-xs text-[#c53030] font-bold px-1">
-              没有可选的银行账户，请先去"银行账户"新建一个 Corporate/Personal/Other 账户。
+              {t.noBankAccounts}
             </p>
           ) : (
             <select className={inputCls} value={value.bank_account_id} onChange={e => set('bank_account_id', e.target.value)}>
-              <option value="">请选择账户…</option>
+              <option value="">{t.selectAccount}</option>
               {bankAccounts.map(a => (
                 <option key={a.id} value={a.id}>{formatAccountOption(a)}</option>
               ))}
@@ -199,43 +202,43 @@ export function PaymentMethodFields({ value, onChange, accounts, compact, type }
         <>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className={labelCls}>Cheque Number</label>
+              <label className={labelCls}>{t.chequeNumber}</label>
               <input className={inputCls + ' font-mono-label'} value={value.cheque_number} onChange={e => set('cheque_number', e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <label className={labelCls}>Cheque Date</label>
+              <label className={labelCls}>{t.chequeDate}</label>
               <input type="date" className={inputCls + ' font-mono-label'} value={value.cheque_date} onChange={e => set('cheque_date', e.target.value)} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className={labelCls}>Cheque Bank</label>
+              <label className={labelCls}>{t.chequeBank}</label>
               <input className={inputCls} placeholder="e.g. Emirates NBD" value={value.cheque_bank} onChange={e => set('cheque_bank', e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <label className={labelCls}>Cheque Amount</label>
+              <label className={labelCls}>{t.chequeAmount}</label>
               <input type="number" step="0.01" className={inputCls + ' font-mono-label'} value={value.cheque_amount} onChange={e => set('cheque_amount', e.target.value)} />
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className={labelCls}>Cheque Status</label>
+            <label className={labelCls}>{t.chequeStatus}</label>
             <select className={inputCls} value={value.cheque_status} onChange={e => set('cheque_status', e.target.value as ChequeStatus)}>
-              <option value="PENDING">PENDING / 待清算</option>
-              <option value="CLEARED">CLEARED / 已清算</option>
-              <option value="BOUNCED">BOUNCED / 退票</option>
-              <option value="CANCELLED">CANCELLED / 作废</option>
+              <option value="PENDING">{t.statusPending}</option>
+              <option value="CLEARED">{t.statusCleared}</option>
+              <option value="BOUNCED">{t.statusBounced}</option>
+              <option value="CANCELLED">{t.statusCancelled}</option>
             </select>
           </div>
           {type === 'out' ? (
             // Issued From — required at creation time, not just once
             // Cleared, since it's the account the cheque is drawn against.
             <div className="space-y-1.5">
-              <label className={labelCls}>Issued From / 开票账户</label>
+              <label className={labelCls}>{t.issuedFrom}</label>
               {bankAccounts.length === 0 ? (
-                <p className="text-xs text-[#c53030] font-bold px-1">没有可选的银行账户，请先去"银行账户"新建一个。</p>
+                <p className="text-xs text-[#c53030] font-bold px-1">{t.noBankAccountsShort}</p>
               ) : (
                 <select className={inputCls} value={value.issued_from_bank_account_id} onChange={e => set('issued_from_bank_account_id', e.target.value)}>
-                  <option value="">请选择账户…</option>
+                  <option value="">{t.selectAccount}</option>
                   {bankAccounts.map(a => (
                     <option key={a.id} value={a.id}>{formatAccountOption(a)}</option>
                   ))}
@@ -245,12 +248,12 @@ export function PaymentMethodFields({ value, onChange, accounts, compact, type }
           ) : (
             value.cheque_status === 'CLEARED' && (
               <div className="space-y-1.5">
-                <label className={labelCls}>Deposited To / 存入账户</label>
+                <label className={labelCls}>{t.depositedTo}</label>
                 {bankAccounts.length === 0 ? (
-                  <p className="text-xs text-[#c53030] font-bold px-1">没有可选的银行账户，请先去"银行账户"新建一个。</p>
+                  <p className="text-xs text-[#c53030] font-bold px-1">{t.noBankAccountsShort}</p>
                 ) : (
                   <select className={inputCls} value={value.deposited_to_bank_account_id} onChange={e => set('deposited_to_bank_account_id', e.target.value)}>
-                    <option value="">请选择账户…</option>
+                    <option value="">{t.selectAccount}</option>
                     {bankAccounts.map(a => (
                       <option key={a.id} value={a.id}>{formatAccountOption(a)}</option>
                     ))}
@@ -263,9 +266,9 @@ export function PaymentMethodFields({ value, onChange, accounts, compact, type }
             <p className="text-xs text-slate-600 px-1">
               {value.cheque_status === 'PENDING'
                 ? (type === 'out'
-                    ? '支票 Cleared 之前不减少开票账户余额；后续可以在"待清算支票"列表里把它标记为已清算。'
-                    : '支票 Cleared 之前不计入任何账户余额；后续可以在"待清算支票"列表里把它标记为已清算。')
-                : '退票/作废的支票不计入任何账户余额。'}
+                    ? t.hintPendingOut
+                    : t.hintPendingIn)
+                : t.hintVoid}
             </p>
           )}
         </>

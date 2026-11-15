@@ -9,6 +9,7 @@ import { roundTo2 } from '../services/currencyUtils';
 import { persistence } from '../services/persistenceService';
 import { cloudDb } from '../services/cloudDb'; // ✅ NEW: Supabase
 import { colors, workspace } from '@gci/design-system';
+import { useI18n } from '@gci/i18n';
 
 const GOLD = colors.goldBase;
 const NAVY = colors.bgBase;
@@ -27,6 +28,9 @@ interface CashFlowEntry {
 
 const CashFlowDashboard: React.FC = () => {
   const [activeView, setActiveView] = useState<'daily' | 'monthly'>('daily');
+  const { dict } = useI18n();
+  const t = dict.trade.finance.cashflow;
+  const typeLabel: Record<FlowType, string> = { SALE: t.typeSale, CONSIGNMENT: t.typeConsignment, ADJUSTMENT: t.typeAdjustment };
   const [flows, setFlows] = useState<CashFlowEntry[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -195,22 +199,22 @@ const CashFlowDashboard: React.FC = () => {
   return (
     <div className="flex flex-col gap-8 animate-in fade-in duration-500 pb-20">
       {/* FINANCE 分区页面标题 */}
-      <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>资金流水</h1>
+      <h1 className="text-2xl font-semibold" style={{ color: '#0F172A', fontFamily: "'Space Grotesk',sans-serif" }}>{t.title}</h1>
       {/* Header Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="bg-white p-10 rounded-[10px] border border-gray-100 shadow-sm relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-all"><TrendingUp className="w-16 h-16" style={{ color: colors.statusSuccess }} /></div>
-          <p className="text-xs font-bold text-slate-600 mb-2">Total Sale Inflow (AED)</p>
+          <p className="text-xs font-bold text-slate-600 mb-2">{t.totalInflow}</p>
           <p className="text-4xl font-bold font-mono-label tracking-tighter leading-none" style={{ color: '#3F7D58' }}>{stats.totalInflow.toFixed(2)}</p>
         </div>
         <div className="bg-white p-10 rounded-[10px] border border-gray-100 shadow-sm relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-all"><Activity className="w-16 h-16" style={{ color: colors.statusWarning }} /></div>
-          <p className="text-xs font-bold text-slate-600 mb-2">Total Adjustments (AED)</p>
+          <p className="text-xs font-bold text-slate-600 mb-2">{t.totalAdj}</p>
           <p className="text-4xl font-bold font-mono-label tracking-tighter leading-none" style={{ color: workspace.accentText }}>{stats.totalAdj.toFixed(2)}</p>
         </div>
         <div className="bg-[#080D1E] p-10 rounded-[10px] shadow-2xl text-white relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-all"><Wallet className="w-16 h-16" /></div>
-          <p className="text-xs font-bold mb-2" style={{ color: workspace.accentText }}>Net Business Flow (AED)</p>
+          <p className="text-xs font-bold mb-2" style={{ color: workspace.accentText }}>{t.net}</p>
           <p className="text-4xl font-bold font-mono-label tracking-tighter leading-none">{stats.net.toFixed(2)}</p>
         </div>
       </div>
@@ -222,14 +226,14 @@ const CashFlowDashboard: React.FC = () => {
           className="px-8 py-4 rounded-md text-xs font-bold transition-all flex items-center gap-3"
           style={activeView === 'daily' ? { backgroundColor: NAVY, color: '#fff', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' } : { color: '#9CA3AF' }}
         >
-          <Calendar className="w-4 h-4" /> Daily Flow
+          <Calendar className="w-4 h-4" /> {t.daily}
         </button>
         <button
           onClick={() => setActiveView('monthly')}
           className="px-8 py-4 rounded-md text-xs font-bold transition-all flex items-center gap-3"
           style={activeView === 'monthly' ? { backgroundColor: NAVY, color: '#fff', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' } : { color: '#9CA3AF' }}
         >
-          <BarChart3 className="w-4 h-4" /> Monthly Review
+          <BarChart3 className="w-4 h-4" /> {t.monthly}
         </button>
       </div>
 
@@ -238,7 +242,7 @@ const CashFlowDashboard: React.FC = () => {
         <Search className="w-5 h-5 text-slate-600" />
         <input
           type="text"
-          placeholder="Search by customer, order or note..."
+          placeholder={t.search}
           value={searchTerm}
           onChange={e => setSearchTerm(e.target.value)}
           className="flex-1 bg-transparent border-none outline-none font-bold text-sm tracking-tight"
@@ -257,20 +261,20 @@ const CashFlowDashboard: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-gray-800 tracking-tighter">{day.date}</h3>
-                    <p className="text-xs font-bold text-slate-600 ">Business Day Summary</p>
+                    <p className="text-xs font-bold text-slate-600 ">{t.daySummary}</p>
                   </div>
                 </div>
                 <div className="flex gap-8">
                   <div className="text-center">
-                    <p className="text-xs font-bold mb-1" style={{ color: colors.statusSuccess }}>Inflow</p>
+                    <p className="text-xs font-bold mb-1" style={{ color: colors.statusSuccess }}>{t.inflow}</p>
                     <p className="text-lg font-bold font-mono-label" style={{ color: '#3F7D58' }}>+{day.inflow.toFixed(2)}</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-xs font-bold mb-1" style={{ color: colors.statusWarning }}>Adj</p>
+                    <p className="text-xs font-bold mb-1" style={{ color: colors.statusWarning }}>{t.adj}</p>
                     <p className="text-lg font-bold font-mono-label" style={{ color: workspace.accentText }}>{day.adjustment.toFixed(2)}</p>
                   </div>
                   <div className="text-center border-l border-gray-200 pl-8">
-                    <p className="text-xs font-bold mb-1" style={{ color: workspace.accentText }}>Net Flow</p>
+                    <p className="text-xs font-bold mb-1" style={{ color: workspace.accentText }}>{t.netFlow}</p>
                     <p className="text-lg font-bold text-[#080D1E] font-mono-label">{day.net.toFixed(2)}</p>
                   </div>
                 </div>
@@ -279,11 +283,11 @@ const CashFlowDashboard: React.FC = () => {
                 <table className="w-full text-left">
                   <thead className="bg-gray-50/30 text-xs font-bold text-slate-600 border-b">
                     <tr>
-                      <th className="px-8 py-4 w-24">Type</th>
-                      <th className="px-8 py-4 w-32">Ref No.</th>
-                      <th className="px-8 py-4">Customer</th>
-                      <th className="px-8 py-4">Memo / Details</th>
-                      <th className="px-8 py-4 text-right">Amount (AED)</th>
+                      <th className="px-8 py-4 w-24">{t.colType}</th>
+                      <th className="px-8 py-4 w-32">{t.colRef}</th>
+                      <th className="px-8 py-4">{t.colCustomer}</th>
+                      <th className="px-8 py-4">{t.colMemo}</th>
+                      <th className="px-8 py-4 text-right">{t.colAmount}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -295,7 +299,7 @@ const CashFlowDashboard: React.FC = () => {
                             item.type === 'CONSIGNMENT' ? 'bg-[#8FA6D4]/15 text-[#4A6090] border-[#8FA6D4]/30' :
                             'bg-[#D9B45A]/15 text-[#7A5F2A] border-[#D9B45A]/30'
                           }`}>
-                            {item.type}
+                            {typeLabel[item.type] || item.type}
                           </span>
                         </td>
                         <td className="px-8 py-4 font-mono-label text-xs font-bold" style={{ color: workspace.accentText }}>{item.reference_no}</td>
@@ -312,7 +316,7 @@ const CashFlowDashboard: React.FC = () => {
             </div>
           ))}
           {dailyAggregates.length === 0 && (
-            <div className="py-40 text-center text-gray-200 text-xs font-bold ">No cash movements recorded</div>
+            <div className="py-40 text-center text-gray-200 text-xs font-bold ">{t.noDaily}</div>
           )}
         </div>
       ) : (
@@ -324,7 +328,7 @@ const CashFlowDashboard: React.FC = () => {
                 <div className="flex justify-between items-start mb-10">
                   <div>
                     <h3 className="text-2xl font-bold text-[#080D1E] tracking-tighter ">{month.month}</h3>
-                    <p className="text-xs font-bold text-slate-600 ">Monthly Performance Review</p>
+                    <p className="text-xs font-bold text-slate-600 ">{t.monthlyReview}</p>
                   </div>
                   <div className="p-4 rounded-[10px]" style={{ backgroundColor: `${GOLD}15`, color: workspace.accentText }}>
                     <BarChart3 className="w-6 h-6" />
@@ -332,19 +336,19 @@ const CashFlowDashboard: React.FC = () => {
                 </div>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center py-3 border-b border-gray-50">
-                    <span className="text-xs font-bold text-slate-600 flex items-center gap-2"><ArrowUpRight className="w-3 h-3" /> Total Inflow</span>
+                    <span className="text-xs font-bold text-slate-600 flex items-center gap-2"><ArrowUpRight className="w-3 h-3" /> {t.mTotalInflow}</span>
                     <span className="font-mono-label font-bold" style={{ color: '#3F7D58' }}>AED {month.inflow.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center py-3 border-b border-gray-50">
-                    <span className="text-xs font-bold text-slate-600 flex items-center gap-2"><PackageCheck className="w-3 h-3" /> Consignment Portion</span>
+                    <span className="text-xs font-bold text-slate-600 flex items-center gap-2"><PackageCheck className="w-3 h-3" /> {t.mConsignment}</span>
                     <span className="font-mono-label font-bold" style={{ color: '#4A6090' }}>AED {month.consignment.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center py-3 border-b border-gray-50">
-                    <span className="text-xs font-bold text-slate-600 flex items-center gap-2"><History className="w-3 h-3" /> Adjustments</span>
+                    <span className="text-xs font-bold text-slate-600 flex items-center gap-2"><History className="w-3 h-3" /> {t.mAdjustments}</span>
                     <span className="font-mono-label font-bold" style={{ color: month.adjustment < 0 ? '#A85D45' : '#8A6D2F' }}>AED {month.adjustment.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center pt-6">
-                    <span className="text-xs font-bold text-[#080D1E] ">Monthly Net Flow</span>
+                    <span className="text-xs font-bold text-[#080D1E] ">{t.mNet}</span>
                     <span className="text-3xl font-bold text-[#080D1E] font-mono-label tracking-tighter leading-none">AED {month.net.toFixed(2)}</span>
                   </div>
                 </div>
@@ -352,7 +356,7 @@ const CashFlowDashboard: React.FC = () => {
             </div>
           ))}
           {monthlyAggregates.length === 0 && (
-            <div className="col-span-full py-40 text-center text-gray-200 text-xs font-bold ">No monthly records found</div>
+            <div className="col-span-full py-40 text-center text-gray-200 text-xs font-bold ">{t.noMonthly}</div>
           )}
         </div>
       )}
@@ -360,7 +364,7 @@ const CashFlowDashboard: React.FC = () => {
       {/* Footer Info */}
       <div className="flex items-center justify-center gap-4 text-slate-600 py-10">
         <Info className="w-4 h-4" />
-        <span className="text-xs font-bold ">Data is aggregated from cloud (Supabase) with local fallback.</span>
+        <span className="text-xs font-bold ">{t.footer}</span>
       </div>
     </div>
   );
