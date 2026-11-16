@@ -23,6 +23,7 @@ const SUPPLIERS = [
   { id: 'r4', status: 'under_review', supplier_name_display: 'FES Workforce Solutions L.L.C.', supplier_type: 'Agent', country: 'UAE', product_categories: ['Manpower Recruitment', 'Construction Workforce'] },
   { id: 'r5', status: 'under_review', supplier_name_display: 'Emirates Strategic L.L.C-FZ', supplier_type: 'Trading', country: 'UAE', product_categories: ['Trading / Sourcing / Business Facilitation', '印度劳工招聘对接'] },
   { id: 'r6', status: 'under_review', supplier_name_display: 'Smart Hire Human Resources Consultancy', supplier_type: 'Service', country: 'UAE', product_categories: ['UAE Visa Sponsorship', 'Manpower Services'] },
+  { id: 'c1', status: 'under_review', supplier_name_display: 'NAD Furniture (New Age Designs)', supplier_type: 'Trading', country: 'UAE', product_categories: ['劳工营家具'] },
   { id: 'x1', status: 'archived', supplier_name_display: 'Old Manpower Agent (archived)', supplier_type: 'Agent', country: 'Nepal', product_categories: ['海外劳务招聘'] },
 ];
 
@@ -78,7 +79,7 @@ test('有几个劳务供应商 → keyword 劳务, all labour agents (incl. unde
     'Dakshinkali Manpower Suppliers (P) Ltd.', 'Emirates Strategic L.L.C-FZ', 'FES Workforce Solutions L.L.C.',
     'Infinite Talent', 'Recruit Me Pvt Ltd', 'Smart Hire Human Resources Consultancy',
   ]);
-  assert.ok(!names.some(n => /Vision Carpets|Multipack|Moni Happy|archived/.test(n)));
+  assert.ok(!names.some(n => /Vision Carpets|Multipack|Moni Happy|archived|NAD Furniture/.test(n))); // 劳工营 suppliers are not labour agents
 });
 
 test('under_review results are labelled; archived never included', async () => {

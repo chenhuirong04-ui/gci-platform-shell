@@ -80,11 +80,11 @@ const PRODUCT_SYNONYMS: Record<string, { term: string; categories: string[] }> =
   '地毯': { term: '地毯', categories: ['carpet', 'furniture', 'FF&E'] },
   '灯具': { term: '灯具', categories: ['lighting', 'building materials'] },
   // Labour / manpower agents (categories such as 海外劳务招聘, 印度劳工招聘对接, Manpower Recruitment)
-  '劳务': { term: '劳务', categories: ['劳务', '劳工', 'manpower', 'recruitment'] },
-  '劳工': { term: '劳务', categories: ['劳务', '劳工', 'manpower', 'recruitment'] },
-  '人力': { term: '劳务', categories: ['劳务', '劳工', 'manpower', 'recruitment'] },
-  'manpower': { term: 'manpower', categories: ['劳务', '劳工', 'manpower', 'recruitment'] },
-  'labour': { term: 'manpower', categories: ['劳务', '劳工', 'manpower', 'recruitment'] },
+  '劳务': { term: '劳务', categories: ['劳务', '劳工招聘', 'manpower', 'recruitment'] },
+  '劳工': { term: '劳务', categories: ['劳务', '劳工招聘', 'manpower', 'recruitment'] },
+  '人力': { term: '劳务', categories: ['劳务', '劳工招聘', 'manpower', 'recruitment'] },
+  'manpower': { term: 'manpower', categories: ['劳务', '劳工招聘', 'manpower', 'recruitment'] },
+  'labour': { term: 'manpower', categories: ['劳务', '劳工招聘', 'manpower', 'recruitment'] },
 };
 
 // ── Simple category-name alias map (for queries without product synonym match) ─
