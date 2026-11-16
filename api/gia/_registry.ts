@@ -5,16 +5,15 @@
 // the caller's own Authorization header, so the endpoint's requireModule
 // check and data access run exactly as they do for the UI today.
 //
-// Permission policy (canUseTool):
-//   - Admin (role_label === 'Admin') may use every tool. The underlying
-//     endpoint still runs its own requireModule (no Admin bypass there), so
-//     an Admin without that endpoint's module still gets the endpoint's 403.
-//   - Non-sensitive tool: the caller needs one of `modules` — identical to
-//     the endpoint's own requireModule list.
-//   - Sensitive tool (finance / sales / receivables / cost / margin data):
-//     the caller ALSO needs the `finance` module. This is deliberately
-//     stricter than the endpoint, whose OR-list (trade | crm | …) lets
-//     ordinary staff through; see `stricterThanEndpoint`.
+// Permission policy (canUseTool) — IDENTICAL to each wrapped endpoint: the
+// caller needs one of `modules`, which is exactly that endpoint's own
+// requireModule list. Like requireModule (api/_lib/auth.ts) there is no
+// Admin bypass: access comes only from user_profiles.modules; role labels
+// (Admin / Editor / …) grant no module by themselves. So the dispatch never
+// denies anyone the endpoint itself would allow, and never allows more.
+// `sensitive` is a label only (cost / margin / sales / receivables data)
+// for later phases. It is deliberately NOT enforced: a stricter rule could
+// block an existing user (LILI, Editor) from data she can read today.
 //
 // No imports: this file must stay free of handlers, env and network so it
 // can be unit-tested in isolation.
@@ -22,7 +21,6 @@
 export type GiaArgSpec = { name: string; required: boolean };
 
 export interface GiaToolAuthView {
-  isAdmin: boolean;
   modules: string[];
 }
 
@@ -34,14 +32,12 @@ export interface GiaTool {
   method: 'GET' | 'POST';
   /** The endpoint's own requireModule list (caller needs one of them). */
   modules: string[];
-  /** Finance / sales / receivables / cost / margin data → needs `finance` too. */
+  /** Label only, NOT enforced: returns finance / sales / receivables / cost / margin data. */
   sensitive: boolean;
   /** Why it is sensitive (fields it returns). */
   sensitiveReason?: string;
   args: GiaArgSpec[];
 }
-
-export const SENSITIVE_MODULE = 'finance';
 
 export const GIA_TOOLS: readonly GiaTool[] = [
   {
@@ -152,16 +148,9 @@ export function findTool(id: unknown): GiaTool | null {
   return GIA_TOOLS.find((t) => t.id === id) ?? null;
 }
 
+// Exactly the wrapped endpoint's requireModule rule — never stricter, never looser.
 export function canUseTool(auth: GiaToolAuthView, tool: GiaTool): boolean {
-  if (auth.isAdmin) return true;
-  if (!tool.modules.some((m) => auth.modules.includes(m))) return false;
-  if (tool.sensitive && !auth.modules.includes(SENSITIVE_MODULE)) return false;
-  return true;
-}
-
-/** True when the dispatch denies a caller the endpoint itself would allow. */
-export function stricterThanEndpoint(tool: GiaTool): boolean {
-  return tool.sensitive && tool.modules.some((m) => m !== SENSITIVE_MODULE);
+  return tool.modules.some((m) => auth.modules.includes(m));
 }
 
 export function listToolsFor(auth: GiaToolAuthView) {

@@ -58,9 +58,12 @@ const post = (body) => dispatch(new Request('https://preview.example/api/gia/dis
 }));
 const list = async () => (await (await tools(new Request('https://preview.example/api/gia/tools', { headers: { authorization: 'Bearer user-token' } }))).json());
 
-const NON_SENSITIVE = ['check_inventory', 'inventory_table_alerts', 'resolve_product'];
+// Owner (Chris, Admin) and LILI (Editor) both hold every module key in
+// user_profiles.modules (data fact noted at apps/shell/src/pages/Home.tsx:42).
+const FULL = ['crm', 'trade', 'quotation', 'finance', 'warehouse'];
 const ALL = ['check_inventory', 'check_quotation_followups', 'consignment_summary', 'customer_360', 'daily_brief', 'inventory_table_alerts',
   'invoice_pending_summary', 'product_overview', 'quotation_history', 'receivables_summary', 'resolve_product', 'sales_summary', 'supplier_search'];
+const ARGS = { customer_360: { customer: 'MAG' }, product_overview: { product: 'M' }, resolve_product: { q: '纸尿裤' }, supplier_search: { query: '劳工' } };
 
 test('no session → 401 on both endpoints', async () => {
   as(null);
@@ -69,47 +72,55 @@ test('no session → 401 on both endpoints', async () => {
   assert.equal(globalThis.__giaCalls.length, 0);
 });
 
-test('user without the module: tool not listed and dispatch → 403, endpoint never called', async () => {
+for (const [who, isAdmin] of [['Owner (Admin)', true], ['LILI (Editor)', false]]) {
+  test(`${who} with every module sees and can call all 13 tools`, async () => {
+    as({ isAdmin, modules: FULL });
+    assert.deepEqual((await list()).tools.map((t) => t.id).sort(), ALL);
+    for (const tool of ALL) assert.equal((await post({ tool, args: ARGS[tool] })).status, 200, tool);
+    assert.equal(globalThis.__giaCalls.length, ALL.length);
+  });
+}
+
+test('dispatch allows exactly what each endpoint allows, for every module combination (never stricter, never looser)', async () => {
+  // Endpoint rule parsed from the endpoint source, not from the registry.
+  const endpointModules = Object.fromEntries(registry.GIA_TOOLS.map((t) => {
+    const src = fs.readFileSync(path.join(ROOT, t.endpoint.replace(/^\//, '') + '.ts'), 'utf8');
+    return [t.id, JSON.parse(src.match(/requireModule\(\w+, (\[[^\]]*\])\)/)[1].replace(/'/g, '"'))];
+  }));
+  for (let mask = 0; mask < 1 << FULL.length; mask++) {
+    const modules = FULL.filter((_, i) => mask & (1 << i));
+    for (const isAdmin of [false, true]) {
+      as({ isAdmin, modules });
+      const expected = ALL.filter((id) => endpointModules[id].some((m) => modules.includes(m)));
+      assert.deepEqual((await list()).tools.map((t) => t.id).sort(), expected, JSON.stringify({ modules, isAdmin }));
+    }
+  }
+});
+
+test('模拟验证 (simulated): staff without the module → not listed, 403, endpoint never called', async () => {
   as({ isAdmin: false, modules: ['crm'] });
   const ids = (await list()).tools.map((t) => t.id);
-  assert.ok(!ids.includes('check_inventory'));
-  assert.ok(!ids.includes('inventory_table_alerts'));
-  assert.deepEqual(ids, ['resolve_product']);
-  const r = await post({ tool: 'check_inventory' });
-  assert.equal(r.status, 403);
+  assert.ok(!ids.includes('check_inventory') && !ids.includes('inventory_table_alerts') && !ids.includes('consignment_summary'));
+  assert.equal((await post({ tool: 'check_inventory' })).status, 403);
   assert.equal(globalThis.__giaCalls.length, 0);
 });
 
-test('sensitive tools are hidden from non-finance staff even when the endpoint would allow them', async () => {
-  as({ isAdmin: false, modules: ['trade', 'crm', 'quotation', 'warehouse'] });
-  assert.deepEqual((await list()).tools.map((t) => t.id).sort(), NON_SENSITIVE);
-  for (const tool of ['receivables_summary', 'sales_summary', 'daily_brief', 'customer_360', 'product_overview', 'supplier_search']) {
-    const args = tool === 'customer_360' ? { customer: 'MAG' } : tool === 'product_overview' ? { product: 'x' } : tool === 'supplier_search' ? { query: 'labour' } : {};
-    assert.equal((await post({ tool, args })).status, 403, tool);
+test('模拟验证 (simulated): a role label alone grants nothing — Editor/Admin with no modules see no tools', async () => {
+  for (const isAdmin of [false, true]) {
+    as({ isAdmin, modules: [] });
+    assert.deepEqual((await list()).tools, []);
+    assert.equal((await post({ tool: 'resolve_product', args: { q: 'x' } })).status, 403);
   }
-  assert.equal(globalThis.__giaCalls.length, 0);
 });
 
-test('finance + trade user sees every tool', async () => {
-  as({ isAdmin: false, modules: ['finance', 'trade'] });
-  assert.deepEqual((await list()).tools.map((t) => t.id).sort(), ALL);
-});
-
-test('finance-only user still needs the endpoint module for non-finance tools', async () => {
-  as({ isAdmin: false, modules: ['finance'] });
-  const ids = (await list()).tools.map((t) => t.id).sort();
-  assert.deepEqual(ids, ['daily_brief', 'invoice_pending_summary', 'receivables_summary', 'sales_summary']);
-});
-
-test('admin sees everything (even with no modules)', async () => {
-  as({ isAdmin: true, modules: [] });
-  const body = await list();
-  assert.equal(body.isAdmin, true);
-  assert.deepEqual(body.tools.map((t) => t.id).sort(), ALL);
+test('sensitive is a label only and is exposed in the tool list', async () => {
+  as({ isAdmin: false, modules: FULL });
+  const sensitive = (await list()).tools.filter((t) => t.sensitive).map((t) => t.id).sort();
+  assert.deepEqual(sensitive, ALL.filter((id) => !['check_inventory', 'inventory_table_alerts', 'resolve_product'].includes(id)));
 });
 
 test('unknown tool → 400; bad args → 400', async () => {
-  as({ isAdmin: true, modules: [] });
+  as({ isAdmin: true, modules: FULL });
   assert.equal((await post({ tool: 'drop_tables' })).status, 400);
   assert.equal((await post({})).status, 400);
   assert.equal((await post({ tool: 'resolve_product' })).status, 400);                         // missing q
@@ -134,7 +145,7 @@ test('GET call forwards only the caller token, same origin, args as query', asyn
 });
 
 test('POST tool (supplier_search) forwards a JSON body', async () => {
-  as({ isAdmin: false, modules: ['finance', 'crm'] });
+  as({ isAdmin: false, modules: ['crm'] });
   assert.equal((await post({ tool: 'supplier_search', args: { query: '劳工' } })).status, 200);
   const call = globalThis.__giaCalls[0];
   assert.equal(new URL(call.req.url).pathname, '/api/suppliers/search');
@@ -142,7 +153,7 @@ test('POST tool (supplier_search) forwards a JSON body', async () => {
 });
 
 test('upstream status is passed through', async () => {
-  as({ isAdmin: true, modules: [] });
+  as({ isAdmin: true, modules: FULL });
   const r = await post({ tool: 'daily_brief' });
   assert.equal(r.status, 200);
   assert.equal(r.headers.get('X-GIA-Tool'), 'daily_brief');
@@ -170,9 +181,4 @@ test('registry matches the real endpoints: file exists, handler wired, module li
     assert.match(src, new RegExp(`method !== '${t.method}'`), t.id + ' method');
     assert.match(handlersSrc, new RegExp(`\\b${t.id}: \\w+`), t.id + ' handler');
   }
-});
-
-test('every sensitive tool whose endpoint OR-list admits non-finance staff is flagged stricter', () => {
-  const stricter = registry.GIA_TOOLS.filter((t) => registry.stricterThanEndpoint(t)).map((t) => t.id).sort();
-  assert.deepEqual(stricter, ALL.filter((id) => !NON_SENSITIVE.includes(id)));
 });
