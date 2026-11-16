@@ -109,6 +109,9 @@ function answerPrompt(question: string, results: ToolRun[]): { systemInstruction
       'Never estimate, round up, or invent numbers. If a tool failed or returned no relevant rows, say "无数据" ' +
       'for that part. When a list carries "<key>__total", that is the full row count; only the first rows are shown. ' +
       'If the question names a size or variant, pick the matching rows yourself. ' +
+      'Always name the stock scope from "stockScope": consignment_only = "寄售在客户处的库存" (name the customer), ' +
+      'warehouse_inventory = "仓库库存"; never call consignment stock plain 库存. ' +
+      'Plain text only: no Markdown (no **, no #); use "•" for list items. ' +
       'Do not suggest that you changed any data; you cannot write anything.',
     prompt: `Today (Dubai): ${today()}\nQuestion: ${question}\n\nTool results (JSON):\n${JSON.stringify(payload)}`,
   };
