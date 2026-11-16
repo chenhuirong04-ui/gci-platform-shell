@@ -30,7 +30,7 @@ export const GIA_AI_FORWARD_INTENTS: ReadonlySet<string> = new Set([
   'check_quotation_followups', // AIPage QUOTATION_FOLLOWUP_RE → quotation follow-up list
 ]);
 
-function isGiaExplicitCommand(text: string): boolean {
+export function isGiaExplicitCommand(text: string): boolean {
   return (
     looksLikeNotionFollowupCommand(text) ||
     detectExplicitDestination(text) !== null ||
