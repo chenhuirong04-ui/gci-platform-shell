@@ -11,6 +11,7 @@ import { colors } from '@gci/design-system';
 import { useI18n } from '@gci/i18n';
 import { useAuth } from '../contexts/AuthContext';
 import { runGiaTopRouter, type GiaRouterState, type PendingDriveFolderCreate } from '../lib/giaRouter';
+import { giaAiForwardPath } from '../lib/giaAiForward';
 import { confirmCaptureItem, completeOrCancelTask, rescheduleTask, type ResolvedCaptureItem } from '../lib/businessCapture';
 import { BUSINESS_AREA_LABEL, BUSINESS_AREA_LABEL_ZH, ALL_BUSINESS_AREAS, type ExecutiveTask, type TaskBusinessArea } from '../lib/executiveTasks';
 import { uploadAndRegisterLocalFile, searchDriveFolders, listChildFolders, extractCompanyName, createFolderIfMissing, getDriveFolderName, DEFAULT_TARGET_FOLDER_ID, DEFAULT_TARGET_FOLDER_NAME, type DriveFolderOption } from '../lib/giaFiles';
@@ -319,6 +320,15 @@ export function BusinessAssistantEntry() {
     if (pendingDriveFolderCreate && !pendingDriveFolderCreate.folderName) {
       setPendingDriveFolderCreate({ ...pendingDriveFolderCreate, folderName: v });
       setValue('');
+      return;
+    }
+    // Read-only business query (inventory / product price / quotation
+    // follow-ups) — answered by AIPage's existing /ai?q= handling, never
+    // by the customer-name lookup below (lib/giaAiForward.ts).
+    const aiPath = giaAiForwardPath(v);
+    if (aiPath) {
+      setValue('');
+      navigate(aiPath);
       return;
     }
     setBusy(true);
