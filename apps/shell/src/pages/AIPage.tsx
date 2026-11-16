@@ -61,7 +61,7 @@ function normalizeInventoryQuery(raw: string): string | null {
   const STRIPS: RegExp[] = [
     /^(?:帮我|请帮我|帮|请)\s*/u,
     /^(?:查询|查看|查一下|查|看一下|看|搜索|搜|找一下|找)\s*/u,
-    /^(?:现在|目前|今天|最近|当前)\s*/u,
+    /^(?:现在|目前|今天|最近|当前|所有|全部)\s*/u,
     /^(?:有多少|还有多少|剩多少|还有没有|有没有)\s*/u,
   ];
   for (let pass = 0; pass < 3; pass++) {
@@ -91,6 +91,15 @@ function normalizeInventoryQuery(raw: string): string | null {
   return s;
 }
 
+// The q sent to /api/ai/resolve-product: the product term with the question
+// wrapper stripped ("现在有多少纸尿裤库存" → "纸尿裤"), so the API never
+// extracts a keyword like "有多少纸尿裤". No product term (full-inventory
+// asks such as "现在有多少库存") → the original text, exactly as before, so
+// the API still answers full_inventory.
+function inventoryResolveQuery(rawQuery: string): string {
+  return normalizeInventoryQuery(rawQuery) ?? rawQuery;
+}
+
 // ── AI-assisted inventory resolver ───────────────────────────────────────────
 // Calls /api/ai/resolve-product which fetches the live product catalog and uses
 // OpenAI to map natural-language input to exact product names from the DB.
@@ -110,7 +119,7 @@ async function resolveInventoryProduct(
   candidateItems: InventoryCandidate[];
 }> {
   try {
-    const res = await fetch(`${base}/api/ai/resolve-product?q=${encodeURIComponent(rawQuery)}`);
+    const res = await fetch(`${base}/api/ai/resolve-product?q=${encodeURIComponent(inventoryResolveQuery(rawQuery))}`);
     if (!res.ok) throw new Error('resolve-product failed');
     const data = await res.json() as {
       ok: boolean;
