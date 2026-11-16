@@ -4,7 +4,8 @@
 //   1. requireUser — the caller's own Supabase session (401 without one).
 //   2. tool lookup — unknown tool → 400.
 //   3. canUseTool — caller's user_profiles.modules vs the wrapped endpoint's
-//      own requireModule list, identical rule (403 otherwise). See _registry.ts.
+//      own requireModule list (403 otherwise); 4 finance tools require
+//      `finance` via GIA (deliberate exception). See _registry.ts.
 //   4. args validated against the tool's spec (400 on unknown/missing).
 //   5. The existing endpoint handler is called in-process with ONLY the
 //      caller's Authorization header, so its own requireModule and data

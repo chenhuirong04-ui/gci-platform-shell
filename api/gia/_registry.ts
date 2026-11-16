@@ -5,15 +5,20 @@
 // the caller's own Authorization header, so the endpoint's requireModule
 // check and data access run exactly as they do for the UI today.
 //
-// Permission policy (canUseTool) — IDENTICAL to each wrapped endpoint: the
-// caller needs one of `modules`, which is exactly that endpoint's own
-// requireModule list. Like requireModule (api/_lib/auth.ts) there is no
-// Admin bypass: access comes only from user_profiles.modules; role labels
-// (Admin / Editor / …) grant no module by themselves. So the dispatch never
-// denies anyone the endpoint itself would allow, and never allows more.
-// `sensitive` is a label only (cost / margin / sales / receivables data)
-// for later phases. It is deliberately NOT enforced: a stricter rule could
-// block an existing user (LILI, Editor) from data she can read today.
+// Permission policy (canUseTool): the caller needs one of `giaModules` when a
+// tool sets it, otherwise one of `modules` (the wrapped endpoint's own
+// requireModule list, so identical to the endpoint). Like requireModule
+// (api/_lib/auth.ts) there is no Admin bypass: access comes only from
+// user_profiles.modules; role labels (Admin / Editor / …) grant no module.
+//
+// Deliberate exception (approved by Chris, 2026-11-16): receivables_summary,
+// sales_summary, invoice_pending_summary and daily_brief return finance data
+// (receivables / revenue / invoice amounts), so via GIA they require the
+// `finance` module — stricter than their endpoints (trade|finance|crm,
+// finance|trade). The endpoints themselves are unchanged. Owner and LILI both
+// hold `finance` in user_profiles.modules, so neither loses access.
+// The other 9 tools stay identical to their endpoints. `sensitive` is a
+// label only.
 //
 // No imports: this file must stay free of handlers, env and network so it
 // can be unit-tested in isolation.
@@ -32,6 +37,8 @@ export interface GiaTool {
   method: 'GET' | 'POST';
   /** The endpoint's own requireModule list (caller needs one of them). */
   modules: string[];
+  /** GIA-only stricter requirement; when set it replaces `modules` for dispatch. */
+  giaModules?: string[];
   /** Label only, NOT enforced: returns finance / sales / receivables / cost / margin data. */
   sensitive: boolean;
   /** Why it is sensitive (fields it returns). */
@@ -105,7 +112,7 @@ export const GIA_TOOLS: readonly GiaTool[] = [
     id: 'receivables_summary',
     description: 'Unpaid / outstanding receivables.',
     endpoint: '/api/ai/receivables-summary', method: 'GET',
-    modules: ['trade', 'finance', 'crm'], sensitive: true,
+    modules: ['trade', 'finance', 'crm'], sensitive: true, giaModules: ['finance'],
     sensitiveReason: 'receivables / outstanding amounts',
     args: [],
   },
@@ -113,7 +120,7 @@ export const GIA_TOOLS: readonly GiaTool[] = [
     id: 'sales_summary',
     description: 'Sales totals by period and/or customer.',
     endpoint: '/api/ai/sales-summary', method: 'GET',
-    modules: ['trade', 'finance', 'crm'], sensitive: true,
+    modules: ['trade', 'finance', 'crm'], sensitive: true, giaModules: ['finance'],
     sensitiveReason: 'sales revenue',
     args: [{ name: 'customer', required: false }, { name: 'period', required: false }],
   },
@@ -121,7 +128,7 @@ export const GIA_TOOLS: readonly GiaTool[] = [
     id: 'invoice_pending_summary',
     description: 'Invoice drafts not yet issued / paid.',
     endpoint: '/api/invoice/pending-summary', method: 'GET',
-    modules: ['finance', 'trade'], sensitive: true,
+    modules: ['finance', 'trade'], sensitive: true, giaModules: ['finance'],
     sensitiveReason: 'invoice amounts',
     args: [],
   },
@@ -137,7 +144,7 @@ export const GIA_TOOLS: readonly GiaTool[] = [
     id: 'daily_brief',
     description: 'Daily business brief (sales, receivables, follow-ups).',
     endpoint: '/api/ai/daily-brief', method: 'GET',
-    modules: ['trade', 'finance', 'crm'], sensitive: true,
+    modules: ['trade', 'finance', 'crm'], sensitive: true, giaModules: ['finance'],
     sensitiveReason: 'aggregates sales and receivables',
     args: [],
   },
@@ -148,9 +155,9 @@ export function findTool(id: unknown): GiaTool | null {
   return GIA_TOOLS.find((t) => t.id === id) ?? null;
 }
 
-// Exactly the wrapped endpoint's requireModule rule — never stricter, never looser.
+// The endpoint's own requireModule rule, or the GIA finance exception above.
 export function canUseTool(auth: GiaToolAuthView, tool: GiaTool): boolean {
-  return tool.modules.some((m) => auth.modules.includes(m));
+  return (tool.giaModules ?? tool.modules).some((m) => auth.modules.includes(m));
 }
 
 export function listToolsFor(auth: GiaToolAuthView) {

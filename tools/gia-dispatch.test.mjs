@@ -58,7 +58,7 @@ const post = (body) => dispatch(new Request('https://preview.example/api/gia/dis
 }));
 const list = async () => (await (await tools(new Request('https://preview.example/api/gia/tools', { headers: { authorization: 'Bearer user-token' } }))).json());
 
-// Owner (Chris, Admin) and LILI (Editor) both hold every module key in
+// Owner (Chris) and LILI both hold every module key (incl. finance) in
 // user_profiles.modules (data fact noted at apps/shell/src/pages/Home.tsx:42).
 const FULL = ['crm', 'trade', 'quotation', 'finance', 'warehouse'];
 const ALL = ['check_inventory', 'check_quotation_followups', 'consignment_summary', 'customer_360', 'daily_brief', 'inventory_table_alerts',
@@ -72,7 +72,7 @@ test('no session → 401 on both endpoints', async () => {
   assert.equal(globalThis.__giaCalls.length, 0);
 });
 
-for (const [who, isAdmin] of [['Owner (Admin)', true], ['LILI (Editor)', false]]) {
+for (const [who, isAdmin] of [['Owner / LILI (Admin)', true], ['same modules, non-Admin role', false]]) {
   test(`${who} with every module sees and can call all 13 tools`, async () => {
     as({ isAdmin, modules: FULL });
     assert.deepEqual((await list()).tools.map((t) => t.id).sort(), ALL);
@@ -81,7 +81,9 @@ for (const [who, isAdmin] of [['Owner (Admin)', true], ['LILI (Editor)', false]]
   });
 }
 
-test('dispatch allows exactly what each endpoint allows, for every module combination (never stricter, never looser)', async () => {
+const FINANCE_ONLY = ['daily_brief', 'invoice_pending_summary', 'receivables_summary', 'sales_summary'];
+
+test('9 tools allow exactly what their endpoint allows; the 4 finance tools require finance — every module combination', async () => {
   // Endpoint rule parsed from the endpoint source, not from the registry.
   const endpointModules = Object.fromEntries(registry.GIA_TOOLS.map((t) => {
     const src = fs.readFileSync(path.join(ROOT, t.endpoint.replace(/^\//, '') + '.ts'), 'utf8');
@@ -91,10 +93,39 @@ test('dispatch allows exactly what each endpoint allows, for every module combin
     const modules = FULL.filter((_, i) => mask & (1 << i));
     for (const isAdmin of [false, true]) {
       as({ isAdmin, modules });
-      const expected = ALL.filter((id) => endpointModules[id].some((m) => modules.includes(m)));
+      const expected = ALL.filter((id) => FINANCE_ONLY.includes(id)
+        ? modules.includes('finance')
+        : endpointModules[id].some((m) => modules.includes(m)));
       assert.deepEqual((await list()).tools.map((t) => t.id).sort(), expected, JSON.stringify({ modules, isAdmin }));
     }
   }
+});
+
+test('模拟验证 (simulated): finance tools — trade-only / crm-only → not listed + 403; finance user passes', async () => {
+  for (const modules of [['trade'], ['crm'], ['crm', 'trade', 'quotation', 'warehouse']]) {
+    for (const isAdmin of [false, true]) {
+      as({ isAdmin, modules });
+      const ids = (await list()).tools.map((t) => t.id);
+      for (const tool of FINANCE_ONLY) {
+        assert.ok(!ids.includes(tool), `${tool} listed for ${modules}`);
+        assert.equal((await post({ tool })).status, 403, `${tool} for ${modules}`);
+      }
+      assert.equal(globalThis.__giaCalls.length, 0);
+    }
+  }
+  as({ isAdmin: false, modules: ['finance'] });
+  const ids = (await list()).tools.map((t) => t.id);
+  for (const tool of FINANCE_ONLY) {
+    assert.ok(ids.includes(tool), tool);
+    assert.equal((await post({ tool })).status, 200, tool);
+  }
+  assert.equal(globalThis.__giaCalls.length, FINANCE_ONLY.length);
+});
+
+test('finance exception lives in the registry only: exactly those 4 tools set giaModules=[finance]', () => {
+  const withGia = registry.GIA_TOOLS.filter((t) => t.giaModules).map((t) => t.id).sort();
+  assert.deepEqual(withGia, FINANCE_ONLY);
+  for (const t of registry.GIA_TOOLS.filter((t) => t.giaModules)) assert.deepEqual(t.giaModules, ['finance']);
 });
 
 test('模拟验证 (simulated): staff without the module → not listed, 403, endpoint never called', async () => {
