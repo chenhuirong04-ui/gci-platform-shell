@@ -101,3 +101,10 @@ test('Home go(): order = follow-up → file → folder name → /ai forward → 
   assert.match(block, /if \(serviceReply\) \{[^}]*return;\s*\}/);
   assert.match(block, /if \(answer\) \{[\s\S]*return;\s*\}/);
 });
+
+test('answer card text: Markdown bold/bullets become plain text, numbers and [source] tags kept', () => {
+  const md = '今天待处理事项：\n\n*   **待收款**：共 7 张订单，未收 AED 4,156.85 [daily_brief]。\n    *   主要欠款客户：BINGOMART 1+1\n- 无数据';
+  assert.equal(lib.giaPlainText(md),
+    '今天待处理事项：\n\n• 待收款：共 7 张订单，未收 AED 4,156.85 [daily_brief]。\n   • 主要欠款客户：BINGOMART 1+1\n• 无数据');
+  assert.equal(lib.giaPlainText('共有 11 个 [supplier_search]'), '共有 11 个 [supplier_search]');
+});

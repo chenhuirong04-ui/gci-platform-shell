@@ -49,6 +49,19 @@ export interface GiaAskAnswer {
 
 export const GIA_ASK_CLIENT_TIMEOUT_MS = 45000;
 
+/** The card shows plain text: drop Markdown emphasis/headings, list markers → "•". */
+export function giaPlainText(s: string): string {
+  return s
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .split('\n')
+    .map((line) => line
+      .replace(/^(\s*)#{1,6}\s+/, '$1')
+      .replace(/^(\s*)[*-]\s+/, (_m, sp: string) => `${sp.length >= 2 ? '   ' : ''}• `))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 /** The answer, or null → caller continues its existing routing. Never throws. */
 export async function askGia(question: string, fetchImpl: typeof fetch = fetch): Promise<GiaAskAnswer | null> {
   const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -64,7 +77,7 @@ export async function askGia(question: string, fetchImpl: typeof fetch = fetch):
     const data: any = await res.json().catch(() => null);
     if (!data?.ok || typeof data.answer !== 'string' || !data.answer.trim()) return null;
     return {
-      answer: data.answer,
+      answer: giaPlainText(data.answer),
       sources: Array.isArray(data.sources) ? data.sources : [],
       toolsUsed: Array.isArray(data.toolsUsed) ? data.toolsUsed : [],
       unverifiedNumbers: Array.isArray(data.unverifiedNumbers) ? data.unverifiedNumbers : [],
