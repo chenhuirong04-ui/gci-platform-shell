@@ -202,7 +202,7 @@ test('numbers in the answer that appear in no tool result are flagged', async ()
 
 test('plan args: unknown args dropped, bad/missing required arg drops the call, duplicates removed', async () => {
   setup({ planCalls: [['check_inventory', { product: 'M', sku: 'x' }], ['check_inventory', { product: 'M' }], ['customer_360', {}]], answer: 'ok' });
-  const r = await post('库存多少');
+  const r = await post('寄售库存多少');
   assert.deepEqual(r.body.toolsUsed, [{ tool: 'check_inventory', args: { product: 'M' }, status: 200 }]);
   assert.deepEqual(r.body.dropped, ['customer_360']);
 });
@@ -241,4 +241,33 @@ test('source tags such as [customer_360] are not flagged as unverified numbers',
   const runs = [{ tool: 'customer_360', args: {}, status: 200, dataText: '{"totalOutstanding":0}' }];
   assert.deepEqual(mod.findUnverifiedNumbers('欠款 AED 0 [customer_360]', runs), []);
   assert.deepEqual(mod.findUnverifiedNumbers('欠款 AED 360 [customer_360]', runs), ['360']);
+});
+
+const calledTools = () => globalThis.__calls.map((c) => c.id).sort();
+
+test('stock: plain "还有多少库存" planned as consignment only → warehouse table added with the same product filter', async () => {
+  setup({ planCalls: [['check_inventory', { product: '纸尿裤' }], ['quotation_history', { product: '纸尿裤' }]], answer: '仓库库存 4321 [inventory_table_alerts]' });
+  const { body } = await post('纸尿裤 M 码还有多少库存，最近报价给谁了？');
+  assert.equal(body.ok, true);
+  assert.deepEqual(calledTools(), ['check_inventory', 'inventory_table_alerts', 'quotation_history']);
+  const wh = globalThis.__calls.find((c) => c.id === 'inventory_table_alerts');
+  assert.match(decodeURIComponent(wh.url), /product=纸尿裤/);
+  assert.equal(body.toolsUsed[0].tool, 'inventory_table_alerts'); // warehouse first
+});
+
+test('stock: customer consignment question → check_inventory only, no warehouse call added', async () => {
+  setup({ planCalls: [['check_inventory', { product: '纸尿裤' }]], answer: '寄售 4321 [check_inventory]' });
+  await post('纸尿裤在客户那里的寄售库存还有多少？');
+  assert.deepEqual(calledTools(), ['check_inventory']);
+});
+
+test('stock: warehouse question planned correctly → unchanged; 4-call cap respected when adding', async () => {
+  setup({ planCalls: [['inventory_table_alerts', { product: '纸尿裤' }]], answer: '仓库 4321 [inventory_table_alerts]' });
+  await post('仓库里纸尿裤还有多少？');
+  assert.deepEqual(calledTools(), ['inventory_table_alerts']);
+  setup({ planCalls: [['check_inventory', { product: '纸尿裤' }], ['quotation_history', { product: '纸尿裤' }], ['daily_brief'], ['sales_summary']] });
+  const { body } = await post('纸尿裤还有多少库存，今天要做什么？');
+  assert.equal(globalThis.__calls.length, 4);
+  assert.equal(body.toolsUsed[0].tool, 'inventory_table_alerts');
+  assert.ok(globalThis.__calls.some((c) => c.id === 'check_inventory'));
 });

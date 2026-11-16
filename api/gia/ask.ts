@@ -84,9 +84,12 @@ function planPrompt(question: string, tools: GiaTool[]): { systemInstruction: st
       `at most ${MAX_CALLS} calls. Arg values are short plain strings taken from the question ` +
       '(customer name, product word such as 纸尿裤, supplier keyword such as 劳务). ' +
       'Product args must be the bare product word without size, pack count or unit (纸尿裤 M 码 → 纸尿裤); ' +
-      'the answer step filters sizes from the returned rows. For stock questions call check_inventory directly; ' +
-      'use resolve_product only when the user asks which catalog products match. ' +
-      'Call every tool the question needs in one plan (e.g. stock + who was quoted → check_inventory and quotation_history). ' +
+      'the answer step filters sizes from the returned rows. Stock: warehouse / own / current stock quantity (仓库库存, 自有库存, 现有库存, ' +
+      'or plain "还有多少库存") → inventory_table_alerts with the product filter (Notion warehouse table, currentQty). ' +
+      'Customer consignment stock (寄售, 客户处) → check_inventory. If the question mentions both, call both. ' +
+      'Never answer a plain stock question from check_inventory alone. ' +
+      'Use resolve_product only when the user asks which catalog products match. ' +
+      'Call every tool the question needs in one plan (e.g. stock + who was quoted → inventory_table_alerts and quotation_history). ' +
       'If no listed tool can answer the question (small talk, weather, general knowledge, writing tasks, ' +
       'or a request to change data), return {"calls": []}.',
     prompt: `Today (Dubai): ${today()}\nTools:\n${JSON.stringify(catalog)}\n\nQuestion: ${question}`,
@@ -111,6 +114,9 @@ function answerPrompt(question: string, results: ToolRun[]): { systemInstruction
       'If the question names a size or variant, pick the matching rows yourself. ' +
       'Always name the stock scope from "stockScope": consignment_only = "寄售在客户处的库存" (name the customer), ' +
       'warehouse_inventory = "仓库库存"; never call consignment stock plain 库存. ' +
+      'inventory_table_alerts with a productFilter lists every matching warehouse row in alertItems (alertType "normal" ' +
+      'is not an alert): report currentQty with its unit and warehouse. Report warehouse stock first; if consignment ' +
+      'stock is also present, list it separately and never add the two together. ' +
       'Plain text only: no Markdown (no **, no #); use "•" for list items. ' +
       'Do not suggest that you changed any data; you cannot write anything.',
     prompt: `Today (Dubai): ${today()}\nQuestion: ${question}\n\nTool results (JSON):\n${JSON.stringify(payload)}`,
@@ -146,6 +152,26 @@ export function sanitizePlan(raw: unknown, allowed: GiaTool[]): { calls: Planned
     calls.push({ tool, values: v.values });
   }
   return { calls, dropped, capped };
+}
+
+const CONSIGNMENT_ONLY = /寄售|客户处|consign/i;
+const WAREHOUSE_WORD = /仓库|自有|现有|warehouse/i;
+
+/**
+ * Stock-scope backstop: a stock question answered only from consignment stock (check_inventory)
+ * also gets the warehouse table (inventory_table_alerts, same product filter), unless the user
+ * asked only about consignment. Warehouse comes first; total stays ≤ MAX_CALLS.
+ */
+export function ensureWarehouseStock(question: string, calls: PlannedCall[], allowed: GiaTool[]): PlannedCall[] {
+  const consign = calls.find((c) => c.tool.id === 'check_inventory');
+  if (!consign || calls.some((c) => c.tool.id === 'inventory_table_alerts')) return calls;
+  if (CONSIGNMENT_ONLY.test(question) && !WAREHOUSE_WORD.test(question)) return calls;
+  const wh = allowed.find((t) => t.id === 'inventory_table_alerts');
+  if (!wh) return calls;
+  const product = consign.values.product;
+  const add: PlannedCall = { tool: wh, values: product ? { product } : {} };
+  const rest = calls.length >= MAX_CALLS ? calls.slice(0, MAX_CALLS - 1) : calls;
+  return [add, ...rest];
 }
 
 interface ToolRun { tool: string; args: Record<string, string>; status: number | 'timeout' | 'error' | 'forbidden'; dataText?: string; data?: unknown; fullText?: string }
@@ -249,7 +275,8 @@ export default async function handler(request: Request): Promise<Response> {
     console.error('[gia-ask] plan failed:', e instanceof Error ? e.message : 'error');
     return fallback('model_failed');
   }
-  const { calls, dropped, capped } = sanitizePlan(plan, allowed);
+  const { calls: planned, dropped, capped } = sanitizePlan(plan, allowed);
+  const calls = ensureWarehouseStock(question, planned, allowed);
   if (calls.length === 0) return fallback('no_tool_selected', { dropped });
 
   // 2) Run the tools (parallel, read-only, caller's own token).
