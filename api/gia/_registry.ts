@@ -1,0 +1,211 @@
+// GIA P0 — read-only tool registry (pure metadata + permission policy).
+//
+// Every tool wraps ONE existing, verified read-only endpoint. The dispatch
+// (api/gia/dispatch.ts) calls that endpoint's own handler in-process with
+// the caller's own Authorization header, so the endpoint's requireModule
+// check and data access run exactly as they do for the UI today.
+//
+// Permission policy (canUseTool):
+//   - Admin (role_label === 'Admin') may use every tool. The underlying
+//     endpoint still runs its own requireModule (no Admin bypass there), so
+//     an Admin without that endpoint's module still gets the endpoint's 403.
+//   - Non-sensitive tool: the caller needs one of `modules` — identical to
+//     the endpoint's own requireModule list.
+//   - Sensitive tool (finance / sales / receivables / cost / margin data):
+//     the caller ALSO needs the `finance` module. This is deliberately
+//     stricter than the endpoint, whose OR-list (trade | crm | …) lets
+//     ordinary staff through; see `stricterThanEndpoint`.
+//
+// No imports: this file must stay free of handlers, env and network so it
+// can be unit-tested in isolation.
+
+export type GiaArgSpec = { name: string; required: boolean };
+
+export interface GiaToolAuthView {
+  isAdmin: boolean;
+  modules: string[];
+}
+
+export interface GiaTool {
+  id: string;
+  description: string;
+  /** Existing endpoint this tool wraps (path only). */
+  endpoint: string;
+  method: 'GET' | 'POST';
+  /** The endpoint's own requireModule list (caller needs one of them). */
+  modules: string[];
+  /** Finance / sales / receivables / cost / margin data → needs `finance` too. */
+  sensitive: boolean;
+  /** Why it is sensitive (fields it returns). */
+  sensitiveReason?: string;
+  args: GiaArgSpec[];
+}
+
+export const SENSITIVE_MODULE = 'finance';
+
+export const GIA_TOOLS: readonly GiaTool[] = [
+  {
+    id: 'resolve_product',
+    description: 'Map a natural-language product phrase to catalog product names.',
+    endpoint: '/api/ai/resolve-product', method: 'GET',
+    modules: ['trade', 'quotation', 'crm'], sensitive: false,
+    args: [{ name: 'q', required: true }],
+  },
+  {
+    id: 'check_inventory',
+    description: 'Consignment stock remaining per product (optional product filter).',
+    endpoint: '/api/trade/check-inventory', method: 'GET',
+    modules: ['trade', 'warehouse'], sensitive: false,
+    args: [{ name: 'product', required: false }],
+  },
+  {
+    id: 'inventory_table_alerts',
+    description: 'Warehouse inventory table with low-stock alerts (optional product filter).',
+    endpoint: '/api/ai/inventory-table-alerts', method: 'GET',
+    modules: ['trade', 'warehouse'], sensitive: false,
+    args: [{ name: 'product', required: false }],
+  },
+  {
+    id: 'product_overview',
+    description: 'Product master price, cost, stock and historical quote prices for one product.',
+    endpoint: '/api/ai/product-overview', method: 'GET',
+    modules: ['trade', 'quotation', 'crm'], sensitive: true,
+    sensitiveReason: 'returns internal cost price (costPriceAED) and historical selling prices',
+    args: [{ name: 'product', required: true }],
+  },
+  {
+    id: 'quotation_history',
+    description: 'Past quotations by customer and/or product.',
+    endpoint: '/api/ai/quotation-history', method: 'GET',
+    modules: ['quotation', 'crm', 'trade'], sensitive: true,
+    sensitiveReason: 'returns quote totals and margin_percent',
+    args: [{ name: 'customer', required: false }, { name: 'product', required: false }],
+  },
+  {
+    id: 'check_quotation_followups',
+    description: 'Quotations waiting for a customer reply.',
+    endpoint: '/api/trade/check-quotation-followups', method: 'GET',
+    modules: ['trade', 'quotation', 'crm'], sensitive: true,
+    sensitiveReason: 'returns grand_total and margin_percent',
+    args: [],
+  },
+  {
+    id: 'customer_360',
+    description: 'One customer: quotes, orders, payments and outstanding amount.',
+    endpoint: '/api/ai/customer-360', method: 'GET',
+    modules: ['crm', 'trade', 'quotation'], sensitive: true,
+    sensitiveReason: 'returns order totals, paid and outstanding amounts',
+    args: [{ name: 'customer', required: true }],
+  },
+  {
+    id: 'consignment_summary',
+    description: 'Consignment batches and settlement value by customer/product.',
+    endpoint: '/api/ai/consignment-summary', method: 'GET',
+    modules: ['trade', 'warehouse'], sensitive: true,
+    sensitiveReason: 'returns per-customer unit prices and settlement amounts',
+    args: [{ name: 'customer', required: false }, { name: 'product', required: false }],
+  },
+  {
+    id: 'receivables_summary',
+    description: 'Unpaid / outstanding receivables.',
+    endpoint: '/api/ai/receivables-summary', method: 'GET',
+    modules: ['trade', 'finance', 'crm'], sensitive: true,
+    sensitiveReason: 'receivables / outstanding amounts',
+    args: [],
+  },
+  {
+    id: 'sales_summary',
+    description: 'Sales totals by period and/or customer.',
+    endpoint: '/api/ai/sales-summary', method: 'GET',
+    modules: ['trade', 'finance', 'crm'], sensitive: true,
+    sensitiveReason: 'sales revenue',
+    args: [{ name: 'customer', required: false }, { name: 'period', required: false }],
+  },
+  {
+    id: 'invoice_pending_summary',
+    description: 'Invoice drafts not yet issued / paid.',
+    endpoint: '/api/invoice/pending-summary', method: 'GET',
+    modules: ['finance', 'trade'], sensitive: true,
+    sensitiveReason: 'invoice amounts',
+    args: [],
+  },
+  {
+    id: 'supplier_search',
+    description: 'Search the supplier library (name, category, product, service).',
+    endpoint: '/api/suppliers/search', method: 'POST',
+    modules: ['trade', 'quotation', 'crm'], sensitive: true,
+    sensitiveReason: 'returns latest supplier quote total_cost (purchase cost)',
+    args: [{ name: 'query', required: true }],
+  },
+  {
+    id: 'daily_brief',
+    description: 'Daily business brief (sales, receivables, follow-ups).',
+    endpoint: '/api/ai/daily-brief', method: 'GET',
+    modules: ['trade', 'finance', 'crm'], sensitive: true,
+    sensitiveReason: 'aggregates sales and receivables',
+    args: [],
+  },
+];
+
+export function findTool(id: unknown): GiaTool | null {
+  if (typeof id !== 'string') return null;
+  return GIA_TOOLS.find((t) => t.id === id) ?? null;
+}
+
+export function canUseTool(auth: GiaToolAuthView, tool: GiaTool): boolean {
+  if (auth.isAdmin) return true;
+  if (!tool.modules.some((m) => auth.modules.includes(m))) return false;
+  if (tool.sensitive && !auth.modules.includes(SENSITIVE_MODULE)) return false;
+  return true;
+}
+
+/** True when the dispatch denies a caller the endpoint itself would allow. */
+export function stricterThanEndpoint(tool: GiaTool): boolean {
+  return tool.sensitive && tool.modules.some((m) => m !== SENSITIVE_MODULE);
+}
+
+export function listToolsFor(auth: GiaToolAuthView) {
+  return GIA_TOOLS.filter((t) => canUseTool(auth, t)).map((t) => ({
+    id: t.id,
+    description: t.description,
+    sensitive: t.sensitive,
+    args: t.args,
+  }));
+}
+
+const MAX_ARG_LEN = 200;
+
+export type ArgCheck =
+  | { ok: true; values: Record<string, string> }
+  | { ok: false; error: string };
+
+export function validateArgs(tool: GiaTool, raw: unknown): ArgCheck {
+  const input = raw === undefined || raw === null ? {} : raw;
+  if (typeof input !== 'object' || Array.isArray(input)) return { ok: false, error: 'args must be an object' };
+  const known = new Set(tool.args.map((a) => a.name));
+  const values: Record<string, string> = {};
+  for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+    if (!known.has(key)) return { ok: false, error: `unknown arg: ${key}` };
+    if (value === undefined || value === null || value === '') continue;
+    if (typeof value !== 'string') return { ok: false, error: `arg ${key} must be a string` };
+    const v = value.trim();
+    if (v.length > MAX_ARG_LEN) return { ok: false, error: `arg ${key} too long` };
+    if (v) values[key] = v;
+  }
+  for (const a of tool.args) {
+    if (a.required && !values[a.name]) return { ok: false, error: `missing arg: ${a.name}` };
+  }
+  return { ok: true, values };
+}
+
+/** The Request handed to the wrapped endpoint (same origin, caller's own token only). */
+export function buildUpstreamRequest(tool: GiaTool, values: Record<string, string>, baseUrl: string, authorization: string): Request {
+  const url = new URL(tool.endpoint, baseUrl);
+  const headers: Record<string, string> = { authorization };
+  if (tool.method === 'GET') {
+    for (const [k, v] of Object.entries(values)) url.searchParams.set(k, v);
+    return new Request(url.toString(), { method: 'GET', headers });
+  }
+  headers['content-type'] = 'application/json';
+  return new Request(url.toString(), { method: 'POST', headers, body: JSON.stringify(values) });
+}
