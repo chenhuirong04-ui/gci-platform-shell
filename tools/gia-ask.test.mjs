@@ -222,3 +222,23 @@ test('read-only + isolation: no service role, no assistant/MCP layer, no direct 
   assert.match(model, /from '\.\.\/ai\/gemini-generate'/);
   assert.doesNotMatch(model, /GEMINI_API_KEY\s*\)|process\.env/);
 });
+
+test('large tool result: compacted for the model, row total kept (11 suppliers, not a cut-off 10)', () => {
+  const row = (i) => ({ supplierName: `Labour Agent ${i}`, warnings: ['供应商档案待审核，信息请核实后再使用'], note: 'x'.repeat(600) });
+  const data = { ok: true, total: 11, exactTypeMatches: Array.from({ length: 11 }, (_, i) => row(i + 1)), results: Array.from({ length: 11 }, (_, i) => row(i + 1)) };
+  assert.ok(JSON.stringify(data).length > 8000);
+  const c = mod.compactForModel(data);
+  assert.equal(typeof c, 'object');
+  assert.ok(JSON.stringify(c).length <= 8000);
+  assert.equal(c.total, 11);
+  for (const k of ['exactTypeMatches', 'results']) {
+    if (c[k].length < 11) assert.equal(c[`${k}__total`], 11);
+  }
+  assert.deepEqual(mod.compactForModel({ a: 1, list: [1, 2] }), { a: 1, list: [1, 2] }); // small results untouched
+});
+
+test('source tags such as [customer_360] are not flagged as unverified numbers', () => {
+  const runs = [{ tool: 'customer_360', args: {}, status: 200, dataText: '{"totalOutstanding":0}' }];
+  assert.deepEqual(mod.findUnverifiedNumbers('欠款 AED 0 [customer_360]', runs), []);
+  assert.deepEqual(mod.findUnverifiedNumbers('欠款 AED 360 [customer_360]', runs), ['360']);
+});

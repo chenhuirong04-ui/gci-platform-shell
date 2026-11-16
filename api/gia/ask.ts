@@ -83,6 +83,10 @@ function planPrompt(question: string, tools: GiaTool[]): { systemInstruction: st
       'Choose which of the listed tools to call to answer the user question. Use ONLY tools from the list, ' +
       `at most ${MAX_CALLS} calls. Arg values are short plain strings taken from the question ` +
       '(customer name, product word such as 纸尿裤, supplier keyword such as 劳务). ' +
+      'Product args must be the bare product word without size, pack count or unit (纸尿裤 M 码 → 纸尿裤); ' +
+      'the answer step filters sizes from the returned rows. For stock questions call check_inventory directly; ' +
+      'use resolve_product only when the user asks which catalog products match. ' +
+      'Call every tool the question needs in one plan (e.g. stock + who was quoted → check_inventory and quotation_history). ' +
       'If no listed tool can answer the question (small talk, weather, general knowledge, writing tasks, ' +
       'or a request to change data), return {"calls": []}.',
     prompt: `Today (Dubai): ${today()}\nTools:\n${JSON.stringify(catalog)}\n\nQuestion: ${question}`,
@@ -103,7 +107,9 @@ function answerPrompt(question: string, results: ToolRun[]): { systemInstruction
       'Use ONLY the tool results provided. Every number, amount or count you state must come from those results ' +
       'and must be followed by its source tool in square brackets, e.g. "欠款 AED 12,000 [customer_360]". ' +
       'Never estimate, round up, or invent numbers. If a tool failed or returned no relevant rows, say "无数据" ' +
-      'for that part. Do not suggest that you changed any data; you cannot write anything.',
+      'for that part. When a list carries "<key>__total", that is the full row count; only the first rows are shown. ' +
+      'If the question names a size or variant, pick the matching rows yourself. ' +
+      'Do not suggest that you changed any data; you cannot write anything.',
     prompt: `Today (Dubai): ${today()}\nQuestion: ${question}\n\nTool results (JSON):\n${JSON.stringify(payload)}`,
   };
 }
@@ -139,7 +145,39 @@ export function sanitizePlan(raw: unknown, allowed: GiaTool[]): { calls: Planned
   return { calls, dropped, capped };
 }
 
-interface ToolRun { tool: string; args: Record<string, string>; status: number | 'timeout' | 'error' | 'forbidden'; dataText?: string; data?: unknown }
+interface ToolRun { tool: string; args: Record<string, string>; status: number | 'timeout' | 'error' | 'forbidden'; dataText?: string; data?: unknown; fullText?: string }
+
+/**
+ * Shrink a tool result for the model without losing totals: scalar fields are kept at every
+ * level; the longest array is halved (its original length recorded as `<key>__total`) and long
+ * strings clipped until the JSON fits. Plain truncation used to cut rows mid-list, so the model
+ * miscounted (e.g. 10 of 11 labour suppliers).
+ */
+export function compactForModel(data: unknown, limit = MAX_RESULT_CHARS): unknown {
+  const size = (v: unknown) => JSON.stringify(v)?.length ?? 0;
+  if (size(data) <= limit) return data;
+  const clone = JSON.parse(JSON.stringify(data, (_k, v) => (typeof v === 'string' && v.length > 160 ? v.slice(0, 160) + '…' : v)));
+  for (let guard = 0; guard < 200 && size(clone) > limit; guard++) {
+    let best: { parent: any; key: string; len: number } | null = null;
+    const walk = (node: any) => {
+      if (!node || typeof node !== 'object') return;
+      for (const [k, v] of Object.entries(node)) {
+        if (Array.isArray(v) && v.length > 1) {
+          const len = size(v);
+          if (!best || len > best.len) best = { parent: node, key: k, len };
+        }
+        if (v && typeof v === 'object') walk(v);
+      }
+    };
+    walk(clone);
+    if (!best) break;
+    const { parent, key } = best as { parent: any; key: string };
+    const arr = parent[key] as unknown[];
+    if (!Array.isArray(parent) && parent[`${key}__total`] === undefined) parent[`${key}__total`] = arr.length;
+    parent[key] = arr.slice(0, Math.ceil(arr.length / 2));
+  }
+  return size(clone) <= limit ? clone : JSON.stringify(clone).slice(0, limit) + TRUNCATED;
+}
 
 async function runCall(c: PlannedCall, auth: { modules: string[] }, baseUrl: string, authorization: string): Promise<ToolRun> {
   const base = { tool: c.tool.id, args: c.values };
@@ -150,8 +188,10 @@ async function runCall(c: PlannedCall, auth: { modules: string[] }, baseUrl: str
   try {
     const res = await withTimeout(run(buildUpstreamRequest(c.tool, c.values, baseUrl, authorization)), TOOL_TIMEOUT_MS, 'tool');
     const data = await res.json().catch(() => null);
-    const text = JSON.stringify(data);
-    return { ...base, status: res.status, data, dataText: text.length > MAX_RESULT_CHARS ? text.slice(0, MAX_RESULT_CHARS) + TRUNCATED : text };
+    const fullText = JSON.stringify(data);
+    const compact = compactForModel(data);
+    const dataText = typeof compact === 'string' ? compact : JSON.stringify(compact);
+    return { ...base, status: res.status, data: typeof compact === 'string' ? data : compact, dataText, fullText };
   } catch (e) {
     const timeout = e instanceof Error && e.message === 'tool_timeout';
     console.error('[gia-ask] tool failed:', c.tool.id, timeout ? 'timeout' : 'error');
@@ -169,10 +209,11 @@ export function findUnverifiedNumbers(answer: string, runs: ToolRun[]): string[]
       if (Number.isFinite(n)) { known.add(String(n)); known.add(n.toFixed(2)); known.add(String(Math.round(n))); }
     }
   };
-  for (const r of runs) if (r.dataText) addNums(r.dataText);
+  for (const r of runs) { const t = r.fullText ?? r.dataText; if (t) addNums(t); }
   addNums(today());
   const out: string[] = [];
-  for (const m of answer.replace(/(\d),(?=\d{3})/g, '$1').match(/\d+(?:\.\d+)?/g) || []) {
+  // Source tags like [customer_360] are not figures.
+  for (const m of answer.replace(/\[[a-z0-9_]+\]/gi, '').replace(/(\d),(?=\d{3})/g, '$1').match(/\d+(?:\.\d+)?/g) || []) {
     if (m.replace('.', '').length < 2) continue;
     if (!known.has(m) && !known.has(String(Number(m))) && !out.includes(m)) out.push(m);
   }
