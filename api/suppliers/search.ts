@@ -79,6 +79,12 @@ const PRODUCT_SYNONYMS: Record<string, { term: string; categories: string[] }> =
   '瓷砖': { term: '瓷砖', categories: ['tiles & stone', 'building materials'] },
   '地毯': { term: '地毯', categories: ['carpet', 'furniture', 'FF&E'] },
   '灯具': { term: '灯具', categories: ['lighting', 'building materials'] },
+  // Labour / manpower agents (categories such as 海外劳务招聘, 印度劳工招聘对接, Manpower Recruitment)
+  '劳务': { term: '劳务', categories: ['劳务', '劳工', 'manpower', 'recruitment'] },
+  '劳工': { term: '劳务', categories: ['劳务', '劳工', 'manpower', 'recruitment'] },
+  '人力': { term: '劳务', categories: ['劳务', '劳工', 'manpower', 'recruitment'] },
+  'manpower': { term: 'manpower', categories: ['劳务', '劳工', 'manpower', 'recruitment'] },
+  'labour': { term: 'manpower', categories: ['劳务', '劳工', 'manpower', 'recruitment'] },
 };
 
 // ── Simple category-name alias map (for queries without product synonym match) ─
@@ -176,6 +182,8 @@ function extractIntent(query: string): ExtractedIntent {
   // 1. Remove intent-phrase prefixes (command words the user types but aren't product names)
   const cleaned = q
     .replace(/我想找|我在找|我要找|帮我找|请帮我找|我需要|我找|帮我|请问|你好|麻烦|能不能|能否|有没有|是否有/g, '')
+    // 1b. Question / counting words are not search terms ("有几个劳务供应商" → "劳务")
+    .replace(/有几个|有几家|有多少|一共|总共|几个|几家|多少|现在|目前/g, '')
     // 2. Remove structured intent terms
     .replace(/谁有|哪些|哪家|哪几家|谁做|谁能|找供应商|供应商|供货商|哪家公司做|which supplier|who has|find supplier|supplier|vendor/g, '')
     // 3. Remove factory/type words (already captured in supplierTypePreference)
@@ -193,7 +201,9 @@ function extractIntent(query: string): ExtractedIntent {
 
   // ── Tokenize ─────────────────────────────────────────────────────────────────
   // Split on whitespace; keep tokens ≥2 chars that aren't pure numbers/symbols
-  const rawTokens = cleaned.split(/\s+/).filter(t => t.length >= 2 && !/^[\d\W]+$/.test(t));
+  // (Unicode-aware: without the u flag \W also matched every Chinese character,
+  // so every pure-Chinese keyword such as "劳务" was dropped.)
+  const rawTokens = cleaned.split(/\s+/).filter(t => t.length >= 2 && !/^[\d\p{P}\p{S}]+$/u.test(t));
 
   // Deduplicate and remove tokens that are substrings of a matched synonym (avoid noise like "纸尿裤" when we already have matchedSynonym)
   const synonymLower = matchedSynonym?.toLowerCase() ?? '';
@@ -450,7 +460,14 @@ export default async function handler(req: Request) {
     if (clientFilters.preferredOnly) intent.preferredOnly = true;
 
     // Build supplier query
-    let supplierUrl = '/rest/v1/suppliers?status=eq.active&select=id,supplier_name_display,name_cn,name_en,short_code,supplier_type,country,city,product_categories,is_preferred,current_rating,strength_notes,website&limit=500';
+    // Most of the library is still status=under_review (e.g. all labour agents),
+    // so any query with real search terms also covers under_review (labelled in
+    // the result); archived never. A query with no search terms lists only
+    // active suppliers, exactly as before.
+    const hasSearchTerms = intent.keywords.length > 0 || !!intent.country || intent.expandedCategories.length > 0
+      || !!intent.certificationKeyword;
+    const statusFilter = hasSearchTerms ? 'in.(active,under_review)' : 'eq.active';
+    let supplierUrl = `/rest/v1/suppliers?status=${statusFilter}&select=id,status,supplier_name_display,name_cn,name_en,short_code,supplier_type,country,city,product_categories,is_preferred,current_rating,strength_notes,website&limit=1000`;
     if (intent.preferredOnly) supplierUrl += '&is_preferred=eq.true';
     if (intent.country) supplierUrl += `&country=eq.${encodeURIComponent(intent.country)}`;
 
@@ -555,6 +572,7 @@ export default async function handler(req: Request) {
         warnings.push('存在已过期认证，请核实');
       }
       if (cats.length === 0) warnings.push('品类信息未完善，搜索准确度受影响');
+      if (s.status === 'under_review') warnings.push('供应商档案待审核，信息请核实后再使用');
       // Type mismatch warnings — only when factory was explicitly requested
       if (intent.supplierTypePreference === 'Factory') {
         if (typeMatchStatus === 'unknown') warnings.push('供应商类型未确认（Unknown），需核实是否为工厂');
@@ -565,6 +583,7 @@ export default async function handler(req: Request) {
         supplierId: s.id,
         supplierName: s.supplier_name_display,
         shortCode: s.short_code,
+        supplierStatus: s.status ?? null,
         matchScore: result.score,
         matchType: result.matchType,
         matchReason: result.matchReason,
