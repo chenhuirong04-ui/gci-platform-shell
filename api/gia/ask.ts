@@ -123,6 +123,9 @@ function answerPrompt(question: string, results: ToolRun[]): { systemInstruction
       'Receivables, sales and collections: report the effective figures (totals / total / totalOutstanding / totalAmount). ' +
       'A "voided" block (已作废订单及其收款) or "excluded" block is NOT receivable or revenue: mention it on its own line ' +
       'only if non-empty, and never add it into the effective figures. ' +
+      'In receivables_summary, 应收账款 / 当前应收 = orderReceivables.total only (= 经营看板「当前应收余额」). ' +
+      'consignmentReceivables (寄售待结算) and invoiceReceivables (发票应收) are different scopes: list each on its own line ' +
+      'with its own label, and never add them into one "总计" with the order receivables. ' +
       'Plain text only: no Markdown (no **, no #); use "•" for list items. ' +
       'Do not suggest that you changed any data; you cannot write anything.',
     prompt: `Today (Dubai): ${today()}\nQuestion: ${question}\n\nTool results (JSON):\n${JSON.stringify(payload)}`,
