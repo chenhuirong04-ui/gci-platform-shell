@@ -1,6 +1,6 @@
 // GET /api/trade/payment-list?customer=&order=&period=   (GIA P3 step 1, read-only)
 // Customer payments recorded in the Trade module (table `payments`), joined to
-// `orders` for the customer name. period: today | week | month | YYYY-MM | all
+// `orders` for the customer name. period: today | week | month | YYYY-MM | YYYY | all
 // (default all). Auth: requireModule(trade|finance|crm) — same as sales-summary.
 // totalAmount = payments of 有效订单 only (isEffectiveOrder, same as 经营看板 已收款);
 // payments on voided / consignment / adjustment / unknown orders are listed with
@@ -26,6 +26,7 @@ export function periodRange(period: string, now = new Date()): { from: string; t
     const [y, m] = p.split('-').map(Number);
     return { from: `${p}-01`, to: day(new Date(Date.UTC(y, m, 1))) };
   }
+  if (/^\d{4}$/.test(p)) return { from: `${p}-01-01`, to: `${Number(p) + 1}-01-01` };
   if (p === 'today') return { from: day(d), to: day(add(d, 1)) };
   if (p === 'week') return { from: day(add(d, -d.getUTCDay())), to: day(add(d, 1)) };
   if (p === 'month') return { from: `${day(d).slice(0, 7)}-01`, to: day(add(d, 1)) };

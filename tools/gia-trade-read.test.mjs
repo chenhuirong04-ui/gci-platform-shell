@@ -150,6 +150,7 @@ test('payment_list periodRange: month / YYYY-MM / all (Dubai time)', () => {
   assert.deepEqual(periodRange('2026-12', now), { from: '2026-12-01', to: '2027-01-01' });
   assert.deepEqual(periodRange('month', now), { from: '2026-11-01', to: '2026-11-19' });
   assert.deepEqual(periodRange('today', now), { from: '2026-11-18', to: '2026-11-19' });
+  assert.deepEqual(periodRange('2026', now), { from: '2026-01-01', to: '2027-01-01' });
   assert.equal(periodRange('all', now), null);
 });
 

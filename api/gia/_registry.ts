@@ -170,7 +170,7 @@ export const GIA_TOOLS: readonly GiaTool[] = [
   },
   {
     id: 'payment_list',
-    description: 'Customer payments received on Trade orders: by customer, order number and/or period (today|week|month|YYYY-MM|all).',
+    description: 'Customer payments received on Trade orders: by customer, order number and/or period (today|week|month|YYYY-MM|YYYY|all).',
     endpoint: '/api/trade/payment-list', method: 'GET',
     modules: ['trade', 'finance', 'crm'], sensitive: true, giaModules: ['finance'],
     sensitiveReason: 'payment amounts',
