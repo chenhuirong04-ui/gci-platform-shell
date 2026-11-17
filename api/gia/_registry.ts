@@ -148,6 +148,49 @@ export const GIA_TOOLS: readonly GiaTool[] = [
     sensitiveReason: 'aggregates sales and receivables',
     args: [],
   },
+  // GIA P3 step 1 (2026-11-17). The two service_* tools wrap existing
+  // endpoints unchanged; the three trade_* tools wrap new read-only endpoints
+  // under api/trade/ (same requireModule list and table access as
+  // /api/ai/sales-summary). Amount-bearing tools follow the finance rule above.
+  {
+    id: 'pi_lookup',
+    description: 'Trade PI (proforma invoices): by customer and/or PI number; amounts, status, converted order, line items when ≤3 match.',
+    endpoint: '/api/trade/pi-lookup', method: 'GET',
+    modules: ['trade', 'finance', 'crm'], sensitive: true, giaModules: ['finance'],
+    sensitiveReason: 'PI amounts',
+    args: [{ name: 'customer', required: false }, { name: 'pi', required: false }],
+  },
+  {
+    id: 'order_lookup',
+    description: 'Trade sales orders (SO): by customer, order number and/or status (PENDING|PARTIAL|PAID|CONSIGNMENT|VOIDED|UNPAID); total, paid, outstanding per order, line items when ≤3 match.',
+    endpoint: '/api/trade/order-lookup', method: 'GET',
+    modules: ['trade', 'finance', 'crm'], sensitive: true, giaModules: ['finance'],
+    sensitiveReason: 'order amounts, paid and outstanding',
+    args: [{ name: 'customer', required: false }, { name: 'order', required: false }, { name: 'status', required: false }],
+  },
+  {
+    id: 'payment_list',
+    description: 'Customer payments received on Trade orders: by customer, order number and/or period (today|week|month|YYYY-MM|YYYY|all).',
+    endpoint: '/api/trade/payment-list', method: 'GET',
+    modules: ['trade', 'finance', 'crm'], sensitive: true, giaModules: ['finance'],
+    sensitiveReason: 'payment amounts',
+    args: [{ name: 'customer', required: false }, { name: 'order', required: false }, { name: 'period', required: false }],
+  },
+  {
+    id: 'service_receivables_summary',
+    description: 'Company Services (enterprise services) receivables: outstanding, overdue, due soon.',
+    endpoint: '/api/bs/receivables-brief-summary', method: 'GET',
+    modules: ['quotation', 'crm'], sensitive: true, giaModules: ['finance'],
+    sensitiveReason: 'receivable amounts',
+    args: [],
+  },
+  {
+    id: 'service_contract_status',
+    description: 'Company Services contract / quote status: revision requested, expired, contract pending.',
+    endpoint: '/api/bs/contract-status-brief-summary', method: 'GET',
+    modules: ['quotation', 'crm'], sensitive: false,
+    args: [],
+  },
 ];
 
 export function findTool(id: unknown): GiaTool | null {

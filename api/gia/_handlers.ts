@@ -13,6 +13,11 @@ import salesSummary from '../ai/sales-summary';
 import invoicePendingSummary from '../invoice/pending-summary';
 import supplierSearch from '../suppliers/search';
 import dailyBrief from '../ai/daily-brief';
+import piLookup from '../trade/pi-lookup';
+import orderLookup from '../trade/order-lookup';
+import paymentList from '../trade/payment-list';
+import serviceReceivablesSummary from '../bs/receivables-brief-summary';
+import serviceContractStatus from '../bs/contract-status-brief-summary';
 
 export type GiaHandler = (request: Request) => Promise<Response>;
 
@@ -30,4 +35,9 @@ export const GIA_HANDLERS: Record<string, GiaHandler> = {
   invoice_pending_summary: invoicePendingSummary,
   supplier_search: supplierSearch,
   daily_brief: dailyBrief,
+  pi_lookup: piLookup,
+  order_lookup: orderLookup,
+  payment_list: paymentList,
+  service_receivables_summary: serviceReceivablesSummary,
+  service_contract_status: serviceContractStatus,
 };

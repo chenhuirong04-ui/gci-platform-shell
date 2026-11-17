@@ -39,6 +39,7 @@ async function sbGet(supabaseUrl: string, tradeAnonHdr: Record<string, string>, 
 }
 
 import { requireModule, legacyTradeAnonHeaders } from '../_lib/auth';
+import { currentOrderRows, isEffectiveOrder, loadPayloads, voidedSummary } from '../trade/_read';
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
@@ -58,14 +59,14 @@ export default async function handler(request: Request): Promise<Response> {
   const todayMs  = todayStart();
 
   // ── Parallel queries ──────────────────────────────────────────────────────
-  const [quotRows, orderRows, stockRows, invoiceRows] = await Promise.all([
+  const [quotRows, orderRows, stockRows, invoiceRows, paymentRows] = await Promise.all([
     // 1. quotation_records — flat schema
     sbGet(supabaseUrl, tradeAnonHdr,
       `quotation_records?select=id,quote_no,customer_name,grand_total,status,created_at,quote_date&order=created_at.desc&limit=200`),
 
-    // 2. orders — payload wrapped, fetch all active
+    // 2. orders — payload wrapped; newest row per order number (Trade app rule)
     sbGet(supabaseUrl, tradeAnonHdr,
-      `orders?select=id,created_at,state,payload&state=eq.active&order=created_at.desc&limit=1000`),
+      `orders?select=id,created_at,state,payload&order=updated_at.desc&limit=2000`).then(currentOrderRows),
 
     // 3. consignment_stock — payload wrapped
     sbGet(supabaseUrl, tradeAnonHdr,
@@ -74,6 +75,9 @@ export default async function handler(request: Request): Promise<Response> {
     // 4. invoice_drafts — flat schema
     sbGet(supabaseUrl, tradeAnonHdr,
       `invoice_drafts?select=id,invoice_no,customer_name,total,status,invoice_date,due_date&order=created_at.desc&limit=200`),
+
+    // 5. payments — current rows; only to report payments on voided orders
+    loadPayloads<any>('payments').catch(() => [] as any[]),
   ]);
 
   // ── Section 1: Quotation follow-ups ───────────────────────────────────────
@@ -93,8 +97,9 @@ export default async function handler(request: Request): Promise<Response> {
 
   // ── Section 2: Receivables ────────────────────────────────────────────────
   const orderPayloads = orderRows.map(r => r.payload).filter(Boolean);
+  // Shared 有效应收 rule (= 经营看板 当前应收余额): not voided / consignment / adjustment
   const unpaidOrders  = orderPayloads.filter(p =>
-    (Number(p.outstandingAmount) || 0) > 0 && p.status !== 'VOIDED'
+    (Number(p.outstandingAmount) || 0) > 0 && isEffectiveOrder(p)
   );
   const totalOutstanding = unpaidOrders.reduce((s, p) => s + (Number(p.outstandingAmount) || 0), 0);
 
@@ -182,6 +187,7 @@ export default async function handler(request: Request): Promise<Response> {
       unpaidOrderCount: unpaidOrders.length,
       totalOutstanding,
       topCustomers: topReceivables,
+      voided: voidedSummary(orderPayloads, paymentRows),
     },
     sales: {
       todayTotal:   todaySalesTotal,

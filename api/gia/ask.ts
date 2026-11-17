@@ -89,6 +89,9 @@ function planPrompt(question: string, tools: GiaTool[]): { systemInstruction: st
       'Customer consignment stock (寄售, 客户处) → check_inventory. If the question mentions both, call both. ' +
       'Never answer a plain stock question from check_inventory alone. ' +
       'Use resolve_product only when the user asks which catalog products match. ' +
+      'Trade documents: PI / 形式发票 / proforma → pi_lookup; 销售订单 / SO / 订单 (amount, paid, unpaid per order) → order_lookup ' +
+      '(status UNPAID for 未付清/还欠 orders); 收款 / 付款记录 / 客户付了多少 → payment_list. quotation_history is the Quotation Center ' +
+      '(GCI-… quotes), not Trade PIs. 企业服务 / 公司服务 receivables → service_receivables_summary; 企业服务合同状态 → service_contract_status. ' +
       'Call every tool the question needs in one plan (e.g. stock + who was quoted → inventory_table_alerts and quotation_history). ' +
       'If no listed tool can answer the question (small talk, weather, general knowledge, writing tasks, ' +
       'or a request to change data), return {"calls": []}.',
@@ -117,6 +120,12 @@ function answerPrompt(question: string, results: ToolRun[]): { systemInstruction
       'inventory_table_alerts with a productFilter lists every matching warehouse row in alertItems (alertType "normal" ' +
       'is not an alert): report currentQty with its unit and warehouse. Report warehouse stock first; if consignment ' +
       'stock is also present, list it separately and never add the two together. ' +
+      'Receivables, sales and collections: report the effective figures (totals / total / totalOutstanding / totalAmount). ' +
+      'A "voided" block (已作废订单及其收款) or "excluded" block is NOT receivable or revenue: mention it on its own line ' +
+      'only if non-empty, and never add it into the effective figures. ' +
+      'In receivables_summary, 应收账款 / 当前应收 = orderReceivables.total only (= 经营看板「当前应收余额」). ' +
+      'consignmentReceivables (寄售待结算) and invoiceReceivables (发票应收) are different scopes: list each on its own line ' +
+      'with its own label, and never add them into one "总计" with the order receivables. ' +
       'Plain text only: no Markdown (no **, no #); use "•" for list items. ' +
       'Do not suggest that you changed any data; you cannot write anything.',
     prompt: `Today (Dubai): ${today()}\nQuestion: ${question}\n\nTool results (JSON):\n${JSON.stringify(payload)}`,

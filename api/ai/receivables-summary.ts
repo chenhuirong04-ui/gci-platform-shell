@@ -47,10 +47,9 @@ function buildOrderReceivables(dbRows: any[], now: number) {
   const rows = payloads.filter(p => {
     const outstanding = Number(p.outstandingAmount) || 0;
     if (outstanding <= 0) return false;
-    if (p.status === 'VOIDED') return false;
+    // Shared 有效应收 rule (= 经营看板 当前应收余额): not voided / consignment / adjustment
+    if (!isEffectiveOrder(p)) return false;
     if (p.status === 'CONSIGNMENT') return false;              // belongs in consignment view
-    if ((p.transactionMode || '') === 'Consignment') return false;
-    if ((p.order_type || 'NORMAL') !== 'NORMAL') return false; // exclude adjustments
     return true;
   });
 
@@ -203,6 +202,7 @@ function buildInvoiceReceivables(invoiceRows: any[], now: number) {
 // ── Handler ──────────────────────────────────────────────────────────────────
 
 import { requireModule, legacyTradeAnonHeaders } from '../_lib/auth';
+import { currentOrderRows, isEffectiveOrder, loadPayloads, voidedSummary } from '../trade/_read';
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
@@ -219,9 +219,9 @@ export default async function handler(request: Request): Promise<Response> {
 
   const now = Date.now();
 
-  const [ordersRes, consignRes, invoiceRes] = await Promise.allSettled([
-    // A: orders — all active, up to 1000 rows; filter in memory (JSONB payload)
-    sbGet(supabaseUrl, tradeAnonHdr, 'orders?select=id,state,payload&state=eq.active&order=created_at.desc&limit=1000'),
+  const [ordersRes, consignRes, invoiceRes, paymentsRes] = await Promise.allSettled([
+    // A: orders — newest row per order number (Trade app rule); filter in memory (JSONB payload)
+    sbGet(supabaseUrl, tradeAnonHdr, 'orders?select=id,created_at,state,payload&order=updated_at.desc&limit=2000').then(currentOrderRows),
     // B: consignment_stock — active rows
     sbGet(supabaseUrl, tradeAnonHdr, 'consignment_stock?select=id,state,payload&state=eq.active&order=created_at.desc&limit=500'),
     // C: invoice_drafts — flat schema; only issued+approved+waiting_approval
@@ -229,6 +229,8 @@ export default async function handler(request: Request): Promise<Response> {
       'invoice_drafts?select=id,invoice_no,customer_name,total,status,invoice_date,due_date'
       + '&or=(status.eq.issued,status.eq.approved,status.eq.waiting_approval)'
       + '&order=created_at.desc&limit=200'),
+    // D: payments — current rows; only used to report payments on voided orders
+    loadPayloads<any>('payments'),
   ]);
 
   const warnings: string[] = [];
@@ -236,6 +238,13 @@ export default async function handler(request: Request): Promise<Response> {
   const orderReceivables = ordersRes.status === 'fulfilled'
     ? buildOrderReceivables(ordersRes.value, now)
     : (warnings.push('订单应收查询失败：' + (ordersRes as any).reason?.message), null);
+
+  if (orderReceivables && ordersRes.status === 'fulfilled') {
+    (orderReceivables as any).voided = voidedSummary(
+      ordersRes.value.map((r: any) => r.payload),
+      paymentsRes.status === 'fulfilled' ? paymentsRes.value : [],
+    );
+  }
 
   const consignmentReceivables = consignRes.status === 'fulfilled'
     ? buildConsignmentReceivables(consignRes.value)

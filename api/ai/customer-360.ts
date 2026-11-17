@@ -43,6 +43,7 @@ const INVOICE_STATUS_ZH: Record<string, string> = {
 };
 
 import { requireModule, legacyTradeAnonHeaders } from '../_lib/auth';
+import { currentOrderRows, isEffectiveOrder, loadPayloads, voidedSummary, payloadIn } from '../trade/_read';
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
@@ -88,7 +89,7 @@ export default async function handler(request: Request): Promise<Response> {
 
     // TECH DEBT: orders uses JSONB payload — cannot filter server-side, filtered in memory (≤500 rows)
     sbGet(supabaseUrl, tradeAnonHdr,
-      `orders?select=id,created_at,state,payload&state=eq.active&order=created_at.desc&limit=500`),
+      `orders?select=id,created_at,state,payload&order=updated_at.desc&limit=2000`).then(currentOrderRows),
 
     // TECH DEBT: consignment_stock uses JSONB payload — filtered in memory (≤500 rows)
     sbGet(supabaseUrl, tradeAnonHdr,
@@ -134,11 +135,21 @@ export default async function handler(request: Request): Promise<Response> {
     statusZh:          ORDER_STATUS_ZH[p.status] || p.status,
     createdAt:         p.createdAt || '',
     dueDate:           p.dueDate  || '',
+    effective:         isEffectiveOrder(p),
   }));
 
-  const totalOutstanding = orders.reduce((s, o) => s + o.outstandingAmount, 0);
-  const totalOrderAmt    = orders.reduce((s, o) => s + o.grandTotal, 0);
-  const activeOrders     = orders.filter(o => o.status !== 'VOIDED');
+  // Shared 有效应收 rule (= 经营看板 / receivables-summary): voided, consignment and
+  // adjustment orders are listed but never count toward amounts or receivables.
+  const activeOrders     = orders.filter(o => o.effective);
+  const totalOutstanding = activeOrders.reduce((s, o) => s + o.outstandingAmount, 0);
+  const totalOrderAmt    = activeOrders.reduce((s, o) => s + o.grandTotal, 0);
+
+  // Voided orders + payments still recorded on them — reported separately only.
+  const voidedIds  = matchedOrders.filter(p => p.status === 'VOIDED' && p.id).map(p => String(p.id));
+  const voidedPays = voidedIds.length
+    ? await loadPayloads<any>('payments', payloadIn('orderId', voidedIds)).catch(() => [] as any[])
+    : [];
+  const voided     = voidedSummary(matchedOrders, voidedPays);
 
   // ── Consignment ───────────────────────────────────────────────────────────
   const consignment = matchedStock.map(p => ({
@@ -198,6 +209,7 @@ export default async function handler(request: Request): Promise<Response> {
       consignmentCount:  consignment.length,
       unsettledCount:    unsettledConsign.length,
       invoiceCount:      invoices.length,
+      voided,
     },
     quotes,
     orders,
