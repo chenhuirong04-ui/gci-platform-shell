@@ -153,12 +153,10 @@ export function buildProfitability(
   const cq = norm(opts.customer);
   const projectsOut = allProjects.filter((p) => (!pq || norm(p.projectName).includes(pq)) && (!cq || norm(p.customerName).includes(cq)));
   const customersOut = allCustomers.filter((c) => !cq || norm(c.customerName).includes(cq));
+  const filtered = !!(pq || cq);
+  const name = [opts.project, opts.customer].filter(Boolean).join(' / ');
 
-  return {
-    period: periodKey,
-    month,
-    filters: { project: opts.project || null, customer: opts.customer || null },
-    projectTotals: {
+  const totals = {
       revenue: kRev, directCost: kCost, grossProfit: kGp, grossMargin: pct(kGp, kRev),
       projectCount: allProjects.length,
       projectsMissingCost: missing.length,
@@ -166,9 +164,25 @@ export function buildProfitability(
       warning: missing.length
         ? `${missing.length} 个项目有收入但未录入成本，合计毛利不能视为实际盈利`
         : allProjects.length ? '成本仅含已关联到项目的支出，可能不完整' : null,
-    },
+  };
+
+  return {
+    period: periodKey,
+    month,
+    filters: { project: opts.project || null, customer: opts.customer || null },
+    // A named project / customer: only its own rows are returned. The company-wide
+    // project totals and the unlinked block are left out so they can never be
+    // read as that project's / customer's figures.
+    selection: filtered ? {
+      matchedProjects: projectsOut.length,
+      matchedCustomers: customersOut.length,
+      message: projectsOut.length || customersOut.length
+        ? null
+        : `财务中心「项目与客户利润」中没有「${name}」在该期间的收入、成本或利润记录（无数据，不是 0 利润）`,
+    } : null,
+    projectTotals: filtered ? null : totals,
     projects: projectsOut.map(({ customerId, ...r }) => r),
-    unlinked: legacyRevenue > 0 || legacyCost > 0 ? {
+    unlinked: !filtered && (legacyRevenue > 0 || legacyCost > 0) ? {
       label: '未关联项目（历史）',
       revenue: legacyRevenue, cost: legacyCost, net: round2(legacyRevenue - legacyCost),
       note: '未关联项目的收支，不计入项目利润，也不是某个项目或客户的利润',

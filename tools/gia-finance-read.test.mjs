@@ -274,6 +274,18 @@ test('profitability: periods like the page (this_month / last_month / YYYY-MM / 
   assert.deepEqual([empty.projectTotals.revenue, empty.projectTotals.grossMargin, empty.projectTotals.warning, empty.unlinked], [0, null, null, null]);
 });
 
+test('profitability: a named customer / project with no data → explicit 无数据, no company totals or unlinked block to misread as 0 profit', () => {
+  const { buildProfitability } = mods['profitability'];
+  const b = buildProfitability(P_TXNS, P_ORDERS, P_PROJECTS, P_CUSTOMERS, { customer: 'Easy4me', now: NOW });
+  assert.deepEqual([b.projects.length, b.customers.length, b.projectTotals, b.unlinked], [0, 0, null, null]);
+  assert.match(b.selection.message, /Easy4me.*无数据，不是 0 利润/);
+  const hit = buildProfitability(P_TXNS, P_ORDERS, P_PROJECTS, P_CUSTOMERS, { project: 'hotel', now: NOW });
+  assert.deepEqual([hit.selection.matchedProjects, hit.selection.message, hit.projectTotals], [1, null, null]);
+  const none = buildProfitability(P_TXNS, P_ORDERS, P_PROJECTS, P_CUSTOMERS, { now: NOW });
+  assert.equal(none.selection, null);
+  assert.equal(none.projectTotals.revenue, 1500);
+});
+
 test('profitability reuses the page classifier (imported, not copied)', () => {
   const src = fs.readFileSync(path.join(ROOT, 'api/finance/profitability.ts'), 'utf8');
   assert.match(src, /from '\.\.\/\.\.\/modules\/trade\/services\/transactionCategories'/);

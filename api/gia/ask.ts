@@ -138,6 +138,7 @@ function answerPrompt(question: string, results: ToolRun[]): { systemInstruction
       'if "linked_only", say the profit is based on cost linked so far and may be incomplete. Repeat projectTotals.warning when present. ' +
       'Customers have no customer-level cost: give revenue / currentAR, and profit only via viaProjects. ' +
       'The "unlinked" block is not any project\'s or customer\'s profit. ' +
+      'If selection.message is present, say exactly that (无数据) and give no revenue, cost or profit figures — never report 0 profit for it. ' +
       'Plain text only: no Markdown (no **, no #); use "•" for list items. ' +
       'Do not suggest that you changed any data; you cannot write anything.',
     prompt: `Today (Dubai): ${today()}\nQuestion: ${question}\n\nTool results (JSON):\n${JSON.stringify(payload)}`,
