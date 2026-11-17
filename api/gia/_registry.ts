@@ -196,7 +196,7 @@ export const GIA_TOOLS: readonly GiaTool[] = [
   // same calculations as the Finance Center pages — see api/finance/_read.ts).
   {
     id: 'bank_balances',
-    description: 'Finance Center bank / cash accounts: balance per active account, bank total, cash total, cheques pending clearance.',
+    description: 'Finance Center bank / cash accounts: balance and currency per active account, totals per currency (company bank, company cash; personal accounts separate, never company funds), cheques pending clearance.',
     endpoint: '/api/finance/bank-balances', method: 'GET',
     modules: ['finance'], sensitive: true,
     sensitiveReason: 'bank balances',

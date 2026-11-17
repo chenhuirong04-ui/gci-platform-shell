@@ -138,11 +138,36 @@ test('bank_balances: opening + Σin − Σout, uncleared cheques excluded; bank 
   assert.equal(enbd.balance, 1599.5);           // 1000 + 500 − 200.5 + 300 (cleared); 999 pending cheque not counted
   assert.equal(enbd.lastTransactionDate, '2026-11-04');
   assert.equal(b.accounts.find((a) => a.type === 'Cash').balance, 30);
-  assert.deepEqual([b.bankTotal, b.cashTotal], [1599.5, 30]);
+  assert.deepEqual(b.totalsByCurrency, [{
+    currency: 'AED', companyBank: { accounts: 1, balance: 1599.5 }, companyCash: { accounts: 1, balance: 30 }, companyTotal: 1629.5, personal: null,
+  }]);
+  assert.equal(b.bankTotal, undefined); // no cross-currency single total any more
   assert.deepEqual(b.pendingCheques.incoming, { count: 1, amount: 999 });
   assert.deepEqual(b.pendingCheques.outgoing, { count: 1, amount: 75 });
   assert.doesNotMatch(JSON.stringify(b), /SECRET|iban|account_number|swift/i);
   assert.ok(seen.find((s) => s.u.includes('/bank_accounts?')).u.includes('is_active=eq.true'));
+});
+
+test('bank_balances multi-currency: totals per currency, never added across currencies or converted; personal accounts separate', () => {
+  const { buildBankBalances } = mods['bank-balances'];
+  const accounts = [
+    { id: 'c1', account_name: 'WIO AED', account_type: 'Corporate', currency: 'AED', opening_balance: 3.85 },
+    { id: 'c2', account_name: 'WIO USD', account_type: 'Corporate', currency: 'USD', opening_balance: 100 },
+    { id: 'p1', account_name: 'WIO Personal AED', account_type: 'Personal', currency: 'AED', opening_balance: 500 },
+    { id: 'k1', account_name: 'Cash', account_type: 'Cash', currency: 'AED', opening_balance: 20 },
+    { id: 'o1', account_name: 'Other EUR', account_type: 'Other', currency: 'eur', opening_balance: 7 },
+  ];
+  const b = buildBankBalances(accounts, []);
+  assert.deepEqual(b.totalsByCurrency, [
+    { currency: 'AED', companyBank: { accounts: 1, balance: 3.85 }, companyCash: { accounts: 1, balance: 20 }, companyTotal: 23.85, personal: { accounts: 1, balance: 500 } },
+    { currency: 'EUR', companyBank: { accounts: 1, balance: 7 }, companyCash: null, companyTotal: 7, personal: null },
+    { currency: 'USD', companyBank: { accounts: 1, balance: 100 }, companyCash: null, companyTotal: 100, personal: null },
+  ]);
+  const personal = b.accounts.find((a) => a.accountName === 'WIO Personal AED');
+  assert.deepEqual([personal.scope, personal.scopeZh, personal.balance, personal.currency], ['personal', '个人账户（非公司资金）', 500, 'AED']);
+  assert.deepEqual(b.accounts.map((a) => [a.accountName, a.currency, a.balance]),
+    [['WIO AED', 'AED', 3.85], ['WIO USD', 'USD', 100], ['WIO Personal AED', 'AED', 500], ['Cash', 'AED', 20], ['Other EUR', 'EUR', 7]]);
+  assert.doesNotMatch(JSON.stringify(b), /bankTotal|cashTotal|exchange|fx|"rate"/i);
 });
 
 test('payables_due: open = not PAID/CANCELLED; overdue / due in 7 days (Dubai date); pending supplier cheques; supplier filter', async () => {
