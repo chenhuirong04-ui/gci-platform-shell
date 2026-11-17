@@ -137,9 +137,11 @@ export default async function handler(request: Request): Promise<Response> {
     dueDate:           p.dueDate  || '',
   }));
 
-  const totalOutstanding = orders.reduce((s, o) => s + o.outstandingAmount, 0);
-  const totalOrderAmt    = orders.reduce((s, o) => s + o.grandTotal, 0);
+  // VOIDED orders are listed but never count toward amounts or receivables
+  // (same as receivables-summary and the Trade app's 应收核销).
   const activeOrders     = orders.filter(o => o.status !== 'VOIDED');
+  const totalOutstanding = activeOrders.reduce((s, o) => s + o.outstandingAmount, 0);
+  const totalOrderAmt    = activeOrders.reduce((s, o) => s + o.grandTotal, 0);
 
   // ── Consignment ───────────────────────────────────────────────────────────
   const consignment = matchedStock.map(p => ({

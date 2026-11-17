@@ -234,3 +234,17 @@ test('customer-360 and daily-brief read orders newest-first without a state pre-
     assert.ok(/currentOrderRows\(/.test(src) || /\.then\(currentOrderRows\)/.test(src), rel);
   }
 });
+
+test('customer-360: voided orders are listed but not counted in order amount / outstanding', async () => {
+  const handler = await buildEndpoint('api/ai/customer-360.ts');
+  const rows = [
+    { id: 'v1', created_at: '2026-07-07T02:15:00Z', state: 'active', payload: { id: 'SO-20260707-2203', customerName: 'BINGOMART 1+1', grandTotal: 703.5, paidAmount: 0, outstandingAmount: 703.5, status: 'VOIDED', createdAt: '2026-07-07T02:15:00Z' } },
+    { id: 'p1', created_at: '2026-06-01T00:00:00Z', state: 'active', payload: { id: 'SO-X', customerName: 'BINGOMART 1+1', grandTotal: 100, paidAmount: 40, outstandingAmount: 60, status: 'PARTIAL', createdAt: '2026-06-01T00:00:00Z' } },
+  ];
+  globalThis.fetch = async (url) => new Response(JSON.stringify(/\/rest\/v1\/orders\?/.test(decodeURIComponent(String(url))) ? rows : []), { status: 200 });
+  const body = await (await handler(new Request('https://x/api/ai/customer-360?customer=BINGOMART', { headers: { authorization: 'Bearer u' } }))).json();
+  assert.equal(body.summary.orderCount, 1);
+  assert.equal(body.summary.totalOrderAmt, 100);
+  assert.equal(body.summary.totalOutstanding, 60);
+  assert.equal(body.orders.length, 2); // still listed
+});
