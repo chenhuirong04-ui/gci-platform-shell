@@ -11,7 +11,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { rolldown } from 'rolldown';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const NAMES = ['bank-balances', 'payables-due', 'pending-vouchers', 'reconciliation-status'];
+const NAMES = ['bank-balances', 'payables-due', 'pending-vouchers', 'reconciliation-status', 'profitability'];
 
 const ACCOUNTS = [
   { id: 'a1', account_name: 'ENBD Corporate', account_type: 'Corporate', bank_name: 'ENBD', currency: 'AED', opening_balance: 1000, is_active: true, iban: 'AE00SECRET' },
@@ -86,12 +86,14 @@ before(async () => {
   const TABLES = {
     bank_accounts: ACCOUNTS, supplier_payables: PAYABLES, supplier_payments: SUPPLIER_CHEQUES,
     finance_vouchers: VOUCHERS, bank_statement_imports: IMPORTS, bank_statement_lines: LINES,
+    crm_projects: [], crm_customers: [],
   };
   globalThis.fetch = async (url, init = {}) => {
     const u = decodeURIComponent(String(url));
     seen.push({ u, method: init.method || 'GET', auth: init.headers?.Authorization });
     const table = u.match(/\/rest\/v1\/([a-z_]+)\?/)[1];
     if (table === 'transactions') return new Response(JSON.stringify(TXNS.map((payload) => ({ payload }))), { status: 200 });
+    if (table === 'orders') return new Response(JSON.stringify([]), { status: 200 });
     return new Response(JSON.stringify(TABLES[table] || []), { status: 200 });
   };
 });
@@ -118,7 +120,7 @@ test('read-only: GET only; RLS tables read with the caller token, transactions w
     await call(name);
     assert.ok(seen.length > 0 && seen.every((s) => s.method === 'GET'), name);
     for (const s of seen) {
-      if (s.u.includes('/rest/v1/transactions?')) assert.equal(s.auth, 'Bearer anon-stub', name);
+      if (/\/rest\/v1\/(transactions|orders)\?/.test(s.u)) assert.equal(s.auth, 'Bearer anon-stub', name);
       else assert.equal(s.auth, 'Bearer user-token', `${name}: ${s.u}`);
     }
     const res = await mods[name].default(new Request(`https://x/api/finance/${name}`, { method: 'POST', headers: { authorization: 'Bearer u' } }));
@@ -199,4 +201,93 @@ test('bank_reconciliation_status: line status counts, processed %, pending amoun
   assert.equal(b.byAccount.length, 1);
   assert.deepEqual([b.byAccount[0].accountName, b.byAccount[0].lastImportAt, b.byAccount[0].lastImportFile], ['ENBD Corporate', '2026-11-15', 'nov.pdf']);
   for (const s of seen) assert.doesNotMatch(s.u, /storage_path|select=\*/);
+});
+
+// ── P3 step 3: 项目与客户利润 — same calculation as FinanceProfitability.tsx ──
+const P_TXNS = [
+  // Project A: revenue 1000 (order payment) + linked cost 400 (manual expense with project_id)
+  { id: 'r1', date: '2026-11-03', type: 'in', amount: 1000, ref_type: 'ORDER_PAYMENT', project_id: 'pA', customer_id: 'cX', payment_method: 'BANK_TRANSFER' },
+  { id: 'c1', date: '2026-11-04', type: 'out', amount: 400, category: 'OTHER_EXPENSE', project_id: 'pA', payment_method: 'BANK_TRANSFER' },
+  // Project B: revenue 500, NO cost linked → must not be called profit
+  { id: 'r2', date: '2026-11-05', type: 'in', amount: 500, ref_type: 'ORDER_PAYMENT', project_id: 'pB', customer_id: 'cY', payment_method: 'CASH' },
+  // Unlinked (legacy): sales 300, supplier payment 120
+  { id: 'r3', date: '2026-10-20', type: 'in', amount: 300, ref_type: 'ORDER_PAYMENT', customer: 'Walk-in', payment_method: 'CASH' },
+  { id: 'c2', date: '2026-11-06', type: 'out', amount: 120, ref_type: 'SUPPLIER_PAYMENT', payment_method: 'BANK_TRANSFER' },
+  // Pending cheque on project A — not counted (page rule)
+  { id: 'r4', date: '2026-11-07', type: 'in', amount: 9999, ref_type: 'ORDER_PAYMENT', project_id: 'pA', customer_id: 'cX', payment_method: 'CHEQUE', cheque_status: 'PENDING' },
+  // Internal transfer — not operating, never revenue
+  { id: 'x1', date: '2026-11-08', type: 'in', amount: 777, category: 'INTERNAL_TRANSFER', project_id: 'pA', payment_method: 'BANK_TRANSFER' },
+];
+const P_ORDERS = [
+  { crmProjectId: 'pA', crmCustomerId: 'cX', status: 'PARTIAL', outstandingAmount: 250 },
+  { crmProjectId: 'pB', crmCustomerId: 'cY', status: 'VOIDED', outstandingAmount: 80 },   // not AR
+];
+const P_PROJECTS = [{ id: 'pA', project_name: 'Hotel FF&E', customer_id: 'cX' }, { id: 'pB', project_name: 'Office Fit-out', customer_id: 'cY' }];
+const P_CUSTOMERS = [{ id: 'cX', customer_name: 'Alpha Hotels' }, { id: 'cY', customer_name: 'Beta Offices' }];
+const NOW = new Date('2026-11-17T08:00:00Z');
+
+test('profitability: project revenue / cost / profit / margin exactly as the page (operating only, cleared only, unlinked separate)', () => {
+  const { buildProfitability } = mods['profitability'];
+  const b = buildProfitability(P_TXNS, P_ORDERS, P_PROJECTS, P_CUSTOMERS, { period: 'all', now: NOW });
+  const a = b.projects.find((p) => p.projectName === 'Hotel FF&E');
+  assert.deepEqual([a.revenue, a.directCost, a.grossProfit, a.grossMargin, a.collected, a.outstanding, a.customerName],
+    [1000, 400, 600, 60, 1000, 250, 'Alpha Hotels']);
+  assert.deepEqual(b.projectTotals.revenue, 1500);
+  assert.deepEqual([b.projectTotals.directCost, b.projectTotals.grossProfit, b.projectTotals.grossMargin], [400, 1100, 73.3333]); // page: roundTo2(gp/rev*10000)/100, shown as 73.3%
+  assert.deepEqual(b.unlinked && [b.unlinked.revenue, b.unlinked.cost, b.unlinked.net], [300, 120, 180]);
+});
+
+test('profitability: missing cost is flagged, never treated as profit; linked cost marked possibly incomplete', () => {
+  const { buildProfitability } = mods['profitability'];
+  const b = buildProfitability(P_TXNS, P_ORDERS, P_PROJECTS, P_CUSTOMERS, { period: 'all', now: NOW });
+  const pB = b.projects.find((p) => p.projectName === 'Office Fit-out');
+  assert.deepEqual([pB.costStatus, pB.costRecorded, pB.outstanding], ['missing', false, 0]);
+  assert.match(pB.profitNote, /不能视为盈利/);
+  const pA = b.projects.find((p) => p.projectName === 'Hotel FF&E');
+  assert.deepEqual([pA.costStatus, pA.costRecorded], ['linked_only', true]);
+  assert.match(pA.profitNote, /可能不完整/);
+  assert.deepEqual([b.projectTotals.projectsMissingCost, b.projectTotals.allCostsRecorded], [1, false]);
+  assert.match(b.projectTotals.warning, /不能视为实际盈利/);
+});
+
+test('profitability: customers — revenue / AR from the page; no customer-level cost; profit only via projects', () => {
+  const { buildProfitability } = mods['profitability'];
+  const b = buildProfitability(P_TXNS, P_ORDERS, P_PROJECTS, P_CUSTOMERS, { period: 'all', customer: 'alpha', now: NOW });
+  assert.equal(b.customers.length, 1);
+  const c = b.customers[0];
+  assert.deepEqual([c.customerName, c.revenue, c.currentAR, c.cost], ['Alpha Hotels', 1000, 250, null]);
+  assert.deepEqual(c.viaProjects, { projectCount: 1, revenue: 1000, directCost: 400, grossProfit: 600, grossMargin: 60, allCostsRecorded: true });
+  assert.deepEqual(b.projects.map((p) => p.projectName), ['Hotel FF&E']);   // customer filter applies to projects too
+  const beta = buildProfitability(P_TXNS, P_ORDERS, P_PROJECTS, P_CUSTOMERS, { customer: 'Beta', now: NOW }).customers[0];
+  assert.equal(beta.viaProjects.allCostsRecorded, false);
+});
+
+test('profitability: periods like the page (this_month / last_month / YYYY-MM / all, UTC month)', () => {
+  const { buildProfitability, periodMonth } = mods['profitability'];
+  assert.deepEqual(periodMonth('this_month', NOW), { key: 'this_month', month: '2026-11' });
+  assert.deepEqual(periodMonth('last_month', NOW), { key: 'last_month', month: '2026-10' });
+  assert.deepEqual(periodMonth('2026-09', NOW), { key: '2026-09', month: '2026-09' });
+  assert.deepEqual(periodMonth('', NOW), { key: 'all_time', month: null });
+  const oct = buildProfitability(P_TXNS, P_ORDERS, P_PROJECTS, P_CUSTOMERS, { period: 'last_month', now: NOW });
+  assert.deepEqual([oct.projects.length, oct.unlinked.revenue, oct.unlinked.cost], [0, 300, 0]);
+  const empty = buildProfitability([], [], [], [], { now: NOW });
+  assert.deepEqual([empty.projectTotals.revenue, empty.projectTotals.grossMargin, empty.projectTotals.warning, empty.unlinked], [0, null, null, null]);
+});
+
+test('profitability: a named customer / project with no data → explicit 无数据, no company totals or unlinked block to misread as 0 profit', () => {
+  const { buildProfitability } = mods['profitability'];
+  const b = buildProfitability(P_TXNS, P_ORDERS, P_PROJECTS, P_CUSTOMERS, { customer: 'Easy4me', now: NOW });
+  assert.deepEqual([b.projects.length, b.customers.length, b.projectTotals, b.unlinked], [0, 0, null, null]);
+  assert.match(b.selection.message, /Easy4me.*无数据，不是 0 利润/);
+  const hit = buildProfitability(P_TXNS, P_ORDERS, P_PROJECTS, P_CUSTOMERS, { project: 'hotel', now: NOW });
+  assert.deepEqual([hit.selection.matchedProjects, hit.selection.message, hit.projectTotals], [1, null, null]);
+  const none = buildProfitability(P_TXNS, P_ORDERS, P_PROJECTS, P_CUSTOMERS, { now: NOW });
+  assert.equal(none.selection, null);
+  assert.equal(none.projectTotals.revenue, 1500);
+});
+
+test('profitability reuses the page classifier (imported, not copied)', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'api/finance/profitability.ts'), 'utf8');
+  assert.match(src, /from '\.\.\/\.\.\/modules\/trade\/services\/transactionCategories'/);
+  assert.doesNotMatch(src, /function classifyTransaction/);
 });

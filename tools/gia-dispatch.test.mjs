@@ -29,7 +29,7 @@ const stubs = {
         return { ok: true, ctx: { userId: 'u1', token: 't', roleLabel: a.isAdmin ? 'Admin' : 'Staff', modules: a.modules, isAdmin: a.isAdmin } };
       }`;
     if (id === '\0handlers') return `
-      const ids = ${JSON.stringify(['resolve_product', 'check_inventory', 'inventory_table_alerts', 'product_overview', 'quotation_history', 'check_quotation_followups', 'customer_360', 'consignment_summary', 'receivables_summary', 'sales_summary', 'invoice_pending_summary', 'supplier_search', 'daily_brief', 'pi_lookup', 'order_lookup', 'payment_list', 'service_receivables_summary', 'service_contract_status', 'bank_balances', 'payables_due', 'pending_vouchers', 'bank_reconciliation_status'])};
+      const ids = ${JSON.stringify(['resolve_product', 'check_inventory', 'inventory_table_alerts', 'product_overview', 'quotation_history', 'check_quotation_followups', 'customer_360', 'consignment_summary', 'receivables_summary', 'sales_summary', 'invoice_pending_summary', 'supplier_search', 'daily_brief', 'pi_lookup', 'order_lookup', 'payment_list', 'service_receivables_summary', 'service_contract_status', 'bank_balances', 'payables_due', 'pending_vouchers', 'bank_reconciliation_status', 'project_customer_profit'])};
       export const GIA_HANDLERS = Object.fromEntries(ids.map((id) => [id, async (req) => {
         globalThis.__giaCalls.push({ id, req, body: req.method === 'POST' ? await req.text() : null });
         return new Response(JSON.stringify({ ok: true, from: id }), { status: 200 });
@@ -64,7 +64,7 @@ const FULL = ['crm', 'trade', 'quotation', 'finance', 'warehouse'];
 const ALL = ['check_inventory', 'check_quotation_followups', 'consignment_summary', 'customer_360', 'daily_brief', 'inventory_table_alerts',
   'invoice_pending_summary', 'product_overview', 'quotation_history', 'receivables_summary', 'resolve_product', 'sales_summary', 'supplier_search',
   'order_lookup', 'payment_list', 'pi_lookup', 'service_contract_status', 'service_receivables_summary',
-  'bank_balances', 'payables_due', 'pending_vouchers', 'bank_reconciliation_status'].sort();
+  'bank_balances', 'payables_due', 'pending_vouchers', 'bank_reconciliation_status', 'project_customer_profit'].sort();
 const ARGS = { customer_360: { customer: 'MAG' }, product_overview: { product: 'M' }, resolve_product: { q: '纸尿裤' }, supplier_search: { query: '劳工' } };
 
 test('no session → 401 on both endpoints', async () => {
@@ -75,7 +75,7 @@ test('no session → 401 on both endpoints', async () => {
 });
 
 for (const [who, isAdmin] of [['Owner / LILI (Admin)', true], ['same modules, non-Admin role', false]]) {
-  test(`${who} with every module sees and can call all 22 tools (13 P0 + 5 P3 step 1 + 4 P3 step 2)`, async () => {
+  test(`${who} with every module sees and can call all 23 tools (13 P0 + 5 P3 step 1 + 4 P3 step 2 + 1 P3 step 3)`, async () => {
     as({ isAdmin, modules: FULL });
     assert.deepEqual((await list()).tools.map((t) => t.id).sort(), ALL);
     for (const tool of ALL) assert.equal((await post({ tool, args: ARGS[tool] })).status, 200, tool);
@@ -124,7 +124,7 @@ test('模拟验证 (simulated): finance tools — trade-only / crm-only → not 
   assert.equal(globalThis.__giaCalls.length, FINANCE_ONLY.length);
 });
 
-const FINANCE_CENTER = ['bank_balances', 'payables_due', 'pending_vouchers', 'bank_reconciliation_status'];
+const FINANCE_CENTER = ['bank_balances', 'payables_due', 'pending_vouchers', 'bank_reconciliation_status', 'project_customer_profit'];
 
 test('P3 step 2 finance-center tools: finance module only (endpoint rule), no giaModules exception; others → not listed + 403', async () => {
   for (const id of FINANCE_CENTER) {
