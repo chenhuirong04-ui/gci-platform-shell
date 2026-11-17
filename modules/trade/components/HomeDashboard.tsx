@@ -14,6 +14,7 @@ import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
 import { Card } from '@gci/design-system';
+import { useI18n } from '@gci/i18n';
 import { persistence } from '../services/persistenceService';
 import { roundTo2 } from '../services/currencyUtils';
 import {
@@ -78,6 +79,8 @@ interface Props { onNavigate: (tab: string) => void; }
 
 // ═══════════════════════════════════════════════════════════════════════════
 const HomeDashboard: React.FC<Props> = () => {
+  const { dict } = useI18n();
+  const t = dict.trade.home;
   const [refreshKey,  setRefreshKey]  = useState(0);
   const [salesState,  setSalesState]  = useState<SS>('loading');
   const [orders,      setOrders]      = useState<any[]>([]);
@@ -228,7 +231,7 @@ const HomeDashboard: React.FC<Props> = () => {
     return Array.from({ length: 6 }, (_, i) => {
       const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - (5 - i));
       const key   = d.toISOString().substring(0, 7);
-      const label = d.toLocaleDateString('zh-CN', { month: 'short' });
+      const label = d.toLocaleDateString(t.dateLocale, { month: 'short' });
       const ords  = normalOrders.filter(o =>
         (o.createdAt || o.created_at || '').substring(0, 7) === key);
       return {
@@ -237,7 +240,7 @@ const HomeDashboard: React.FC<Props> = () => {
         collected: roundTo2(ords.reduce((s, o) => s + (Number(o.paidAmount) || 0), 0)),
       };
     });
-  }, [normalOrders]);
+  }, [normalOrders, t.dateLocale]);
 
   // ── Customer Segment Mix — reads Customer Master directly, counts customers ──
 
@@ -250,24 +253,24 @@ const HomeDashboard: React.FC<Props> = () => {
     if (salesState === 'loading' && invState === 'loading') return [];
     const list: RiskAlert[] = [];
     if (salesKPI.totalOutstanding > 0)
-      list.push({ level: 'orange', message: '有未收应收款，请查看应收核销' });
+      list.push({ level: 'orange', message: t.alertArUnpaid });
     if (invKPI.lowStockCount > 0)
-      list.push({ level: 'yellow', message: `有 ${invKPI.lowStockCount} 个低库存产品，请检查补货` });
+      list.push({ level: 'yellow', message: t.alertLowStock(invKPI.lowStockCount) });
     if (invKPI.over90Count > 0)
-      list.push({ level: 'orange', message: `有 ${invKPI.over90Count} 个库存超过90天未动` });
+      list.push({ level: 'orange', message: t.alertStale(invKPI.over90Count) });
     if (conKPI.over30Unsettled > 0)
-      list.push({ level: 'red', message: `有 ${conKPI.over30Unsettled} 个寄售超过30天未结算，请跟进` });
+      list.push({ level: 'red', message: t.alertConsignOverdue(conKPI.over30Unsettled) });
     return list;
-  }, [salesState, invState, salesKPI, invKPI, conKPI]);
+  }, [salesState, invState, salesKPI, invKPI, conKPI, t]);
 
   const todayActions = useMemo((): string[] => {
     const list: string[] = [];
-    if (salesKPI.totalOutstanding > 0)   list.push('跟进逾期客户回款');
-    if (conKPI.over30Unsettled > 0)      list.push('联系寄售客户确认销售和结算');
-    if (invKPI.lowStockCount > 0)        list.push('检查是否需要补货');
-    if (invKPI.over90Count > 0)          list.push('考虑促销、打包销售或清仓');
+    if (salesKPI.totalOutstanding > 0)   list.push(t.actionFollowOverdue);
+    if (conKPI.over30Unsettled > 0)      list.push(t.actionContactConsign);
+    if (invKPI.lowStockCount > 0)        list.push(t.actionCheckRestock);
+    if (invKPI.over90Count > 0)          list.push(t.actionClearance);
     return list;
-  }, [salesKPI, invKPI, conKPI]);
+  }, [salesKPI, invKPI, conKPI, t]);
 
   // ─────────────────────────────────────────────────────────────────────
   return (
@@ -276,10 +279,10 @@ const HomeDashboard: React.FC<Props> = () => {
       {/* ── Header bar ──────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-base font-semibold text-[#0F1E45]" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>Trade Intelligence · Command Center</h2>
+          <h2 className="text-base font-semibold text-[#0F1E45]" style={{ fontFamily: "'Space Grotesk',sans-serif" }}>{t.title}</h2>
           <p className="font-mono-label text-xs text-slate-600 mt-0.5">
-            GCI Global Operations · {lastRefresh.toLocaleTimeString()}
-            {invState === 'error' && <span className="ml-2 text-[#7A5F2A]">· 库存来自缓存</span>}
+            {t.subtitle} · {lastRefresh.toLocaleTimeString(t.dateLocale)}
+            {invState === 'error' && <span className="ml-2 text-[#7A5F2A]">{t.inventoryFromCache}</span>}
           </p>
         </div>
         <button
@@ -287,7 +290,7 @@ const HomeDashboard: React.FC<Props> = () => {
           className="font-mono-label flex items-center gap-2 px-4 py-2 bg-white border rounded-md text-xs font-bold text-slate-600 hover:text-[#0F1E45] hover:shadow-md transition-all shadow-sm"
           style={{ borderColor: '#0F1E4520' }}
         >
-          <RefreshCw className={`w-3 h-3 ${salesState === 'loading' ? 'animate-spin' : ''}`} />刷新
+          <RefreshCw className={`w-3 h-3 ${salesState === 'loading' ? 'animate-spin' : ''}`} />{t.refresh}
         </button>
       </div>
 
@@ -305,13 +308,13 @@ const HomeDashboard: React.FC<Props> = () => {
           {/* Top row */}
           <div className="flex items-start justify-between mb-5 relative z-10">
             <div>
-              <div className="font-mono-label text-xs text-[#C9A84C]/90 mb-1.5">Trade Intelligence</div>
-              <div className="text-white/65 text-sm font-semibold ">本月销售概览 · 6M Trend</div>
+              <div className="font-mono-label text-xs text-[#C9A84C]/90 mb-1.5">{t.heroKicker}</div>
+              <div className="text-white/65 text-sm font-semibold ">{t.salesOverview}</div>
             </div>
             <div className="flex items-center gap-2 bg-white/5 border border-white/8 rounded-lg px-3 py-1.5 backdrop-blur-sm">
               <div className={`w-1.5 h-1.5 rounded-full ${salesState === 'ok' ? 'bg-[#6FBF8E] animate-pulse' : salesState === 'loading' ? 'bg-[#D9B45A] animate-pulse' : 'bg-gray-500'}`} />
               <span className="font-mono-label text-xs text-white/70">
-                {salesState === 'loading' ? 'SYNCING' : 'LIVE'}
+                {salesState === 'loading' ? t.syncing : t.live}
               </span>
             </div>
           </div>
@@ -331,7 +334,7 @@ const HomeDashboard: React.FC<Props> = () => {
                 <div className="flex items-center gap-3 mt-2.5">
                   <TrendBadgeDark trend={trendSales} />
                   <span className="text-white/55 text-xs font-medium">
-                    上月 {fmtAED(salesKPI.lastMonthSales)}
+                    {t.lastMonth} {fmtAED(salesKPI.lastMonthSales)}
                   </span>
                 </div>
               </>
@@ -341,7 +344,7 @@ const HomeDashboard: React.FC<Props> = () => {
           {/* Separator */}
           <div className="relative z-10 mb-4 flex items-center gap-3">
             <div className="flex-1 h-px bg-white/8" />
-            <span className="font-mono-label text-xs text-white/50">6-Month Revenue Trend</span>
+            <span className="font-mono-label text-xs text-white/50">{t.trendTitle}</span>
             <div className="flex-1 h-px bg-white/8" />
           </div>
 
@@ -369,7 +372,7 @@ const HomeDashboard: React.FC<Props> = () => {
                     }}
                     formatter={(v: any, name: string) => [
                       `AED ${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-                      name === 'sales' ? '销售额' : '收款'
+                      name === 'sales' ? t.sales : t.collected
                     ]}
                     labelStyle={{ fontWeight: 700, color: '#C9A84C', marginBottom: 4 }}
                   />
@@ -388,11 +391,11 @@ const HomeDashboard: React.FC<Props> = () => {
           <div className="relative z-10 mt-3 flex items-center gap-4">
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-sm bg-[#C9A84C]/30 border border-[#C9A84C]/50" />
-              <span className="text-xs text-white/60 font-semibold">销售额</span>
+              <span className="text-xs text-white/60 font-semibold">{t.sales}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-6 h-0.5 bg-[#C9A84C] rounded-full" />
-              <span className="text-xs text-white/60 font-semibold">收款</span>
+              <span className="text-xs text-white/60 font-semibold">{t.collected}</span>
             </div>
           </div>
         </div>
@@ -400,32 +403,32 @@ const HomeDashboard: React.FC<Props> = () => {
         {/* ── Stat Stack (2/5) ── */}
         <div className="lg:col-span-2 grid grid-cols-2 lg:grid-cols-1 gap-3">
           <CommandStatCard
-            label="应收未收" sub="OUTSTANDING AR"
+            label={t.arLabel} sub={t.arSub}
             value={fmtAED(salesKPI.totalOutstanding)}
             loading={salesState === 'loading'} accent="rose"
             alert={salesKPI.totalOutstanding > 0}
-            sourceMeta="Supabase · 实时 · 全部未收款累计"
+            sourceMeta={t.arSource}
           />
           <CommandStatCard
-            label="本月收款" sub="COLLECTED MTD"
+            label={t.collectedLabel} sub={t.collectedSub}
             value={fmtAED(salesKPI.monthCollected)}
             loading={salesState === 'loading'} accent="emerald"
             trend={trendCollected}
-            sourceMeta="Supabase · 实时 · 本月 paidAmount"
+            sourceMeta={t.collectedSource}
           />
           <CommandStatCard
-            label="库存估值" sub="STOCK VALUE"
+            label={t.stockLabel} sub={t.stockSub}
             value={fmtAED(invKPI.totalStockValue)}
             loading={invState === 'loading'} accent="gold"
-            badge={invKPI.lowStockCount > 0 ? `${invKPI.lowStockCount} 低库存` : undefined}
-            sourceMeta="Notion · 实时 · 当前库存×成本价"
+            badge={invKPI.lowStockCount > 0 ? t.lowStockBadge(invKPI.lowStockCount) : undefined}
+            sourceMeta={t.stockSource}
           />
           <CommandStatCard
-            label="寄售在外" sub="CONSIGNMENT"
+            label={t.consignLabel} sub={t.consignSub}
             value={fmtAED(conKPI.totalConsignOut)}
             loading={consignLoading} accent="violet"
-            badge={conKPI.over30Unsettled > 0 ? `${conKPI.over30Unsettled} 超期` : undefined}
-            sourceMeta="Supabase · consignment_stock · 含税"
+            badge={conKPI.over30Unsettled > 0 ? t.overdueBadge(conKPI.over30Unsettled) : undefined}
+            sourceMeta={t.consignSource}
           />
         </div>
       </div>
@@ -447,10 +450,11 @@ const HomeDashboard: React.FC<Props> = () => {
 
 // ── TrendBadgeDark — used inside the dark hero card ───────────────────────
 const TrendBadgeDark: React.FC<{ trend: TrendData }> = ({ trend }) => {
+  const t = useI18n().dict.trade.home;
   if (trend === null)
-    return <span className="text-xs font-bold text-white/50">实时数据</span>;
+    return <span className="text-xs font-bold text-white/50">{t.liveData}</span>;
   if (trend.dir === 'flat')
-    return <span className="inline-flex items-center gap-0.5 text-xs font-bold text-white/55"><Minus className="w-3 h-3" />持平</span>;
+    return <span className="inline-flex items-center gap-0.5 text-xs font-bold text-white/55"><Minus className="w-3 h-3" />{t.flat}</span>;
   const up = trend.dir === 'up';
   return (
     <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border ${
@@ -524,6 +528,9 @@ const CommandStatCard: React.FC<{
 interface MixSlice { seg: string; name: string; value: number; count: number; color: string; }
 
 const CustomerMixCard: React.FC<{ slices: MixSlice[]; loading: boolean }> = ({ slices, loading }) => {
+  const { dict } = useI18n();
+  const t = dict.trade.home;
+  const segName = (s: MixSlice) => dict.trade.segments[s.seg] || s.name;
   const totalCount = slices.reduce((s, x) => s + x.value, 0);
   const hasData = slices.length > 0;
 
@@ -532,14 +539,14 @@ const CustomerMixCard: React.FC<{ slices: MixSlice[]; loading: boolean }> = ({ s
       {/* Header */}
       <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2.5">
         <div className="w-2 h-2 rounded-full bg-[#94A3B8]" />
-        <span className="font-mono-label text-sm text-gray-700">客户结构</span>
-        <span className="font-mono-label text-xs text-slate-600 ">Customer Segment</span>
+        <span className="font-mono-label text-sm text-gray-700">{t.customerMix}</span>
+        {t.customerMixSub && <span className="font-mono-label text-xs text-slate-600 ">{t.customerMixSub}</span>}
         <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full border ${
           hasData
             ? 'bg-[#6FBF8E]/12 text-[#3F7D58] border-[#6FBF8E]/25'
             : 'bg-[#D9B45A]/12 text-[#7A5F2A] border-[#D9B45A]/25'
         }`}>
-          {hasData ? '实时' : '待录入'}
+          {hasData ? t.live : t.pending}
         </span>
       </div>
 
@@ -569,13 +576,13 @@ const CustomerMixCard: React.FC<{ slices: MixSlice[]; loading: boolean }> = ({ s
                     {slices.map((s, i) => <Cell key={i} fill={s.color} />)}
                   </Pie>
                   <Tooltip
-                    formatter={(v: any) => [`${Number(v)} 个客户`, '客户数量']}
+                    formatter={(v: any, _n: any, p: any) => [t.customersTip(Number(v)), p?.payload ? segName(p.payload) : t.customerCount]}
                     contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e5e7eb' }}
                   />
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-xs font-bold text-slate-600 ">客户</span>
+                <span className="text-xs font-bold text-slate-600 ">{t.customers}</span>
                 <span className="text-xs font-bold text-gray-700 font-mono-label">{totalCount}</span>
               </div>
             </div>
@@ -586,8 +593,8 @@ const CustomerMixCard: React.FC<{ slices: MixSlice[]; loading: boolean }> = ({ s
                 return (
                   <div key={i} className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: s.color }} />
-                    <span className="text-xs font-bold text-gray-600 flex-1 truncate">{s.name}</span>
-                    <span className="text-xs font-mono-label text-slate-600">{s.value}家</span>
+                    <span className="text-xs font-bold text-gray-600 flex-1 truncate">{segName(s)}</span>
+                    <span className="text-xs font-mono-label text-slate-600">{t.customerUnit(s.value)}</span>
                     <span className="text-xs font-bold text-slate-600 font-mono-label">{pct.toFixed(1)}%</span>
                   </div>
                 );
@@ -595,7 +602,7 @@ const CustomerMixCard: React.FC<{ slices: MixSlice[]; loading: boolean }> = ({ s
             </div>
 
             <p className="text-xs text-slate-600 font-mono-label self-start">
-              Notion Customer Master · 按客户数量统计
+              {t.pieSource}
             </p>
           </>
         ) : (
@@ -616,20 +623,20 @@ const CustomerMixCard: React.FC<{ slices: MixSlice[]; loading: boolean }> = ({ s
               </ResponsiveContainer>
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className="text-xs font-bold text-slate-600 text-center leading-tight">
-                  待<br/>录入
+                  {t.pendingLine1}<br/>{t.pendingLine2}
                 </span>
               </div>
             </div>
 
             <div className="w-full bg-slate-50 border border-slate-100 rounded-[10px] p-3 space-y-2">
-              <p className="text-xs font-bold text-slate-600 ">接入方式</p>
+              <p className="text-xs font-bold text-slate-600 ">{t.howToConnect}</p>
               <p className="text-xs text-slate-600 leading-relaxed">
-                在 PI 报价单录入客户类型（customerType），分析图自动更新
+                {t.howToConnectHint}
               </p>
               <div className="flex flex-wrap gap-1 pt-1">
-                {(['超市零售','批发贸易','工程项目','酒店餐饮','政府机构'] as const).map((t, i) => (
+                {(['RETAIL', 'WHOLESALE', 'PROJECT', 'HOSPITALITY', 'INSTITUTION'] as const).map((seg, i) => (
                   <span key={i} className="text-xs px-1.5 py-0.5 rounded-full font-bold bg-slate-100 text-slate-600">
-                    {t}
+                    {dict.trade.segments[seg]}
                   </span>
                 ))}
               </div>
@@ -648,17 +655,19 @@ const RISK_STYLE: Record<RiskLevel, { bg: string; border: string; dot: string; t
   yellow: { bg: 'bg-[#D9B45A]/8',  border: 'border-[#D9B45A]/15', dot: 'bg-[#D9B45A]', text: 'text-[#7A5F2A]' },
 };
 
-const RiskAlertsPanel: React.FC<{ alerts: RiskAlert[]; loading: boolean }> = ({ alerts, loading }) => (
+const RiskAlertsPanel: React.FC<{ alerts: RiskAlert[]; loading: boolean }> = ({ alerts, loading }) => {
+  const t = useI18n().dict.trade.home;
+  return (
   <Card tone="light" className="overflow-hidden hover:shadow-md transition-shadow">
     <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2.5">
       <div className="w-7 h-7 rounded-lg bg-[#D9B45A]/12 flex items-center justify-center">
         <AlertTriangle className="w-3.5 h-3.5 text-[#7A5F2A]" />
       </div>
-      <span className="font-mono-label text-sm text-gray-700">经营风险提醒</span>
-      <span className="font-mono-label text-xs text-slate-600 ml-1">Risk Alerts</span>
+      <span className="font-mono-label text-sm text-gray-700">{t.riskTitle}</span>
+      {t.riskSub && <span className="font-mono-label text-xs text-slate-600 ml-1">{t.riskSub}</span>}
       {alerts.length > 0 && (
         <span className="ml-auto text-xs font-bold bg-[#D9B45A]/15 text-[#8A6B2A] border border-[#D9B45A]/25 px-2 py-0.5 rounded-full">
-          {alerts.length} 项
+          {t.itemsCount(alerts.length)}
         </span>
       )}
     </div>
@@ -670,7 +679,7 @@ const RiskAlertsPanel: React.FC<{ alerts: RiskAlert[]; loading: boolean }> = ({ 
       ) : alerts.length === 0 ? (
         <div className="flex items-center gap-3 px-4 py-3 bg-[#6FBF8E]/10 border border-[#6FBF8E]/20 rounded-[10px]">
           <CheckCircle2 className="w-4 h-4 text-[#3F7D58] flex-shrink-0" />
-          <span className="text-sm font-semibold text-[#3F7D58]">当前暂无高风险事项</span>
+          <span className="text-sm font-semibold text-[#3F7D58]">{t.noRisk}</span>
         </div>
       ) : alerts.map((a, i) => {
         const st = RISK_STYLE[a.level];
@@ -683,7 +692,8 @@ const RiskAlertsPanel: React.FC<{ alerts: RiskAlert[]; loading: boolean }> = ({ 
       })}
     </div>
   </Card>
-);
+  );
+};
 
 // ── Today Actions Panel ───────────────────────────────────────────────────
 const P_CLS = [
@@ -692,7 +702,8 @@ const P_CLS = [
 ];
 
 const TodayActionsPanel: React.FC<{ actions: string[]; loading: boolean }> = ({ actions, loading }) => {
-  const today = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' });
+  const t = useI18n().dict.trade.home;
+  const today = new Date().toLocaleDateString(t.dateLocale, { month: 'long', day: 'numeric', weekday: 'short' });
   return (
     <Card tone="light" className="overflow-hidden hover:shadow-md transition-shadow">
       <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
@@ -700,7 +711,7 @@ const TodayActionsPanel: React.FC<{ actions: string[]; loading: boolean }> = ({ 
           <div className="w-7 h-7 rounded-lg bg-[#0F1E45]/8 flex items-center justify-center">
             <Zap className="w-3.5 h-3.5 text-[#0F1E45]" />
           </div>
-          <span className="font-mono-label text-sm text-gray-700">近期待处理事项</span>
+          <span className="font-mono-label text-sm text-gray-700">{t.actionsTitle}</span>
         </div>
         <span className="text-xs text-slate-600 font-semibold">{today}</span>
       </div>
@@ -712,7 +723,7 @@ const TodayActionsPanel: React.FC<{ actions: string[]; loading: boolean }> = ({ 
         ) : actions.length === 0 ? (
           <div className="flex items-center gap-3 px-4 py-2.5 bg-[#6FBF8E]/10 border border-[#6FBF8E]/20 rounded-[10px]">
             <CheckCircle2 className="w-4 h-4 text-[#3F7D58] flex-shrink-0" />
-            <span className="text-sm font-semibold text-[#3F7D58]">近期暂无紧急待办，正常开单即可</span>
+            <span className="text-sm font-semibold text-[#3F7D58]">{t.noActions}</span>
           </div>
         ) : actions.map((a, i) => (
           <div key={i} className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-[10px] hover:bg-[#C9A84C]/8 hover:border-[#C9A84C]/20 transition-all cursor-default">
