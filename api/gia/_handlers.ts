@@ -18,6 +18,10 @@ import orderLookup from '../trade/order-lookup';
 import paymentList from '../trade/payment-list';
 import serviceReceivablesSummary from '../bs/receivables-brief-summary';
 import serviceContractStatus from '../bs/contract-status-brief-summary';
+import bankBalances from '../finance/bank-balances';
+import payablesDue from '../finance/payables-due';
+import pendingVouchers from '../finance/pending-vouchers';
+import bankReconciliationStatus from '../finance/reconciliation-status';
 
 export type GiaHandler = (request: Request) => Promise<Response>;
 
@@ -40,4 +44,8 @@ export const GIA_HANDLERS: Record<string, GiaHandler> = {
   payment_list: paymentList,
   service_receivables_summary: serviceReceivablesSummary,
   service_contract_status: serviceContractStatus,
+  bank_balances: bankBalances,
+  payables_due: payablesDue,
+  pending_vouchers: pendingVouchers,
+  bank_reconciliation_status: bankReconciliationStatus,
 };

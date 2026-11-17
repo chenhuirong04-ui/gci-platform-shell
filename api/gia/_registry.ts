@@ -191,6 +191,41 @@ export const GIA_TOOLS: readonly GiaTool[] = [
     modules: ['quotation', 'crm'], sensitive: false,
     args: [],
   },
+  // GIA P3 step 2 (2026-11-17) — 财务中心 read-only. New endpoints under
+  // api/finance/ (requireModule('finance'); RLS tables read as the caller,
+  // same calculations as the Finance Center pages — see api/finance/_read.ts).
+  {
+    id: 'bank_balances',
+    description: 'Finance Center bank / cash accounts: balance per active account, bank total, cash total, cheques pending clearance.',
+    endpoint: '/api/finance/bank-balances', method: 'GET',
+    modules: ['finance'], sensitive: true,
+    sensitiveReason: 'bank balances',
+    args: [],
+  },
+  {
+    id: 'payables_due',
+    description: 'Supplier accounts payable (应付账款): total outstanding, overdue, due in 7 days, open payables by due date, pending supplier cheques. Optional supplier filter.',
+    endpoint: '/api/finance/payables-due', method: 'GET',
+    modules: ['finance'], sensitive: true,
+    sensitiveReason: 'payable amounts',
+    args: [{ name: 'supplier', required: false }],
+  },
+  {
+    id: 'pending_vouchers',
+    description: 'Finance vouchers (凭证) uploaded but not yet confirmed into the books: count, AI-read amount, list (oldest first).',
+    endpoint: '/api/finance/pending-vouchers', method: 'GET',
+    modules: ['finance'], sensitive: true,
+    sensitiveReason: 'voucher amounts',
+    args: [],
+  },
+  {
+    id: 'bank_reconciliation_status',
+    description: 'Bank reconciliation (银行对账) progress: imported statements, lines pending / confirmed / matched / ignored, per account.',
+    endpoint: '/api/finance/reconciliation-status', method: 'GET',
+    modules: ['finance'], sensitive: true,
+    sensitiveReason: 'bank statement amounts',
+    args: [],
+  },
 ];
 
 export function findTool(id: unknown): GiaTool | null {

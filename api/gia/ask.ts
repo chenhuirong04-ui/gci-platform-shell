@@ -92,6 +92,8 @@ function planPrompt(question: string, tools: GiaTool[]): { systemInstruction: st
       'Trade documents: PI / 形式发票 / proforma → pi_lookup; 销售订单 / SO / 订单 (amount, paid, unpaid per order) → order_lookup ' +
       '(status UNPAID for 未付清/还欠 orders); 收款 / 付款记录 / 客户付了多少 → payment_list. quotation_history is the Quotation Center ' +
       '(GCI-… quotes), not Trade PIs. 企业服务 / 公司服务 receivables → service_receivables_summary; 企业服务合同状态 → service_contract_status. ' +
+      'Finance Center: 银行余额 / 账户余额 / 现金 / 账上有多少钱 → bank_balances; 应付 / 欠供应商 / 到期付款 / 要付的款 → payables_due ' +
+      '(supplier arg when a supplier is named); 待处理凭证 / 未入账凭证 → pending_vouchers; 银行对账 / 对账进度 → bank_reconciliation_status. ' +
       'Call every tool the question needs in one plan (e.g. stock + who was quoted → inventory_table_alerts and quotation_history). ' +
       'If no listed tool can answer the question (small talk, weather, general knowledge, writing tasks, ' +
       'or a request to change data), return {"calls": []}.',
