@@ -44,6 +44,10 @@ export interface GiaTool {
   /** Why it is sensitive (fields it returns). */
   sensitiveReason?: string;
   args: GiaArgSpec[];
+  /** Content tools (full document / record text): bigger result budget for the answer model. */
+  resultChars?: number;
+  /** Content tools that read original files: longer tool timeout. */
+  timeoutMs?: number;
 }
 
 export const GIA_TOOLS: readonly GiaTool[] = [
@@ -235,6 +239,34 @@ export const GIA_TOOLS: readonly GiaTool[] = [
     modules: ['finance'], sensitive: true,
     sensitiveReason: 'revenue, cost and profit',
     args: [{ name: 'project', required: false }, { name: 'customer', required: false }, { name: 'period', required: false }],
+  },
+  // GIA P4 (2026-11-17) — company management data, read as the caller under the
+  // existing RLS (api/company/*). modules = any GCI module, mirroring those tables'
+  // "any signed-in user" policies; knowledge confidentiality stays with RLS.
+  {
+    id: 'company_documents',
+    description: 'Company documents & licences (公司文件 / 营业执照 / 许可证 / 合同): search by name, type, number, company or content; stored AI recognition (summary, extracted fields), expiry status, renewal / version history, Home expiry reminders. read=true returns the FULL TEXT of the original file(s) (auto when a search matches ≤ 2 files).',
+    endpoint: '/api/company/documents', method: 'GET',
+    modules: ['crm', 'trade', 'quotation', 'finance', 'warehouse', 'knowledge_public', 'knowledge', 'knowledge_confidential'], sensitive: true,
+    sensitiveReason: 'company documents and their original content',
+    args: [{ name: 'query', required: false }, { name: 'type', required: false }, { name: 'read', required: false }],
+    resultChars: 40000, timeoutMs: 20000,
+  },
+  {
+    id: 'internal_tasks',
+    description: 'Internal tasks (内部事项): title, status, priority, area, owner, due date, overdue, description, blocker, full follow-up log, completion. status open|in_progress|completed|cancelled|active|overdue|all (default active); filter by query, area, owner.',
+    endpoint: '/api/company/tasks', method: 'GET',
+    modules: ['crm', 'trade', 'quotation', 'finance', 'warehouse', 'knowledge_public', 'knowledge', 'knowledge_confidential'], sensitive: false,
+    args: [{ name: 'status', required: false }, { name: 'query', required: false }, { name: 'area', required: false }, { name: 'owner', required: false }],
+    resultChars: 20000,
+  },
+  {
+    id: 'knowledge_search',
+    description: 'Knowledge base (知识库 / 规则 / 经营活动): search rules, knowledge items, business activities (licence activities), sources and open questions; returns the full original content of the top matches. kind rule|item|activity|source|question optional.',
+    endpoint: '/api/company/knowledge', method: 'GET',
+    modules: ['crm', 'trade', 'quotation', 'finance', 'warehouse', 'knowledge_public', 'knowledge', 'knowledge_confidential'], sensitive: false,
+    args: [{ name: 'query', required: true }, { name: 'kind', required: false }],
+    resultChars: 30000,
   },
 ];
 

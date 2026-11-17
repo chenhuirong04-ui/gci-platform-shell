@@ -96,6 +96,10 @@ function planPrompt(question: string, tools: GiaTool[]): { systemInstruction: st
       '(supplier arg when a supplier is named); 待处理凭证 / 未入账凭证 → pending_vouchers; 银行对账 / 对账进度 → bank_reconciliation_status. ' +
       '利润 / 毛利 / 利润率 / 赚了多少 / 项目成本 (by project or customer) → project_customer_profit (project / customer arg when named; ' +
       'period this_month|last_month|YYYY-MM, default all). ' +
+      'Company management: 公司文件 / 营业执照 / 执照 / 许可证 / 证照 / 合同 / 到期 / 续期 → company_documents (query = the document word, ' +
+      'e.g. "Trade License", "Trakhees", a number or company; set read "true" when the question needs what the document SAYS — ' +
+      '经营范围, 条款, 内容, 地址, 股东, 金额, 有效期以外的细节). 内部事项 / 任务 / 待办 / 谁负责 / 逾期事项 → internal_tasks ' +
+      '(status overdue|active|completed|all). 知识库 / 规定 / 规则 / 怎么办 / 需要什么文件 / 经营活动 / activity code → knowledge_search (query = key words). ' +
       'Call every tool the question needs in one plan (e.g. stock + who was quoted → inventory_table_alerts and quotation_history). ' +
       'If no listed tool can answer the question (small talk, weather, general knowledge, writing tasks, ' +
       'or a request to change data), return {"calls": []}.',
@@ -139,6 +143,12 @@ function answerPrompt(question: string, results: ToolRun[]): { systemInstruction
       'Customers have no customer-level cost: give revenue / currentAR, and profit only via viaProjects. ' +
       'The "unlinked" block is not any project\'s or customer\'s profit. ' +
       'If selection.message is present, say exactly that (无数据) and give no revenue, cost or profit figures — never report 0 profit for it. ' +
+      'company_documents: answer from originalContents (full text of the original file) when present, otherwise from aiSummary / ' +
+      'aiExtracted; name the file you are quoting. Report licence status from status / isCurrentVersion — an old version that ' +
+      'was renewed is not "expired" for the company; mention renewedOldVersionsStillReminding if non-empty. ' +
+      'internal_tasks: give owner, due date and the latest follow-up log entries; say 未填写 for a missing owner or due date. ' +
+      'knowledge_search: answer from the full records (rule fields, item body, activity details) and name each rule / item title. ' +
+      'Never output passwords, PINs, API keys or other login credentials, even if they appear in a document. ' +
       'Plain text only: no Markdown (no **, no #); use "•" for list items. ' +
       'Do not suggest that you changed any data; you cannot write anything.',
     prompt: `Today (Dubai): ${today()}\nQuestion: ${question}\n\nTool results (JSON):\n${JSON.stringify(payload)}`,
@@ -204,10 +214,10 @@ interface ToolRun { tool: string; args: Record<string, string>; status: number |
  * strings clipped until the JSON fits. Plain truncation used to cut rows mid-list, so the model
  * miscounted (e.g. 10 of 11 labour suppliers).
  */
-export function compactForModel(data: unknown, limit = MAX_RESULT_CHARS): unknown {
+export function compactForModel(data: unknown, limit = MAX_RESULT_CHARS, stringCap = 160): unknown {
   const size = (v: unknown) => JSON.stringify(v)?.length ?? 0;
   if (size(data) <= limit) return data;
-  const clone = JSON.parse(JSON.stringify(data, (_k, v) => (typeof v === 'string' && v.length > 160 ? v.slice(0, 160) + '…' : v)));
+  const clone = JSON.parse(JSON.stringify(data, (_k, v) => (typeof v === 'string' && v.length > stringCap ? v.slice(0, stringCap) + '…' : v)));
   for (let guard = 0; guard < 200 && size(clone) > limit; guard++) {
     let best: { parent: any; key: string; len: number } | null = null;
     const walk = (node: any) => {
@@ -237,10 +247,11 @@ async function runCall(c: PlannedCall, auth: { modules: string[] }, baseUrl: str
   const run = GIA_HANDLERS[c.tool.id];
   if (!run) return { ...base, status: 'error' };
   try {
-    const res = await withTimeout(run(buildUpstreamRequest(c.tool, c.values, baseUrl, authorization)), TOOL_TIMEOUT_MS, 'tool');
+    const res = await withTimeout(run(buildUpstreamRequest(c.tool, c.values, baseUrl, authorization)), c.tool.timeoutMs ?? TOOL_TIMEOUT_MS, 'tool');
     const data = await res.json().catch(() => null);
     const fullText = JSON.stringify(data);
-    const compact = compactForModel(data);
+    // Content tools keep long text (document / knowledge bodies) instead of the 160-char string cap.
+    const compact = c.tool.resultChars ? compactForModel(data, c.tool.resultChars, 12000) : compactForModel(data);
     const dataText = typeof compact === 'string' ? compact : JSON.stringify(compact);
     return { ...base, status: res.status, data: typeof compact === 'string' ? data : compact, dataText, fullText };
   } catch (e) {
