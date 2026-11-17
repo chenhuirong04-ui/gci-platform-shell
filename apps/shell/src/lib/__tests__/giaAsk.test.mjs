@@ -38,10 +38,10 @@ test('free-text business questions go to the LLM path', () => {
   }
 });
 
-test('diaper inventory still takes the existing /ai forward first (unchanged)', () => {
+test('inventory questions: LLM first, the /ai forward stays as the fallback (LLM no answer / keyword phrase)', () => {
   assert.ok(fwd.giaAiForwardPath('现在有多少纸尿裤库存'));
   const go = ENTRY_SRC.slice(ENTRY_SRC.indexOf('async function go()'));
-  assert.ok(go.indexOf('giaAiForwardPath(v)') < go.indexOf('giaAskEligible(v)'));
+  assert.ok(go.indexOf('giaAskEligible(v)') < go.indexOf('giaAiForwardPath(v)'));
 });
 
 test('pure customer names keep the customer card flow', () => {
@@ -80,22 +80,22 @@ test('askGia: answer on ok, null (→ existing flow) on fallback / HTTP error / 
   assert.equal(await lib.askGia('x', async () => { throw new Error('offline'); }), null);
 });
 
-test('Home go(): order = follow-up → file → folder name → /ai forward → LLM ask → router → customer lookup', () => {
+test('Home go(): order = follow-up → file → folder name → LLM ask → /ai forward → router → customer lookup', () => {
   const go = ENTRY_SRC.slice(ENTRY_SRC.indexOf('async function go()'));
   const at = (s) => { const i = go.indexOf(s); assert.ok(i >= 0, 'missing in go(): ' + s); return i; };
   const order = [
     'looksLikeNotionFollowupCommand(v)',
     'if (selectedFile)',
     'pendingDriveFolderCreate && !pendingDriveFolderCreate.folderName',
-    'giaAiForwardPath(v)',
     'giaAskEligible(v)',
+    'giaAiForwardPath(v)',
     'runGiaTopRouter(v, state)',
     '/business-assistant?customer=',
   ].map(at);
   for (let i = 1; i < order.length; i++) assert.ok(order[i - 1] < order[i], `step ${i} out of order`);
   // Inside the LLM block the existing service/labour-rate answer runs first; with
-  // neither a service reply nor an LLM answer it falls through to the router.
-  const block = go.slice(at('giaAskEligible(v)'), at('runGiaTopRouter(v, state)'));
+  // neither a service reply nor an LLM answer it falls through to the /ai forward.
+  const block = go.slice(at('giaAskEligible(v)'), at('giaAiForwardPath(v)'));
   assert.ok(block.indexOf('answerServiceKnowledgeQuery(v') < block.indexOf('askGia(v)'));
   assert.equal((block.match(/return;/g) || []).length, 2);
   assert.match(block, /if \(serviceReply\) \{[^}]*return;\s*\}/);
@@ -107,4 +107,13 @@ test('answer card text: Markdown bold/bullets become plain text, numbers and [so
   assert.equal(lib.giaPlainText(md),
     '今天待处理事项：\n\n• 待收款：共 7 张订单，未收 AED 4,156.85 [daily_brief]。\n   • 主要欠款客户：BINGOMART 1+1\n• 无数据');
   assert.equal(lib.giaPlainText('共有 11 个 [supplier_search]'), '共有 11 个 [supplier_search]');
+});
+
+test('Home order: full questions reach the LLM before the /ai keyword forward; names, commands, keyword phrases unchanged', () => {
+  const q = '纸尿裤 M 码仓库和客户寄售分别还有多少？';
+  assert.equal(lib.giaAskEligible(q), true);
+  assert.ok(fwd.giaAiForwardPath(q)); // the /ai forward would also take it — so order decides
+  assert.equal(lib.giaAskEligible('纸尿裤库存'), false); // keyword phrase → /ai as before
+  assert.equal(lib.giaAskEligible('SHADI'), false); // customer card as before
+  assert.equal(lib.giaAskEligible('记录跟进：SHADI 问了纸尿裤库存'), false); // follow-up confirm as before
 });
