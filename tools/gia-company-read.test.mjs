@@ -178,6 +178,23 @@ test('tasks: full task + follow-up log, overdue / missing owner / missing due da
   assert.deepEqual(buildTasks(TASKS, new Map(), now, { query: '房东' }).tasks.map((t) => t.title), ['展厅物品清理']);   // searches the log too
 });
 
+test('knowledge: a multi-word question is searched whole and per word; items matched by more words rank higher', async () => {
+  const { searchTerms } = mods.knowledge;
+  const asked = [];
+  const fake = async (q) => {
+    asked.push(q);
+    if (q === 'Golden Visa 工作许可 文件') return [];                       // whole phrase finds nothing (the real failure)
+    if (q === 'Golden') return [{ kind: 'rule', id: 'r1', title: 'R', rank: 1 }, { kind: 'activity', id: 'a9', title: 'A', rank: 1.2 }];
+    if (q === 'Visa') return [{ kind: 'rule', id: 'r1', title: 'R', rank: 1 }];
+    if (q === '工作许可') return [{ kind: 'rule', id: 'r1', title: 'R', rank: 0.8 }];
+    return [];
+  };
+  const hits = await searchTerms('Golden Visa 工作许可 文件', fake);
+  assert.deepEqual(asked, ['Golden Visa 工作许可 文件', 'Golden', 'Visa', '工作许可', '文件']);
+  assert.deepEqual(hits.map((h) => h.id), ['r1', 'a9']);
+  assert.equal(hits[0].rank, 2);    // best 1 + 0.5 + 0.5
+});
+
 test('knowledge: the module\'s own knowledge_search ranking, then the FULL records; credentials masked; id + kind reads one record', async () => {
   const { body } = await call('knowledge', 'query=golden%20visa');
   assert.deepEqual(body.results.map((r) => [r.kind, r.title]), [['rule', RULES[0].title], ['item', ITEMS[0].title]]);

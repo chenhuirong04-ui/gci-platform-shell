@@ -38,6 +38,22 @@ export function fullRecord(kind: string, row: Record<string, unknown>) {
   return out;
 }
 
+interface Hit { kind: string; id: string; title: string; rank: number }
+
+/** Whole query + up to 5 words (≥ 2 chars); merged and ranked. */
+export async function searchTerms(query: string, search: (q: string) => Promise<Hit[]>): Promise<Hit[]> {
+  const words = query.split(/[\s,，、;；?？!！。]+/).map((w) => w.trim()).filter((w) => w.length >= 2);
+  const terms = Array.from(new Set([query.trim(), ...words])).slice(0, 6);
+  const lists = await Promise.all(terms.map((t) => search(t).catch(() => [] as Hit[])));
+  const best = new Map<string, Hit & { _score: number }>();
+  for (const r of lists.flat()) {
+    const prev = best.get(r.id);
+    const score = Number(r.rank) || 0;
+    best.set(r.id, prev ? { ...prev, _score: Math.max(score, prev._score) + 0.5 } : { ...r, _score: score });
+  }
+  return [...best.values()].sort((a, b) => b._score - a._score).map(({ _score, ...h }) => ({ ...h, rank: _score }));
+}
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method !== 'GET') return json({ ok: false, error: 'Method not allowed' }, 405);
   const auth = await requireModule(request, ['crm', 'trade', 'quotation', 'finance', 'warehouse', 'knowledge_public', 'knowledge', 'knowledge_confidential']);
@@ -57,9 +73,11 @@ export default async function handler(request: Request): Promise<Response> {
     }
     if (!query) return json({ ok: false, error: 'query is required (or id + kind)' }, 400);
 
-    // Ranked search (rules / items / activities) — the Knowledge module's own function
+    // Ranked search (rules / items / activities) — the Knowledge module's own function,
+    // run for the whole query and for each word, merged like the module's question
+    // search (searchKnowledgeForQuestion): best rank wins, +0.5 per extra matching term.
     const hits = (!kind || ['rule', 'item', 'activity'].includes(kind))
-      ? (await userRpc<{ kind: string; id: string; title: string; rank: number }>(auth.ctx, 'knowledge_search', { q: query, max_results: 30 }))
+      ? (await searchTerms(query, (q) => userRpc<Hit>(auth.ctx, 'knowledge_search', { q, max_results: 20 })))
         .filter((h) => !kind || h.kind === kind)
       : [];
     // Sources and questions by text
