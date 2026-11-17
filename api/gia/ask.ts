@@ -120,6 +120,9 @@ function answerPrompt(question: string, results: ToolRun[]): { systemInstruction
       'inventory_table_alerts with a productFilter lists every matching warehouse row in alertItems (alertType "normal" ' +
       'is not an alert): report currentQty with its unit and warehouse. Report warehouse stock first; if consignment ' +
       'stock is also present, list it separately and never add the two together. ' +
+      'Receivables, sales and collections: report the effective figures (totals / total / totalOutstanding / totalAmount). ' +
+      'A "voided" block (已作废订单及其收款) or "excluded" block is NOT receivable or revenue: mention it on its own line ' +
+      'only if non-empty, and never add it into the effective figures. ' +
       'Plain text only: no Markdown (no **, no #); use "•" for list items. ' +
       'Do not suggest that you changed any data; you cannot write anything.',
     prompt: `Today (Dubai): ${today()}\nQuestion: ${question}\n\nTool results (JSON):\n${JSON.stringify(payload)}`,

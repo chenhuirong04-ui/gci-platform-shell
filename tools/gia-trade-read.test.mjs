@@ -28,6 +28,7 @@ const ORDER_ITEMS = [{ orderId: 'SO-002', desc: 'Diaper M', qty: 2, price: 52.5,
 const PAYMENTS = [
   { id: 'p1', orderId: 'SO-002', date: '2026-11-11', amount: 50, method: 'BANK', note: 'part' },
   { id: 'p2', orderId: 'SO-001', date: '2026-10-05', amount: 210, method: 'CASH' },
+  { id: 'p3', orderId: 'SO-003', date: '2026-11-12', amount: 30, method: 'CASH' },   // on a voided order
 ];
 const TABLES = { quotes: QUOTES, quote_items: QUOTE_ITEMS, orders: ORDERS, order_items: ORDER_ITEMS, payments: PAYMENTS };
 
@@ -116,11 +117,13 @@ test('pi_lookup: PI number match is case/spacing-insensitive; no filter → all,
   assert.equal(all.totalGrandTotal, 315);
 });
 
-test('order_lookup: totals exclude VOIDED, voided still listed; UNPAID filter; items for ≤3 orders', async () => {
+test('order_lookup: totals = 有效订单 only, voided listed + reported separately; UNPAID filter; items for ≤3 orders', async () => {
   const b = (await call('order-lookup', 'customer=BINGOMART')).body;
   assert.equal(b.matchedCount, 2);
   assert.equal(b.voidedCount, 1);
-  assert.deepEqual(b.totals, { grandTotal: 105, paid: 50, outstanding: 55, currency: 'AED', note: 'totals exclude VOIDED orders' });
+  assert.deepEqual(b.totals, { grandTotal: 105, paid: 50, outstanding: 55, currency: 'AED', note: '有效订单口径：不含已作废、寄售、调整单（与经营看板一致）' });
+  assert.deepEqual([b.voided.orderIds, b.voided.paymentCount, b.voided.paymentAmount], [['SO-003'], 1, 30]);
+  assert.deepEqual(b.orders.map((o) => o.counted), [false, true]);
   assert.equal(b.orders.find((o) => o.orderNo === 'SO-002').items[0].lineTotal, 105);
   const unpaid = (await call('order-lookup', 'status=unpaid')).body;
   assert.deepEqual(unpaid.orders.map((o) => o.orderNo), ['SO-002']);
@@ -129,9 +132,12 @@ test('order_lookup: totals exclude VOIDED, voided still listed; UNPAID filter; i
 
 test('payment_list: joined to orders for the customer; customer + period filters; totals', async () => {
   const b = (await call('payment-list', 'customer=bingomart')).body;
-  assert.equal(b.matchedCount, 1);
-  assert.equal(b.totalAmount, 50);
-  assert.deepEqual(b.payments[0], { date: '2026-11-11', amount: 50, method: 'BANK', methodZh: '银行转账', orderNo: 'SO-002', customerName: 'BINGOMART 1+1', orderStatus: 'PARTIAL', note: 'part' });
+  assert.equal(b.matchedCount, 2);
+  assert.equal(b.totalAmount, 50);                       // voided-order payment not counted
+  assert.deepEqual(b.excluded, { count: 1, amount: 30, note: '已作废 / 寄售 / 调整单或找不到订单的收款，不计入有效已收款' });
+  assert.deepEqual([b.voided.orderIds, b.voided.paymentAmount], [['SO-003'], 30]);
+  assert.equal(b.payments[0].counted, false);
+  assert.deepEqual(b.payments[1], { date: '2026-11-11', amount: 50, method: 'BANK', methodZh: '银行转账', orderNo: 'SO-002', customerName: 'BINGOMART 1+1', orderStatus: 'PARTIAL', counted: true, note: 'part' });
   const oct = (await call('payment-list', 'period=2026-10')).body;
   assert.deepEqual(oct.payments.map((p) => p.orderNo), ['SO-001']);
   assert.equal((await call('payment-list')).body.totalAmount, 260);
@@ -212,7 +218,8 @@ test('receivables-summary: an order whose newest row is VOIDED is no longer coun
   const body = await (await handler(new Request('https://x/api/ai/receivables-summary', { headers: { authorization: 'Bearer u' } }))).json();
   assert.equal(body.orderReceivables.orderCount, 1);
   assert.equal(body.orderReceivables.total, 449.22);
-  assert.ok(!JSON.stringify(body.orderReceivables).includes('SO-20260707-3525'));
+  assert.ok(!JSON.stringify(body.orderReceivables.customers).includes('SO-20260707-3525'));
+  assert.deepEqual(body.orderReceivables.voided.orderIds, ['SO-20260707-3525']); // reported separately
   const ordersUrl = urls.find((u) => u.includes('/rest/v1/orders?'));
   assert.match(ordersUrl, /order=updated_at\.desc/);
   assert.doesNotMatch(ordersUrl, /state=eq\.active/); // a state pre-filter would let older active rows stand in
@@ -229,7 +236,7 @@ test('sales-summary: duplicate rows count once, using the newest row', async () 
 test('customer-360 and daily-brief read orders newest-first without a state pre-filter and apply currentOrderRows', () => {
   for (const rel of ['api/ai/customer-360.ts', 'api/ai/daily-brief.ts', 'api/ai/receivables-summary.ts', 'api/ai/sales-summary.ts']) {
     const src = fs.readFileSync(path.join(ROOT, rel), 'utf8');
-    assert.match(src, /import \{ currentOrderRows \} from '\.\.\/trade\/_read'/, rel);
+    assert.match(src, /import \{ currentOrderRows[^}]*\} from '\.\.\/trade\/_read'/, rel);
     assert.doesNotMatch(src, /orders\?select=[^'`]*state=eq\.active/, rel);
     assert.ok(/currentOrderRows\(/.test(src) || /\.then\(currentOrderRows\)/.test(src), rel);
   }
@@ -247,4 +254,47 @@ test('customer-360: voided orders are listed but not counted in order amount / o
   assert.equal(body.summary.totalOrderAmt, 100);
   assert.equal(body.summary.totalOutstanding, 60);
   assert.equal(body.orders.length, 2); // still listed
+});
+
+test('有效应收 rule is identical to the 经营看板 (isRevenueOrder) and used by every receivables endpoint', async () => {
+  const b = await rolldown({
+    input: path.join(ROOT, 'api/trade/_read.ts'), platform: 'node',
+    plugins: [{ name: 'stub-auth', resolveId: (id) => (id === '../_lib/auth' ? '\0a' : null), load: (id) => (id === '\0a' ? 'export function legacyTradeAnonHeaders(){return {}}' : null) }],
+  });
+  const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'gci-eff-')), 'read.mjs');
+  await b.write({ file: out, format: 'esm' });
+  const { isEffectiveOrder, voidedSummary } = await import(pathToFileURL(out).href);
+  const d = await rolldown({ input: path.join(ROOT, 'modules/trade/services/annualDashboard.ts'), platform: 'node' });
+  const out2 = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'gci-eff2-')), 'dash.mjs');
+  await d.write({ file: out2, format: 'esm' });
+  const { isRevenueOrder } = await import(pathToFileURL(out2).href);
+  const cases = [
+    { status: 'PAID' }, { status: 'PENDING' }, { status: 'PARTIAL' }, { status: 'VOIDED' },
+    { status: 'CONSIGNMENT', transactionMode: 'Consignment' }, { status: 'VOIDED', transactionMode: 'Consignment' },
+    { status: 'PENDING', order_type: 'ADJUSTMENT' }, { status: 'PAID', order_type: 'NORMAL', transactionMode: 'Direct Sale' },
+  ];
+  for (const c of cases) assert.equal(isEffectiveOrder(c), isRevenueOrder(c), JSON.stringify(c));
+  assert.deepEqual(voidedSummary([{ id: 'A', status: 'VOIDED' }, { id: 'B', status: 'PAID' }], [{ orderId: 'A', amount: 10.5 }, { orderId: 'B', amount: 1 }]),
+    { orderCount: 1, orderIds: ['A'], paymentCount: 1, paymentAmount: 10.5, note: '已作废订单及其收款记录单独列示，不计入有效营业额或应收' });
+  for (const rel of ['api/ai/customer-360.ts', 'api/ai/daily-brief.ts', 'api/ai/receivables-summary.ts', 'api/trade/order-lookup.ts', 'api/trade/payment-list.ts']) {
+    assert.match(fs.readFileSync(path.join(ROOT, rel), 'utf8'), /isEffectiveOrder\(/, rel);
+  }
+});
+
+test('daily-brief: 有效应收 excludes voided / consignment / adjustment; voided reported separately', async () => {
+  const handler = await buildEndpoint('api/ai/daily-brief.ts');
+  const rows = [
+    { id: 'a', created_at: '2026-07-07T00:00:00Z', state: 'active', payload: { id: 'SO-V', customerName: 'BINGOMART 1+1', grandTotal: 703.5, paidAmount: 0, outstandingAmount: 703.5, status: 'VOIDED', createdAt: '2026-07-07T00:00:00Z' } },
+    { id: 'b', created_at: '2026-06-01T00:00:00Z', state: 'active', payload: { id: 'SO-C', customerName: 'K', grandTotal: 90, paidAmount: 0, outstandingAmount: 90, status: 'CONSIGNMENT', transactionMode: 'Consignment', createdAt: '2026-06-01T00:00:00Z' } },
+    { id: 'c', created_at: '2026-06-01T00:00:00Z', state: 'active', payload: { id: 'SO-X', customerName: 'Easy', grandTotal: 100, paidAmount: 40, outstandingAmount: 60, status: 'PARTIAL', createdAt: '2026-06-01T00:00:00Z' } },
+  ];
+  const pays = [{ payload: { id: 'p9', orderId: 'SO-V', amount: 20, date: '2026-07-07' } }];
+  globalThis.fetch = async (url) => {
+    const u = decodeURIComponent(String(url));
+    return new Response(JSON.stringify(/\/rest\/v1\/orders\?/.test(u) ? rows : /\/rest\/v1\/payments\?/.test(u) ? pays : []), { status: 200 });
+  };
+  const body = await (await handler(new Request('https://x/api/ai/daily-brief', { headers: { authorization: 'Bearer u' } }))).json();
+  assert.equal(body.receivables.unpaidOrderCount, 1);
+  assert.equal(body.receivables.totalOutstanding, 60);
+  assert.deepEqual([body.receivables.voided.orderIds, body.receivables.voided.paymentAmount], [['SO-V'], 20]);
 });

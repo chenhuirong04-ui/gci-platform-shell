@@ -2,13 +2,16 @@
 // Customer payments recorded in the Trade module (table `payments`), joined to
 // `orders` for the customer name. period: today | week | month | YYYY-MM | all
 // (default all). Auth: requireModule(trade|finance|crm) — same as sales-summary.
+// totalAmount = payments of 有效订单 only (isEffectiveOrder, same as 经营看板 已收款);
+// payments on voided / consignment / adjustment / unknown orders are listed with
+// counted=false and reported separately in `excluded` (voided ones in `voided`).
 import { requireModule } from '../_lib/auth';
-import { json, loadPayloads, customerMatcher, docMatcher, sum } from './_read';
+import { json, loadPayloads, customerMatcher, docMatcher, sum, isEffectiveOrder, voidedSummary } from './_read';
 
 export const config = { runtime: 'edge' };
 
 interface Payment { id: string; orderId: string; date: string; amount: number; method: string; note?: string }
-interface Order { id: string; customerName: string; status: string }
+interface Order { id: string; customerName: string; status: string; transactionMode?: string; order_type?: string }
 
 export const PAYMENT_LIST_MAX = 20;
 const METHOD_ZH: Record<string, string> = { CASH: '现金', BANK: '银行转账', BANK_TRANSFER: '银行转账', CHEQUE: '支票', OTHER: '其他' };
@@ -53,13 +56,19 @@ export default async function handler(request: Request): Promise<Response> {
         (!range || ((p.date || '').slice(0, 10) >= range.from && (p.date || '').slice(0, 10) < range.to)))
       .sort((a, b) => String(b.p.date).localeCompare(String(a.p.date)));
     const shown = matched.slice(0, PAYMENT_LIST_MAX);
+    const counted = matched.filter(({ o }) => isEffectiveOrder(o));
+    const excluded = matched.filter(({ o }) => !isEffectiveOrder(o));
+    const matchedOrders = Array.from(new Set(matched.map(({ o }) => o).filter(Boolean))) as Order[];
 
     return json({
       ok: true,
       source: 'payments + orders (Trade customer payments)',
       filters: { customer: customer || null, order: orderNo || null, period, range },
       matchedCount: matched.length,
-      totalAmount: sum(matched, (x) => x.p.amount),
+      totalAmount: sum(counted, (x) => x.p.amount),
+      countedCount: counted.length,
+      excluded: { count: excluded.length, amount: sum(excluded, (x) => x.p.amount), note: '已作废 / 寄售 / 调整单或找不到订单的收款，不计入有效已收款' },
+      voided: voidedSummary(matchedOrders, matched.map(({ p }) => p)),
       currency: 'AED',
       payments: shown.map(({ p, o }) => ({
         date: (p.date || '').slice(0, 10) || null,
@@ -69,6 +78,7 @@ export default async function handler(request: Request): Promise<Response> {
         orderNo: p.orderId,
         customerName: o?.customerName ?? null,
         orderStatus: o?.status ?? null,
+        counted: isEffectiveOrder(o),
         note: p.note ? String(p.note).slice(0, 120) : null,
       })),
       note: matched.length > PAYMENT_LIST_MAX ? `仅显示最近 ${PAYMENT_LIST_MAX} 笔，共 ${matched.length} 笔` : undefined,

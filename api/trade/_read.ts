@@ -73,6 +73,34 @@ export function currentOrderRows<R extends { id?: string; state?: string | null;
     String(b.payload?.createdAt ?? b.created_at ?? '').localeCompare(String(a.payload?.createdAt ?? a.created_at ?? '')));
 }
 
+/**
+ * Effective (valid) sales order — the ONE rule for 有效营业额 / 有效应收, identical to
+ * the 经营看板 (modules/trade/services/annualDashboard.ts isRevenueOrder):
+ * not VOIDED, not a consignment order, not an adjustment order.
+ * 有效应收 = Σ outstandingAmount of effective orders (= 经营看板 「当前应收余额」).
+ */
+export function isEffectiveOrder(p: any): boolean {
+  return !!p && p.order_type !== 'ADJUSTMENT' && p.status !== 'VOIDED' && p.transactionMode !== 'Consignment';
+}
+
+/**
+ * Voided orders and the payment records still attached to them — reported
+ * separately, never part of effective revenue or receivables. Includes voided
+ * consignment / adjustment orders.
+ */
+export function voidedSummary(orders: any[], payments: any[]) {
+  const voided = (orders || []).filter((o) => o?.status === 'VOIDED');
+  const ids = new Set(voided.map((o) => o.id));
+  const pays = (payments || []).filter((p) => ids.has(p?.orderId));
+  return {
+    orderCount: voided.length,
+    orderIds: voided.map((o) => o.id),
+    paymentCount: pays.length,
+    paymentAmount: sum(pays, (p: any) => p.amount),
+    note: '已作废订单及其收款记录单独列示，不计入有效营业额或应收',
+  };
+}
+
 /** Newest first by the business createdAt (for display after the dedupe). */
 export function byCreatedDesc<T extends { createdAt?: string; date?: string }>(a: T, b: T): number {
   return String(b.createdAt ?? b.date ?? '').localeCompare(String(a.createdAt ?? a.date ?? ''));
