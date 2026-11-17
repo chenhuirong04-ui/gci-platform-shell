@@ -89,6 +89,9 @@ function planPrompt(question: string, tools: GiaTool[]): { systemInstruction: st
       'Customer consignment stock (寄售, 客户处) → check_inventory. If the question mentions both, call both. ' +
       'Never answer a plain stock question from check_inventory alone. ' +
       'Use resolve_product only when the user asks which catalog products match. ' +
+      'Trade documents: PI / 形式发票 / proforma → pi_lookup; 销售订单 / SO / 订单 (amount, paid, unpaid per order) → order_lookup ' +
+      '(status UNPAID for 未付清/还欠 orders); 收款 / 付款记录 / 客户付了多少 → payment_list. quotation_history is the Quotation Center ' +
+      '(GCI-… quotes), not Trade PIs. 企业服务 / 公司服务 receivables → service_receivables_summary; 企业服务合同状态 → service_contract_status. ' +
       'Call every tool the question needs in one plan (e.g. stock + who was quoted → inventory_table_alerts and quotation_history). ' +
       'If no listed tool can answer the question (small talk, weather, general knowledge, writing tasks, ' +
       'or a request to change data), return {"calls": []}.',
