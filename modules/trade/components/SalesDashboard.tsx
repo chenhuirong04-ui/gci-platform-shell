@@ -2,11 +2,15 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   TrendingUp, Users, Package, AlertTriangle,
   RefreshCw, Clock, BarChart3, CheckCircle,
-  PieChart, DollarSign, Hash, Layers
+  PieChart, DollarSign, Hash, Layers, CalendarDays, ChevronDown, ChevronRight
 } from 'lucide-react';
-import { OrderRecord, OrderItemRecord } from '../types';
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid,
+} from 'recharts';
+import type { OrderRecord, OrderItemRecord, PaymentRecord } from '../types';
 import { roundTo2 } from '../services/currencyUtils';
 import { persistence } from '../services/persistenceService';
+import { isRevenueOrder, availableYears, buildAnnualView } from '../services/annualDashboard';
 import { colors, workspace } from '@gci/design-system';
 
 const GOLD = colors.goldBase;
@@ -27,18 +31,23 @@ const SalesDashboard: React.FC = () => {
   const [orders,      setOrders]      = useState<OrderRecord[]>([]);
   const [orderItems,  setOrderItems]  = useState<OrderItemRecord[]>([]);
   const [consign,     setConsign]     = useState<any[]>([]);
+  const [payments,    setPayments]    = useState<PaymentRecord[]>([]);
+  const [year,        setYear]        = useState<number>(new Date().getFullYear());
+  const [openMonth,   setOpenMonth]   = useState<number | null>(null);
   const [loading,     setLoading]     = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
   const load = async () => {
     setLoading(true);
     try {
-      const [o, oi] = await Promise.all([
+      const [o, oi, p] = await Promise.all([
         persistence.getOrders(),
         persistence.getOrderItems(),
+        persistence.getPayments().catch(() => [] as PaymentRecord[]),
       ]);
       setOrders(Array.isArray(o) ? o : []);
       setOrderItems(Array.isArray(oi) ? oi : []);
+      setPayments(Array.isArray(p) ? p : []);
       setConsign(readLS('icare_consignment'));
       setLastRefresh(new Date());
     } catch {
@@ -52,14 +61,12 @@ const SalesDashboard: React.FC = () => {
   useEffect(() => { load(); }, []);
 
   // Exclude adjustments, voided orders, and consignment from revenue calculations
-  const normalOrders = useMemo(
-    () => orders.filter(o =>
-      (o as any).order_type !== 'ADJUSTMENT' &&
-      (o as any).status !== 'VOIDED' &&
-      (o as any).transactionMode !== 'Consignment'
-    ),
-    [orders]
-  );
+  // (rule shared with the annual view: services/annualDashboard.ts isRevenueOrder)
+  const normalOrders = useMemo(() => orders.filter(isRevenueOrder), [orders]);
+
+  // ── Annual view (year selector, 4 totals, 1–12 trend, month detail) ──────
+  const years  = useMemo(() => availableYears(orders, new Date().getFullYear()), [orders]);
+  const annual = useMemo(() => buildAnnualView(orders, payments, year), [orders, payments, year]);
 
   const todayStr     = new Date().toISOString().split('T')[0];
   const thisMonthKey = todayStr.substring(0, 7);
@@ -251,6 +258,159 @@ const SalesDashboard: React.FC = () => {
           <BreakCard label="逾期应收"     sub="OVERDUE AR"  value={`AED ${fmt(breakdown.overdueAmt)}`}
             pct={kpi.allOutstanding > 0 ? breakdown.overdueAmt / kpi.allOutstanding : 0}
             barClass="bg-[#E0846A]" alert={breakdown.overdueAmt > 0} />
+        </div>
+      </div>
+
+      {/* ══ Annual — 全年经营 (year selector · 4 totals · 1–12 trend · month detail) ══ */}
+      <div className="bg-white rounded-[10px] border border-gray-100 shadow-sm overflow-hidden">
+        <div className="bg-gray-50 border-b border-gray-100 px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5">
+            <div style={{ color: GOLD }}><CalendarDays className="w-4 h-4" /></div>
+            <div>
+              <div className="text-base font-bold" style={{ color: '#374151' }}>全年经营 · {year}</div>
+              <div className="text-xs font-bold text-slate-600 mt-0.5">ANNUAL OVERVIEW · 1–12 月</div>
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
+            年份
+            <select
+              value={year}
+              onChange={e => { setYear(Number(e.target.value)); setOpenMonth(null); }}
+              className="px-3 py-1.5 bg-white border border-gray-200 rounded-md text-sm font-bold text-gray-700"
+              aria-label="选择年份"
+            >
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </label>
+        </div>
+
+        <div className="p-5 space-y-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <KpiCard label="全年营业额"   sub={`REVENUE ${year}`}   value={`AED ${fmt(annual.totals.revenue)}`}   icon={<TrendingUp  className="w-5 h-5" />} c="indigo"  />
+            <KpiCard label="全年已收款"   sub={`COLLECTED ${year}`} value={`AED ${fmt(annual.totals.collected)}`} icon={<CheckCircle className="w-5 h-5" />} c="emerald" />
+            <KpiCard label="当前应收余额" sub="OUTSTANDING NOW"     value={`AED ${fmt(kpi.allOutstanding)}`}       icon={<AlertTriangle className="w-5 h-5" />}
+              c={kpi.allOutstanding > 0 ? 'amber' : 'emerald'} />
+            <KpiCard label="全年订单数"   sub={`ORDERS ${year}`}    value={`${annual.totals.orderCount} 单`}      icon={<Hash        className="w-5 h-5" />} c="violet"  />
+          </div>
+
+          <div>
+            <div className="text-sm font-bold text-gray-700 mb-2">月度趋势 · 营业额 vs 已收款 (AED)</div>
+            <div className="h-64" data-testid="annual-trend">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={annual.months.map(m => ({ label: `${m.month}月`, 营业额: m.revenue, 已收款: m.collected }))}
+                  margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#475569' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#475569' }} axisLine={false} tickLine={false} width={56}
+                    tickFormatter={(v: number) => (Math.abs(v) >= 1000 ? `${roundTo2(v / 1000)}k` : String(v))} />
+                  <Tooltip formatter={(v: any) => `AED ${fmt(Number(v) || 0)}`} cursor={{ fill: 'rgba(160,127,60,0.08)' }} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey="营业额" fill={NAVY} radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="已收款" fill="#6FBF8E" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm" data-testid="annual-months">
+              <thead>
+                <tr className="text-xs font-bold text-slate-600 border-b border-gray-100">
+                  <th className="text-left py-2 pr-2">月份</th>
+                  <th className="text-right py-2 px-2">营业额</th>
+                  <th className="text-right py-2 px-2">已收款</th>
+                  <th className="text-right py-2 px-2">未收款</th>
+                  <th className="text-right py-2 px-2">订单数</th>
+                  <th className="text-right py-2 pl-2">明细</th>
+                </tr>
+              </thead>
+              <tbody>
+                {annual.months.map(m => (
+                  <React.Fragment key={m.key}>
+                    <tr className="border-b border-gray-50">
+                      <td className="py-2 pr-2 font-bold text-gray-700">{m.month} 月</td>
+                      <td className="py-2 px-2 text-right font-mono-label">{fmt(m.revenue)}</td>
+                      <td className="py-2 px-2 text-right font-mono-label text-[#2d5c40]">{fmt(m.collected)}</td>
+                      <td className="py-2 px-2 text-right font-mono-label text-[#A85D45]">{fmt(m.outstanding)}</td>
+                      <td className="py-2 px-2 text-right">{m.orderCount}</td>
+                      <td className="py-2 pl-2 text-right">
+                        {m.orderCount > 0 ? (
+                          <button
+                            onClick={() => setOpenMonth(openMonth === m.month ? null : m.month)}
+                            className="inline-flex items-center gap-1 text-xs font-bold text-[#7A5F2A] hover:underline"
+                          >
+                            {openMonth === m.month ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                            查看
+                          </button>
+                        ) : <span className="text-xs text-slate-400">—</span>}
+                      </td>
+                    </tr>
+                    {openMonth === m.month && (
+                      <tr>
+                        <td colSpan={6} className="bg-gray-50 p-4">
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div>
+                              <div className="text-xs font-bold text-slate-600 mb-2">订单明细 · {m.orderCount} 单</div>
+                              <div className="space-y-1.5">
+                                {m.orders.map(o => (
+                                  <div key={o.id} className="flex justify-between gap-3 bg-white border border-gray-100 rounded-md px-3 py-2">
+                                    <div className="min-w-0">
+                                      <div className="text-xs font-bold font-mono-label text-gray-700">{o.id}</div>
+                                      <div className="text-xs text-slate-600 truncate">
+                                        {(o.createdAt || '').substring(0, 10)} · {o.customerName || '—'} · {o.status}
+                                      </div>
+                                    </div>
+                                    <div className="text-right shrink-0 text-xs font-mono-label">
+                                      <div className="font-bold text-[#080D1E]">AED {fmt(Number(o.grandTotal) || 0)}</div>
+                                      <div className="text-[#2d5c40]">已收 {fmt(Number(o.paidAmount) || 0)}</div>
+                                      {(Number(o.outstandingAmount) || 0) > 0 && (
+                                        <div className="text-[#A85D45]">未收 {fmt(Number(o.outstandingAmount) || 0)}</div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs font-bold text-slate-600 mb-2">收款明细 · {m.payments.length} 笔</div>
+                              {m.payments.length === 0 ? (
+                                <div className="text-xs text-slate-500 bg-white border border-gray-100 rounded-md px-3 py-2">本月订单暂无收款记录</div>
+                              ) : (
+                                <div className="space-y-1.5">
+                                  {m.payments.map(p => (
+                                    <div key={p.id} className="flex justify-between gap-3 bg-white border border-gray-100 rounded-md px-3 py-2">
+                                      <div className="min-w-0">
+                                        <div className="text-xs font-bold text-gray-700">{(p.date || '').substring(0, 10)} · {p.method}</div>
+                                        <div className="text-xs text-slate-600 font-mono-label truncate">{p.orderId}</div>
+                                      </div>
+                                      <div className="text-xs font-bold font-mono-label text-[#2d5c40] shrink-0">AED {fmt(Number(p.amount) || 0)}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
+                <tr className="font-bold">
+                  <td className="py-2 pr-2 text-gray-700">合计</td>
+                  <td className="py-2 px-2 text-right font-mono-label">{fmt(annual.totals.revenue)}</td>
+                  <td className="py-2 px-2 text-right font-mono-label text-[#2d5c40]">{fmt(annual.totals.collected)}</td>
+                  <td className="py-2 px-2 text-right font-mono-label text-[#A85D45]">{fmt(roundTo2(annual.months.reduce((s, m) => s + m.outstanding, 0)))}</td>
+                  <td className="py-2 px-2 text-right">{annual.totals.orderCount}</td>
+                  <td />
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p className="text-xs text-slate-600 font-semibold leading-relaxed">
+            ℹ 口径与本月指标一致：按订单创建月份归集；不含寄售、调整单、已作废订单。已收款 = 该月订单已收金额；
+            当前应收余额 = 全部订单未收款（不限年份）。无业务的月份显示 0。
+          </p>
         </div>
       </div>
 
