@@ -12,6 +12,8 @@ import { useI18n } from '@gci/i18n';
 import { useAuth } from '../contexts/AuthContext';
 import { runGiaTopRouter, type GiaRouterState, type PendingDriveFolderCreate } from '../lib/giaRouter';
 import { giaAiForwardPath } from '../lib/giaAiForward';
+import { giaAskEligible, askGia, type GiaAskAnswer } from '../lib/giaAsk';
+import { looksLikeServiceKnowledgeQuery, answerServiceKnowledgeQuery } from '../lib/serviceKnowledge';
 import { confirmCaptureItem, completeOrCancelTask, rescheduleTask, type ResolvedCaptureItem } from '../lib/businessCapture';
 import { BUSINESS_AREA_LABEL, BUSINESS_AREA_LABEL_ZH, ALL_BUSINESS_AREAS, type ExecutiveTask, type TaskBusinessArea } from '../lib/executiveTasks';
 import { uploadAndRegisterLocalFile, searchDriveFolders, listChildFolders, extractCompanyName, createFolderIfMissing, getDriveFolderName, DEFAULT_TARGET_FOLDER_ID, DEFAULT_TARGET_FOLDER_NAME, type DriveFolderOption } from '../lib/giaFiles';
@@ -105,6 +107,7 @@ export function BusinessAssistantEntry() {
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
   const [fileSearchReply, setFileSearchReply] = useState<string | null>(null);
+  const [giaAnswer, setGiaAnswer] = useState<(GiaAskAnswer & { question: string }) | null>(null);
   const [pendingCapture, setPendingCapture] = useState<ResolvedCaptureItem[] | null>(null);
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [captureDone, setCaptureDone] = useState<Set<number>>(new Set());
@@ -305,6 +308,7 @@ export function BusinessAssistantEntry() {
       setCaptureDone(new Set());
       setCaptureError(null);
       setFileSearchReply(null);
+      setGiaAnswer(null);
       setPendingTaskLifecycle(null);
       setPendingTaskReschedule(null);
       describeNotionFollowup(v);
@@ -331,6 +335,32 @@ export function BusinessAssistantEntry() {
       navigate(aiPath);
       return;
     }
+    // Free-text business question → LLM picks P0 read-only tools and answers
+    // from their results (lib/giaAsk.ts, /api/gia/ask). null → continue below.
+    // GIA's own service/labour-rate answer still wins when it has a real
+    // catalog hit (it is the first answer runGiaTopRouter would give).
+    if (giaAskEligible(v)) {
+      setBusy(true);
+      setGiaAnswer(null);
+      let serviceReply: string | null = null;
+      if (looksLikeServiceKnowledgeQuery(v)) {
+        try { serviceReply = await answerServiceKnowledgeQuery(v, lang ?? 'zh'); } catch { serviceReply = null; }
+      }
+      const answer = serviceReply ? null : await askGia(v);
+      setBusy(false);
+      if (serviceReply) {
+        setFileSearchReply(serviceReply);
+        setValue('');
+        return;
+      }
+      if (answer) {
+        setFileSearchReply(null);
+        setGiaAnswer({ question: v, ...answer });
+        setValue('');
+        return;
+      }
+    }
+    setGiaAnswer(null);
     setBusy(true);
     const state: GiaRouterState = {
       currentCustomer: null, // Home has no loaded customer context
@@ -1972,6 +2002,21 @@ export function BusinessAssistantEntry() {
             <div style={{ fontSize: 12, fontWeight: 700, color: GOLD, marginBottom: 6 }}>GIA 回复</div>
             <div style={{ fontSize: 12.5, color: TEXT, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{fileSearchReply}</div>
             <button onClick={() => setFileSearchReply(null)} style={{ marginTop: 8, padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>关闭</button>
+          </div>
+        )}
+
+        {giaAnswer && (
+          <div style={{ marginTop: 14, padding: '14px 16px', background: 'rgba(203,168,92,0.05)', border: `1px solid ${BORD}`, borderRadius: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: GOLD, marginBottom: 6 }}>GIA 回复 · {giaAnswer.question}</div>
+            <div style={{ fontSize: 12.5, color: TEXT, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{giaAnswer.answer}</div>
+            <div style={{ marginTop: 8, fontSize: 11, color: MUTED, lineHeight: 1.6 }}>
+              数据来源（只读）：{giaAnswer.toolsUsed.map((u) => `${u.tool}${typeof u.status === 'number' && u.status < 400 ? '' : `（${u.status}）`}`).join('、') || '无'}
+              {giaAnswer.capped && <div>本次最多调用 4 个工具，其余未执行。</div>}
+              {giaAnswer.unverifiedNumbers.length > 0 && (
+                <div style={{ color: RED }}>以下数字未在工具结果中找到，请核对：{giaAnswer.unverifiedNumbers.join('、')}</div>
+              )}
+            </div>
+            <button onClick={() => setGiaAnswer(null)} style={{ marginTop: 8, padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORD}`, color: MUTED }}>关闭</button>
           </div>
         )}
 
