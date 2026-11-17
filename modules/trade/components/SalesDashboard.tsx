@@ -65,7 +65,7 @@ const SalesDashboard: React.FC = () => {
   const normalOrders = useMemo(() => orders.filter(isRevenueOrder), [orders]);
 
   // ── Annual view (year selector, 4 totals, 1–12 trend, month detail) ──────
-  const years  = useMemo(() => availableYears(orders, new Date().getFullYear()), [orders]);
+  const years  = useMemo(() => availableYears(orders, new Date().getFullYear(), payments), [orders, payments]);
   const annual = useMemo(() => buildAnnualView(orders, payments, year), [orders, payments, year]);
 
   const todayStr     = new Date().toISOString().split('T')[0];
@@ -334,7 +334,7 @@ const SalesDashboard: React.FC = () => {
                       <td className="py-2 px-2 text-right font-mono-label text-[#A85D45]">{fmt(m.outstanding)}</td>
                       <td className="py-2 px-2 text-right">{m.orderCount}</td>
                       <td className="py-2 pl-2 text-right">
-                        {m.orderCount > 0 ? (
+                        {m.orderCount > 0 || m.payments.length > 0 ? (
                           <button
                             onClick={() => setOpenMonth(openMonth === m.month ? null : m.month)}
                             className="inline-flex items-center gap-1 text-xs font-bold text-[#7A5F2A] hover:underline"
@@ -350,7 +350,10 @@ const SalesDashboard: React.FC = () => {
                         <td colSpan={6} className="bg-gray-50 p-4">
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             <div>
-                              <div className="text-xs font-bold text-slate-600 mb-2">订单明细 · {m.orderCount} 单</div>
+                              <div className="text-xs font-bold text-slate-600 mb-2">订单明细（按下单日期）· {m.orderCount} 单</div>
+                              {m.orderCount === 0 && (
+                                <div className="text-xs text-slate-500 bg-white border border-gray-100 rounded-md px-3 py-2">本月无新订单</div>
+                              )}
                               <div className="space-y-1.5">
                                 {m.orders.map(o => (
                                   <div key={o.id} className="flex justify-between gap-3 bg-white border border-gray-100 rounded-md px-3 py-2">
@@ -372,9 +375,9 @@ const SalesDashboard: React.FC = () => {
                               </div>
                             </div>
                             <div>
-                              <div className="text-xs font-bold text-slate-600 mb-2">收款明细 · {m.payments.length} 笔</div>
+                              <div className="text-xs font-bold text-slate-600 mb-2">收款明细（按付款日期）· {m.payments.length} 笔</div>
                               {m.payments.length === 0 ? (
-                                <div className="text-xs text-slate-500 bg-white border border-gray-100 rounded-md px-3 py-2">本月订单暂无收款记录</div>
+                                <div className="text-xs text-slate-500 bg-white border border-gray-100 rounded-md px-3 py-2">本月无收款记录</div>
                               ) : (
                                 <div className="space-y-1.5">
                                   {m.payments.map(p => (
@@ -408,9 +411,15 @@ const SalesDashboard: React.FC = () => {
           </div>
 
           <p className="text-xs text-slate-600 font-semibold leading-relaxed">
-            ℹ 口径与本月指标一致：按订单创建月份归集；不含寄售、调整单、已作废订单。已收款 = 该月订单已收金额；
+            ℹ 营业额 / 未收款 / 订单数：按订单创建月份归集（与本月指标一致）；不含寄售、调整单、已作废订单。
+            已收款：按收款记录的实际付款日期归集，只计上述订单的收款，每笔只计一次；全年已收款 = 1–12 月合计。
             当前应收余额 = 全部订单未收款（不限年份）。无业务的月份显示 0。
           </p>
+          {annual.excludedPayments.count > 0 && (
+            <p className="text-xs text-slate-500 font-semibold" data-testid="annual-excluded-payments">
+              另有 {annual.excludedPayments.count} 笔 {year} 年收款记录（AED {fmt(annual.excludedPayments.amount)}）属于已作废 / 寄售 / 调整单或找不到对应订单，未计入已收款。
+            </p>
+          )}
         </div>
       </div>
 
