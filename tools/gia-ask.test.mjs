@@ -13,7 +13,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const GIA = path.join(ROOT, 'api/gia');
 const IDS = ['resolve_product', 'check_inventory', 'inventory_table_alerts', 'product_overview', 'quotation_history', 'check_quotation_followups',
   'customer_360', 'consignment_summary', 'receivables_summary', 'sales_summary', 'invoice_pending_summary', 'supplier_search', 'daily_brief',
-  'pi_lookup', 'order_lookup', 'payment_list', 'service_receivables_summary', 'service_contract_status'];
+  'pi_lookup', 'order_lookup', 'payment_list', 'service_receivables_summary', 'service_contract_status',
+  'bank_balances', 'payables_due', 'pending_vouchers', 'bank_reconciliation_status'];
 
 const stubs = {
   name: 'gia-ask-stubs',
@@ -89,7 +90,7 @@ test('no session → 401, model never called', async () => {
   assert.equal(globalThis.__modelCalls.length, 0);
 });
 
-test('Owner / LILI (all 5 modules): the model sees all 18 tools', async () => {
+test('Owner / LILI (all 5 modules): the model sees all 22 tools', async () => {
   for (const isAdmin of [true, false]) {
     setup({ auth: { isAdmin, modules: FULL }, planCalls: [['daily_brief']] });
     await post('今天有什么要处理的');
