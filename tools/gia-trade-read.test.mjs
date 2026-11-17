@@ -86,9 +86,9 @@ test('no session → 401 and nothing read; same module list as sales-summary', a
   }
 });
 
-test('read-only: GET only, active rows only, legacy anon read like sales-summary; POST → 405', async () => {
+test('read-only: GET only, newest-first read like the Trade app, legacy anon read like sales-summary; POST → 405', async () => {
   await call('payment-list', 'customer=BINGO');
-  assert.ok(seen.length > 0 && seen.every((s) => s.method === 'GET' && s.u.includes('state=eq.active')));
+  assert.ok(seen.length > 0 && seen.every((s) => s.method === 'GET' && s.u.includes('order=updated_at.desc')));
   const res = await mods['pi-lookup'].default(new Request('https://x/api/trade/pi-lookup', { method: 'POST', headers: { authorization: 'Bearer u' } }));
   assert.equal(res.status, 405);
   for (const name of ['pi-lookup', 'order-lookup', 'payment-list', '_read']) {
@@ -145,4 +145,25 @@ test('payment_list periodRange: month / YYYY-MM / all (Dubai time)', () => {
   assert.deepEqual(periodRange('month', now), { from: '2026-11-01', to: '2026-11-19' });
   assert.deepEqual(periodRange('today', now), { from: '2026-11-18', to: '2026-11-19' });
   assert.equal(periodRange('all', now), null);
+});
+
+test('duplicate physical rows: newest row per business id wins (same as the Trade app), then active only', async () => {
+  const b = await rolldown({
+    input: path.join(ROOT, 'api/trade/_read.ts'),
+    platform: 'node',
+    plugins: [{ name: 'stub-auth', resolveId: (id) => (id === '../_lib/auth' ? '\0a' : null), load: (id) => (id === '\0a' ? 'export function legacyTradeAnonHeaders(){return {}}' : null) }],
+  });
+  const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'gci-cr-')), 'read.mjs');
+  await b.write({ file: out, format: 'esm' });
+  const { currentRows } = await import(pathToFileURL(out).href);
+  // Rows arrive updated_at DESC, like the app's cloudDb.exportAll.
+  const rows = [
+    { id: 'r3', state: 'active', payload: { id: 'SO-1', status: 'PAID', outstandingAmount: 0 } },      // newest
+    { id: 'r2', state: 'active', payload: { id: 'SO-1', status: 'PENDING', outstandingAmount: 814.8 } },
+    { id: 'r1', state: 'active', payload: { id: 'SO-1', status: 'VOIDED', outstandingAmount: 0 } },
+    { id: 'r5', state: 'cancelled', payload: { id: 'SO-2', status: 'PENDING' } },                     // newest is cancelled → hidden
+    { id: 'r4', state: 'active', payload: { id: 'SO-2', status: 'PENDING' } },                        // older active row is NOT resurrected
+    { id: 'r6', state: null, payload: { id: 'SO-3', status: 'PAID' } },                               // missing state = active
+  ];
+  assert.deepEqual(currentRows(rows).map((p) => `${p.id}:${p.status}`), ['SO-1:PAID', 'SO-3:PAID']);
 });

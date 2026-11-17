@@ -4,7 +4,7 @@
 // Auth: requireModule(trade|finance|crm) — same list as /api/ai/sales-summary.
 import { requireModule } from '../_lib/auth';
 import {
-  json, loadPayloads, payloadIn, customerMatcher, docMatcher, sum, PI_STATUS_ZH, ITEM_DETAIL_MAX,
+  json, loadPayloads, payloadIn, customerMatcher, docMatcher, sum, byCreatedDesc, PI_STATUS_ZH, ITEM_DETAIL_MAX,
 } from './_read';
 
 export const config = { runtime: 'edge' };
@@ -30,7 +30,7 @@ export default async function handler(request: Request): Promise<Response> {
   const byNo = docMatcher(piNo);
 
   try {
-    const all = await loadPayloads<Pi>('quotes');
+    const all = (await loadPayloads<Pi>('quotes')).sort(byCreatedDesc);
     const matched = all.filter((p) => byCustomer(p.customerName) && byNo(p.id, p.quoteRef));
     const shown = matched.slice(0, PI_LIST_MAX);
     const detailIds = shown.length <= ITEM_DETAIL_MAX ? shown.map((p) => p.id) : [];

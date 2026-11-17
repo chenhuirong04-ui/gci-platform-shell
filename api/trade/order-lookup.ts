@@ -5,7 +5,7 @@
 // Auth: requireModule(trade|finance|crm) — same list as /api/ai/sales-summary.
 import { requireModule } from '../_lib/auth';
 import {
-  json, loadPayloads, payloadIn, customerMatcher, docMatcher, sum, ORDER_STATUS_ZH, ITEM_DETAIL_MAX,
+  json, loadPayloads, payloadIn, customerMatcher, docMatcher, sum, byCreatedDesc, ORDER_STATUS_ZH, ITEM_DETAIL_MAX,
 } from './_read';
 
 export const config = { runtime: 'edge' };
@@ -34,7 +34,7 @@ export default async function handler(request: Request): Promise<Response> {
     : status === 'UNPAID' ? 'UNPAID' : '';
 
   try {
-    const all = await loadPayloads<Order>('orders');
+    const all = (await loadPayloads<Order>('orders')).sort(byCreatedDesc);
     const matched = all.filter((o) => byCustomer(o.customerName) && byNo(o.id, o.quoteId) && (
       !wantStatus ? true
         : wantStatus === 'UNPAID' ? o.status !== 'VOIDED' && (Number(o.outstandingAmount) || 0) > 0

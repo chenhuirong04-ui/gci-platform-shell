@@ -21,15 +21,41 @@ export function json(body: unknown, status = 200): Response {
 
 export type TradeTable = 'quotes' | 'quote_items' | 'orders' | 'order_items' | 'payments';
 
-/** Active payloads of one legacy Trade table, newest first. `extra` = PostgREST filters. */
+/**
+ * Current payloads of one legacy Trade table — the same record set the Trade
+ * module shows. Old saves sometimes inserted a new physical row instead of
+ * updating, so one business id can have several rows. The app
+ * (modules/trade/services/cloudDb.exportAll + persistenceService.mergeById /
+ * normalizeCloudRow) reads every row by updated_at DESC and keeps the NEWEST
+ * row per business id (payload.id, else row id), whatever its state; then
+ * only state 'active' is shown. Mirrored here exactly. `extra` = PostgREST filters.
+ */
 export async function loadPayloads<T>(table: TradeTable, extra = '', limit = ROW_LIMIT): Promise<T[]> {
   const base = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   if (!base) throw new Error('supabase_not_configured');
-  const url = `${base}/rest/v1/${table}?select=payload&state=eq.active${extra}&order=created_at.desc&limit=${limit}`;
+  const url = `${base}/rest/v1/${table}?select=id,state,payload${extra}&order=updated_at.desc&limit=${limit}`;
   const res = await fetch(url, { method: 'GET', headers: { ...legacyTradeAnonHeaders(), 'Content-Type': 'application/json' } });
   if (!res.ok) throw new Error(`supabase_${res.status}`);
-  const rows: Array<{ payload: T | null }> = await res.json();
-  return rows.map((r) => r.payload).filter((p): p is T => !!p);
+  const rows: Array<{ id?: string; state?: string | null; payload: (T & { id?: string }) | null }> = await res.json();
+  return currentRows(rows);
+}
+
+/** Newest row per business id wins (rows arrive newest first); then active only. */
+export function currentRows<T>(rows: Array<{ id?: string; state?: string | null; payload: (T & { id?: string }) | null }>): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const r of rows) {
+    if (!r.payload) continue;
+    const key = String(r.payload.id ?? r.id ?? '');
+    if (key) { if (seen.has(key)) continue; seen.add(key); }
+    if ((r.state ?? 'active') === 'active') out.push(r.payload);
+  }
+  return out;
+}
+
+/** Newest first by the business createdAt (for display after the dedupe). */
+export function byCreatedDesc<T extends { createdAt?: string; date?: string }>(a: T, b: T): number {
+  return String(b.createdAt ?? b.date ?? '').localeCompare(String(a.createdAt ?? a.date ?? ''));
 }
 
 /** PostgREST `in.(…)` filter on a payload key, values quoted. */
