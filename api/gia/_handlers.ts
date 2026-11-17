@@ -26,6 +26,7 @@ import projectCustomerProfit from '../finance/profitability';
 import companyDocuments from '../company/documents';
 import internalTasks from '../company/tasks';
 import knowledgeSearch from '../company/knowledge';
+import crmFollowups from '../crm/followups-due';
 
 export type GiaHandler = (request: Request) => Promise<Response>;
 
@@ -56,4 +57,5 @@ export const GIA_HANDLERS: Record<string, GiaHandler> = {
   company_documents: companyDocuments,
   internal_tasks: internalTasks,
   knowledge_search: knowledgeSearch,
+  crm_followups: crmFollowups,
 };

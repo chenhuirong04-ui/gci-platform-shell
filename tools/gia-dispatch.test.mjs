@@ -29,7 +29,7 @@ const stubs = {
         return { ok: true, ctx: { userId: 'u1', token: 't', roleLabel: a.isAdmin ? 'Admin' : 'Staff', modules: a.modules, isAdmin: a.isAdmin } };
       }`;
     if (id === '\0handlers') return `
-      const ids = ${JSON.stringify(['resolve_product', 'check_inventory', 'inventory_table_alerts', 'product_overview', 'quotation_history', 'check_quotation_followups', 'customer_360', 'consignment_summary', 'receivables_summary', 'sales_summary', 'invoice_pending_summary', 'supplier_search', 'daily_brief', 'pi_lookup', 'order_lookup', 'payment_list', 'service_receivables_summary', 'service_contract_status', 'bank_balances', 'payables_due', 'pending_vouchers', 'bank_reconciliation_status', 'project_customer_profit', 'company_documents', 'internal_tasks', 'knowledge_search'])};
+      const ids = ${JSON.stringify(['resolve_product', 'check_inventory', 'inventory_table_alerts', 'product_overview', 'quotation_history', 'check_quotation_followups', 'customer_360', 'consignment_summary', 'receivables_summary', 'sales_summary', 'invoice_pending_summary', 'supplier_search', 'daily_brief', 'pi_lookup', 'order_lookup', 'payment_list', 'service_receivables_summary', 'service_contract_status', 'bank_balances', 'payables_due', 'pending_vouchers', 'bank_reconciliation_status', 'project_customer_profit', 'company_documents', 'internal_tasks', 'knowledge_search', 'crm_followups'])};
       export const GIA_HANDLERS = Object.fromEntries(ids.map((id) => [id, async (req) => {
         globalThis.__giaCalls.push({ id, req, body: req.method === 'POST' ? await req.text() : null });
         return new Response(JSON.stringify({ ok: true, from: id }), { status: 200 });
@@ -65,7 +65,7 @@ const ALL = ['check_inventory', 'check_quotation_followups', 'consignment_summar
   'invoice_pending_summary', 'product_overview', 'quotation_history', 'receivables_summary', 'resolve_product', 'sales_summary', 'supplier_search',
   'order_lookup', 'payment_list', 'pi_lookup', 'service_contract_status', 'service_receivables_summary',
   'bank_balances', 'payables_due', 'pending_vouchers', 'bank_reconciliation_status', 'project_customer_profit',
-  'company_documents', 'internal_tasks', 'knowledge_search'].sort();
+  'company_documents', 'internal_tasks', 'knowledge_search', 'crm_followups'].sort();
 const ARGS = { customer_360: { customer: 'MAG' }, product_overview: { product: 'M' }, resolve_product: { q: '纸尿裤' }, supplier_search: { query: '劳工' }, knowledge_search: { query: 'visa' } };
 
 test('no session → 401 on both endpoints', async () => {
@@ -76,7 +76,7 @@ test('no session → 401 on both endpoints', async () => {
 });
 
 for (const [who, isAdmin] of [['Owner / LILI (Admin)', true], ['same modules, non-Admin role', false]]) {
-  test(`${who} with every module sees and can call all 26 tools (13 P0 + 10 P3 + 3 P4)`, async () => {
+  test(`${who} with every module sees and can call all 27 tools (13 P0 + 10 P3 + 3 P4 + 1 P5)`, async () => {
     as({ isAdmin, modules: FULL });
     assert.deepEqual((await list()).tools.map((t) => t.id).sort(), ALL);
     for (const tool of ALL) assert.equal((await post({ tool, args: ARGS[tool] })).status, 200, tool);
@@ -172,7 +172,7 @@ test('模拟验证 (simulated): a role label alone grants nothing — Editor/Adm
 test('sensitive is a label only and is exposed in the tool list', async () => {
   as({ isAdmin: false, modules: FULL });
   const sensitive = (await list()).tools.filter((t) => t.sensitive).map((t) => t.id).sort();
-  assert.deepEqual(sensitive, ALL.filter((id) => !['check_inventory', 'inventory_table_alerts', 'resolve_product', 'service_contract_status', 'internal_tasks', 'knowledge_search'].includes(id)));
+  assert.deepEqual(sensitive, ALL.filter((id) => !['check_inventory', 'inventory_table_alerts', 'resolve_product', 'service_contract_status', 'internal_tasks', 'knowledge_search', 'crm_followups'].includes(id)));
 });
 
 test('unknown tool → 400; bad args → 400', async () => {

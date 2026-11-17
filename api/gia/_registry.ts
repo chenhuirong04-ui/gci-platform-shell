@@ -268,6 +268,15 @@ export const GIA_TOOLS: readonly GiaTool[] = [
     args: [{ name: 'query', required: true }, { name: 'kind', required: false }],
     resultChars: 30000,
   },
+  // GIA P5 (2026-11-17) — CRM follow-ups due today / overdue (crm_customers, same
+  // rule as the Home 工作台), read as the caller.
+  {
+    id: 'crm_followups',
+    description: 'CRM customer follow-ups due today and overdue (客户跟进 / 今天要跟进谁 / 逾期未跟进): customer, status, priority, owner, next follow-up date, days overdue, next action, last note; urgent flag = Home workbench rule.',
+    endpoint: '/api/crm/followups-due', method: 'GET',
+    modules: ['crm'], sensitive: false,
+    args: [],
+  },
 ];
 
 export function findTool(id: unknown): GiaTool | null {

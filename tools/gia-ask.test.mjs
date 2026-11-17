@@ -15,7 +15,7 @@ const IDS = ['resolve_product', 'check_inventory', 'inventory_table_alerts', 'pr
   'customer_360', 'consignment_summary', 'receivables_summary', 'sales_summary', 'invoice_pending_summary', 'supplier_search', 'daily_brief',
   'pi_lookup', 'order_lookup', 'payment_list', 'service_receivables_summary', 'service_contract_status',
   'bank_balances', 'payables_due', 'pending_vouchers', 'bank_reconciliation_status', 'project_customer_profit',
-  'company_documents', 'internal_tasks', 'knowledge_search'];
+  'company_documents', 'internal_tasks', 'knowledge_search', 'crm_followups'];
 
 const stubs = {
   name: 'gia-ask-stubs',
@@ -91,7 +91,7 @@ test('no session → 401, model never called', async () => {
   assert.equal(globalThis.__modelCalls.length, 0);
 });
 
-test('Owner / LILI (all 5 modules): the model sees all 26 tools', async () => {
+test('Owner / LILI (all 5 modules): the model sees all 27 tools', async () => {
   for (const isAdmin of [true, false]) {
     setup({ auth: { isAdmin, modules: FULL }, planCalls: [['daily_brief']] });
     await post('今天有什么要处理的');
@@ -273,4 +273,73 @@ test('stock: warehouse question planned correctly → unchanged; 4-call cap resp
   assert.equal(globalThis.__calls.length, 4);
   assert.equal(body.toolsUsed[0].tool, 'inventory_table_alerts');
   assert.ok(globalThis.__calls.some((c) => c.id === 'check_inventory'));
+});
+
+// ── GIA P5: daily business overview ─────────────────────────────────────────
+const BUNDLE = ['bank_balances', 'company_documents', 'consignment_summary', 'crm_followups', 'daily_brief', 'internal_tasks',
+  'inventory_table_alerts', 'knowledge_search', 'payables_due', 'pending_vouchers', 'receivables_summary'];
+
+test('P5 overview: keyword question → no planner call, the full cross-module bundle runs in parallel with the caller token', async () => {
+  setup({ answer: '今日经营概况（事实）… 4321 [daily_brief]', toolDelay: 60 });
+  const { status, body } = await post('今天公司经营情况怎么样？最需要处理哪三件事？');
+  assert.equal(status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.mode, 'overview');
+  assert.deepEqual(calledTools(), BUNDLE);
+  assert.equal(globalThis.__modelCalls.length, 1); // answer only
+  assert.match(globalThis.__modelCalls[0].systemInstruction, /DAILY BUSINESS OVERVIEW/);
+  assert.match(globalThis.__modelCalls[0].systemInstruction, /寄售待结算 is separate/);
+  assert.ok(globalThis.__calls.every((c) => c.auth === 'Bearer user-token' && !c.cookie && c.method === 'GET'));
+  const starts = globalThis.__calls.map((c) => c.start);
+  assert.ok(Math.max(...starts) - Math.min(...starts) < 50, 'parallel');
+  assert.deepEqual(body.unavailable, []);
+  assert.deepEqual(body.unverifiedNumbers, []);
+});
+
+test('P5 overview: planner can choose overview for other wording', async () => {
+  setup({ model: async (call, n) => (n === 1 ? JSON.stringify({ overview: true, calls: [] }) : '概况 4321 [receivables_summary]') });
+  const { body } = await post('今天我该先做什么？');
+  assert.equal(body.mode, 'overview');
+  assert.deepEqual(calledTools(), BUNDLE);
+});
+
+test('P5 overview: tools the caller may not use are not run and are named as unavailable', async () => {
+  setup({ auth: { isAdmin: false, modules: ['crm'] }, answer: '概况 4321 [crm_followups]' });
+  const { body } = await post('公司整体情况怎么样');
+  assert.equal(body.ok, true);
+  for (const t of ['receivables_summary', 'bank_balances', 'payables_due', 'pending_vouchers', 'daily_brief', 'inventory_table_alerts', 'consignment_summary']) {
+    assert.ok(!calledTools().includes(t), t);
+    assert.ok(body.unavailable.some((u) => u.includes(t)), t);
+  }
+  assert.deepEqual(calledTools(), ['company_documents', 'crm_followups', 'internal_tasks', 'knowledge_search']);
+  assert.match(globalThis.__modelCalls[0].systemInstruction, /无权限查看/);
+});
+
+test('P5 overview: a failing tool does not stop the analysis; answer model failure → fallback', async () => {
+  setup({ toolBehaviour: { payables_due: 'throw' }, answer: '应付 无数据' });
+  const { body } = await post('最需要处理哪三件事');
+  assert.equal(body.ok, true);
+  assert.equal(body.toolsUsed.find((t) => t.tool === 'payables_due').status, 'error');
+  setup({ model: async () => { throw new Error('down'); } });
+  const r2 = await post('今天经营情况');
+  assert.equal(r2.body.ok, false);
+  assert.equal(r2.body.fallback, true);
+});
+
+test('P5 overview keyword detection', () => {
+  for (const q of ['今天公司经营情况怎么样？最需要处理哪三件事？', '公司现在情况怎么样', '最近经营状况', '有哪几件事要优先处理', 'business overview please'])
+    assert.ok(mod.isOverviewQuestion(q), q);
+  for (const q of ['纸尿裤还有多少库存', 'MAG 欠多少钱', '银行余额多少', '营业执照什么时候到期'])
+    assert.ok(!mod.isOverviewQuestion(q), q);
+});
+
+test('response is streamed: starts with whitespace, still one valid JSON body', async () => {
+  setup({ planCalls: [['daily_brief']] });
+  const r = await ask(new Request('https://preview.example/api/gia/ask', {
+    method: 'POST', headers: { authorization: 'Bearer user-token', 'content-type': 'application/json' }, body: JSON.stringify({ question: '今天的简报' }),
+  }));
+  const text = await r.text();
+  assert.equal(r.status, 200);
+  assert.match(text, /^\s+\{/);
+  assert.equal(JSON.parse(text).ok, true);
 });

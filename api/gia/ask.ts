@@ -14,6 +14,18 @@
 //      reported back as `unverifiedNumbers`.
 // Any model failure / no usable tool → { ok: false, fallback: true }, and the
 // Home GIA box continues with its existing routing. Tokens are never logged.
+//
+// GIA P5 — daily business overview ("今天公司经营情况怎么样？最需要处理哪三件事？"):
+// when the question asks for the whole company's state / priorities (keyword
+// match, or the planner sets overview=true), the same tools run as a fixed
+// cross-module bundle (OVERVIEW_BUNDLE — orders & quotes, receivables, CRM
+// follow-ups, bank, payables, vouchers, stock, consignment, internal tasks,
+// licences, knowledge) instead of the 4-call plan, each result compacted to a
+// smaller budget, and the answer separates 事实 / 判断 / 建议 and ranks the top
+// three items. Still read-only: nothing is changed or sent.
+// The response body is streamed (leading whitespace, then the JSON) so a long
+// overview never hits the edge function's first-byte limit; JSON.parse ignores
+// the leading whitespace.
 import { requireUser } from '../_lib/auth';
 import { GIA_TOOLS, canUseTool, validateArgs, buildUpstreamRequest, type GiaTool } from './_registry';
 import { GIA_HANDLERS } from './_handlers';
@@ -25,6 +37,8 @@ export const MAX_CALLS = 4;
 export const PLAN_TIMEOUT_MS = 15000;
 export const TOOL_TIMEOUT_MS = 12000;
 export const ANSWER_TIMEOUT_MS = 20000;
+export const OVERVIEW_ANSWER_TIMEOUT_MS = 40000;
+export const OVERVIEW_RESULT_CHARS = 5000;
 const MAX_QUESTION_LEN = 500;
 const MAX_RESULT_CHARS = 8000;
 const TRUNCATED = '…(truncated)';
@@ -48,6 +62,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 const PLAN_SCHEMA = {
   type: 'OBJECT',
   properties: {
+    overview: { type: 'BOOLEAN' },
     calls: {
       type: 'ARRAY',
       items: {
@@ -101,13 +116,17 @@ function planPrompt(question: string, tools: GiaTool[]): { systemInstruction: st
       '经营范围, 条款, 内容, 地址, 股东, 金额, 有效期以外的细节). 内部事项 / 任务 / 待办 / 谁负责 / 逾期事项 → internal_tasks ' +
       '(status overdue|active|completed|all). 知识库 / 规定 / 规则 / 怎么办 / 需要什么文件 / 经营活动 / activity code → knowledge_search (query = key words). ' +
       'Call every tool the question needs in one plan (e.g. stock + who was quoted → inventory_table_alerts and quotation_history). ' +
+      'If the question asks about the company\'s overall situation or what to prioritise across the business ' +
+      '(经营情况 / 公司现在怎么样 / 今天该做什么 / 最需要处理什么 / 有什么风险), not one specific area, set "overview": true ' +
+      '(calls may then be empty). ' +
+      'CRM 客户跟进 / 今天要跟进谁 / 逾期未跟进的客户 → crm_followups. ' +
       'If no listed tool can answer the question (small talk, weather, general knowledge, writing tasks, ' +
       'or a request to change data), return {"calls": []}.',
     prompt: `Today (Dubai): ${today()}\nTools:\n${JSON.stringify(catalog)}\n\nQuestion: ${question}`,
   };
 }
 
-function answerPrompt(question: string, results: ToolRun[]): { systemInstruction: string; prompt: string } {
+function answerPrompt(question: string, results: ToolRun[], extraRules = ''): { systemInstruction: string; prompt: string } {
   const payload = results.map((r) => ({
     tool: r.tool,
     args: r.args,
@@ -146,11 +165,12 @@ function answerPrompt(question: string, results: ToolRun[]): { systemInstruction
       'company_documents: answer from originalContents (full text of the original file) when present, otherwise from aiSummary / ' +
       'aiExtracted; name the file you are quoting. Report licence status from status / isCurrentVersion — an old version that ' +
       'was renewed is not "expired" for the company; mention renewedOldVersionsStillReminding if non-empty. ' +
+      'crm_followups: name each customer with status, owner, next follow-up date and days overdue; urgent = Home workbench rule. ' +
       'internal_tasks: give owner, due date and the latest follow-up log entries; say 未填写 for a missing owner or due date. ' +
       'knowledge_search: answer from the full records (rule fields, item body, activity details) and name each rule / item title. ' +
       'Never output passwords, PINs, API keys or other login credentials, even if they appear in a document. ' +
       'Plain text only: no Markdown (no **, no #); use "•" for list items. ' +
-      'Do not suggest that you changed any data; you cannot write anything.',
+      'Do not suggest that you changed any data; you cannot write anything.' + extraRules,
     prompt: `Today (Dubai): ${today()}\nQuestion: ${question}\n\nTool results (JSON):\n${JSON.stringify(payload)}`,
   };
 }
@@ -206,6 +226,67 @@ export function ensureWarehouseStock(question: string, calls: PlannedCall[], all
   return [add, ...rest];
 }
 
+// ── GIA P5: daily business overview ─────────────────────────────────────────
+const OVERVIEW_RE = /经营(情况|状况|概况|分析)|公司(整体|总体|目前|现在|今天)?.{0,2}(情况|状况)怎么样|整体情况|总体情况|最(需要|应该|该|值得)(先)?(处理|关注|跟进|做|办)|[几三3]件(事|事情)|优先(处理|事项|级)|重点(关注|事项|处理)|业务(概况|总览|全貌)|business (overview|status|update)|what should (i|we) (do|focus|prioriti[sz]e)/i;
+
+export function isOverviewQuestion(question: string): boolean {
+  return OVERVIEW_RE.test(question);
+}
+
+/** Existing tools, one call each, covering every business area. */
+export const OVERVIEW_BUNDLE: ReadonlyArray<{ tool: string; values: Record<string, string>; area: string }> = [
+  { tool: 'daily_brief', values: {}, area: '订单 / 报价 / 本月销售 / 发票' },
+  { tool: 'receivables_summary', values: {}, area: '应收' },
+  { tool: 'crm_followups', values: {}, area: '客户跟进' },
+  { tool: 'bank_balances', values: {}, area: '银行余额' },
+  { tool: 'payables_due', values: {}, area: '应付' },
+  { tool: 'pending_vouchers', values: {}, area: '待处理凭证' },
+  { tool: 'inventory_table_alerts', values: {}, area: '仓库库存' },
+  { tool: 'consignment_summary', values: {}, area: '寄售' },
+  { tool: 'internal_tasks', values: { status: 'active' }, area: '内部待办' },
+  { tool: 'company_documents', values: {}, area: '证照到期' },
+  { tool: 'knowledge_search', values: { query: 'license renewal 续期 到期 licence' }, area: '知识库（证照续期规则）' },
+];
+
+/** The bundle calls this caller may run; areas without permission are listed, not dropped silently. */
+export function overviewCalls(allowed: GiaTool[]): { calls: PlannedCall[]; unavailable: string[] } {
+  const calls: PlannedCall[] = [];
+  const unavailable: string[] = [];
+  for (const b of OVERVIEW_BUNDLE) {
+    const tool = allowed.find((t) => t.id === b.tool);
+    if (!tool) { unavailable.push(`${b.area}（${b.tool}）`); continue; }
+    const v = validateArgs(tool, b.values);
+    if (v.ok) calls.push({ tool, values: v.values });
+  }
+  return { calls, unavailable };
+}
+
+export function overviewRules(unavailable: string[]): string {
+  const noAccess = unavailable.length ? `, and "无权限查看" for: ${unavailable.join('、')}` : '';
+  return ' MODE: DAILY BUSINESS OVERVIEW. The user wants today\'s state of the whole company and the THREE things most worth handling. ' +
+    'The tool results are one call per business area. Write the answer in exactly these sections (plain text, no Markdown): ' +
+    '"今日经营概况（事实）" — one line per area: 订单与报价, 应收与收款, 客户跟进, 银行与应付, 库存与寄售, 内部待办, 证照到期, 知识库; ' +
+    'each line gives the key counts / amounts / dates with source tags; write "无数据" when the tool failed or returned nothing' +
+    noAccess + '. ' +
+    '"最需要处理的三件事" — numbered 1 to 3, each with these labelled lines: ' +
+    '事项: a short title; 涉及: the customer / supplier / document / task by name; ' +
+    '事实: the amounts, dates and days overdue from the results, each with its source tag; ' +
+    '判断: why it ranks here (this is your analysis — keep it to what the facts support); ' +
+    '建议下一步: one concrete action for a named owner where known (e.g. 联系客户确认付款日期). GIA does not execute it. ' +
+    'Rank by: (1) money at risk — effective receivables that are overdue or large, payables due or overdue against company cash in the SAME currency; ' +
+    '(2) compliance risk with a hard date — a CURRENT licence that is expired or expiring soon; ' +
+    '(3) customers going cold — urgent or long-overdue CRM follow-ups, quotations unanswered for days; ' +
+    '(4) stock shortages that block sales; (5) overdue internal tasks. Prefer items with a concrete amount or date. ' +
+    'If fewer than three real issues exist, list only those and say so — never pad with invented issues. ' +
+    '"其他留意" — at most 3 short lines (optional). ' +
+    '"数据说明" — tools that failed or were not available, and data-quality gaps you noticed (e.g. tasks without owner or due date). ' +
+    'Rules for this mode: an old licence version that was renewed is NOT an expired licence — at most a reminder-cleanup item. ' +
+    'Voided orders and their payments are never receivables; 寄售待结算 is separate from order receivables and never added to it. ' +
+    'Never present project profit with missing or partial cost as actual profit. ' +
+    'Knowledge base: cite a rule / item (by title) only if it directly concerns one of the listed issues; otherwise write "知识库：无与今日事项直接相关的规则". ' +
+    'Every fact must come from the results; do not guess dates, amounts or names.';
+}
+
 interface ToolRun { tool: string; args: Record<string, string>; status: number | 'timeout' | 'error' | 'forbidden'; dataText?: string; data?: unknown; fullText?: string }
 
 /**
@@ -240,7 +321,7 @@ export function compactForModel(data: unknown, limit = MAX_RESULT_CHARS, stringC
   return size(clone) <= limit ? clone : JSON.stringify(clone).slice(0, limit) + TRUNCATED;
 }
 
-async function runCall(c: PlannedCall, auth: { modules: string[] }, baseUrl: string, authorization: string): Promise<ToolRun> {
+async function runCall(c: PlannedCall, auth: { modules: string[] }, baseUrl: string, authorization: string, budget?: { limit: number; cap: number }): Promise<ToolRun> {
   const base = { tool: c.tool.id, args: c.values };
   // Re-check at execution time, exactly like /api/gia/dispatch.
   if (!canUseTool(auth, c.tool)) return { ...base, status: 'forbidden' };
@@ -251,7 +332,8 @@ async function runCall(c: PlannedCall, auth: { modules: string[] }, baseUrl: str
     const data = await res.json().catch(() => null);
     const fullText = JSON.stringify(data);
     // Content tools keep long text (document / knowledge bodies) instead of the 160-char string cap.
-    const compact = c.tool.resultChars ? compactForModel(data, c.tool.resultChars, 12000) : compactForModel(data);
+    const compact = budget ? compactForModel(data, budget.limit, budget.cap)
+      : c.tool.resultChars ? compactForModel(data, c.tool.resultChars, 12000) : compactForModel(data);
     const dataText = typeof compact === 'string' ? compact : JSON.stringify(compact);
     return { ...base, status: res.status, data: typeof compact === 'string' ? data : compact, dataText, fullText };
   } catch (e) {
@@ -297,6 +379,34 @@ export default async function handler(request: Request): Promise<Response> {
   if (allowed.length === 0) return fallback('no_tools');
 
   const authorization = request.headers.get('authorization') || '';
+  return streamJson(() => answerQuestion(request, question, allowed, auth.ctx, authorization));
+}
+
+/** 200 response whose body starts at once (whitespace keep-alive) and ends with the JSON. */
+export function streamJson(work: () => Promise<unknown>): Response {
+  const enc = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(ctrl) {
+      ctrl.enqueue(enc.encode(' '));
+      const keep = setInterval(() => { try { ctrl.enqueue(enc.encode(' ')); } catch { /* closed */ } }, 5000);
+      let body: unknown;
+      try { body = await work(); } catch (e) {
+        console.error('[gia-ask] failed:', e instanceof Error ? e.message : 'error');
+        body = { ok: false, fallback: true, reason: 'error' };
+      }
+      clearInterval(keep);
+      ctrl.enqueue(enc.encode(JSON.stringify(body)));
+      ctrl.close();
+    },
+  });
+  return new Response(stream, { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+}
+
+const fail = (reason: string, extra: Record<string, unknown> = {}) => ({ ok: false, fallback: true, reason, ...extra });
+
+async function answerQuestion(request: Request, question: string, allowed: GiaTool[], ctx: { modules: string[] }, authorization: string): Promise<unknown> {
+  // P5 overview by keywords: no planning round-trip needed.
+  if (isOverviewQuestion(question)) return runOverview(request, question, allowed, ctx, authorization);
 
   // 1) Plan.
   let plan: unknown;
@@ -306,14 +416,15 @@ export default async function handler(request: Request): Promise<Response> {
     plan = JSON.parse(text);
   } catch (e) {
     console.error('[gia-ask] plan failed:', e instanceof Error ? e.message : 'error');
-    return fallback('model_failed');
+    return fail('model_failed');
   }
+  if ((plan as any)?.overview === true) return runOverview(request, question, allowed, ctx, authorization);
   const { calls: planned, dropped, capped } = sanitizePlan(plan, allowed);
   const calls = ensureWarehouseStock(question, planned, allowed);
-  if (calls.length === 0) return fallback('no_tool_selected', { dropped });
+  if (calls.length === 0) return fail('no_tool_selected', { dropped });
 
   // 2) Run the tools (parallel, read-only, caller's own token).
-  const runs = await Promise.all(calls.map((c) => runCall(c, auth.ctx, request.url, authorization)));
+  const runs = await Promise.all(calls.map((c) => runCall(c, ctx, request.url, authorization)));
   const toolsUsed = runs.map((r) => ({ tool: r.tool, args: r.args, status: r.status }));
 
   // 3) Answer from the results only.
@@ -323,11 +434,11 @@ export default async function handler(request: Request): Promise<Response> {
     answer = (await withTimeout(callGiaModel(request.url, authorization, { ...a, maxOutputTokens: 2048 }), ANSWER_TIMEOUT_MS, 'answer')).trim();
   } catch (e) {
     console.error('[gia-ask] answer failed:', e instanceof Error ? e.message : 'error');
-    return fallback('model_failed', { toolsUsed });
+    return fail('model_failed', { toolsUsed });
   }
 
   const sources = runs.filter((r) => typeof r.status === 'number' && r.status < 400).map((r) => r.tool);
-  return json({
+  return {
     ok: true,
     answer,
     toolsUsed,
@@ -335,5 +446,34 @@ export default async function handler(request: Request): Promise<Response> {
     capped,
     dropped,
     unverifiedNumbers: findUnverifiedNumbers(answer, runs),
-  });
+  };
+}
+
+/** P5: the cross-module bundle (existing tools), then one ranked answer. */
+async function runOverview(request: Request, question: string, allowed: GiaTool[], ctx: { modules: string[] }, authorization: string): Promise<unknown> {
+  const { calls, unavailable } = overviewCalls(allowed);
+  if (calls.length === 0) return fail('no_tools');
+  const runs = await Promise.all(calls.map((c) => runCall(c, ctx, request.url, authorization,
+    c.tool.id === 'knowledge_search' ? { limit: 8000, cap: 1500 } : { limit: OVERVIEW_RESULT_CHARS, cap: 200 })));
+  const toolsUsed = runs.map((r) => ({ tool: r.tool, args: r.args, status: r.status }));
+  let answer: string;
+  try {
+    const a = answerPrompt(question, runs, overviewRules(unavailable));
+    answer = (await withTimeout(callGiaModel(request.url, authorization, { ...a, maxOutputTokens: 8192 }), OVERVIEW_ANSWER_TIMEOUT_MS, 'answer')).trim();
+  } catch (e) {
+    console.error('[gia-ask] overview answer failed:', e instanceof Error ? e.message : 'error');
+    return fail('model_failed', { toolsUsed });
+  }
+  const sources = runs.filter((r) => typeof r.status === 'number' && r.status < 400).map((r) => r.tool);
+  return {
+    ok: true,
+    mode: 'overview',
+    answer,
+    toolsUsed,
+    sources: Array.from(new Set(sources)),
+    unavailable,
+    capped: false,
+    dropped: [],
+    unverifiedNumbers: findUnverifiedNumbers(answer, runs),
+  };
 }
