@@ -203,6 +203,7 @@ function buildInvoiceReceivables(invoiceRows: any[], now: number) {
 // ── Handler ──────────────────────────────────────────────────────────────────
 
 import { requireModule, legacyTradeAnonHeaders } from '../_lib/auth';
+import { currentOrderRows } from '../trade/_read';
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
@@ -220,8 +221,8 @@ export default async function handler(request: Request): Promise<Response> {
   const now = Date.now();
 
   const [ordersRes, consignRes, invoiceRes] = await Promise.allSettled([
-    // A: orders — all active, up to 1000 rows; filter in memory (JSONB payload)
-    sbGet(supabaseUrl, tradeAnonHdr, 'orders?select=id,state,payload&state=eq.active&order=created_at.desc&limit=1000'),
+    // A: orders — newest row per order number (Trade app rule); filter in memory (JSONB payload)
+    sbGet(supabaseUrl, tradeAnonHdr, 'orders?select=id,created_at,state,payload&order=updated_at.desc&limit=2000').then(currentOrderRows),
     // B: consignment_stock — active rows
     sbGet(supabaseUrl, tradeAnonHdr, 'consignment_stock?select=id,state,payload&state=eq.active&order=created_at.desc&limit=500'),
     // C: invoice_drafts — flat schema; only issued+approved+waiting_approval

@@ -42,15 +42,35 @@ export async function loadPayloads<T>(table: TradeTable, extra = '', limit = ROW
 
 /** Newest row per business id wins (rows arrive newest first); then active only. */
 export function currentRows<T>(rows: Array<{ id?: string; state?: string | null; payload: (T & { id?: string }) | null }>): T[] {
+  return latestActiveRows(rows).map((r) => r.payload as T);
+}
+
+/**
+ * Same rule, returning the row objects themselves (for endpoints that also use
+ * row columns such as created_at). Input must be ordered updated_at DESC and
+ * must NOT be pre-filtered by state, or an older active row could stand in
+ * for a newer voided / cancelled one.
+ */
+export function latestActiveRows<R extends { id?: string; state?: string | null; payload: any }>(rows: R[]): R[] {
   const seen = new Set<string>();
-  const out: T[] = [];
-  for (const r of rows) {
-    if (!r.payload) continue;
+  const out: R[] = [];
+  for (const r of rows || []) {
+    if (!r?.payload) continue;
     const key = String(r.payload.id ?? r.id ?? '');
     if (key) { if (seen.has(key)) continue; seen.add(key); }
-    if ((r.state ?? 'active') === 'active') out.push(r.payload);
+    if ((r.state ?? 'active') === 'active') out.push(r);
   }
   return out;
+}
+/**
+ * For the older AI endpoints that read `orders` rows themselves
+ * (customer-360, daily-brief, receivables-summary, sales-summary): current
+ * rows per the app rule, then back in created_at DESC order as those
+ * endpoints listed them before. Query must be `order=updated_at.desc`, no state filter.
+ */
+export function currentOrderRows<R extends { id?: string; state?: string | null; created_at?: string; payload: any }>(rows: R[]): R[] {
+  return latestActiveRows(rows).sort((a, b) =>
+    String(b.payload?.createdAt ?? b.created_at ?? '').localeCompare(String(a.payload?.createdAt ?? a.created_at ?? '')));
 }
 
 /** Newest first by the business createdAt (for display after the dedupe). */

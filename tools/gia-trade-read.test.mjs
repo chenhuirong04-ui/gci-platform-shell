@@ -167,3 +167,70 @@ test('duplicate physical rows: newest row per business id wins (same as the Trad
   ];
   assert.deepEqual(currentRows(rows).map((p) => `${p.id}:${p.status}`), ['SO-1:PAID', 'SO-3:PAID']);
 });
+
+// ── Older AI endpoints that read `orders` themselves: same newest-row rule ──
+const DUP_ORDER_ROWS = [ // updated_at DESC, as requested with order=updated_at.desc
+  { id: 'r3', created_at: '2026-07-07T02:40:00Z', state: 'active', payload: { id: 'SO-20260707-3525', customerName: 'BINGOMART 1+1', grandTotal: 814.8, paidAmount: 814.8, outstandingAmount: 0, status: 'VOIDED', createdAt: '2026-07-07T02:40:00Z', dueDate: '2026/07/07' } },
+  { id: 'r2', created_at: '2026-07-07T02:40:00Z', state: 'active', payload: { id: 'SO-20260707-3525', customerName: 'BINGOMART 1+1', grandTotal: 814.8, paidAmount: 0, outstandingAmount: 814.8, status: 'PENDING', createdAt: '2026-07-07T02:40:00Z', dueDate: '2026/07/07' } },
+  { id: 'r1', created_at: '2026-05-21T02:40:00Z', state: 'active', payload: { id: 'SO-20260521-3787', customerName: 'Easy4me FZ LLE', grandTotal: 449.22, paidAmount: 0, outstandingAmount: 449.22, status: 'PENDING', createdAt: new Date().toISOString(), dueDate: '2099/01/01' } },
+];
+
+async function buildEndpoint(rel) {
+  const b = await rolldown({
+    input: path.join(ROOT, rel),
+    platform: 'node',
+    plugins: [{
+      name: 'stub-auth',
+      resolveId(id) { return id === '../_lib/auth' ? '\0auth' : null; },
+      load(id) {
+        return id === '\0auth'
+          ? `export async function requireModule(){ return { ok: true, ctx: {} }; }
+             export function legacyTradeAnonHeaders(){ return { apikey: 'anon-stub', Authorization: 'Bearer anon-stub' }; }`
+          : null;
+      },
+    }],
+  });
+  const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'gci-ai-')), path.basename(rel, '.ts') + '.mjs');
+  await b.write({ file: out, format: 'esm' });
+  return (await import(pathToFileURL(out).href)).default;
+}
+
+function stubOrders() {
+  const urls = [];
+  globalThis.fetch = async (url) => {
+    const u = decodeURIComponent(String(url));
+    urls.push(u);
+    const rows = /\/rest\/v1\/orders\?/.test(u) ? DUP_ORDER_ROWS : [];
+    return new Response(JSON.stringify(rows), { status: 200 });
+  };
+  return urls;
+}
+
+test('receivables-summary: an order whose newest row is VOIDED is no longer counted as unpaid (stale PENDING row ignored)', async () => {
+  const handler = await buildEndpoint('api/ai/receivables-summary.ts');
+  const urls = stubOrders();
+  const body = await (await handler(new Request('https://x/api/ai/receivables-summary', { headers: { authorization: 'Bearer u' } }))).json();
+  assert.equal(body.orderReceivables.orderCount, 1);
+  assert.equal(body.orderReceivables.total, 449.22);
+  assert.ok(!JSON.stringify(body.orderReceivables).includes('SO-20260707-3525'));
+  const ordersUrl = urls.find((u) => u.includes('/rest/v1/orders?'));
+  assert.match(ordersUrl, /order=updated_at\.desc/);
+  assert.doesNotMatch(ordersUrl, /state=eq\.active/); // a state pre-filter would let older active rows stand in
+});
+
+test('sales-summary: duplicate rows count once, using the newest row', async () => {
+  const handler = await buildEndpoint('api/ai/sales-summary.ts');
+  stubOrders();
+  const body = await (await handler(new Request('https://x/api/ai/sales-summary?period=month', { headers: { authorization: 'Bearer u' } }))).json();
+  // SO-20260707-3525 newest = VOIDED (not a sale); the Easy4me order is PENDING (not a sale either) → no revenue rows
+  assert.equal(body.totalGrandTotal ?? body.summary?.totalGrandTotal ?? 0, 0);
+});
+
+test('customer-360 and daily-brief read orders newest-first without a state pre-filter and apply currentOrderRows', () => {
+  for (const rel of ['api/ai/customer-360.ts', 'api/ai/daily-brief.ts', 'api/ai/receivables-summary.ts', 'api/ai/sales-summary.ts']) {
+    const src = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+    assert.match(src, /import \{ currentOrderRows \} from '\.\.\/trade\/_read'/, rel);
+    assert.doesNotMatch(src, /orders\?select=[^'`]*state=eq\.active/, rel);
+    assert.ok(/currentOrderRows\(/.test(src) || /\.then\(currentOrderRows\)/.test(src), rel);
+  }
+});

@@ -39,6 +39,7 @@ async function sbGet(supabaseUrl: string, tradeAnonHdr: Record<string, string>, 
 }
 
 import { requireModule, legacyTradeAnonHeaders } from '../_lib/auth';
+import { currentOrderRows } from '../trade/_read';
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
@@ -63,9 +64,9 @@ export default async function handler(request: Request): Promise<Response> {
     sbGet(supabaseUrl, tradeAnonHdr,
       `quotation_records?select=id,quote_no,customer_name,grand_total,status,created_at,quote_date&order=created_at.desc&limit=200`),
 
-    // 2. orders — payload wrapped, fetch all active
+    // 2. orders — payload wrapped; newest row per order number (Trade app rule)
     sbGet(supabaseUrl, tradeAnonHdr,
-      `orders?select=id,created_at,state,payload&state=eq.active&order=created_at.desc&limit=1000`),
+      `orders?select=id,created_at,state,payload&order=updated_at.desc&limit=2000`).then(currentOrderRows),
 
     // 3. consignment_stock — payload wrapped
     sbGet(supabaseUrl, tradeAnonHdr,

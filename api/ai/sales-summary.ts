@@ -64,6 +64,7 @@ function periodStart(period: string): number {
 }
 
 import { requireModule, legacyTradeAnonHeaders } from '../_lib/auth';
+import { currentOrderRows } from '../trade/_read';
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 200, headers: CORS });
@@ -86,9 +87,10 @@ export default async function handler(request: Request): Promise<Response> {
   // Future: mirror createdAt + status + grandTotal as top-level columns for server-side filtering.
   const queryUrl = `${supabaseUrl}/rest/v1/orders`
     + `?select=id,created_at,state,payload`
-    + `&state=eq.active`
-    + `&order=created_at.desc`
-    + `&limit=1000`;
+    // All rows newest-updated first, no state filter: one order number can have
+    // several physical rows; currentOrderRows keeps the newest (Trade app rule).
+    + `&order=updated_at.desc`
+    + `&limit=2000`;
 
   const res = await fetch(queryUrl, {
     headers: {
@@ -102,7 +104,7 @@ export default async function handler(request: Request): Promise<Response> {
     return json({ ok: false, error: `Supabase ${res.status}`, detail: errText });
   }
 
-  const dbRows: DbRow[] = await res.json();
+  const dbRows: DbRow[] = currentOrderRows(await res.json());
   const cutoff = periodStart(period);
 
   // Filter by period, valid sale statuses, optional customer
