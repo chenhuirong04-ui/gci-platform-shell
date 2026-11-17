@@ -106,13 +106,20 @@ export function buildDocuments(docs: Doc[], today: string, opts: { query?: strin
     };
   };
 
-  const q = norm(opts.query);
+  // Word search: a query like "Trakhees 许可证" matches on any of its words; only
+  // the documents matching the most words are kept (best matches).
+  const words = String(opts.query || '').split(/[\s,，、;；/]+/).map(norm).filter((w) => w.length >= 2);
   const t = norm(opts.type);
   const hay = (d: Doc) => norm([d.document_name, d.file_name, d.category, d.document_type, d.company_name, d.document_number,
     d.issuing_authority, d.ai_summary, d.notes, d.ai_extracted ? JSON.stringify(d.ai_extracted) : ''].join(' '));
-  const matched = docs
-    .filter((d) => (!q || hay(d).includes(q)) && (!t || norm(typeOf(d)).includes(t) || norm(d.category).includes(t)))
-    .sort((a, b) => String(a.expiry_date || '9999').localeCompare(String(b.expiry_date || '9999')));
+  const score = (d: Doc) => (words.length ? words.filter((w) => hay(d).includes(w)).length : 1);
+  const typed = docs.filter((d) => !t || norm(typeOf(d)).includes(t) || norm(d.category).includes(t));
+  const best = Math.max(0, ...typed.map(score));
+  // Current versions first (latest expiry), then older ones — so reads pick the live document.
+  const matched = typed
+    .filter((d) => best > 0 && score(d) === best)
+    .sort((a, b) => Number(versionInfo.get(b.id)!.isCurrent) - Number(versionInfo.get(a.id)!.isCurrent)
+      || String(b.expiry_date || '').localeCompare(String(a.expiry_date || '')));
 
   const all = docs.map(shape);
   const alerts = all.filter((d) => d.inHomeReminder).sort((a, b) => (a.daysUntilExpiry ?? 0) - (b.daysUntilExpiry ?? 0));

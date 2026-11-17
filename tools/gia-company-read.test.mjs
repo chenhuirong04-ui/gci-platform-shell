@@ -128,6 +128,14 @@ test('documents: versions by type + company + number — renewed old licence is 
   assert.equal(v.homeReminders.count, 2); // old licence (−46 days) + lease (14 days), as the Home tile counts them
 });
 
+test('documents: word search keeps the best matches; current version listed (and read) first', () => {
+  const { buildDocuments } = mods.documents;
+  assert.deepEqual(buildDocuments(DOCS, '2026-11-17', { query: 'lease 合同' }).documents.map((d) => d.fileName), ['lease.pdf']);
+  assert.deepEqual(buildDocuments(DOCS, '2026-11-17', { query: 'trade license' }).documents.map((d) => d.fileName),
+    ['renewed-license.pdf', 'old-license.pdf']);
+  assert.equal(buildDocuments(DOCS, '2026-11-17', { query: 'nothing-here' }).matchedCount, 0);
+});
+
 test('documents: stored AI recognition is returned with credentials masked', () => {
   const { buildDocuments } = mods.documents;
   const old = buildDocuments(DOCS, '2026-11-17').documents.find((d) => d.id === 'd1');
