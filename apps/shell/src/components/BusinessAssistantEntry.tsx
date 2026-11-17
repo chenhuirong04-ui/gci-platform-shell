@@ -326,17 +326,10 @@ export function BusinessAssistantEntry() {
       setValue('');
       return;
     }
-    // Read-only business query (inventory / product price / quotation
-    // follow-ups) — answered by AIPage's existing /ai?q= handling, never
-    // by the customer-name lookup below (lib/giaAiForward.ts).
-    const aiPath = giaAiForwardPath(v);
-    if (aiPath) {
-      setValue('');
-      navigate(aiPath);
-      return;
-    }
     // Free-text business question → LLM picks P0 read-only tools and answers
-    // from their results (lib/giaAsk.ts, /api/gia/ask). null → continue below.
+    // from their results (lib/giaAsk.ts, /api/gia/ask). It runs BEFORE the
+    // /ai keyword forward so a full question ("纸尿裤 M 码仓库和客户寄售分别
+    // 还有多少") is not grabbed by the inventory page; null → continue below.
     // GIA's own service/labour-rate answer still wins when it has a real
     // catalog hit (it is the first answer runGiaTopRouter would give).
     if (giaAskEligible(v)) {
@@ -359,6 +352,16 @@ export function BusinessAssistantEntry() {
         setValue('');
         return;
       }
+    }
+    // Read-only business query (inventory / product price / quotation
+    // follow-ups) the LLM did not answer, or a short keyword phrase without a
+    // question cue ("纸尿裤库存") — AIPage's existing /ai?q= handling, never
+    // the customer-name lookup below (lib/giaAiForward.ts).
+    const aiPath = giaAiForwardPath(v);
+    if (aiPath) {
+      setValue('');
+      navigate(aiPath);
+      return;
     }
     setGiaAnswer(null);
     setBusy(true);

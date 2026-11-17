@@ -1,8 +1,8 @@
 // Home GIA → LLM tool answers (POST /api/gia/ask, GIA P2 phase 1).
 //
 // Order in BusinessAssistantEntry.go(): follow-up note → pending file →
-// pending folder name → /ai forward (inventory etc., unchanged) → THIS →
-// runGiaTopRouter → customer lookup. Only free-text business QUESTIONS reach
+// pending folder name → THIS → /ai forward (when the LLM has no answer, or a
+// keyword phrase without a question cue) → runGiaTopRouter → customer lookup. Only free-text business QUESTIONS reach
 // the LLM: explicit commands (giaAiForward's isGiaExplicitCommand) never do,
 // and a plain name such as "SHADI" has no question cue, so it still opens
 // the customer card exactly as before. If the server can't answer
