@@ -22,6 +22,7 @@ import bankBalances from '../finance/bank-balances';
 import payablesDue from '../finance/payables-due';
 import pendingVouchers from '../finance/pending-vouchers';
 import bankReconciliationStatus from '../finance/reconciliation-status';
+import projectCustomerProfit from '../finance/profitability';
 
 export type GiaHandler = (request: Request) => Promise<Response>;
 
@@ -48,4 +49,5 @@ export const GIA_HANDLERS: Record<string, GiaHandler> = {
   payables_due: payablesDue,
   pending_vouchers: pendingVouchers,
   bank_reconciliation_status: bankReconciliationStatus,
+  project_customer_profit: projectCustomerProfit,
 };

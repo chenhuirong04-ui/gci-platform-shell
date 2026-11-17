@@ -226,6 +226,16 @@ export const GIA_TOOLS: readonly GiaTool[] = [
     sensitiveReason: 'bank statement amounts',
     args: [],
   },
+  // GIA P3 step 3 (2026-11-17) — 财务中心「项目与客户利润」, same calculation
+  // as FinanceProfitability.tsx (api/finance/profitability.ts).
+  {
+    id: 'project_customer_profit',
+    description: 'Project & customer profitability (项目与客户利润, cash basis): revenue, direct cost, gross profit, margin per project; revenue / AR per customer and profit via its projects; flags projects whose cost is not recorded. Filter by project and/or customer; period this_month|last_month|YYYY-MM|all.',
+    endpoint: '/api/finance/profitability', method: 'GET',
+    modules: ['finance'], sensitive: true,
+    sensitiveReason: 'revenue, cost and profit',
+    args: [{ name: 'project', required: false }, { name: 'customer', required: false }, { name: 'period', required: false }],
+  },
 ];
 
 export function findTool(id: unknown): GiaTool | null {

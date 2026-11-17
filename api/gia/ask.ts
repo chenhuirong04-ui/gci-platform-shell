@@ -94,6 +94,8 @@ function planPrompt(question: string, tools: GiaTool[]): { systemInstruction: st
       '(GCI-… quotes), not Trade PIs. 企业服务 / 公司服务 receivables → service_receivables_summary; 企业服务合同状态 → service_contract_status. ' +
       'Finance Center: 银行余额 / 账户余额 / 现金 / 账上有多少钱 → bank_balances; 应付 / 欠供应商 / 到期付款 / 要付的款 → payables_due ' +
       '(supplier arg when a supplier is named); 待处理凭证 / 未入账凭证 → pending_vouchers; 银行对账 / 对账进度 → bank_reconciliation_status. ' +
+      '利润 / 毛利 / 利润率 / 赚了多少 / 项目成本 (by project or customer) → project_customer_profit (project / customer arg when named; ' +
+      'period this_month|last_month|YYYY-MM, default all). ' +
       'Call every tool the question needs in one plan (e.g. stock + who was quoted → inventory_table_alerts and quotation_history). ' +
       'If no listed tool can answer the question (small talk, weather, general knowledge, writing tasks, ' +
       'or a request to change data), return {"calls": []}.',
@@ -131,6 +133,11 @@ function answerPrompt(question: string, results: ToolRun[]): { systemInstruction
       'bank_balances: report totals per currency from totalsByCurrency (公司银行 / 公司现金 / 公司合计 per currency); ' +
       'never add different currencies together and never convert with an exchange rate. Personal accounts (scope "personal") ' +
       'are NOT company funds: list them on their own line labelled 个人账户（非公司资金）. Always state the currency with each amount. ' +
+      'project_customer_profit: it is cash-basis management accounting. For each project give revenue, directCost, ' +
+      'grossProfit, grossMargin and its profitNote. If costStatus is "missing", say 成本未录入 and never call it 盈利 or profit; ' +
+      'if "linked_only", say the profit is based on cost linked so far and may be incomplete. Repeat projectTotals.warning when present. ' +
+      'Customers have no customer-level cost: give revenue / currentAR, and profit only via viaProjects. ' +
+      'The "unlinked" block is not any project\'s or customer\'s profit. ' +
       'Plain text only: no Markdown (no **, no #); use "•" for list items. ' +
       'Do not suggest that you changed any data; you cannot write anything.',
     prompt: `Today (Dubai): ${today()}\nQuestion: ${question}\n\nTool results (JSON):\n${JSON.stringify(payload)}`,
