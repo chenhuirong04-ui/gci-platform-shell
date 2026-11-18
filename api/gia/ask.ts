@@ -471,6 +471,14 @@ async function runOverview(request: Request, question: string, allowed: GiaTool[
     }
   }
   const candidates = rankPriorities(raw, today());
+  // daily_brief's crm / crmNote predate crm_followups and are wrong now: drop them before the model sees them.
+  for (const r of runs) {
+    if (r.tool === 'daily_brief' && r.data && typeof r.data === 'object') {
+      const { crm: _crm, crmNote: _note, ...rest } = r.data as Record<string, unknown>;
+      r.data = rest;
+      r.dataText = JSON.stringify(rest);
+    }
+  }
   const rankingText = JSON.stringify(candidates);
   const withRanking: ToolRun[] = [...runs, { tool: 'priority_ranking', args: {}, status: 200, data: candidates, dataText: rankingText, fullText: rankingText }];
   let answer: string;

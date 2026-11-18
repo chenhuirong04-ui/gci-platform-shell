@@ -42,7 +42,7 @@ const stubs = {
         if (behaviour === 'throw') throw new Error('boom');
         await new Promise((r) => setTimeout(r, globalThis.__toolDelay || 0));
         call.end = Date.now();
-        const data = behaviour === 'empty' ? { ok: true, rows: [] } : { ok: true, from: id, total: 4321 };
+        const data = behaviour === 'empty' ? { ok: true, rows: [] } : id === 'daily_brief' ? { ok: true, from: id, total: 4321, crm: null, crmNote: 'old localStorage note' } : { ok: true, from: id, total: 4321 };
         return new Response(JSON.stringify(data), { status: 200 });
       }]));`;
     if (id === '\0model') return `
@@ -296,6 +296,7 @@ test('P5 overview: keyword question → no planner call, the full cross-module b
   assert.equal(globalThis.__modelCalls[0].temperature, 0); // repeatable ranking
   assert.match(globalThis.__modelCalls[0].prompt, /priority_ranking/);
   assert.ok(Array.isArray(body.priorities));
+  assert.doesNotMatch(globalThis.__modelCalls[0].prompt, /crmNote/);
   assert.deepEqual(body.unverifiedNumbers, []);
 });
 
