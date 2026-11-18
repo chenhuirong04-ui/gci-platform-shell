@@ -1281,6 +1281,9 @@ export const translations: Record<Language, Record<string, string>> = {
     'Selected {n} of {m} lines matching "{k}" (adjust with the checkboxes).': '已按「{k}」选中 {n}/{m} 项（可在表格勾选调整）。',
     'From GIA': '来自 GIA 的指示',
     'Preview only — nothing is saved until you save it.': '仅预览，未保存任何数据；确认后再保存。',
+    'Customer (CRM)': '客户（CRM）',
+    'No CRM customer selected — you can keep preparing the draft; you will be asked before saving.': '尚未选择 CRM 客户：可继续准备草稿，保存前会提示确认。',
+    'No CRM customer selected — this quote will not be linked to a customer record. Save anyway?': '尚未选择 CRM 客户，这份报价将不会关联客户记录。仍要保存吗？',
   },
   bilingual: {
     // Categories & Scenarios
@@ -1953,5 +1956,8 @@ export const translations: Record<Language, Record<string, string>> = {
     'Selected {n} of {m} lines matching "{k}" (adjust with the checkboxes).': '已按「{k}」选中 {n}/{m} 项（可在表格勾选调整）。 / Selected {n} of {m} lines matching "{k}" (adjust with the checkboxes).',
     'From GIA': '来自 GIA 的指示 / From GIA',
     'Preview only — nothing is saved until you save it.': '仅预览，未保存任何数据；确认后再保存。 / Preview only — nothing is saved until you save it.',
+    'Customer (CRM)': '客户（CRM） / Customer (CRM)',
+    'No CRM customer selected — you can keep preparing the draft; you will be asked before saving.': '尚未选择 CRM 客户：可继续准备草稿，保存前会提示确认。 / No CRM customer selected — you can keep preparing the draft; you will be asked before saving.',
+    'No CRM customer selected — this quote will not be linked to a customer record. Save anyway?': '尚未选择 CRM 客户，这份报价将不会关联客户记录。仍要保存吗？ / No CRM customer selected — this quote will not be linked to a customer record. Save anyway?',
   }
 };
