@@ -114,6 +114,14 @@ export async function findCustomerByExactName(name: string): Promise<CrmCustomer
   return ((data ?? [])[0] as CrmCustomer) ?? null;
 }
 
+/** One customer by id — restores the CRM customer a saved supplier quote was linked to. */
+export async function getCustomerById(id: string): Promise<CrmCustomer | null> {
+  if (!id) return null;
+  const { data, error } = await supabase.from('crm_customers').select('*').eq('id', id).limit(1);
+  if (error) { console.error('[crmProjects] getCustomerById failed:', error); return null; }
+  return ((data ?? [])[0] as CrmCustomer) ?? null;
+}
+
 export async function listContactsForCustomer(customerId: string): Promise<CrmContact[]> {
   const { data, error } = await supabase
     .from('crm_contacts')

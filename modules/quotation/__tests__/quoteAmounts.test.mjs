@@ -347,3 +347,20 @@ test('PR #17 UAT fix 3: first "Generate GCI Quote" saves status GENERATED', () =
   // "Update Draft" keeps using the current state (no forced status)
   assert.match(SRC, /onClick=\{\(\) => handleSaveToCloud\(confirmed, \{ totalSupplierCost, totalSelling, totalProfit, overallMargin, totalVAT, grandTotal \}\)\}/);
 });
+
+test('convert flow keeps the CRM customer (id + name + phone) and asks before saving without one', () => {
+  const apply = SRC.slice(SRC.indexOf('const applyQuoteCustomer = '), SRC.indexOf('/** Customer-quote currency'));
+  assert.match(apply, /customerId: next\.customerId,/);
+  assert.match(apply, /projectId: next\.projectId,/);
+  assert.match(apply, /phoneWhatsApp: next\.customerId \? \(next\.whatsapp \|\| next\.phone \|\| prev\.phoneWhatsApp\) : prev\.phoneWhatsApp,/);
+  // supplier page + pricing page use the same mapper
+  assert.equal((SRC.match(/onChange=\{applyQuoteCustomer\}/g) || []).length, 2);
+  // archive restores the customer the supplier quote was saved with
+  const arc = SRC.slice(SRC.indexOf('const handleCreateGCIQuoteFromSupplier'), SRC.indexOf('const handleConfirmRate = () => {'));
+  assert.match(arc, /const sqCustomerId = result\.quote\.customer_id;/);
+  assert.match(arc, /applyQuoteCustomer\(restoredCustomer\);/);
+  // saved quote carries customer_id from quoteInfo
+  assert.match(SRC, /customer_id: quoteInfo\.customerId \|\| undefined,/);
+  // no customer → confirm before saving (supplier-quote conversions)
+  assert.match(SRC, /if \(quoteSource === 'supplier-archive' && !quoteInfo\.customerId\n\s+&& !window\.confirm\(/);
+});

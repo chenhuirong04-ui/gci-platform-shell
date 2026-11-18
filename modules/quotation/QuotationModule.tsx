@@ -89,7 +89,7 @@ import { useAuth } from '../../apps/shell/src/contexts/AuthContext';
 import { StepIndicator } from './components/StepIndicator';
 import { TypeSelection, QuoteType } from './components/TypeSelection';
 import { CustomerProjectSelector, emptyCustomerProjectSelection, selectionFrom, type CustomerProjectSelection } from '../../apps/shell/src/components/CustomerProjectSelector';
-import { searchCustomers } from '../../apps/shell/src/lib/crmProjects';
+import { searchCustomers, getCustomerById, listContactsForCustomer, listProjectsForCustomer } from '../../apps/shell/src/lib/crmProjects';
 import { takeQuoteHandoff, matchProducts, pickCustomerHit, type QuoteHandoff } from '../../apps/shell/src/lib/giaQuoteDraft';
 import { SupplierSelector, emptySupplierSelection, type SupplierSelection } from '../../apps/shell/src/components/SupplierSelector';
 import { saveQuotation, updateQuotation, loadByQuoteNo, listQuotations, markSentToTrade, deleteQuotation, QuotationItem, QuotationRecord } from './lib/quotationCloud';
@@ -925,6 +925,20 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
   // ── Cloud Save / Load ────────────────────────────────────────────────────
 
+  /** Supplier-quote → GCI quote customer: the CRM pick (shared selector) is mirrored into
+   *  the quote — customer_id / project_id for the CRM link, name + phone for the PDF. */
+  const applyQuoteCustomer = (next: CustomerProjectSelection) => {
+    setSqCpSelection(next);
+    const combinedName = next.projectName ? `${next.customerName} / ${next.projectName}` : next.customerName;
+    setQuoteInfo(prev => ({
+      ...prev,
+      customerProjectName: combinedName,
+      customerId: next.customerId,
+      projectId: next.projectId,
+      phoneWhatsApp: next.customerId ? (next.whatsapp || next.phone || prev.phoneWhatsApp) : prev.phoneWhatsApp,
+    }));
+  };
+
   /** Customer-quote currency: the one currency (AED or USD) all priced lines carry
    *  (set by Convert to GCI Quote / restored from history); anything else stays AED as before. */
   const quoteCurrencyOf = (items: typeof draftItems): 'AED' | 'USD' => {
@@ -1021,6 +1035,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     totalSupplierCost: number; totalSelling: number; totalProfit: number;
     overallMargin: number; totalVAT: number; grandTotal: number;
   }, markGenerated = false) => {
+    if (quoteSource === 'supplier-archive' && !quoteInfo.customerId
+      && !window.confirm(t('No CRM customer selected — this quote will not be linked to a customer record. Save anyway?'))) return;
     setCloudSaveStatus('saving');
     try {
       // Reuse the Supplier Quote image storage: rows that already carry a
@@ -2969,11 +2985,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
         <div className="mb-5">
           <CustomerProjectSelector
             value={sqCpSelection}
-            onChange={next => {
-              setSqCpSelection(next);
-              const combinedName = next.projectName ? `${next.customerName} / ${next.projectName}` : next.customerName;
-              setQuoteInfo(prev => ({ ...prev, customerProjectName: combinedName }));
-            }}
+            onChange={applyQuoteCustomer}
           />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
@@ -3605,6 +3617,23 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
     restoredDraft.forEach(d => { d.notes = newNotes[d.id] || ''; });
     setDraftItems(restoredDraft);
+
+    // CRM customer saved on the supplier quote → same selection as picking it by hand.
+    let restoredCustomer = emptyCustomerProjectSelection();
+    const sqCustomerId = result.quote.customer_id;
+    if (sqCustomerId) {
+      const [c, contacts, projects] = await Promise.all([
+        getCustomerById(sqCustomerId), listContactsForCustomer(sqCustomerId),
+        result.quote.project_id ? listProjectsForCustomer(sqCustomerId) : Promise.resolve([]),
+      ]);
+      if (c) {
+        const primary = contacts.find(x => x.is_primary) || contacts[0] || null;
+        restoredCustomer = selectionFrom(c, primary);
+        const p = projects.find(x => x.id === result.quote.project_id);
+        if (p) restoredCustomer = { ...restoredCustomer, projectId: p.id, projectName: p.project_name };
+      }
+    }
+    applyQuoteCustomer(restoredCustomer);
     setTradeTerms(result.quote.terms_notes || '');
 
     // Same step as "Convert to GCI Quote": confirm supplier currency → quote currency, rate
@@ -6619,6 +6648,16 @@ Leave a field as empty string if not present. Never fabricate values.`;
         </div>
 
         <StepIndicator current={sentToTrade ? 6 : quoteGenerated ? 5 : 4} />
+
+        {quoteSource === 'supplier-archive' && (
+          <div className="bg-white border border-[#0C1B3A]/8 rounded-[10px] px-6 py-4" data-testid="sq-pricing-customer">
+            <p className="text-xs font-bold text-slate-600 mb-2">{t('Customer (CRM)')}</p>
+            <CustomerProjectSelector value={sqCpSelection} onChange={applyQuoteCustomer} />
+            {!quoteInfo.customerId && (
+              <p className="mt-2 text-xs font-bold text-amber-700">{t('No CRM customer selected — you can keep preparing the draft; you will be asked before saving.')}</p>
+            )}
+          </div>
+        )}
 
         {/* Quote Context */}
         <div className="bg-[#0C1B3A]/3 border border-[#0C1B3A]/8 rounded-[10px] px-6 py-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
