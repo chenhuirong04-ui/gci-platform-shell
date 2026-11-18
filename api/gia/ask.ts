@@ -30,6 +30,7 @@ import { requireUser } from '../_lib/auth';
 import { GIA_TOOLS, canUseTool, validateArgs, buildUpstreamRequest, type GiaTool } from './_registry';
 import { GIA_HANDLERS } from './_handlers';
 import { callGiaModel } from './_model';
+import { rankPriorities, PRIORITY_MIN_SCORE } from './_priorities';
 
 export const config = { runtime: 'edge' };
 
@@ -244,6 +245,7 @@ export const OVERVIEW_BUNDLE: ReadonlyArray<{ tool: string; values: Record<strin
   { tool: 'inventory_table_alerts', values: {}, area: '仓库库存' },
   { tool: 'consignment_summary', values: {}, area: '寄售' },
   { tool: 'internal_tasks', values: { status: 'active' }, area: '内部待办' },
+  { tool: 'bank_reconciliation_status', values: {}, area: '银行对账' },
   { tool: 'company_documents', values: {}, area: '证照到期' },
   { tool: 'knowledge_search', values: { query: 'license renewal 续期 到期 licence' }, area: '知识库（证照续期规则）' },
 ];
@@ -264,28 +266,32 @@ export function overviewCalls(allowed: GiaTool[]): { calls: PlannedCall[]; unava
 export function overviewRules(unavailable: string[]): string {
   const noAccess = unavailable.length ? `, and "无权限查看" for: ${unavailable.join('、')}` : '';
   return ' MODE: DAILY BUSINESS OVERVIEW. The user wants today\'s state of the whole company and the THREE things most worth handling. ' +
-    'The tool results are one call per business area. Write the answer in exactly these sections (plain text, no Markdown): ' +
-    '"今日经营概况（事实）" — one line per area: 订单与报价, 应收与收款, 客户跟进, 银行与应付, 库存与寄售, 内部待办, 证照到期, 知识库; ' +
+    'The tool results are one call per business area, plus "priority_ranking": candidate issues already scored by the system ' +
+    '(score = 资金影响 0–40 + 逾期 0–30 + 紧急性 0–20, × 数据可信度), highest first. Write the answer in exactly these sections (plain text, no Markdown): ' +
+    '"今日经营概况（事实）" — one line per area: 订单与报价, 应收与收款, 客户跟进, 银行与资金, 应付, 库存与寄售, 内部待办, 证照到期, 知识库; ' +
     'each line gives the key counts / amounts / dates with source tags; write "无数据" when the tool failed or returned nothing' +
     noAccess + '. ' +
-    '"最需要处理的三件事" — numbered 1 to 3, each with these labelled lines: ' +
-    '事项: a short title; 涉及: the customer / supplier / document / task by name; ' +
-    '事实: the amounts, dates and days overdue from the results, each with its source tag; ' +
-    '判断: why it ranks here (this is your analysis — keep it to what the facts support); ' +
-    '建议下一步: one concrete action for a named owner where known (e.g. 联系客户确认付款日期). GIA does not execute it. ' +
-    'Rank by: (1) money at risk — effective receivables that are overdue or large, payables due or overdue against company cash in the SAME currency; ' +
-    '(2) compliance risk with a hard date — a CURRENT licence that is expired or expiring soon; ' +
-    '(3) customers going cold — urgent or long-overdue CRM follow-ups, quotations unanswered for days; ' +
-    '(4) stock shortages that block sales; (5) overdue internal tasks. Prefer items with a concrete amount or date. ' +
-    'If fewer than three real issues exist, list only those and say so — never pad with invented issues. ' +
-    '"其他留意" — at most 3 short lines (optional). ' +
-    '"数据说明" — tools that failed or were not available, and data-quality gaps you noticed (e.g. tasks without owner or due date). ' +
+    'In 应收与收款 always keep three lines apart: 正式应收 (orderReceivables + invoiceReceivables), 寄售待结算 (not a formal receivable — ' +
+    'only consignment already sold and unpaid is owed now; unsold consignment is stock at the customer), and 已作废 (never receivable). ' +
+    'In 银行与资金 say the figure is the 账面余额 of recorded company accounts per currency, not the company\'s total available cash; ' +
+    'personal accounts are not company funds; never add currencies. ' +
+    '"最需要处理的三件事" — take the priority_ranking candidates IN RANK ORDER (rank 1, 2, 3) whose score is at least ' + PRIORITY_MIN_SCORE + '. ' +
+    'Keep that order. You may replace or swap an item ONLY when a concrete fact in the tool results that the score does not capture ' +
+    'makes another candidate clearly more urgent; then add the line "排序调整: <the fact>". Never reorder for style or variety. ' +
+    'If fewer than three candidates reach ' + PRIORITY_MIN_SCORE + ', list only those and say "今日只有 N 件需要优先处理" — never pad. ' +
+    'Each item, numbered, with these labelled lines: 事项: the candidate title; 涉及: its involves; ' +
+    '排序依据: the candidate basis line verbatim (资金影响 / 逾期 / 紧急性 / 可信度 = 分数) and its confidenceReason; ' +
+    '事实: the candidate facts (keep the source tags), plus any directly related figure from the tool results; ' +
+    '判断: why it matters, kept to what the facts support (this is your analysis); ' +
+    '建议下一步: the suggestedAction, made concrete with names / dates from the results. GIA does not execute it. ' +
+    '"其他留意" — the next 1–3 candidates by rank, one short line each with their score (optional). ' +
+    '"数据说明" — tools that failed or were not available, and data-quality gaps (low-confidence candidates, missing owners / due dates, stale tables). ' +
     'Rules for this mode: an old licence version that was renewed is NOT an expired licence — at most a reminder-cleanup item. ' +
-    'Voided orders and their payments are never receivables; 寄售待结算 is separate from order receivables and never added to it. ' +
-    'Never present project profit with missing or partial cost as actual profit. ' +
+    'Voided orders and their payments are never receivables; 寄售待结算 is never added to formal receivables. ' +
+    'Never present project profit with missing or partial cost as actual profit, and never use it to rank. ' +
     'CRM follow-ups come from crm_followups only; daily_brief\'s "crm" / "crmNote" fields are obsolete — never mention them. ' +
     'Knowledge base: cite a rule / item (by title) only if it directly concerns one of the listed issues; otherwise write "知识库：无与今日事项直接相关的规则". ' +
-    'Every fact must come from the results; do not guess dates, amounts or names.';
+    'Every fact must come from the results or priority_ranking; do not guess dates, amounts or names.';
 }
 
 interface ToolRun { tool: string; args: Record<string, string>; status: number | 'timeout' | 'error' | 'forbidden'; dataText?: string; data?: unknown; fullText?: string }
@@ -457,10 +463,20 @@ async function runOverview(request: Request, question: string, allowed: GiaTool[
   const runs = await Promise.all(calls.map((c) => runCall(c, ctx, request.url, authorization,
     c.tool.id === 'knowledge_search' ? { limit: 8000, cap: 1500 } : { limit: OVERVIEW_RESULT_CHARS, cap: 200 })));
   const toolsUsed = runs.map((r) => ({ tool: r.tool, args: r.args, status: r.status }));
+  // Step 2: deterministic ranking from the raw (uncompacted) results.
+  const raw: Record<string, unknown> = {};
+  for (const r of runs) {
+    if (typeof r.status === 'number' && r.status < 400 && r.fullText) {
+      try { raw[r.tool] = JSON.parse(r.fullText); } catch { /* unparsable result: area reads as 无数据 */ }
+    }
+  }
+  const candidates = rankPriorities(raw, today());
+  const rankingText = JSON.stringify(candidates);
+  const withRanking: ToolRun[] = [...runs, { tool: 'priority_ranking', args: {}, status: 200, data: candidates, dataText: rankingText, fullText: rankingText }];
   let answer: string;
   try {
-    const a = answerPrompt(question, runs, overviewRules(unavailable));
-    answer = (await withTimeout(callGiaModel(request.url, authorization, { ...a, maxOutputTokens: 8192 }), OVERVIEW_ANSWER_TIMEOUT_MS, 'answer')).trim();
+    const a = answerPrompt(question, withRanking, overviewRules(unavailable));
+    answer = (await withTimeout(callGiaModel(request.url, authorization, { ...a, maxOutputTokens: 8192, temperature: 0 }), OVERVIEW_ANSWER_TIMEOUT_MS, 'answer')).trim();
   } catch (e) {
     console.error('[gia-ask] overview answer failed:', e instanceof Error ? e.message : 'error');
     return fail('model_failed', { toolsUsed });
@@ -473,8 +489,9 @@ async function runOverview(request: Request, question: string, allowed: GiaTool[
     toolsUsed,
     sources: Array.from(new Set(sources)),
     unavailable,
+    priorities: candidates.map((c) => ({ rank: c.rank, key: c.key, title: c.title, score: c.score })),
     capped: false,
     dropped: [],
-    unverifiedNumbers: findUnverifiedNumbers(answer, runs),
+    unverifiedNumbers: findUnverifiedNumbers(answer, withRanking),
   };
 }

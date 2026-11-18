@@ -12,6 +12,8 @@ export interface ModelCall {
   /** JSON response schema (Gemini responseSchema); omit for plain text. */
   responseSchema?: unknown;
   maxOutputTokens?: number;
+  /** Sampling temperature; 0 for repeatable answers (daily overview). */
+  temperature?: number;
 }
 
 /** Returns the model's reply text; throws on any failure (caller falls back). */
@@ -22,6 +24,7 @@ export async function callGiaModel(baseUrl: string, authorization: string, call:
     config.responseSchema = call.responseSchema;
   }
   if (call.maxOutputTokens) config.maxOutputTokens = call.maxOutputTokens;
+  if (typeof call.temperature === 'number') config.temperature = call.temperature;
   const req = new Request(new URL('/api/ai/gemini-generate', baseUrl).toString(), {
     method: 'POST',
     headers: { authorization, 'content-type': 'application/json' },

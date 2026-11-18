@@ -276,7 +276,7 @@ test('stock: warehouse question planned correctly → unchanged; 4-call cap resp
 });
 
 // ── GIA P5: daily business overview ─────────────────────────────────────────
-const BUNDLE = ['bank_balances', 'company_documents', 'consignment_summary', 'crm_followups', 'daily_brief', 'internal_tasks',
+const BUNDLE = ['bank_balances', 'bank_reconciliation_status', 'company_documents', 'consignment_summary', 'crm_followups', 'daily_brief', 'internal_tasks',
   'inventory_table_alerts', 'knowledge_search', 'payables_due', 'pending_vouchers', 'receivables_summary'];
 
 test('P5 overview: keyword question → no planner call, the full cross-module bundle runs in parallel with the caller token', async () => {
@@ -288,11 +288,14 @@ test('P5 overview: keyword question → no planner call, the full cross-module b
   assert.deepEqual(calledTools(), BUNDLE);
   assert.equal(globalThis.__modelCalls.length, 1); // answer only
   assert.match(globalThis.__modelCalls[0].systemInstruction, /DAILY BUSINESS OVERVIEW/);
-  assert.match(globalThis.__modelCalls[0].systemInstruction, /寄售待结算 is separate/);
+  assert.match(globalThis.__modelCalls[0].systemInstruction, /寄售待结算 is never added/);
   assert.ok(globalThis.__calls.every((c) => c.auth === 'Bearer user-token' && !c.cookie && c.method === 'GET'));
   const starts = globalThis.__calls.map((c) => c.start);
   assert.ok(Math.max(...starts) - Math.min(...starts) < 50, 'parallel');
   assert.deepEqual(body.unavailable, []);
+  assert.equal(globalThis.__modelCalls[0].temperature, 0); // repeatable ranking
+  assert.match(globalThis.__modelCalls[0].prompt, /priority_ranking/);
+  assert.ok(Array.isArray(body.priorities));
   assert.deepEqual(body.unverifiedNumbers, []);
 });
 
