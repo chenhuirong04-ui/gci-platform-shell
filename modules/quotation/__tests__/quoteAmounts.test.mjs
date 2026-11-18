@@ -252,6 +252,8 @@ test('customer quote currency / VAT wiring: PDF, page and TRADE use the real quo
   assert.match(pdf, /const cur = quoteCurrencyOf\(items\);/);
   assert.ok(!/'AED'|AED \$\{|\(AED\)/.test(pdf), 'hard-coded AED is back in the customer PDF');
   assert.match(pdf, /`VAT \(\$\{tradeVatPercent\}%\):`/);
+  const review = SRC.slice(SRC.indexOf('const renderTradeQuoteReview = '), SRC.indexOf('{/* Terms & Notes in GCI Draft */}'));
+  assert.ok(!/`AED \$\{|>AED \{|\(AED\)|incl 5% VAT|'VAT 5%'/.test(review), 'hard-coded AED / 5% is back on the pricing page');
   // TRADE PI is AED + 5% only: anything else is blocked, never relabelled
   assert.match(SRC, /if \(cur !== 'AED' \|\| tradeVatPercent !== 5\) \{/);
   // supplier-archive conversion and a new / reopened quote start at 5%; a priced quote saved with 0 VAT reopens at 0%

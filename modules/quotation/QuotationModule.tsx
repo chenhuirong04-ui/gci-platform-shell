@@ -6694,7 +6694,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
               <div>
                 <p className="text-xs font-bold text-slate-600">{t('Grand Total')} (VAT {tradeVatPercent}%)</p>
                 <p className="text-xl font-bold font-mono-label text-[#7A5F2A] mt-1">
-                  {totalSelling > 0 ? `AED ${grandTotal.toFixed(2)}` : '—'}
+                  {totalSelling > 0 ? `${cur} ${grandTotal.toFixed(2)}` : '—'}
                 </p>
                 {totalSelling > 0 && <p className="text-xs text-slate-600 mt-0.5">VAT {totalVAT.toFixed(2)}</p>}
               </div>
