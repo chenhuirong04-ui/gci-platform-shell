@@ -73,7 +73,7 @@ interface CustomerProjectSelectorProps {
 const inputCls = 'w-full p-3 border border-gray-300 rounded-lg outline-none focus:border-[#CBA85C] text-sm font-bold text-gray-700 bg-white min-w-0';
 const labelCls = 'text-xs font-semibold text-slate-600';
 
-function selectionFrom(c: CrmCustomer, contact: CrmContact | null): CustomerProjectSelection {
+export function selectionFrom(c: CrmCustomer, contact: CrmContact | null): CustomerProjectSelection {
   return {
     customerId: c.id,
     customerName: c.customer_name,
