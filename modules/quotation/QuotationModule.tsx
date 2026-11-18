@@ -5122,6 +5122,14 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     }
   };
 
+  /** Supplier currency read by AI (PDF / header-less sheet), not from a header:
+   *  pre-select it when exactly one is found, but always ask the user to confirm. */
+  const applyAiCurrency = (aiRows: any[] | undefined) => {
+    const curs = [...new Set((aiRows || []).map((r: any) => detectHeaderCurrency([String(r?.originalCurrency || '')]).currency).filter(Boolean))] as string[];
+    if (curs.length === 1) setSupplierMeta(prev => ({ ...prev, currency: curs[0] }));
+    setSqCurrencyCheck({ status: curs.length > 1 ? 'multi' : 'unclear', found: curs });
+  };
+
   const parsePDF = async (file: File) => {
     setIsProcessingAI(true);
     setSqParseStatus('parsing');
@@ -5226,6 +5234,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
       }
 
       await processWithAI(rows);
+      applyAiCurrency(rows);
       setSqParseStatus('done');
     } catch (err: any) {
       const msg = err?.message || err?.toString() || 'unknown error';
@@ -5622,10 +5631,7 @@ Set "productDetected":false if the photo is a logo, blank, or has no identifiabl
             setImportText(sheetText);
             const aiRows = await handleAnalyze(sheetText);
             setSqParseStatus(prev => (prev === 'parsing' ? 'done' : prev));
-            // Currency read by AI (not from a header): pre-select it, but always ask the user to confirm.
-            const aiCurs = [...new Set((aiRows || []).map((r: any) => detectHeaderCurrency([String(r.originalCurrency || '')]).currency).filter(Boolean))] as string[];
-            if (aiCurs.length === 1) setSupplierMeta(prev => ({ ...prev, currency: aiCurs[0] }));
-            setSqCurrencyCheck({ status: aiCurs.length > 1 ? 'multi' : 'unclear', found: aiCurs });
+            applyAiCurrency(aiRows);
             return;
           }
           // Supplier price lists often have no quantity / spec column: leave them empty
