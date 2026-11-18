@@ -20,6 +20,8 @@ interface CustomerCreateModalProps {
   open: boolean;
   /** pre-filled company name (e.g. what the user typed in a search box) */
   initialName?: string;
+  /** pre-filled contact details (e.g. a new customer first typed into a quote) */
+  initialContact?: { contactName?: string; mobile?: string; email?: string };
   allowLead?: boolean;
   /** full CRM profile form (WhatsApp, business line, stage) */
   extended?: boolean;
@@ -34,7 +36,7 @@ const inputCls = 'w-full p-3 border border-gray-300 rounded-lg outline-none focu
 const labelCls = 'text-xs font-semibold text-slate-600';
 const emptyForm = { name: '', country: '', contactName: '', mobile: '', whatsapp: '', email: '', type: '', source: '', businessLine: '', stage: '' };
 
-export function CustomerCreateModal({ open, initialName = '', allowLead = false, extended = false, onClose, onCreated, onUseExisting }: CustomerCreateModalProps) {
+export function CustomerCreateModal({ open, initialName = '', initialContact, allowLead = false, extended = false, onClose, onCreated, onUseExisting }: CustomerCreateModalProps) {
   const { dict, lang } = useI18n();
   const en = lang === 'en';
   const cp = dict.quotation.customerPicker;
@@ -51,7 +53,7 @@ export function CustomerCreateModal({ open, initialName = '', allowLead = false,
   // every time the dialog opens it starts from the typed name with an empty form
   useEffect(() => {
     if (!open) return;
-    setForm({ ...emptyForm, name: initialName.trim() });
+    setForm({ ...emptyForm, name: initialName.trim(), contactName: initialContact?.contactName || '', mobile: initialContact?.mobile || '', email: initialContact?.email || '' });
     setFormError('');
     setDuplicate(null);
     setLicFile(null); setLicFields(null); setLicBusy(false); setLicMsg('');

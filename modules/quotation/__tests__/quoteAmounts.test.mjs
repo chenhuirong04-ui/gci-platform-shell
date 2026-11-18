@@ -362,5 +362,5 @@ test('convert flow keeps the CRM customer (id + name + phone) and asks before sa
   // saved quote carries customer_id from quoteInfo
   assert.match(SRC, /customer_id: quoteInfo\.customerId \|\| undefined,/);
   // no customer → confirm before saving (supplier-quote conversions)
-  assert.match(SRC, /if \(quoteSource === 'supplier-archive' && !quoteInfo\.customerId\n\s+&& !window\.confirm\(/);
+  assert.match(SRC, /if \(quoteSource === 'supplier-archive' && !quoteInfo\.customerId && !sqQuoteOnlyCustomer\n\s+&& !window\.confirm\(/);
 });
