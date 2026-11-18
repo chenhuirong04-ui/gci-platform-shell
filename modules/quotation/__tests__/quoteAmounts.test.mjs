@@ -277,9 +277,14 @@ test('customer quote currency / VAT wiring: PDF, page and TRADE use the real quo
   assert.match(SRC, /if \(cur !== 'AED' \|\| tradeVatPercent !== 5\) \{/);
   // supplier-archive conversion and a new / reopened quote start at 5%; a priced quote saved with 0 VAT reopens at 0%
   assert.match(SRC, /setTradeVatPercent\(Number\(record\.selling_total\) > 0 && Number\(record\.vat_amount\) === 0 \? 0 : 5\);/);
-  // Excel: no named unit-price column → stop instead of reading a fixed column
+  // Excel: no named unit-price column (incl. no header) → never a fixed column; the sheet
+  // goes to the existing AI text parser and the currency must be confirmed by the user.
   assert.ok(!/falls back to col 4 which is fine/.test(SRC));
-  assert.match(SRC, /if \(mappings\.price === -1\) \{\n\s+const msg = t\('No unit price column found/);
+  const noPrice = SRC.slice(SRC.indexOf('if (mappings.price === -1) {'), SRC.indexOf('// Supplier price lists often have no quantity'));
+  assert.match(noPrice, /XLSX\.utils\.sheet_to_csv\(worksheet, \{ blankrows: false \}\)/);
+  assert.match(noPrice, /const aiRows = await handleAnalyze\(sheetText\);/);
+  assert.match(noPrice, /setSqCurrencyCheck\(\{ status: aiCurs\.length > 1 \? 'multi' : 'unclear', found: aiCurs \}\);/);
+  assert.match(SRC, /const sourceText = typeof textOverride === 'string' \? textOverride : importText;/);
 });
 
 test('pricing rows: allocated row costs add up to the header cost (GCI-20261114-001 acceptance)', () => {

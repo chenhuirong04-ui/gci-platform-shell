@@ -5546,9 +5546,14 @@ Set "productDetected":false if the photo is a logo, blank, or has no identifiabl
           }
         }
 
-        const headers = bestHeaderRowIndex !== -1 
-          ? jsonData[bestHeaderRowIndex].map((h: any) => String(h || '').toLowerCase().trim())
-          : jsonData[0].map((h: any) => String(h || '').toLowerCase().trim());
+        // sheet_to_json({ header: 1 }) leaves a HOLE for a blank header cell; .map() keeps
+        // holes, so every later headers.findIndex(h => h.…) crashed on `undefined`
+        // ("Cannot read properties of undefined (reading 'toLowerCase')").
+        // Array.from turns holes into '' — a blank header is simply an unnamed column.
+        const headers: string[] = Array.from(
+          (bestHeaderRowIndex !== -1 ? jsonData[bestHeaderRowIndex] : jsonData[0]) || [],
+          (h: any) => String(h || '').toLowerCase().trim(),
+        );
 
         const findCol = (kList: string[]) => headers.findIndex((h: string) => kList.some(k => h === k || (h.length > 1 && h.includes(k))));
 
@@ -5606,12 +5611,21 @@ Set "productDetected":false if the photo is a logo, blank, or has no identifiabl
           // ── Supplier Quote mode: auto-process without mapping dialog ──────
           // No Gemini involved. Parse immediately and show items.
           // Allow any price column (AED, CNY, USD, KRW, etc.) — do not require AED column name.
-          // No named unit-price column → stop: a fixed fallback column would be a guess at the cost.
+          // No named unit-price column (no header row at all, or an unnamed price column):
+          // never guess a fixed column — read the sheet as text with the existing
+          // "paste supplier quote text" AI parser instead (same prompt: never fabricate).
           if (mappings.price === -1) {
-            const msg = t('No unit price column found (e.g. Unit Price / 单价 / 단가 / 공급가). Rename the cost column header and upload again, or use PDF / paste text.');
-            setSqParseError(msg);
-            setSqParseStatus('error');
-            alert(`❌ ${msg}`);
+            const sheetText = XLSX.utils.sheet_to_csv(worksheet, { blankrows: false }).trim();
+            if (!sheetText) throw new Error('Excel file appears to be empty.');
+            setSqParseError('');
+            setSqParseStatus('parsing');
+            setImportText(sheetText);
+            const aiRows = await handleAnalyze(sheetText);
+            setSqParseStatus(prev => (prev === 'parsing' ? 'done' : prev));
+            // Currency read by AI (not from a header): pre-select it, but always ask the user to confirm.
+            const aiCurs = [...new Set((aiRows || []).map((r: any) => detectHeaderCurrency([String(r.originalCurrency || '')]).currency).filter(Boolean))] as string[];
+            if (aiCurs.length === 1) setSupplierMeta(prev => ({ ...prev, currency: aiCurs[0] }));
+            setSqCurrencyCheck({ status: aiCurs.length > 1 ? 'multi' : 'unclear', found: aiCurs });
             return;
           }
           // Supplier price lists often have no quantity / spec column: leave them empty
@@ -6061,9 +6075,12 @@ Leave a field as empty string if not present. Never fabricate values.`;
     }
   };
 
-  const handleAnalyze = async () => {
-    if (!importText.trim()) return;
-    
+  // `textOverride`: an Excel sheet without a usable header (see parseExcel) — the
+  // button passes its click event, so only a string counts as an override.
+  const handleAnalyze = async (textOverride?: unknown) => {
+    const sourceText = typeof textOverride === 'string' ? textOverride : importText;
+    if (!sourceText.trim()) return;
+
     setIsProcessingAI(true);
     try {
       const ai = geminiProxy;
@@ -6085,7 +6102,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
         For each item, also write a professional English description (not a literal translation) while keeping the original supplier text untouched.
 
         Input Text:
-        ${importText}
+        ${sourceText}
 
         Return ONLY valid JSON in this exact format:
         {
@@ -6135,6 +6152,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
 
       await processWithAI(rows);
       setImportText('');
+      return rows;
     } catch (err: any) {
       const msg = err?.message || 'AI Text Analysis failed.';
       console.error('Text Analysis Error:', err);

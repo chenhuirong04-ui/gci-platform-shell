@@ -183,9 +183,22 @@ export async function listFilterOptions(): Promise<{ countries: string[]; catego
   return { countries, categories };
 }
 
+/**
+ * Search term for the PostgREST `or=(… .ilike.*term*)` filter. Characters with a
+ * meaning in that filter — `,` `(` `)` `"` `\` and the `*` / `%` wildcards — are
+ * dropped (a name like "海汀顿 (Heddington)" otherwise breaks the request), and
+ * the words are joined with `*` so spaces / missing brackets still match
+ * ("cool home" → Coolhome, "海汀顿 Heddington" → 海汀顿 (Heddington)).
+ */
+export function supplierSearchPattern(q: string): string {
+  const words = String(q || '').replace(/[%*,()"\\]/g, ' ').trim().split(/\s+/).filter(Boolean);
+  return words.map(w => encodeURIComponent(w)).join('*');
+}
+
 export async function searchSuppliers(q: string, limit = 20): Promise<Supplier[]> {
-  if (q.length < 2) return [];
-  const encoded = encodeURIComponent(q);
+  if (q.trim().length < 2) return [];
+  const encoded = supplierSearchPattern(q);
+  if (!encoded) return [];
   const res = await sb(
     `/rest/v1/suppliers?or=(supplier_name_display.ilike.*${encoded}*,name_cn.ilike.*${encoded}*,name_en.ilike.*${encoded}*,short_code.ilike.*${encoded}*)&status=neq.archived&limit=${limit}&order=is_preferred.desc,supplier_name_display.asc`,
     { method: 'GET' },
