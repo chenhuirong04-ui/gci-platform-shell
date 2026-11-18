@@ -72,6 +72,9 @@ export interface QuotationItemMeta {
   moq?: string; packaging?: string; delivery?: string; payment?: string; remarks?: string;
   sa?: boolean; // item came from the Supplier Quote archive (customer description format)
   show?: { deliveryTime: boolean; packaging: boolean; remarks: boolean; moq: boolean; paymentTerms: boolean };
+  /** Quote-level, like `show`: contact + email of a customer kept on the quote only (not in CRM).
+   *  Name and phone stay in quotation_records.customer_name / phone_wa. */
+  cust?: { contact?: string; email?: string };
 }
 
 export interface SaveQuotationPayload {

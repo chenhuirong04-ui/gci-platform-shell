@@ -55,3 +55,18 @@ test('quote wiring: ask before CRM, quote-only keeps name/phone without a CRM li
   const D = read('apps/shell/src/components/CustomerCreateModal.tsx');
   assert.match(D, /contactName: initialContact\?\.contactName \|\| '', mobile: initialContact\?\.mobile \|\| '', email: initialContact\?\.email \|\| ''/);
 });
+
+test('quote-only customer keeps contact + email on save and reopen (existing item_meta, no new column)', () => {
+  const M = read('modules/quotation/QuotationModule.tsx');
+  // save: only when not CRM-linked, carried on every line like the quote-level `show`
+  assert.match(M, /const quoteOnlyCust = !quoteInfo\.customerId && sqQuoteOnlyCustomer\n\s+\? \{ contact: sqQuoteOnlyCustomer\.contactName \|\| '', email: sqQuoteOnlyCustomer\.email \|\| '' \} : null;/);
+  assert.match(M, /show: \{ \.\.\.sqIncludeFields \},\n\s+\.\.\.\(quoteOnlyCust \? \{ cust: quoteOnlyCust \} : \{\}\),/);
+  // name + phone stay in the existing header columns
+  assert.match(M, /customer_name: quoteInfo\.customerProjectName \|\| '',/);
+  assert.match(M, /phone_wa: quoteInfo\.phoneWhatsApp \|\| '',/);
+  // reopen: restored only for a quote without a CRM link
+  assert.match(M, /setSqQuoteOnlyCustomer\(!record\.customer_id && savedCust && record\.customer_name \? \{\n\s+name: record\.customer_name, contactName: savedCust\.contact \|\| '', phone: record\.phone_wa \|\| '', email: savedCust\.email \|\| '',\n\s+\} : null\);/);
+  assert.match(M, /\(quoteSource === 'supplier-archive' \|\| sqQuoteOnlyCustomer\) && \(/);
+  const Q = read('modules/quotation/lib/quotationCloud.ts');
+  assert.match(Q, /cust\?: \{ contact\?: string; email\?: string \};/);
+});
