@@ -11,8 +11,20 @@
  */
 import { roundTo2, calculateTradeTotals } from '../../trade/services/currencyUtils';
 
-/** Only used to weight the per-line VAT split; the VAT total itself comes from calculateTradeTotals. */
+/** Default VAT rate (UAE 5%); a quote may use 0% (export / outside UAE). */
 const VAT_SHARE = 0.05;
+
+/**
+ * MOQ check for a customer quantity. The MOQ is free text from the supplier
+ * ("1,000 pcs", "MOQ 500"); the first number in it is the minimum. Returns that
+ * minimum when qty is below it, otherwise null (also when no number is given).
+ */
+export function belowMoq(moq: string | undefined, qty: number): number | null {
+  const m = String(moq || '').replace(/,/g, '').match(/\d+(\.\d+)?/);
+  if (!m) return null;
+  const min = Number(m[0]);
+  return min > 0 && (Number(qty) || 0) < min ? min : null;
+}
 
 /** Money → integer fils using the same roundTo2 rule as Trade / PI. */
 export const toCents = (x: number): number => Math.round(roundTo2(Number(x) || 0) * 100);
@@ -85,13 +97,13 @@ export function supplierCostTotal(
   return roundTo2(items.reduce((s, it) => s + (Number(it.targetUnitPrice) || 0) * (Number(it.quantity) || 0), 0));
 }
 
-export function reconcileQuoteAmounts(lines: AmountLineInput[], costTotalOverride?: number): { lines: AmountLine[]; totals: AmountTotals } {
+export function reconcileQuoteAmounts(lines: AmountLineInput[], costTotalOverride?: number, vatRate: number = VAT_SHARE): { lines: AmountLine[]; totals: AmountTotals } {
   // Quotation Center keeps LINE totals, so each line goes in as price = line amount, qty = 1.
-  const { subtotal, vat, total } = calculateTradeTotals(lines.map(l => ({ price: roundTo2(Number(l.selling) || 0), qty: 1 })));
+  const { subtotal, vat, total } = calculateTradeTotals(lines.map(l => ({ price: roundTo2(Number(l.selling) || 0), qty: 1 })), vatRate);
   const sellC = lines.map(l => toCents(l.selling));
   const subtotalC = toCents(subtotal);
   const vatTotalC = toCents(vat);
-  const vatC = allocateCents(sellC.map(c => c * VAT_SHARE), vatTotalC);
+  const vatC = allocateCents(sellC.map(c => c * vatRate), vatTotalC);
 
   const exactCostC = lines.map(l => (Number(l.cost) || 0) * 100);
   const costTotalC = costTotalOverride !== undefined

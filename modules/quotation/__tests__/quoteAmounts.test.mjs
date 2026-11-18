@@ -170,7 +170,7 @@ test('no unit price is derived from a line total anywhere in the customer quote'
   assert.match(SRC, /setSellingPrices\(prev => \(\{ \.\.\.prev, \[item\.id\]: roundTo2\(supplierUnit \* \(1 \+ pct \/ 100\)\) \}\)\);/);
   assert.match(SRC, /const lineSellingTotal = lineFromUnit\(sellPrice, item\.quantity\);/);
   // totals = Trade / PI rule
-  assert.match(SRC, /const piTotals = calculateTradeTotals\(confirmed\.map\(it => \(\{ price: roundTo2\(sellingPrices\[it\.id\] \|\| 0\), qty: it\.quantity \}\)\)\);/);
+  assert.match(SRC, /const piTotals = calculateTradeTotals\(confirmed\.map\(it => \(\{ price: roundTo2\(sellingPrices\[it\.id\] \|\| 0\), qty: it\.quantity \}\)\), tradeVatRate\);/);
   // PDF + push use the unit price directly
   assert.match(SRC, /const unitSellPrice = roundTo2\(sellingPrices\[item\.id\] \|\| 0\);/);
   assert.match(SRC, /const lineTot = lineFromUnit\(unitSellPrice, item\.quantity\);/);
@@ -225,7 +225,40 @@ test('baseline wiring: set on history restore, cleared on new quote, used by pag
   assert.match(SRC, /const totalSupplierCost = supplierCostTotal\(confirmed, savedCostBaseline\);/);
   assert.match(SRC, /const sumCost = supplierCostTotal\(confirmedSummary, savedCostBaseline\);/);
   const fn = SRC.slice(SRC.indexOf('const buildCloudPayload = '), SRC.indexOf('const handleSaveToCloud = async'));
-  assert.match(fn, /\}\)\), supplierCostTotal\(confirmed, savedCostBaseline\)\);/);
+  assert.match(fn, /\}\)\), supplierCostTotal\(confirmed, savedCostBaseline\), tradeVatRate\);/);
+});
+
+test('VAT 0% / 5%: same rounding rule, 0% gives no VAT; default stays 5%', () => {
+  const lines = [{ cost: 10, selling: 18.62 }, { cost: 20, selling: 21.48 }];
+  assert.deepEqual(lib.reconcileQuoteAmounts(lines).totals, lib.reconcileQuoteAmounts(lines, undefined, 0.05).totals);
+  const zero = lib.reconcileQuoteAmounts(lines, undefined, 0);
+  assert.equal(zero.totals.totalVAT, 0);
+  assert.equal(zero.totals.grandTotal, zero.totals.totalSelling);
+  zero.lines.forEach(l => { assert.equal(l.vat, 0); assert.equal(l.lineTotal, l.selling); });
+  assert.equal(lib.reconcileQuoteAmounts(lines).totals.totalVAT, 2.01); // 40.10 × 5%
+});
+
+test('MOQ: first number in the MOQ text; below → the minimum, else null', () => {
+  assert.equal(lib.belowMoq('1,000 pcs', 500), 1000);
+  assert.equal(lib.belowMoq('MOQ 500', 500), null);
+  assert.equal(lib.belowMoq('300', 299), 300);
+  assert.equal(lib.belowMoq('', 1), null);
+  assert.equal(lib.belowMoq(undefined, 1), null);
+  assert.equal(lib.belowMoq('on request', 1), null);
+});
+
+test('customer quote currency / VAT wiring: PDF, page and TRADE use the real quote currency', () => {
+  const pdf = SRC.slice(SRC.indexOf('const generateTradePDF = ('), SRC.indexOf('// Customer PDFs never include internal costs'));
+  assert.match(pdf, /const cur = quoteCurrencyOf\(items\);/);
+  assert.ok(!/'AED'|AED \$\{|\(AED\)/.test(pdf), 'hard-coded AED is back in the customer PDF');
+  assert.match(pdf, /`VAT \(\$\{tradeVatPercent\}%\):`/);
+  // TRADE PI is AED + 5% only: anything else is blocked, never relabelled
+  assert.match(SRC, /if \(cur !== 'AED' \|\| tradeVatPercent !== 5\) \{/);
+  // supplier-archive conversion and a new / reopened quote start at 5%; a priced quote saved with 0 VAT reopens at 0%
+  assert.match(SRC, /setTradeVatPercent\(Number\(record\.selling_total\) > 0 && Number\(record\.vat_amount\) === 0 \? 0 : 5\);/);
+  // Excel: no named unit-price column → stop instead of reading a fixed column
+  assert.ok(!/falls back to col 4 which is fine/.test(SRC));
+  assert.match(SRC, /if \(mappings\.price === -1\) \{\n\s+const msg = t\('No unit price column found/);
 });
 
 test('pricing rows: allocated row costs add up to the header cost (GCI-20261114-001 acceptance)', () => {
@@ -243,7 +276,7 @@ test('pricing rows: allocated row costs add up to the header cost (GCI-20261114-
   // unit costs and unit selling prices are inputs only — never rewritten
   assert.deepEqual(restored.map(r => r.targetUnitPrice), [14.32, 14.32, 16.53, 16.53, 16.53, ...Array(9).fill(1.32)]);
   // wiring: row display uses the allocated cost; the unit cost shown (@) stays the original
-  assert.match(SRC, /const rowCosts = reconcileQuoteAmounts\(confirmed\.map\(it => \(\{ cost: it\.targetUnitPrice \* it\.quantity, selling: lineFromUnit\(sellingPrices\[it\.id\] \|\| 0, it\.quantity\) \}\)\), totalSupplierCost\)\.lines;/);
+  assert.match(SRC, /const rowCosts = reconcileQuoteAmounts\(confirmed\.map\(it => \(\{ cost: it\.targetUnitPrice \* it\.quantity, selling: lineFromUnit\(sellingPrices\[it\.id\] \|\| 0, it\.quantity\) \}\)\), totalSupplierCost, tradeVatRate\)\.lines;/);
   assert.match(SRC, /const supplierUnit = item\.targetUnitPrice;\s+\/\/ original unit cost \(unchanged\)\n\s+const supplierTotal = rowCosts\[idx\]\.cost;/);
   assert.match(SRC, /const lineProfit = lineSellingTotal - supplierTotal;/);
 });
