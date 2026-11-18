@@ -837,6 +837,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       projectId: null,
     }));
     setCpSelection(emptyCustomerProjectSelection());
+    setSqQuoteOnlyCustomer(null);
   };
 
   const addToPackage = () => {
@@ -879,6 +880,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       projectId: null,
     });
     setCpSelection(emptyCustomerProjectSelection());
+    setSqQuoteOnlyCustomer(null);
     setProjectInfoSubmitted(true);
     
     if (quote.category === FurnitureCategory.BED) setConfig(quote.config as BedConfiguration);
@@ -995,6 +997,9 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       selling: lineFromUnit(sellingPrices[item.id] || 0, item.quantity),
     })), supplierCostTotal(confirmed, savedCostBaseline), tradeVatRate);
     const sums = amounts.totals;
+    // Customer typed into the quote and not saved to CRM: contact + email have no header column.
+    const quoteOnlyCust = !quoteInfo.customerId && sqQuoteOnlyCustomer
+      ? { contact: sqQuoteOnlyCustomer.contactName || '', email: sqQuoteOnlyCustomer.email || '' } : null;
     const record = {
       quote_no: quoteNo,
       customer_name: quoteInfo.customerProjectName || '',
@@ -1046,6 +1051,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
           payment: item.paymentTerms || '', remarks: item.remarks || '',
           sa: quoteSource === 'supplier-archive' || !!item.fromSupplierArchive,
           show: { ...sqIncludeFields },
+          ...(quoteOnlyCust ? { cust: quoteOnlyCust } : {}),
         },
       };
     });
@@ -1176,6 +1182,12 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       if (missingImages > 0) console.warn(`[Cloud Load] ${missingImages} stored image(s) could not be restored`);
       const savedShow = items.find(it => it.item_meta?.show)?.item_meta?.show;
       if (savedShow) setSqIncludeFields({ ...savedShow });
+      const savedCust = items.find(it => it.item_meta?.cust)?.item_meta?.cust;
+      setSqCpSelection(emptyCustomerProjectSelection());
+      setSqQuoteOnlyCustomer(!record.customer_id && savedCust && record.customer_name ? {
+        name: record.customer_name, contactName: savedCust.contact || '', phone: record.phone_wa || '', email: savedCust.email || '',
+      } : null);
+      setSqSelectorKey(k => k + 1);
 
       // Restore selling prices & extras keyed by NEW draft ids
       const newSelling: Record<string, number> = {};
@@ -6675,7 +6687,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
 
         <StepIndicator current={sentToTrade ? 6 : quoteGenerated ? 5 : 4} />
 
-        {quoteSource === 'supplier-archive' && (
+        {(quoteSource === 'supplier-archive' || sqQuoteOnlyCustomer) && (
           <div className="bg-white border border-[#0C1B3A]/8 rounded-[10px] px-6 py-4" data-testid="sq-pricing-customer">
             <p className="text-xs font-bold text-slate-600 mb-2">{t('Customer (CRM)')}</p>
             <CustomerProjectSelector key={sqSelectorKey} value={sqCpSelection} onChange={applyQuoteCustomer} />
