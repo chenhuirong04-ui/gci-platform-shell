@@ -1273,6 +1273,14 @@ export const translations: Record<Language, Record<string, string>> = {
     'TRADE PI supports AED with 5% VAT only. Save the quote and download the PDF instead.': 'TRADE PI 目前只支持 AED + 5% VAT。请保存报价并下载 PDF。',
     '{n} line(s) below supplier MOQ': '{n} 个品项低于供应商 MOQ',
     'Selling price = converted cost × (1 + margin). Editable per line on the pricing page.': '售价 = 换算后成本 ×（1 + 利润率），进入定价页后可逐行修改。',
+    'Customer matched in CRM: {c}': '已在 CRM 匹配客户：{c}',
+    'Several CRM customers match "{c}" — pick one below.': 'CRM 中有多个客户匹配「{c}」，请在下方选择。',
+    'No CRM customer matches "{c}" — pick or create one below.': 'CRM 中没有匹配「{c}」的客户，请在下方选择或新建。',
+    'Customer lookup failed — pick one below.': '客户查找失败，请在下方选择。',
+    'No line matches "{k}" — all lines kept.': '没有品项匹配「{k}」，已保留全部品项。',
+    'Selected {n} of {m} lines matching "{k}" (adjust with the checkboxes).': '已按「{k}」选中 {n}/{m} 项（可在表格勾选调整）。',
+    'From GIA': '来自 GIA 的指示',
+    'Preview only — nothing is saved until you save it.': '仅预览，未保存任何数据；确认后再保存。',
   },
   bilingual: {
     // Categories & Scenarios
@@ -1937,5 +1945,13 @@ export const translations: Record<Language, Record<string, string>> = {
     'TRADE PI supports AED with 5% VAT only. Save the quote and download the PDF instead.': 'TRADE PI 目前只支持 AED + 5% VAT。请保存报价并下载 PDF。 / TRADE PI supports AED with 5% VAT only. Save the quote and download the PDF instead.',
     '{n} line(s) below supplier MOQ': '{n} 个品项低于供应商 MOQ / {n} line(s) below supplier MOQ',
     'Selling price = converted cost × (1 + margin). Editable per line on the pricing page.': '售价 = 换算后成本 ×（1 + 利润率），进入定价页后可逐行修改。 / Selling price = converted cost × (1 + margin). Editable per line on the pricing page.',
+    'Customer matched in CRM: {c}': '已在 CRM 匹配客户：{c} / Customer matched in CRM: {c}',
+    'Several CRM customers match "{c}" — pick one below.': 'CRM 中有多个客户匹配「{c}」，请在下方选择。 / Several CRM customers match "{c}" — pick one below.',
+    'No CRM customer matches "{c}" — pick or create one below.': 'CRM 中没有匹配「{c}」的客户，请在下方选择或新建。 / No CRM customer matches "{c}" — pick or create one below.',
+    'Customer lookup failed — pick one below.': '客户查找失败，请在下方选择。 / Customer lookup failed — pick one below.',
+    'No line matches "{k}" — all lines kept.': '没有品项匹配「{k}」，已保留全部品项。 / No line matches "{k}" — all lines kept.',
+    'Selected {n} of {m} lines matching "{k}" (adjust with the checkboxes).': '已按「{k}」选中 {n}/{m} 项（可在表格勾选调整）。 / Selected {n} of {m} lines matching "{k}" (adjust with the checkboxes).',
+    'From GIA': '来自 GIA 的指示 / From GIA',
+    'Preview only — nothing is saved until you save it.': '仅预览，未保存任何数据；确认后再保存。 / Preview only — nothing is saved until you save it.',
   }
 };

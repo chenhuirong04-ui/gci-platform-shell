@@ -37,6 +37,7 @@ import {
   looksLikeNotionFollowupCommand, parseNotionFollowup, createNotionFollowupLog,
   type ParsedNotionFollowup,
 } from '../lib/notionFollowup';
+import { isQuoteRequest, parseQuoteInstruction, setQuoteHandoff, type QuoteInstruction } from '../lib/giaQuoteDraft';
 
 const GOLD = '#CBA85C';
 const GOLD_L = '#E2C988';
@@ -113,6 +114,8 @@ export function BusinessAssistantEntry() {
   const [captureDone, setCaptureDone] = useState<Set<number>>(new Set());
   const [captureBusy, setCaptureBusy] = useState<number | 'all' | null>(null);
   const [pendingTaskLifecycle, setPendingTaskLifecycle] = useState<{ action: 'completed' | 'cancelled'; matches: ExecutiveTask[] } | null>(null);
+  // GIA → Quotation Center hand-off card (supplier price list + quote instruction).
+  const [pendingQuoteDraft, setPendingQuoteDraft] = useState<{ instruction: QuoteInstruction; text: string } | null>(null);
   const [pendingTaskReschedule, setPendingTaskReschedule] = useState<{ whenPhrase: string; resolvedDate: string | null; matches: ExecutiveTask[] } | null>(null);
   // Local file -> Drive upload — a direct tool action, kept fully separate
   // from pendingCapture/Planner state. Never sends the file name to Planner
@@ -262,6 +265,13 @@ export function BusinessAssistantEntry() {
     if (pendingDrivePlan || pendingBusinessDocument) {
       // A plan/confirm-card is already up — its own candidate/edit/confirm
       // buttons own the interaction now, not free-typed text.
+      return;
+    }
+    // Supplier price list + "报价 / quote" → offer the Quotation Center preview
+    // (read-only here; the file is parsed and previewed there, nothing saved).
+    if (can('quotation') && isQuoteRequest(selectedFile.name, v)) {
+      setFileDescription(v);
+      setPendingQuoteDraft({ instruction: parseQuoteInstruction(v), text: v });
       return;
     }
     if (looksLikeBusinessDocumentDescription(v)) {
@@ -512,6 +522,7 @@ export function BusinessAssistantEntry() {
     // Reset the whole routing flow to its starting phase for each new file —
     // never carry a previous file's description/suggestion over to this one.
     setUploadPhase('describe');
+    setPendingQuoteDraft(null);
     setFileDescription('');
     setSelectedFolder({ id: DEFAULT_TARGET_FOLDER_ID, name: DEFAULT_TARGET_FOLDER_NAME });
     setDescribeCandidates(null);
@@ -788,6 +799,7 @@ export function BusinessAssistantEntry() {
     setUploadError(null);
     setMultiDropNotice(false);
     setUploadPhase('describe');
+    setPendingQuoteDraft(null);
     setFileDescription('');
     setDescribeCandidates(null);
     setManualPickerOpen(false);
@@ -1390,7 +1402,59 @@ export function BusinessAssistantEntry() {
               <div>{lang === 'zh' ? '大小：' : 'Size: '}{formatFileSize(selectedFile.size)}</div>
             </div>
 
-            {uploadPhase === 'describe' && (
+            {pendingQuoteDraft && selectedFile && (() => {
+              const ins = pendingQuoteDraft.instruction;
+              const zh = lang === 'zh';
+              const none = zh ? '未指定' : 'not stated';
+              const rows: [string, string][] = [
+                [zh ? '文件' : 'File', selectedFile.name],
+                [zh ? '默认毛利率' : 'Default margin', ins.margin !== undefined ? `${ins.margin}%` : `${none}（${zh ? '确认窗口里填写' : 'set in the confirmation'}）`],
+                [zh ? '报价币种' : 'Quote currency', ins.currency || `${none}（${zh ? '确认窗口里选择' : 'choose in the confirmation'}）`],
+                ['VAT', ins.vat !== undefined ? `${ins.vat}%` : `${none}（${zh ? '默认 5%' : 'default 5%'}）`],
+                [zh ? '客户' : 'Customer', ins.customer ? `${ins.customer}（${zh ? '在 CRM 中查找，唯一匹配才自动选' : 'looked up in CRM, auto-picked only if unique'}）` : `${none}（${zh ? '在报价中心选择' : 'pick in the Quotation Center'}）`],
+                [zh ? '产品' : 'Products', ins.products?.length ? ins.products.join(' / ') : (zh ? '全部品项' : 'all lines')],
+              ];
+              return (
+                <div data-testid="gia-quote-draft-card">
+                  <div style={{ fontSize: 12.5, color: TEXT, marginBottom: 8 }}>
+                    {zh ? '这是供应商报价表。GIA 按你的指示在报价中心生成客户报价预览：' : 'This is a supplier price list. GIA will open a customer-quote preview in the Quotation Center:'}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', fontSize: 12, marginBottom: 8 }}>
+                    {rows.map(([k, v]) => (
+                      <div key={k} style={{ display: 'contents' }}>
+                        <span style={{ color: 'rgba(255,255,255,0.55)' }}>{k}</span>
+                        <span style={{ color: TEXT }}>{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>
+                    {zh ? '不会保存任何数据。报价中心先读取并预览，确认币种 / 汇率后自动算售价；你确认后才保存或生成 PDF。' : 'Nothing is saved. The Quotation Center reads and previews the file; prices are calculated after you confirm currency / rate; nothing is saved until you confirm.'}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      data-testid="gia-quote-draft-open"
+                      onClick={() => {
+                        setQuoteHandoff({ file: selectedFile, instruction: pendingQuoteDraft.instruction, text: pendingQuoteDraft.text });
+                        setPendingQuoteDraft(null);
+                        setSelectedFile(null);
+                        navigate('/quotation');
+                      }}
+                      style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: `linear-gradient(135deg,${GOLD},#E2C988)`, border: 'none', color: '#080D1E', fontWeight: 700 }}
+                    >
+                      {zh ? '在报价中心打开预览' : 'Open preview in Quotation Center'}
+                    </button>
+                    <button
+                      onClick={() => { const text = pendingQuoteDraft.text; setPendingQuoteDraft(null); void describeAndRouteFile(text); }}
+                      style={{ padding: '6px 14px', borderRadius: 7, fontSize: 11.5, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORD}`, color: TEXT }}
+                    >
+                      {zh ? '不做报价，存入 Drive' : 'Not a quote — store in Drive'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {uploadPhase === 'describe' && !pendingQuoteDraft && (
               <>
                 <div style={{ fontSize: 12.5, color: TEXT, marginBottom: 6 }}>
                   {lang === 'zh' ? '告诉 GIA 这份文件属于谁 / 是什么资料：' : 'Tell GIA what this file is or who it belongs to:'}

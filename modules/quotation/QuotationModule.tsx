@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import JSZip from 'jszip';
@@ -88,7 +88,9 @@ import { useI18n } from '@gci/i18n';
 import { useAuth } from '../../apps/shell/src/contexts/AuthContext';
 import { StepIndicator } from './components/StepIndicator';
 import { TypeSelection, QuoteType } from './components/TypeSelection';
-import { CustomerProjectSelector, emptyCustomerProjectSelection, type CustomerProjectSelection } from '../../apps/shell/src/components/CustomerProjectSelector';
+import { CustomerProjectSelector, emptyCustomerProjectSelection, selectionFrom, type CustomerProjectSelection } from '../../apps/shell/src/components/CustomerProjectSelector';
+import { searchCustomers } from '../../apps/shell/src/lib/crmProjects';
+import { takeQuoteHandoff, matchProducts, pickCustomerHit, type QuoteHandoff } from '../../apps/shell/src/lib/giaQuoteDraft';
 import { SupplierSelector, emptySupplierSelection, type SupplierSelection } from '../../apps/shell/src/components/SupplierSelector';
 import { saveQuotation, updateQuotation, loadByQuoteNo, listQuotations, markSentToTrade, deleteQuotation, QuotationItem, QuotationRecord } from './lib/quotationCloud';
 import {
@@ -2864,6 +2866,21 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
         <span className="text-[#7A5F2A]">{t('Save Supplier Quote')}</span>
       </div>
 
+      {giaQuoteRef.current && (
+        <div className="rounded-[10px] border border-[#C9A84C]/40 bg-[#C9A84C]/8 px-6 py-4 text-[13px] text-[#0C1B3A]" data-testid="gia-quote-banner">
+          <p className="font-bold mb-1">{t('From GIA')}: <span className="font-normal">{giaQuoteRef.current.text}</span></p>
+          <p className="text-xs text-slate-600">
+            {[
+              giaQuoteRef.current.instruction.margin !== undefined ? `${t('Default Margin %')}: ${giaQuoteRef.current.instruction.margin}%` : null,
+              giaQuoteRef.current.instruction.currency ? `${t('Customer Currency')}: ${giaQuoteRef.current.instruction.currency}` : null,
+              giaQuoteRef.current.instruction.vat !== undefined ? `VAT ${giaQuoteRef.current.instruction.vat}%` : null,
+            ].filter(Boolean).join(' · ')}
+          </p>
+          {giaNotes.map((n, i) => <p key={i} className="text-xs text-[#7A5F2A] mt-1">• {n}</p>)}
+          <p className="text-xs text-slate-600 mt-1">{t('Preview only — nothing is saved until you save it.')}</p>
+        </div>
+      )}
+
       {/* Supplier Metadata Form — Quotation Center master-data unification
           (2026-09-15): Supplier is now a required search-and-pick against
           real `suppliers`, never hand-typed. Selecting one auto-fills the
@@ -5252,7 +5269,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
     setTradeItemNotes(newNotes);
     setSellingPrices(newSelling);
     setSavedCostBaseline(null);
-    setTradeVatPercent(5);
+    setTradeVatPercent(giaQuoteRef.current?.instruction.vat === 0 ? 0 : 5);
     setMarkupPercents(newMarkups);
     setQuoteGenerated(false);
     setSentToTrade(false);
@@ -5267,6 +5284,70 @@ Leave a field as empty string if not present. Never fabricate values.`;
     setView('configurator');
     setShowCurrencyModal(false);
   };
+
+  // ── GIA hand-off: supplier price list + quote instruction, consumed once on open ──
+  // Same importer as a manual upload; nothing is saved here — the user reviews the
+  // preview, saves the supplier quote, confirms currency / rate, then prices.
+  const giaQuoteRef = useRef<QuoteHandoff | null>(null);
+  const giaFilterApplied = useRef(false);
+  const [giaPendingFile, setGiaPendingFile] = useState<File | null>(null);
+  const [giaNotes, setGiaNotes] = useState<string[]>([]);
+  useEffect(() => {
+    const h = takeQuoteHandoff();
+    if (!h) return;
+    giaQuoteRef.current = h;
+    const ins = h.instruction;
+    (async () => {
+      const notes: string[] = [];
+      if (ins.margin !== undefined) setSqGlobalMargin(ins.margin);
+      if (ins.currency) setSqCustomerCurrency(ins.currency);
+      if (ins.customer) {
+        try {
+          const hits = await searchCustomers(ins.customer, 8);
+          const hit = pickCustomerHit(ins.customer, hits);
+          if (hit) {
+            const sel = selectionFrom(hit.customer, hit.contact);
+            setSqCpSelection(sel);
+            setQuoteInfo(prev => ({ ...prev, customerProjectName: sel.customerName, customerId: sel.customerId }));
+            notes.push(t('Customer matched in CRM: {c}').replace('{c}', sel.customerName));
+          } else {
+            notes.push((hits.length ? t('Several CRM customers match "{c}" — pick one below.') : t('No CRM customer matches "{c}" — pick or create one below.')).replace('{c}', ins.customer));
+          }
+        } catch {
+          notes.push(t('Customer lookup failed — pick one below.'));
+        }
+      }
+      setGiaNotes(notes);
+      setDraftItems([]); setTradeTerms(''); setSqSaveStatus('idle');
+      setAppMode('supplier-quote');
+      setGiaPendingFile(h.file);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (appMode !== 'supplier-quote' || !giaPendingFile) return;
+    const f = giaPendingFile;
+    setGiaPendingFile(null);
+    handleFileUpload({ target: { files: [f] } } as unknown as React.ChangeEvent<HTMLInputElement>);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appMode, giaPendingFile]);
+  // Product keywords → only matching lines included (still editable in the table).
+  useEffect(() => {
+    const h = giaQuoteRef.current;
+    if (!h || giaFilterApplied.current || sqParseStatus !== 'done' || draftItems.length === 0) return;
+    giaFilterApplied.current = true;
+    const m = matchProducts(draftItems, h.instruction.products);
+    if (!m) return;
+    const n = m.filter(Boolean).length;
+    const kw = (h.instruction.products || []).join(' / ');
+    if (n === 0) {
+      setGiaNotes(prev => [...prev, t('No line matches "{k}" — all lines kept.').replace('{k}', kw)]);
+      return;
+    }
+    setDraftItems(prev => prev.map((it, i) => ({ ...it, includeInGCI: !!m[i] })));
+    setGiaNotes(prev => [...prev, t('Selected {n} of {m} lines matching "{k}" (adjust with the checkboxes).').replace('{n}', String(n)).replace('{m}', String(m.length)).replace('{k}', kw)]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sqParseStatus, draftItems]);
 
   /** Auto-fills Supplier Name/Contact from AI-detected info — only if the user hasn't typed one in already. */
   const applyDetectedSupplierInfo = (info?: { name?: string; contact?: string }) => {
