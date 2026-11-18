@@ -283,6 +283,7 @@ export function overviewRules(unavailable: string[]): string {
     'Rules for this mode: an old licence version that was renewed is NOT an expired licence — at most a reminder-cleanup item. ' +
     'Voided orders and their payments are never receivables; 寄售待结算 is separate from order receivables and never added to it. ' +
     'Never present project profit with missing or partial cost as actual profit. ' +
+    'CRM follow-ups come from crm_followups only; daily_brief\'s "crm" / "crmNote" fields are obsolete — never mention them. ' +
     'Knowledge base: cite a rule / item (by title) only if it directly concerns one of the listed issues; otherwise write "知识库：无与今日事项直接相关的规则". ' +
     'Every fact must come from the results; do not guess dates, amounts or names.';
 }
