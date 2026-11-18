@@ -102,6 +102,9 @@ import {
 } from './lib/supplierQuoteImages';
 import { extractXlsxImages as extractXlsxImagesFromBuffer, isImageHeader } from './lib/xlsxImages';
 import { DEFAULT_RATES, defaultRate, convertAmount, detectHeaderCurrency, SUPPLIER_CURRENCIES } from './lib/currencyRates';
+import { QuoteNewCustomer } from './components/QuoteNewCustomer';
+import type { QuoteOnlyCustomer } from './lib/quoteCustomer';
+import type { CrmCustomer, CrmContact } from '../../apps/shell/src/lib/crmSupabase';
 import { reconcileQuoteAmounts, lineFromUnit, supplierCostTotal, costFingerprint, belowMoq, type SavedCostBaseline } from './lib/quoteAmounts';
 import { roundTo2, calculateTradeTotals } from '../trade/services/currencyUtils';
 import {
@@ -378,6 +381,10 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   // snapshot — never the primary relation anymore.
   const [sqSupplierSelection, setSqSupplierSelection] = useState<SupplierSelection>(emptySupplierSelection());
   const [sqCpSelection, setSqCpSelection] = useState<CustomerProjectSelection>(emptyCustomerProjectSelection());
+  // New customer typed into the quote and kept on the quote only (user chose not to save it to CRM).
+  const [sqQuoteOnlyCustomer, setSqQuoteOnlyCustomer] = useState<QuoteOnlyCustomer | null>(null);
+  // Remounts the CRM selector so its search box shows a customer chosen outside it.
+  const [sqSelectorKey, setSqSelectorKey] = useState(0);
   // Read URL params injected by DEAL (client, project, salesperson, businessId, returnUrl, quoteType, phone)
   const _urlParams = new URLSearchParams(window.location.search);
   const _clientParam = _urlParams.get('client') || '';
@@ -929,6 +936,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
    *  the quote — customer_id / project_id for the CRM link, name + phone for the PDF. */
   const applyQuoteCustomer = (next: CustomerProjectSelection) => {
     setSqCpSelection(next);
+    setSqQuoteOnlyCustomer(null);
     const combinedName = next.projectName ? `${next.customerName} / ${next.projectName}` : next.customerName;
     setQuoteInfo(prev => ({
       ...prev,
@@ -937,6 +945,20 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       projectId: next.projectId,
       phoneWhatsApp: next.customerId ? (next.whatsapp || next.phone || prev.phoneWhatsApp) : prev.phoneWhatsApp,
     }));
+  };
+
+  /** New customer kept on this quote only: name + phone go to the quote (and PDF) as typed; no CRM link. */
+  const applyQuoteOnlyCustomer = (c: QuoteOnlyCustomer) => {
+    setSqCpSelection(emptyCustomerProjectSelection());
+    setSqQuoteOnlyCustomer(c);
+    setSqSelectorKey(k => k + 1);
+    setQuoteInfo(prev => ({ ...prev, customerProjectName: c.name, customerId: null, projectId: null, phoneWhatsApp: c.phone }));
+  };
+
+  /** New customer saved to CRM (or a similar existing one chosen) — linked exactly like a CRM pick. */
+  const applyCreatedCustomer = (c: CrmCustomer, contact: CrmContact | null) => {
+    applyQuoteCustomer(selectionFrom(c, contact));
+    setSqSelectorKey(k => k + 1);
   };
 
   /** Customer-quote currency: the one currency (AED or USD) all priced lines carry
@@ -1035,7 +1057,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     totalSupplierCost: number; totalSelling: number; totalProfit: number;
     overallMargin: number; totalVAT: number; grandTotal: number;
   }, markGenerated = false) => {
-    if (quoteSource === 'supplier-archive' && !quoteInfo.customerId
+    if (quoteSource === 'supplier-archive' && !quoteInfo.customerId && !sqQuoteOnlyCustomer
       && !window.confirm(t('No CRM customer selected — this quote will not be linked to a customer record. Save anyway?'))) return;
     setCloudSaveStatus('saving');
     try {
@@ -2984,9 +3006,13 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
             hand-typed "Customer / Project" string. */}
         <div className="mb-5">
           <CustomerProjectSelector
+            key={sqSelectorKey}
             value={sqCpSelection}
             onChange={applyQuoteCustomer}
           />
+          {!sqCpSelection.customerId && (
+            <QuoteNewCustomer t={t} value={sqQuoteOnlyCustomer} onQuoteOnly={applyQuoteOnlyCustomer} onCrmCustomer={applyCreatedCustomer} />
+          )}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {[
@@ -6652,8 +6678,11 @@ Leave a field as empty string if not present. Never fabricate values.`;
         {quoteSource === 'supplier-archive' && (
           <div className="bg-white border border-[#0C1B3A]/8 rounded-[10px] px-6 py-4" data-testid="sq-pricing-customer">
             <p className="text-xs font-bold text-slate-600 mb-2">{t('Customer (CRM)')}</p>
-            <CustomerProjectSelector value={sqCpSelection} onChange={applyQuoteCustomer} />
-            {!quoteInfo.customerId && (
+            <CustomerProjectSelector key={sqSelectorKey} value={sqCpSelection} onChange={applyQuoteCustomer} />
+            {!sqCpSelection.customerId && (
+              <QuoteNewCustomer t={t} value={sqQuoteOnlyCustomer} onQuoteOnly={applyQuoteOnlyCustomer} onCrmCustomer={applyCreatedCustomer} />
+            )}
+            {!quoteInfo.customerId && !sqQuoteOnlyCustomer && (
               <p className="mt-2 text-xs font-bold text-amber-700">{t('No CRM customer selected — you can keep preparing the draft; you will be asked before saving.')}</p>
             )}
           </div>
