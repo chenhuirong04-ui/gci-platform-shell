@@ -58,6 +58,7 @@ export default async function handler(request: Request): Promise<Response> {
   if (cfg.responseMimeType) generationConfig.responseMimeType = cfg.responseMimeType;
   if (cfg.responseSchema) generationConfig.responseSchema = cfg.responseSchema;
   if (typeof cfg.maxOutputTokens === 'number') generationConfig.maxOutputTokens = cfg.maxOutputTokens;
+  if (typeof cfg.temperature === 'number' && cfg.temperature >= 0 && cfg.temperature <= 2) generationConfig.temperature = cfg.temperature;
   const restBody: Record<string, unknown> = { contents, generationConfig };
   if (typeof cfg.systemInstruction === 'string' && cfg.systemInstruction) {
     restBody.systemInstruction = { parts: [{ text: cfg.systemInstruction }] };
