@@ -59,6 +59,7 @@ export function SupplierSelector({ value, onChange, className }: SupplierSelecto
   const [creating, setCreating] = useState(false);
 
   const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const searchSeq = useRef(0);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -68,13 +69,17 @@ export function SupplierSelector({ value, onChange, className }: SupplierSelecto
     }
     clearTimeout(searchTimer.current);
     if (!query.trim()) {
+      searchSeq.current++;
       setResults([]);
       setSearching(false);
       return;
     }
     setSearching(true);
+    const seq = ++searchSeq.current;
     searchTimer.current = setTimeout(async () => {
       const rows = await searchSuppliers(query, 10);
+      // A slower, older request must not overwrite the results of the latest query.
+      if (seq !== searchSeq.current) return;
       setResults(rows);
       setSearching(false);
     }, 250);
