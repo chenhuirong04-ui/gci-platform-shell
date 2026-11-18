@@ -37,7 +37,19 @@ test('existing rate table is unchanged', () => {
   assert.deepEqual(lib.DEFAULT_RATES, {
     AED: { AED: 1.0, USD: 0.2723 }, USD: { AED: 3.6725, USD: 1.0 }, CNY: { AED: 0.505, USD: 0.1375 },
     EUR: { AED: 4.00, USD: 1.09 }, GBP: { AED: 4.67, USD: 1.27 },
+    KRW: { AED: 0.0026, USD: 0.00071 }, // added for Korean supplier quotes; always confirmed before use
   });
+});
+
+test('KRW: Korean supplier headers are detected; 원산지 (origin) is not a currency', () => {
+  const d = h => lib.detectHeaderCurrency(h);
+  for (const h of ['공급가(원)', '공급가 (원)', '단가[원]', 'unit price (krw)', 'supply price ₩', '单价(韩元)', '원화 단가'])
+    assert.equal(d([h]).currency, 'KRW', h);
+  assert.equal(d(['원산지']).currency, null);
+  assert.equal(d(['단가']).currency, null);          // no currency named → user confirms
+  assert.deepEqual(d(['공급가(원)', 'price usd']).found.sort(), ['KRW', 'USD']); // mixed → confirm
+  assert.equal(lib.convertAmount(15000, lib.defaultRate('KRW', 'AED')), '39.00');
+  assert.ok(lib.SUPPLIER_CURRENCIES.includes('KRW'));
 });
 
 test('header detection: one explicit currency is used, none/several require confirmation', () => {

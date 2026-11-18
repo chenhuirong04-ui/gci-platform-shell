@@ -1267,6 +1267,11 @@ export const translations: Record<Language, Record<string, string>> = {
     '{n} items': '{n} 件',
     '{n} packages': '{n} 个套餐',
     '{n} packages · {m} items total': '{n} 个套餐 · 共 {m} 件',
+    'No unit price column found (e.g. Unit Price / 单价 / 단가 / 공급가). Rename the cost column header and upload again, or use PDF / paste text.': '未找到单价列（如 Unit Price / 单价 / 단가 / 공급가）。请把成本单价列的表头改成以上名称后重新上传，或改用 PDF / 粘贴文本。',
+    'Quantity below supplier MOQ:': '以下品项数量低于供应商起订量（MOQ）：',
+    'Continue anyway?': '仍然继续？',
+    'TRADE PI supports AED with 5% VAT only. Save the quote and download the PDF instead.': 'TRADE PI 目前只支持 AED + 5% VAT。请保存报价并下载 PDF。',
+    '{n} line(s) below supplier MOQ': '{n} 个品项低于供应商 MOQ',
   },
   bilingual: {
     // Categories & Scenarios
@@ -1925,5 +1930,10 @@ export const translations: Record<Language, Record<string, string>> = {
     '{n} items': '{n} 件 / {n} items',
     '{n} packages': '{n} 个套餐 / {n} packages',
     '{n} packages · {m} items total': '{n} 个套餐 · 共 {m} 件 / {n} packages · {m} items total',
+    'No unit price column found (e.g. Unit Price / 单价 / 단가 / 공급가). Rename the cost column header and upload again, or use PDF / paste text.': '未找到单价列（如 Unit Price / 单价 / 단가 / 공급가）。请把成本单价列的表头改成以上名称后重新上传，或改用 PDF / 粘贴文本。 / No unit price column found (e.g. Unit Price / 单价 / 단가 / 공급가). Rename the cost column header and upload again, or use PDF / paste text.',
+    'Quantity below supplier MOQ:': '以下品项数量低于供应商起订量（MOQ）： / Quantity below supplier MOQ:',
+    'Continue anyway?': '仍然继续？ / Continue anyway?',
+    'TRADE PI supports AED with 5% VAT only. Save the quote and download the PDF instead.': 'TRADE PI 目前只支持 AED + 5% VAT。请保存报价并下载 PDF。 / TRADE PI supports AED with 5% VAT only. Save the quote and download the PDF instead.',
+    '{n} line(s) below supplier MOQ': '{n} 个品项低于供应商 MOQ / {n} line(s) below supplier MOQ',
   }
 };

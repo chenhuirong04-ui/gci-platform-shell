@@ -15,9 +15,9 @@ export const roundTo2 = (num: number): number => {
 /**
  * 核心：精准计算小计与税额
  */
-export const calculateTradeTotals = (items: { price: number; qty: number }[]) => {
+export const calculateTradeTotals = (items: { price: number; qty: number }[], vatRate = 0.05) => {
   const subtotal = roundTo2(items.reduce((s, i) => s + roundTo2(i.price * i.qty), 0));
-  const vat = roundTo2(subtotal * 0.05);
+  const vat = roundTo2(subtotal * vatRate);
   const total = roundTo2(subtotal + vat);
   return { subtotal, vat, total };
 };

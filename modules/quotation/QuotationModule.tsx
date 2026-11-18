@@ -99,8 +99,8 @@ import {
   uploadSupplierQuoteImage, loadSupplierQuoteImage, isValidImageRef, mapWithLimit, type SupplierQuoteImageRef,
 } from './lib/supplierQuoteImages';
 import { extractXlsxImages as extractXlsxImagesFromBuffer, isImageHeader } from './lib/xlsxImages';
-import { DEFAULT_RATES, defaultRate, convertAmount, detectHeaderCurrency } from './lib/currencyRates';
-import { reconcileQuoteAmounts, lineFromUnit, supplierCostTotal, costFingerprint, type SavedCostBaseline } from './lib/quoteAmounts';
+import { DEFAULT_RATES, defaultRate, convertAmount, detectHeaderCurrency, SUPPLIER_CURRENCIES } from './lib/currencyRates';
+import { reconcileQuoteAmounts, lineFromUnit, supplierCostTotal, costFingerprint, belowMoq, type SavedCostBaseline } from './lib/quoteAmounts';
 import { roundTo2, calculateTradeTotals } from '../trade/services/currencyUtils';
 import {
   listServiceCategories, listServiceCatalogItems, addServiceCategory, addServiceCatalogItem,
@@ -403,6 +403,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   const [markupPercents, setMarkupPercents] = useState<Record<string, number>>({});
   const [tradeItemNotes, setTradeItemNotes] = useState<Record<string, string>>({});
   const [tradeItemCurrencies, setTradeItemCurrencies] = useState<Record<string, string>>({});
+  // Customer-quote VAT: 5% (UAE) or 0% (export / outside UAE). Chosen per quote, never guessed.
+  const [tradeVatPercent, setTradeVatPercent] = useState<5 | 0>(5);
   const [quoteGenerated, setQuoteGenerated] = useState(false);
   const [tradeTerms, setTradeTerms] = useState<string>(''); // extracted terms / notes from supplier quote
   const [sentToTrade, setSentToTrade] = useState(false);    // flow completion flag
@@ -791,6 +793,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     setMarkupPercents({});
     setTradeItemNotes({});
     setTradeItemCurrencies({});
+    setTradeVatPercent(5);
     setQuoteGenerated(false);
     setTradeTerms('');
     setSentToTrade(false);
@@ -920,6 +923,26 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
   // ── Cloud Save / Load ────────────────────────────────────────────────────
 
+  /** Customer-quote currency: the one currency (AED or USD) all priced lines carry
+   *  (set by Convert to GCI Quote / restored from history); anything else stays AED as before. */
+  const quoteCurrencyOf = (items: typeof draftItems): 'AED' | 'USD' => {
+    const set = new Set(items.map(it => tradeItemCurrencies[it.id] || 'AED'));
+    return set.size === 1 && set.has('USD') ? 'USD' : 'AED';
+  };
+  const tradeVatRate = tradeVatPercent / 100;
+  /** Lines whose quantity is below the supplier MOQ (first number in the MOQ text). */
+  const moqWarnings = (items: typeof draftItems) => items
+    .map((it, i) => ({ row: i + 1, name: it.originalName, qty: it.quantity, moq: it.moq || '', min: belowMoq(it.moq, it.quantity) }))
+    .filter(w => w.min !== null);
+  /** Before a customer-facing step: list lines below MOQ and let the user decide. */
+  const confirmMoq = (items: typeof draftItems): boolean => {
+    const w = moqWarnings(items);
+    if (w.length === 0) return true;
+    return window.confirm(t('Quantity below supplier MOQ:') + '\n'
+      + w.map(x => `#${x.row} ${x.name}: ${x.qty} < MOQ ${x.moq}`).join('\n')
+      + '\n\n' + t('Continue anyway?'));
+  };
+
   /** Build the Supabase payload from current quote state (trade/BOQ path). */
   const buildCloudPayload = (confirmed: typeof draftItems, _totals: {
     totalSupplierCost: number; totalSelling: number; totalProfit: number;
@@ -932,7 +955,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     const amounts = reconcileQuoteAmounts(confirmed.map(item => ({
       cost: item.targetUnitPrice * item.quantity,
       selling: lineFromUnit(sellingPrices[item.id] || 0, item.quantity),
-    })), supplierCostTotal(confirmed, savedCostBaseline));
+    })), supplierCostTotal(confirmed, savedCostBaseline), tradeVatRate);
     const sums = amounts.totals;
     const record = {
       quote_no: quoteNo,
@@ -1135,6 +1158,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
         ? { total: Number(record.supplier_cost_total), fingerprint: costFingerprint(restoredDraftItems) } : null);
       setMarkupPercents(newMarkup);
       setTradeItemCurrencies(newCurrency);
+      // Header stores the VAT amount, not the rate: a priced quote saved with 0 VAT was a 0% quote.
+      setTradeVatPercent(Number(record.selling_total) > 0 && Number(record.vat_amount) === 0 ? 0 : 5);
       setTradeItemNotes(newNotes);
       setTradeTerms(record.terms_notes || '');
       setCloudId(record.id || null);
@@ -2884,7 +2909,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
               onChange={e => changeSupplierCurrency(e.target.value)}
               className="w-full bg-[#0C1B3A]/3 border border-[#0C1B3A]/10 rounded-md px-4 py-2.5 text-[14px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C] transition-colors"
             >
-              {['AED','USD','CNY','EUR','GBP'].map(c => <option key={c} value={c}>{c}</option>)}
+              {SUPPLIER_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div>
@@ -3104,7 +3129,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
               <label className="text-xs font-bold text-slate-600 block mb-1.5">{t('Supplier Currency')}</label>
               <select value={supplierMeta.currency} onChange={e => changeSupplierCurrency(e.target.value)}
                 className="bg-white border border-[#0C1B3A]/10 rounded-md px-3 py-2 text-[13px] font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]">
-                {['CNY','USD','AED'].map(c => <option key={c} value={c}>{c === 'CNY' ? t('RMB (CNY)') : c}</option>)}
+                {SUPPLIER_CURRENCIES.map(c => <option key={c} value={c}>{c === 'CNY' ? t('RMB (CNY)') : c}</option>)}
               </select>
             </div>
             <div>
@@ -3567,6 +3592,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     setTradeTerms(result.quote.terms_notes || '');
     setSellingPrices({});
     setSavedCostBaseline(null);
+    setTradeVatPercent(5);
     setMarkupPercents({});
     setQuoteGenerated(false);
     setSentToTrade(false);
@@ -3875,6 +3901,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     totalSelling: number,
     totalVAT: number
   ) => {
+    const cur = quoteCurrencyOf(items);
     const doc = new jsPDF();
     const navy: [number, number, number] = [12, 27, 58];
     const gold: [number, number, number] = [201, 168, 76];
@@ -3915,7 +3942,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     ];
     const rightCol = [
       ['Date:', quoteInfo.date || new Date().toISOString().split('T')[0]],
-      ['Currency:', 'AED'],
+      ['Currency:', cur],
       ['Source:', _businessIdParam ? `DEAL · ${_businessIdParam}` : 'Manual'],
     ];
     leftCol.forEach(([label, val], i) => {
@@ -3931,7 +3958,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     // Items table
     const colWidths = [75, 20, 18, 28, 28];
     const colX = [margin, margin+75, margin+95, margin+113, margin+141];
-    const headers = ['Description', 'Qty', 'Unit', 'Unit Price', 'Total (AED)'];
+    const headers = ['Description', 'Qty', 'Unit', 'Unit Price', `Total (${cur})`];
 
     doc.setFillColor(...navy);
     doc.rect(margin, y, w - margin * 2, 7, 'F');
@@ -3980,8 +4007,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
 
     // Totals
     const totals = [
-      ['Subtotal (excl. VAT):', `AED ${totalSelling.toFixed(2)}`],
-      ['VAT (5%):', `AED ${totalVAT.toFixed(2)}`],
+      ['Subtotal (excl. VAT):', `${cur} ${totalSelling.toFixed(2)}`],
+      [`VAT (${tradeVatPercent}%):`, `${cur} ${totalVAT.toFixed(2)}`],
     ];
     totals.forEach(([label, val]) => {
       doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 80, 80);
@@ -3993,7 +4020,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     doc.setTextColor(201, 168, 76);
     doc.setFontSize(10); doc.setFont('helvetica', 'bold');
     doc.text('GRAND TOTAL:', 127, y + 5.5);
-    doc.text(`AED ${grandTotal.toFixed(2)}`, w - margin, y + 5.5, { align: 'right' });
+    doc.text(`${cur} ${grandTotal.toFixed(2)}`, w - margin, y + 5.5, { align: 'right' });
     y += 14;
 
     // Customer PDFs never include internal costs, profit, or markup summaries.
@@ -5231,6 +5258,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
     setTradeItemNotes(newNotes);
     setSellingPrices({});
     setSavedCostBaseline(null);
+    setTradeVatPercent(5);
     setMarkupPercents(newMarkups);
     setQuoteGenerated(false);
     setSentToTrade(false);
@@ -5418,12 +5446,12 @@ Set "productDetected":false if the photo is a logo, blank, or has no identifiabl
 
         // 1. Find Header Row (row with most keywords)
         const keywords = {
-          item: ['furniture item', 'item', 'product', 'description', '分项', '产品名称', '品名', '项目名称'],
-          spec: ['specification', 'size', 'dimension', 'specs', '规格', '尺寸', '描述'],
-          qty: ['qty', 'quantity', '数量'],
-          price: ['unit price', 'price', 'target price', '单价', '目标价'],
-          total: ['total', 'amount', 'subtotal', '小计', '合计'],
-          no: ['no.', 's.no', '序号', '编号', 'sn'] // To skip them as items
+          item: ['furniture item', 'item', 'product', 'description', '分项', '产品名称', '品名', '项目名称', '제품명', '상품명', '품명', '품목'],
+          spec: ['specification', 'size', 'dimension', 'specs', '规格', '尺寸', '描述', '규격', '사양'],
+          qty: ['qty', 'quantity', '数量', '수량'],
+          price: ['unit price', 'price', 'target price', '单价', '目标价', '단가', '공급가', '납품가', '도매가', '출고가', '가격'],
+          total: ['total', 'amount', 'subtotal', '小计', '合计', '금액', '합계', '총액'],
+          no: ['no.', 's.no', '序号', '编号', 'sn', '번호', '순번'] // To skip them as items
         };
 
         let bestHeaderRowIndex = -1;
@@ -5464,6 +5492,16 @@ Set "productDetected":false if the photo is a logo, blank, or has no identifiabl
            mappings.item = headers.findIndex((h, idx) => idx !== mappings.no && !isImageHeader(h) && keywords.item.some(k => h.includes(k)));
         }
 
+        // Unit cost is never a retail / consumer price or a line amount (e.g. "Retail Price",
+        // 소비자가, 공급가액 = supply AMOUNT). Prefer an explicit supply / wholesale price column.
+        const NOT_UNIT_PRICE = /retail|msrp|rrp|consumer|소비자|권장|공급가액|금액|합계|total|amount/;
+        const isPriceHeader = (h: string) => keywords.price.some((k: string) => h === k || (h.length > 1 && h.includes(k)));
+        if (mappings.price !== -1 && NOT_UNIT_PRICE.test(headers[mappings.price])) {
+          mappings.price = headers.findIndex((h: string) => isPriceHeader(h) && !NOT_UNIT_PRICE.test(h));
+        }
+        const supplyPriceIdx = headers.findIndex((h: string) => /supply|wholesale|공급|납품|도매|출고/.test(h) && isPriceHeader(h) && !NOT_UNIT_PRICE.test(h));
+        if (supplyPriceIdx !== -1) mappings.price = supplyPriceIdx;
+
         // AED-priority price column selection: prefer AED column, reject RMB/CNY/SAR columns
         const IGNORED_CURRENCIES = ['rmb', 'cny', 'sar', 'saudi riyal'];
         const aedPriceIdx = headers.findIndex((h: string) =>
@@ -5491,11 +5529,19 @@ Set "productDetected":false if the photo is a logo, blank, or has no identifiabl
         if (appMode === 'supplier-quote') {
           // ── Supplier Quote mode: auto-process without mapping dialog ──────
           // No Gemini involved. Parse immediately and show items.
-          // Allow any price column (AED, CNY, USD, etc.) — do not require AED column name
-          // mappings.price === -1 just means no keyword match; autoMappings falls back to col 4 which is fine
+          // Allow any price column (AED, CNY, USD, KRW, etc.) — do not require AED column name.
+          // No named unit-price column → stop: a fixed fallback column would be a guess at the cost.
           if (mappings.price === -1) {
-            console.warn('[parseExcel] No named price column found, using fallback column', autoMappings.price);
+            const msg = t('No unit price column found (e.g. Unit Price / 单价 / 단가 / 공급가). Rename the cost column header and upload again, or use PDF / paste text.');
+            setSqParseError(msg);
+            setSqParseStatus('error');
+            alert(`❌ ${msg}`);
+            return;
           }
+          // Supplier price lists often have no quantity / spec column: leave them empty
+          // (quantity 1, editable) instead of reading whatever sits in a fixed column.
+          autoMappings.qty = mappings.qty;
+          autoMappings.spec = mappings.spec;
           // Supplier currency from the price/total headers: one explicit currency → use it;
           // none or several → keep the current pick and ask the user to confirm (no guessing).
           const headerCurrency = detectHeaderCurrency([headers[autoMappings.price], mappings.total !== -1 ? headers[mappings.total] : '']);
@@ -5550,15 +5596,15 @@ Set "productDetected":false if the photo is a logo, blank, or has no identifiabl
           }
 
           // Extra detail columns — best-effort, missing column just means empty field
-          const colModel   = findColLocal(['model','sku','型号','货号']);
+          const colModel   = findColLocal(['model','sku','barcode','型号','货号','条码','바코드','품번','모델']);
           const colMaterial= findColLocal(['material','材质','材料']);
-          const colColor   = findColLocal(['color','colour','颜色']);
-          const colMoq     = findColLocal(['moq','minimum order','起订量']);
-          const colPackaging = findColLocal(['packaging','package','包装']);
-          const colDelivery = findColLocal(['delivery','lead time','交期','交货']);
+          const colColor   = findColLocal(['color','colour','颜色','색상','컬러']);
+          const colMoq     = findColLocal(['moq','minimum order','起订量','최소주문','최소 주문','최소수량']);
+          const colPackaging = findColLocal(['packaging','package','包装','포장','입수']);
+          const colDelivery = findColLocal(['delivery','lead time','交期','交货','납기','리드타임']);
           const colPayment  = findColLocal(['payment','付款']);
-          const colRemarks  = findColLocal(['remark','note','备注']);
-          const colSize     = findColLocal(['size','dimension','尺寸']);
+          const colRemarks  = findColLocal(['remark','note','备注','비고']);
+          const colSize     = findColLocal(['size','dimension','尺寸','volume','capacity','용량','容量']);
 
           const TERM_KEYWORDS = ['payment','lead time','delivery time','validity','warranty','guarantee','remark','note','notes','condition','terms','incoterm'];
           const SKIP_ROW_WORDS = ['subtotal','grand total','合计','总计','小计','总价','合价','grand'];
@@ -6348,20 +6394,27 @@ Leave a field as empty string if not present. Never fabricate values.`;
     const confirmed = draftItems.filter(it => it.status === 'Confirmed' && it.includeInGCI !== false);
     const totalSupplierCost = supplierCostTotal(confirmed, savedCostBaseline);
     // Row cost amounts = header cost split with the quoteAmounts tail allocation, so rows add up to the header.
-    const rowCosts = reconcileQuoteAmounts(confirmed.map(it => ({ cost: it.targetUnitPrice * it.quantity, selling: lineFromUnit(sellingPrices[it.id] || 0, it.quantity) })), totalSupplierCost).lines;
+    const rowCosts = reconcileQuoteAmounts(confirmed.map(it => ({ cost: it.targetUnitPrice * it.quantity, selling: lineFromUnit(sellingPrices[it.id] || 0, it.quantity) })), totalSupplierCost, tradeVatRate).lines;
     console.log('[Pricing View] Confirmed items:', confirmed.length, '| Supplier Total:', totalSupplierCost.toFixed(2));
     // sellingPrices[id] = UNIT selling price. Subtotal / VAT / total = the Trade / PI rule
     // (calculateTradeTotals: sum of roundTo2(unit × qty), VAT on the subtotal).
-    const piTotals = calculateTradeTotals(confirmed.map(it => ({ price: roundTo2(sellingPrices[it.id] || 0), qty: it.quantity })));
+    const piTotals = calculateTradeTotals(confirmed.map(it => ({ price: roundTo2(sellingPrices[it.id] || 0), qty: it.quantity })), tradeVatRate);
     const totalSelling = piTotals.subtotal;
     const totalProfit = totalSelling - totalSupplierCost;
     const overallMargin = totalSupplierCost > 0 ? (totalProfit / totalSupplierCost) * 100 : 0;
     const totalVAT = piTotals.vat;
     const grandTotal = piTotals.total;
+    const cur = quoteCurrencyOf(confirmed);
+    const lowMoq = moqWarnings(confirmed);
 
     const handleSendTradeToTrade = () => {
       if (!quoteInfo.customerProjectName) { alert(t('Please enter Customer / Project Name')); return; }
       if (totalSelling <= 0) { alert(t('Please enter selling price')); return; }
+      // TRADE PI is AED with 5% VAT only — never hand it a USD or 0% quote under an AED/5% label.
+      if (cur !== 'AED' || tradeVatPercent !== 5) {
+        alert(t('TRADE PI supports AED with 5% VAT only. Save the quote and download the PDF instead.'));
+        return;
+      }
       const payload = {
         customerName: quoteInfo.customerProjectName,
         projectName: quoteInfo.customerProjectName,
@@ -6503,6 +6556,25 @@ Leave a field as empty string if not present. Never fabricate values.`;
           </button>
         </div>
 
+        {/* Quote currency / VAT — currency comes from Convert to GCI Quote; VAT is chosen here */}
+        <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-600">
+          <span>{t('Quote Currency')}: <span className="text-[#0C1B3A]" data-testid="sq-quote-currency">{cur}</span></span>
+          <label className="flex items-center gap-2">
+            VAT
+            <select value={tradeVatPercent} onChange={e => setTradeVatPercent(Number(e.target.value) === 0 ? 0 : 5)}
+              data-testid="sq-vat-select"
+              className="bg-white border border-[#0C1B3A]/15 rounded-md px-2 py-1 text-xs font-bold text-[#0C1B3A] outline-none focus:border-[#C9A84C]">
+              <option value={5}>5% (UAE)</option>
+              <option value={0}>0% (Export / outside UAE)</option>
+            </select>
+          </label>
+          {lowMoq.length > 0 && (
+            <span className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1 text-amber-800" data-testid="sq-moq-banner">
+              {t('{n} line(s) below supplier MOQ').replace('{n}', String(lowMoq.length))}
+            </span>
+          )}
+        </div>
+
         {/* Pricing Table */}
         <div className="bg-white rounded-[10px] border border-[#0C1B3A]/8 overflow-hidden shadow-sm">
           {/* Table Header */}
@@ -6555,7 +6627,12 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     <span className="text-xs font-bold text-slate-600 ">{tradeItemCurrencies[item.id] || 'AED'} · {item.unit}</span>
                     </div>
                   </div>
-                  <div className="col-span-1 text-right text-xs font-bold text-[#0C1B3A]">{item.quantity}</div>
+                  <div className="col-span-1 text-right text-xs font-bold text-[#0C1B3A]">
+                    {item.quantity}
+                    {belowMoq(item.moq, item.quantity) !== null && (
+                      <p className="mt-0.5 text-[11px] font-bold text-amber-700" data-testid="sq-moq-warning">{'< MOQ'} {item.moq}</p>
+                    )}
+                  </div>
                   <div className="col-span-2 text-right">
                     <p className="text-xs font-mono-label text-slate-600">{supplierTotal.toFixed(2)}</p>
                     <p className="text-xs text-slate-600">@{supplierUnit.toFixed(2)}</p>
@@ -6606,18 +6683,18 @@ Leave a field as empty string if not present. Never fabricate values.`;
             <div className="grid grid-cols-3 gap-8 text-center">
               <div>
                 <p className="text-xs font-bold text-slate-600">{t('Total Supplier Cost')}</p>
-                <p className="text-xl font-bold font-mono-label text-[#0C1B3A] mt-1">AED {totalSupplierCost.toFixed(2)}</p>
+                <p className="text-xl font-bold font-mono-label text-[#0C1B3A] mt-1">{cur} {totalSupplierCost.toFixed(2)}</p>
               </div>
               <div>
                 <p className="text-xs font-bold text-slate-600">{t('Total Profit · Margin')}</p>
                 <p className={`text-xl font-bold font-mono-label mt-1 ${totalProfit > 0 ? 'text-green-700' : totalSelling > 0 ? 'text-red-600' : 'text-slate-600'}`}>
-                  {totalSelling > 0 ? `AED ${totalProfit.toFixed(2)} · ${overallMargin.toFixed(1)}%` : '—'}
+                  {totalSelling > 0 ? `${cur} ${totalProfit.toFixed(2)} · ${overallMargin.toFixed(1)}%` : '—'}
                 </p>
               </div>
               <div>
-                <p className="text-xs font-bold text-slate-600">{t('Grand Total (incl 5% VAT)')}</p>
+                <p className="text-xs font-bold text-slate-600">{t('Grand Total')} (VAT {tradeVatPercent}%)</p>
                 <p className="text-xl font-bold font-mono-label text-[#7A5F2A] mt-1">
-                  {totalSelling > 0 ? `AED ${grandTotal.toFixed(2)}` : '—'}
+                  {totalSelling > 0 ? `${cur} ${grandTotal.toFixed(2)}` : '—'}
                 </p>
                 {totalSelling > 0 && <p className="text-xs text-slate-600 mt-0.5">VAT {totalVAT.toFixed(2)}</p>}
               </div>
@@ -6640,6 +6717,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
           <button
             onClick={() => {
               if (totalSelling <= 0) { alert(t('Please enter selling prices first')); return; }
+              if (!confirmMoq(confirmed)) return;
               setQuoteGenerated(true);
               // Auto-save to cloud on generate
               handleSaveToCloud(confirmed, { totalSupplierCost, totalSelling, totalProfit, overallMargin, totalVAT, grandTotal }, true); // state update is async: save as GENERATED now
@@ -6733,11 +6811,11 @@ Leave a field as empty string if not present. Never fabricate values.`;
             {/* Financials summary */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               {[
-                { label: t('Supplier Cost'), value: `AED ${totalSupplierCost.toFixed(2)}`, color: 'text-slate-600' },
-                { label: t('Selling (excl VAT)'), value: `AED ${totalSelling.toFixed(2)}`, color: 'text-[#0C1B3A]' },
-                { label: t('Profit · {n}%').replace('{n}', overallMargin.toFixed(1)), value: `AED ${totalProfit.toFixed(2)}`, color: totalProfit > 0 ? 'text-green-600' : 'text-red-500' },
-                { label: t('VAT 5%'), value: `AED ${totalVAT.toFixed(2)}`, color: 'text-slate-600' },
-                { label: t('Grand Total'), value: `AED ${grandTotal.toFixed(2)}`, color: 'text-[#C9A84C] text-lg' },
+                { label: t('Supplier Cost'), value: `${cur} ${totalSupplierCost.toFixed(2)}`, color: 'text-slate-600' },
+                { label: t('Selling (excl VAT)'), value: `${cur} ${totalSelling.toFixed(2)}`, color: 'text-[#0C1B3A]' },
+                { label: t('Profit · {n}%').replace('{n}', overallMargin.toFixed(1)), value: `${cur} ${totalProfit.toFixed(2)}`, color: totalProfit > 0 ? 'text-green-600' : 'text-red-500' },
+                { label: `VAT ${tradeVatPercent}%`, value: `${cur} ${totalVAT.toFixed(2)}`, color: 'text-slate-600' },
+                { label: t('Grand Total'), value: `${cur} ${grandTotal.toFixed(2)}`, color: 'text-[#C9A84C] text-lg' },
               ].map(f => (
                 <div key={f.label} className="bg-white rounded-[10px] border border-[#0C1B3A]/8 p-4 text-center">
                   <p className="text-xs font-bold text-slate-600 mb-1">{f.label}</p>
@@ -6751,7 +6829,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
               <div className="grid grid-cols-12 gap-2 px-5 py-2.5 bg-[#0C1B3A]/5 text-xs font-bold text-slate-600">
                 <div className="col-span-5">{t('Item')}</div>
                 <div className="col-span-1 text-center">{t('Qty')}</div>
-                <div className="col-span-2 text-right">{t('Unit Price (AED)')}</div>
+                <div className="col-span-2 text-right">{t('Unit Price')} ({cur})</div>
                 <div className="col-span-2 text-right">{t('Subtotal')}</div>
                 <div className="col-span-1 text-right">{t('VAT')}</div>
                 <div className="col-span-1 text-right">{t('Total')}</div>
@@ -6759,7 +6837,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
               <div className="divide-y divide-[#0C1B3A]/5">
                 {(() => {
                   // Same per-line VAT split as the saved quote (VAT on the whole quote, allocated to lines).
-                  const rec = reconcileQuoteAmounts(confirmed.map(it => ({ cost: it.targetUnitPrice * it.quantity, selling: lineFromUnit(sellingPrices[it.id] || 0, it.quantity) })), supplierCostTotal(confirmed, savedCostBaseline));
+                  const rec = reconcileQuoteAmounts(confirmed.map(it => ({ cost: it.targetUnitPrice * it.quantity, selling: lineFromUnit(sellingPrices[it.id] || 0, it.quantity) })), supplierCostTotal(confirmed, savedCostBaseline), tradeVatRate);
                   return confirmed.map((item, idx) => {
                   const unitSell = roundTo2(sellingPrices[item.id] || 0);  // unit price
                   const sub = rec.lines[idx].selling;                        // unit × qty
@@ -6784,8 +6862,8 @@ Leave a field as empty string if not present. Never fabricate values.`;
                 })()}
               </div>
               <div className="px-5 py-3 bg-[#0C1B3A] flex justify-end items-center gap-4">
-                <p className="text-xs font-bold text-white/40">{t('Grand Total (incl 5% VAT)')}</p>
-                <p className="text-xl font-bold font-mono-label text-[#7A5F2A]">AED {grandTotal.toFixed(2)}</p>
+                <p className="text-xs font-bold text-white/40">{t('Grand Total')} (VAT {tradeVatPercent}%)</p>
+                <p className="text-xl font-bold font-mono-label text-[#7A5F2A]">{cur} {grandTotal.toFixed(2)}</p>
               </div>
             </div>
 
