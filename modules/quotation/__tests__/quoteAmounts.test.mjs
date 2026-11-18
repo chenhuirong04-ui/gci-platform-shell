@@ -221,7 +221,9 @@ test('reopened GCI-20261114-001: saved cost total 90.12 is kept until a cost lin
 
 test('baseline wiring: set on history restore, cleared on new quote, used by page / summary / save', () => {
   assert.match(SRC, /setSavedCostBaseline\(typeof record\.supplier_cost_total === 'number'\n\s+\? \{ total: Number\(record\.supplier_cost_total\), fingerprint: costFingerprint\(restoredDraftItems\) \} : null\);/);
-  assert.equal((SRC.match(/setSellingPrices\(\{\}\);\n\s+setSavedCostBaseline\(null\);/g) || []).length, 3);
+  // New quote clears; Convert / archive conversion pre-fill prices and also clear the baseline.
+  assert.equal((SRC.match(/setSellingPrices\(\{\}\);\n\s+setSavedCostBaseline\(null\);/g) || []).length, 1);
+  assert.match(SRC, /setSellingPrices\(newSelling\);\n\s+setSavedCostBaseline\(null\);/);
   assert.match(SRC, /const totalSupplierCost = supplierCostTotal\(confirmed, savedCostBaseline\);/);
   assert.match(SRC, /const sumCost = supplierCostTotal\(confirmedSummary, savedCostBaseline\);/);
   const fn = SRC.slice(SRC.indexOf('const buildCloudPayload = '), SRC.indexOf('const handleSaveToCloud = async'));
@@ -245,6 +247,23 @@ test('MOQ: first number in the MOQ text; below → the minimum, else null', () =
   assert.equal(lib.belowMoq('', 1), null);
   assert.equal(lib.belowMoq(undefined, 1), null);
   assert.equal(lib.belowMoq('on request', 1), null);
+});
+
+test('step 2: margin pre-fills the selling price (same rule as the pricing-page markup field)', () => {
+  const fn = SRC.slice(SRC.indexOf('const handleConfirmRate = () => {'), SRC.indexOf('const applyDetectedSupplierInfo'));
+  assert.match(fn, /newMarkups\[it\.id\] = it\.marginPercent \?\? sqGlobalMargin;/);
+  assert.match(fn, /if \(it\.targetUnitPrice > 0\) newSelling\[it\.id\] = roundTo2\(it\.targetUnitPrice \* \(1 \+ newMarkups\[it\.id\] \/ 100\)\);/);
+  assert.match(SRC, /setSellingPrices\(prev => \(\{ \.\.\.prev, \[item\.id\]: roundTo2\(supplierUnit \* \(1 \+ pct \/ 100\)\) \}\)\);/); // same formula
+  // Supplier page preview: USD 3.9 × 3.6725 at 30% → 18.62 — the pre-filled price is identical.
+  const unit = Number((3.9 * 3.6725).toFixed(4));
+  assert.equal(Math.round(unit * 1.3 * 100) / 100, 18.62);
+  // salesperson only filled when empty
+  assert.match(fn, /salesperson: prev\.salesperson \|\| profile\?\.display_name \|\| ''/);
+  // archive "Create GCI Quote" goes through the same currency / rate / margin confirmation
+  const arc = SRC.slice(SRC.indexOf('const handleCreateGCIQuoteFromSupplier'), SRC.indexOf('const handleConfirmRate = () => {'));
+  assert.match(arc, /setShowCurrencyModal\(true\);/);
+  assert.ok(!/setTradePhase\('pricing'\)/.test(arc), 'archive must not skip the currency confirmation');
+  assert.match(SRC, /data-testid="rate-modal-margin"/);
 });
 
 test('customer quote currency / VAT wiring: PDF, page and TRADE use the real quote currency', () => {

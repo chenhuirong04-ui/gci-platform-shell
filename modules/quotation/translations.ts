@@ -1272,6 +1272,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'Continue anyway?': '仍然继续？',
     'TRADE PI supports AED with 5% VAT only. Save the quote and download the PDF instead.': 'TRADE PI 目前只支持 AED + 5% VAT。请保存报价并下载 PDF。',
     '{n} line(s) below supplier MOQ': '{n} 个品项低于供应商 MOQ',
+    'Selling price = converted cost × (1 + margin). Editable per line on the pricing page.': '售价 = 换算后成本 ×（1 + 利润率），进入定价页后可逐行修改。',
   },
   bilingual: {
     // Categories & Scenarios
@@ -1935,5 +1936,6 @@ export const translations: Record<Language, Record<string, string>> = {
     'Continue anyway?': '仍然继续？ / Continue anyway?',
     'TRADE PI supports AED with 5% VAT only. Save the quote and download the PDF instead.': 'TRADE PI 目前只支持 AED + 5% VAT。请保存报价并下载 PDF。 / TRADE PI supports AED with 5% VAT only. Save the quote and download the PDF instead.',
     '{n} line(s) below supplier MOQ': '{n} 个品项低于供应商 MOQ / {n} line(s) below supplier MOQ',
+    'Selling price = converted cost × (1 + margin). Editable per line on the pricing page.': '售价 = 换算后成本 ×（1 + 利润率），进入定价页后可逐行修改。 / Selling price = converted cost × (1 + margin). Editable per line on the pricing page.',
   }
 };

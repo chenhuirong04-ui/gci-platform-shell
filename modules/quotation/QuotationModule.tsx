@@ -331,7 +331,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   const wb = dict.quotation.workbench;
   // Every "send to / open in Trade" button below is shown only with the trade module
   // (same user_profiles.modules check /trade itself uses) — no quotation-only exception.
-  const { can } = useAuth();
+  const { can, profile } = useAuth();
   const canTrade = can('trade');
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<FurnitureCategory | null>(null);
@@ -3586,28 +3586,19 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       }
     });
 
+    restoredDraft.forEach(d => { d.notes = newNotes[d.id] || ''; });
     setDraftItems(restoredDraft);
-    setTradeItemCurrencies(newCurrencies);
-    setTradeItemNotes(newNotes);
     setTradeTerms(result.quote.terms_notes || '');
-    setSellingPrices({});
-    setSavedCostBaseline(null);
-    setTradeVatPercent(5);
-    setMarkupPercents({});
-    setQuoteGenerated(false);
-    setSentToTrade(false);
 
-    // Track navigation source for breadcrumb/back nav
-    setQuoteSource('supplier-archive');
-    setSqSourceId(sq.id || null);
-
-    // Navigate to pricing flow
-    setQuoteType('trade');
-    setQuoteMode('package');
-    setTradePhase('pricing');
-    setProjectInfoSubmitted(true);
-    setAppMode('customer-quote'); // exit supplier-quote render trap so renderTradeQuoteReview() is reached
-    setView('configurator');
+    // Same step as "Convert to GCI Quote": confirm supplier currency → quote currency, rate
+    // and default margin; handleConfirmRate then converts, prices and opens the pricing page.
+    const supCur = result.quote.currency || items[0]?.currency || 'AED';
+    const quoteCur = supCur === 'USD' ? 'USD' : 'AED';
+    setSupplierMeta(prev => ({ ...prev, currency: supCur }));
+    setSavedSQId(sq.id || null);
+    setPendingConversionItems(restoredDraft.filter(d => d.includeInGCI !== false));
+    setRateConfig({ quoteCurrency: quoteCur, rate: defaultRate(supCur, quoteCur) });
+    setShowCurrencyModal(true);
   };
 
   // Handle 3-path type selection (Step 2)
@@ -5247,16 +5238,19 @@ Leave a field as empty string if not present. Never fabricate values.`;
     const newCurrencies: Record<string, string> = {};
     const newNotes: Record<string, string> = {};
     const newMarkups: Record<string, number> = {};
+    const newSelling: Record<string, number> = {};
     converted.forEach(it => {
       newCurrencies[it.id] = quoteCurrency;
       newNotes[it.id] = it.notes || '';
       // Carry over per-item margin set in Module 2's table (falls back to global default)
       newMarkups[it.id] = it.marginPercent ?? sqGlobalMargin;
+      // Pre-fill the unit selling price from that margin (editable on the pricing page).
+      if (it.targetUnitPrice > 0) newSelling[it.id] = roundTo2(it.targetUnitPrice * (1 + newMarkups[it.id] / 100));
     });
     setDraftItems(converted);
     setTradeItemCurrencies(newCurrencies);
     setTradeItemNotes(newNotes);
-    setSellingPrices({});
+    setSellingPrices(newSelling);
     setSavedCostBaseline(null);
     setTradeVatPercent(5);
     setMarkupPercents(newMarkups);
@@ -5264,6 +5258,7 @@ Leave a field as empty string if not present. Never fabricate values.`;
     setSentToTrade(false);
     setQuoteSource('supplier-archive');
     setSqSourceId(savedSQId);
+    setQuoteInfo(prev => ({ ...prev, salesperson: prev.salesperson || profile?.display_name || '' }));
     setQuoteType('trade');
     setQuoteMode('package');
     setTradePhase('pricing');
@@ -10337,6 +10332,16 @@ Leave a field as empty string if not present. Never fabricate values.`;
                     </div>
                   )}
                   <p className="text-xs text-slate-600 font-mono-label pl-1">{rateLabel}</p>
+                </div>
+
+                {/* Default margin — items with their own margin keep it */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600 block">{t('Default Margin %')}</label>
+                  <input type="number" step="1" min="0" value={sqGlobalMargin}
+                    onChange={e => setSqGlobalMargin(Number(e.target.value) || 0)}
+                    data-testid="rate-modal-margin"
+                    className="w-full bg-[#0C1B3A]/4 border border-[#0C1B3A]/10 rounded-md px-4 py-3 text-[14px] font-bold text-[#0C1B3A] font-mono-label outline-none focus:border-[#C9A84C]" />
+                  <p className="text-xs text-slate-600 pl-1">{t('Selling price = converted cost × (1 + margin). Editable per line on the pricing page.')}</p>
                 </div>
 
                 {/* Preview */}
