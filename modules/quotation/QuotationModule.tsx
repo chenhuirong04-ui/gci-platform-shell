@@ -897,6 +897,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
     }
     setCurrentStep(STEPS.length - 1);
     setView('configurator');
+    setAppMode('customer-quote');
   };
 
   const saveToHistory = () => {
@@ -1235,6 +1236,7 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       setLoadQuoteNo('');
       setQuoteSource('gci-history');
       setView('configurator'); // switch from history to the loaded quote
+      setAppMode('customer-quote'); // history opened from the landing page must show the quote, not the landing cards
     } catch (e) {
       console.error('[Cloud Load] Error:', e);
       setLoadStatus('error');
