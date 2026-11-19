@@ -482,6 +482,8 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   const [cloudSaveStatus, setCloudSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [loadQuoteNo, setLoadQuoteNo] = useState<string>('');
   const [loadStatus, setLoadStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+  // History card being opened (cloud load can take seconds): shown on the card, repeat clicks ignored.
+  const [historyOpening, setHistoryOpening] = useState<{ no: string; failed: boolean } | null>(null);
   // Cloud history
   const [cloudHistory, setCloudHistory] = useState<QuotationRecord[]>([]);
   const [cloudHistoryLoading, setCloudHistoryLoading] = useState(false);
@@ -1117,11 +1119,11 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
   /** Load a quotation from cloud by quote_no and restore all state. */
   const handleLoadDraft = async (overrideQuoteNo?: string) => {
     const qNo = (overrideQuoteNo || loadQuoteNo).trim();
-    if (!qNo) return;
+    if (!qNo) return false;
     setLoadStatus('loading');
     try {
       const result = await loadByQuoteNo(qNo);
-      if (!result) { setLoadStatus('error'); return; }
+      if (!result) { setLoadStatus('error'); return false; }
 
       const { record, items } = result;
 
@@ -1237,9 +1239,11 @@ export default function QuotationModule({ initialMode, initialView }: QuotationM
       setQuoteSource('gci-history');
       setView('configurator'); // switch from history to the loaded quote
       setAppMode('customer-quote'); // history opened from the landing page must show the quote, not the landing cards
+      return true;
     } catch (e) {
       console.error('[Cloud Load] Error:', e);
       setLoadStatus('error');
+      return false;
     }
   };
 
@@ -9995,8 +9999,15 @@ Leave a field as empty string if not present. Never fabricate values.`;
                       return (
                         <div
                           key={rec.id}
-                          className="p-5 bg-white border border-[#080D1E]/8 rounded-[10px] flex items-center gap-5 hover:border-[#CBA85C] hover:shadow-lg transition-all group cursor-pointer"
-                          onClick={() => handleLoadDraft(rec.quote_no)}
+                          data-testid="cloud-history-card"
+                          aria-busy={historyOpening?.no === rec.quote_no && !historyOpening.failed}
+                          className={`p-5 bg-white border border-[#080D1E]/8 rounded-[10px] flex items-center gap-5 hover:border-[#CBA85C] hover:shadow-lg transition-all group cursor-pointer ${historyOpening?.no === rec.quote_no && !historyOpening.failed ? 'border-[#CBA85C] opacity-70' : ''}`}
+                          onClick={async () => {
+                            if (historyOpening && !historyOpening.failed) return; // one open at a time
+                            setHistoryOpening({ no: rec.quote_no, failed: false });
+                            const ok = await handleLoadDraft(rec.quote_no);
+                            setHistoryOpening(ok ? null : { no: rec.quote_no, failed: true });
+                          }}
                         >
                           {/* Left: info */}
                           <div className="flex-1 min-w-0">
@@ -10009,6 +10020,11 @@ Leave a field as empty string if not present. Never fabricate values.`;
                             </div>
                             <h3 className="text-base font-bold text-[#080D1E] truncate">{rec.customer_name || '—'}</h3>
                             <p className="text-xs text-slate-600 mt-0.5">{rec.quote_no} · {rec.quote_date} · {rec.salesperson || t('Staff')}</p>
+                            {historyOpening?.no === rec.quote_no && (
+                              <p data-testid="history-opening" className={`text-xs font-bold mt-1 ${historyOpening.failed ? 'text-red-600' : 'text-[#7A5F2A]'}`}>
+                                {historyOpening.failed ? t('Could not open this quote. Please try again.') : t('Opening quote…')}
+                              </p>
+                            )}
                           </div>
                           {/* Right: amounts */}
                           <div className="text-right shrink-0">
@@ -10033,7 +10049,9 @@ Leave a field as empty string if not present. Never fabricate values.`;
                           >
                             {t('Delete')}
                           </button>
-                          <ChevronRight className="w-5 h-5 text-slate-600 group-hover:text-[#7A5F2A] transition-colors shrink-0" />
+                          {historyOpening?.no === rec.quote_no && !historyOpening.failed
+                            ? <RefreshCw className="w-5 h-5 text-[#7A5F2A] animate-spin shrink-0" />
+                            : <ChevronRight className="w-5 h-5 text-slate-600 group-hover:text-[#7A5F2A] transition-colors shrink-0" />}
                         </div>
                       );
                     })}
